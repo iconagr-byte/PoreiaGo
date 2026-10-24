@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import {
+  isPlatformSeatBookingDemo,
+  isSealedWalletLiveBooking,
+} from '../lib/marketing/platformBusDemoShowcase.js';
 import { resolvePublicOfficeTrip } from '../lib/wallet/walletOfficeTrips.js';
 
 function seedForTripId(seedTrip, id) {
@@ -16,18 +19,23 @@ function seedForTripId(seedTrip, id) {
  * Never auto-navigates away — callers stay on the seat page with an error UI.
  *
  * @param {string|number|undefined} tripId
- * @param {{ seedTrip?: object|null }} [options]
+ * @param {{ seedTrip?: object|null, fromWallet?: boolean }} [options]
  * @returns {{ trip: object|null, loading: boolean, isDemo: boolean }}
  */
 export function usePublicOfficeTrip(tripId, options = {}) {
   const id = Number(tripId);
   const validId = Number.isFinite(id) && id > 0;
   const seedTrip = options?.seedTrip || null;
+  const fromWallet = Boolean(options?.fromWallet);
   const seedId =
     seedTrip && Number.isFinite(Number(seedTrip.id)) && Number(seedTrip.id) === id
       ? Number(seedTrip.id)
       : null;
-  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
+  // Wallet Κράτηση / sealed office → live commit (not platform demo simulation).
+  const isDemo = useMemo(() => {
+    if (fromWallet || isSealedWalletLiveBooking()) return false;
+    return isPlatformSeatBookingDemo();
+  }, [fromWallet]);
   const [trip, setTrip] = useState(() => seedForTripId(seedTrip, id));
   const [loading, setLoading] = useState(validId && seedId == null);
 

@@ -32,6 +32,7 @@ import {
   isWalletBookFlow,
   officeTripFromWalletState,
 } from '../lib/wallet/walletBookTrip.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
@@ -46,6 +47,7 @@ export default function SeatSelection() {
   const [occupancyLoading, setOccupancyLoading] = useState(true);
   const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
     seedTrip,
+    fromWallet,
   });
 
   const { pricePerSeat, quote } = useTripPricing(trip);
@@ -72,7 +74,10 @@ export default function SeatSelection() {
     (async () => {
       let remote = [];
       try {
-        const data = await fetchOccupiedSeats(trip.id, getSaasTenantId());
+        const data = await fetchOccupiedSeats(
+          trip.id,
+          getWalletTenantId() || getSaasTenantId(),
+        );
         remote = Array.isArray(data?.seats) ? data.seats : [];
       } catch {
         /* offline / no tenant — fall back to local bookings */

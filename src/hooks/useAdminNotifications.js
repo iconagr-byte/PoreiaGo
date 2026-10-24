@@ -101,6 +101,9 @@ function alertToItem(row) {
     title = reason === 'login' ? 'Σύνδεση οδηγού' : 'Έναρξη βάρδιας';
   } else if (type === 'DRIVER_OFFLINE') {
     title = 'Τέλος βάρδιας';
+  } else if (type === 'NEW_BOOKING' || type === 'BOOKING_PAID') {
+    title = 'Νέα κράτηση';
+    tab = row.metadata?.tab || 'bookings';
   }
   return normalizeItem({
     id: `alert-${row.id}`,
@@ -418,19 +421,25 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
         /βάρδια|συνδέθηκε|online|οδηγός/i.test(
           `${payload.title || ''} ${payload.body || ''}`,
         );
+      const isNewBooking =
+        pushType.includes('new_booking') ||
+        pushType === 'booking_paid' ||
+        /νέα κράτηση/i.test(String(payload.title || ''));
       pushItem(
         {
           id: stableChatId || payload.tag || payload.data?.message_id || `push-${Date.now()}`,
           title: payload.title || 'Ειδοποίηση',
           body: payload.body || '',
           type: pushType,
-          tab: payload.data?.tab || (stableChatId ? 'driver_chat' : null),
+          tab:
+            payload.data?.tab ||
+            (stableChatId ? 'driver_chat' : isNewBooking ? 'bookings' : null),
           driverId,
           url: payload.url || payload.data?.url || null,
           read: false,
         },
-        // Chat OS push already dinged; driver connect still plays in-tab chime + toast.
-        { upsert: true, silent: !isShift },
+        // Chat OS push already dinged; driver connect / new booking play in-tab chime.
+        { upsert: true, silent: !(isShift || isNewBooking) },
       );
     };
     navigator.serviceWorker.addEventListener('message', onMessage);

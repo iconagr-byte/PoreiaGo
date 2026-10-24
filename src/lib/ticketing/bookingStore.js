@@ -428,7 +428,8 @@ export async function createBookingFromCheckout({
     balanceDue ?? (paymentPlan === PAYMENT_PLAN_DEPOSIT ? split.balanceDue : 0),
   );
   const paymentMethodMeta = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
-  const tenantId = getSaasTenantId();
+  // Wallet sealed office wins over marketing DEV tenant / empty SaaS session.
+  const tenantId = getWalletTenantId() || getSaasTenantId();
   const extrasList = Array.isArray(extras) ? extras : [];
   const extrasSum = roundMoney(extrasTotal || 0);
   const seatsTotal = roundMoney(seatSubtotal != null ? seatSubtotal : total);

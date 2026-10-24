@@ -65,6 +65,7 @@ export default function CheckoutPage() {
   const seedTrip = officeTripFromWalletState(location.state, tripId);
   const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
     seedTrip,
+    fromWallet,
   });
   const [processing, setProcessing] = useState(false);
   const [demoDone, setDemoDone] = useState(null);
@@ -405,6 +406,8 @@ export default function CheckoutPage() {
         extras: Array.isArray(pending.extras) ? pending.extras : [],
         extrasTotal: Number(pending.extrasTotal) || 0,
         seatSubtotal: Number(pending.seatSubtotal) || null,
+        bookingSource: fromWallet ? 'My Wallet' : undefined,
+        agentName: fromWallet ? 'Wallet Auto' : undefined,
       });
       clearPendingCheckout();
       const resumeToken = getStoredResumeToken();

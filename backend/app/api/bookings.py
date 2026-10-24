@@ -399,6 +399,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         # Mandatory server-side office (+ customer) payment emails when money was taken.
         # Do not rely on frontend fire-and-forget notifyPaymentConfirmationSafe.
         if paid_now > 0:
+            notify_payload = None
             try:
                 from api.admin_booking_mapper import booking_to_admin_dict
                 from ticketing.payment_confirmation_email import (
@@ -414,6 +415,31 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             except Exception as exc:
                 logger.error(
                     "Guest booking office payment email failed ref=%s tenant=%s: %s",
+                    ref,
+                    tenant_id,
+                    exc,
+                )
+
+            # Admin bell + Web Push (καμπανάκι) for Wallet / B2C paid bookings.
+            try:
+                from travel_platform.notifications.excursion_booking_push import (
+                    notify_excursion_booking_to_office,
+                )
+
+                push_payload = notify_payload or {
+                    "id": str(booking.id),
+                    "pnr": ref,
+                    "tenant_id": str(tenant_id),
+                    "passenger_name": passenger_name,
+                    "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                    "seat_label": seat_label,
+                    "amount_paid": float(paid_now),
+                }
+                push_payload.setdefault("tenant_id", str(tenant_id))
+                await notify_excursion_booking_to_office(push_payload)
+            except Exception as exc:
+                logger.warning(
+                    "Guest booking office bell/push failed ref=%s tenant=%s: %s",
                     ref,
                     tenant_id,
                     exc,
