@@ -21,8 +21,17 @@ describe('walletBookTrip', () => {
     const trip = { id: 7, title: 'Μετεωρα' };
     expect(walletBookNavState(trip)).toEqual({ fromWallet: true, officeTrip: trip });
     expect(isWalletBookFlow({ fromWallet: true })).toBe(true);
-    expect(isWalletBookFlow({})).toBe(false);
     expect(isWalletBookFlow(null)).toBe(false);
+  });
+
+  it('treats pendingCheckout.fromWallet as wallet book flow', () => {
+    const store = globalThis.sessionStorage;
+    if (!store || typeof store.setItem !== 'function') return;
+    store.removeItem('pendingCheckout');
+    expect(isWalletBookFlow({})).toBe(false);
+    store.setItem('pendingCheckout', JSON.stringify({ fromWallet: true, tripId: 91001 }));
+    expect(isWalletBookFlow({})).toBe(true);
+    store.removeItem('pendingCheckout');
   });
 
   it('reads seeded office trip only when ids match', () => {

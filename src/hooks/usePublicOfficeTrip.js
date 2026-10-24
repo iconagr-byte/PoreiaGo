@@ -32,8 +32,20 @@ export function usePublicOfficeTrip(tripId, options = {}) {
       ? Number(seedTrip.id)
       : null;
   // Wallet Κράτηση / sealed office → live commit (not platform demo simulation).
+  // Also honor pendingCheckout.fromWallet when Router state was dropped (Capacitor).
   const isDemo = useMemo(() => {
     if (fromWallet || isSealedWalletLiveBooking()) return false;
+    try {
+      const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pendingCheckout') : null;
+      if (raw) {
+        const pending = JSON.parse(raw);
+        if (pending?.fromWallet) return false;
+        // Never trust a stale demo flag once Wallet sealed / fromWallet path ran.
+        if (pending?.demo === false) return false;
+      }
+    } catch {
+      /* ignore */
+    }
     return isPlatformSeatBookingDemo();
   }, [fromWallet]);
   const [trip, setTrip] = useState(() => seedForTripId(seedTrip, id));

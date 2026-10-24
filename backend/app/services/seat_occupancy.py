@@ -36,14 +36,23 @@ def seats_from_booking(booking: Booking) -> set[str]:
 def booking_matches_external_trip(booking: Booking, external_trip_id: int | None) -> bool:
     if external_trip_id is None:
         return False
+    want = int(external_trip_id)
+    # Prefer metadata (guest B2C), then ORM trip_id column (Wallet / Contabo integer ids).
+    candidates = []
     meta = booking.metadata_json or {}
-    raw = meta.get("external_trip_id", meta.get("trip_id"))
-    if raw is None:
-        return False
-    try:
-        return int(raw) == int(external_trip_id)
-    except (TypeError, ValueError):
-        return False
+    if meta.get("external_trip_id") is not None:
+        candidates.append(meta.get("external_trip_id"))
+    if meta.get("trip_id") is not None:
+        candidates.append(meta.get("trip_id"))
+    if getattr(booking, "trip_id", None) is not None:
+        candidates.append(booking.trip_id)
+    for raw in candidates:
+        try:
+            if int(raw) == want:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 async def load_occupied_seats_for_trip(

@@ -1,6 +1,14 @@
-import { API_BASE } from '../config/api.js';
+import { API_BASE, getApiBase } from '../config/api.js';
 import { normalizeTrip } from '../lib/trips/tripMarket.js';
 import { getSaasTenantId, getSaasToken } from './saasApi.js';
+
+function apiBase() {
+  try {
+    return getApiBase() || API_BASE || '';
+  } catch {
+    return API_BASE || '';
+  }
+}
 
 /**
  * Published trips for the current office Host (tenant-scoped).
@@ -55,7 +63,7 @@ export async function fetchPublicOfficeTrips(hostOrOpts) {
     const headers = {};
     const token = getSaasToken();
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}/api/site/trips${qs}`, { headers });
+    const res = await fetch(`${apiBase()}/api/site/trips${qs}`, { headers });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {

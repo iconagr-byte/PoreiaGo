@@ -429,20 +429,32 @@ export async function createBookingFromCheckout({
   );
   const paymentMethodMeta = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
   // Wallet sealed office wins over marketing DEV tenant / empty SaaS session.
-  const tenantId = getWalletTenantId() || getSaasTenantId();
+  // Host can still resolve Achillio when both are empty (Capacitor → office API).
+  const tenantId = getWalletTenantId() || getSaasTenantId() || null;
   const extrasList = Array.isArray(extras) ? extras : [];
   const extrasSum = roundMoney(extrasTotal || 0);
   const seatsTotal = roundMoney(seatSubtotal != null ? seatSubtotal : total);
+  const sourceLabel = bookingSource || 'Website (B2C)';
+  const isWalletLive =
+    Boolean(getWalletTenantId()) ||
+    /my wallet|wallet auto/i.test(String(sourceLabel)) ||
+    /wallet auto/i.test(String(agentName || ''));
+  const tripExternalId = Number(trip?.id);
+  const externalTripId =
+    Number.isFinite(tripExternalId) && tripExternalId > 0 ? Math.trunc(tripExternalId) : null;
 
-  if (tenantId) {
+  // Always attempt SaaS guest create for Wallet / sealed / when tenant known.
+  // Previously a 500/network failure silently wrote localStorage only — office saw 0 κρατήσεις.
+  const shouldCommitSaas = isWalletLive || Boolean(tenantId);
+  if (shouldCommitSaas) {
     try {
       const api = await saasCreateGuestBooking({
-        tenantId,
+        tenantId: tenantId || undefined,
         passengerName: passenger.name.trim(),
         passengerEmail: passenger.email.trim(),
         seatLabel: seatList.join(', '),
         amountEur: paidNow,
-        externalTripId: trip.id,
+        externalTripId,
         tripTitle: trip.title,
         paymentMethod: paymentMethod || paymentMethodMeta,
         phone: passenger.phone.trim(),
@@ -452,7 +464,7 @@ export async function createBookingFromCheckout({
         totalEur: total,
         balanceDue: remaining,
         depositPercent: pct,
-        source: bookingSource || 'Website (B2C)',
+        source: sourceLabel,
         agentName: agentName || 'Online Auto',
         departureAt: trip.departureTime || null,
       });
@@ -525,6 +537,14 @@ export async function createBookingFromCheckout({
         /κατειλημ|seat.?conflict|θέσε/i.test(String(err?.message || ''))
       ) {
         throw err;
+      }
+      // Wallet / sealed office: never pretend success with a local-only pass.
+      if (isWalletLive) {
+        const msg = String(err?.message || '').trim();
+        throw new Error(
+          msg ||
+            'Η κράτηση δεν καταχωρήθηκε στο γραφείο. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.',
+        );
       }
       console.warn('[checkout] SaaS booking failed, using localStorage', err);
     }
