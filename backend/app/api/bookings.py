@@ -7,6 +7,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -170,22 +171,41 @@ async def get_occupied_seats(
 async def _guest_booking_side_effects(
     *,
     booking_snapshot: dict,
-    tenant_id: UUID,
+    tenant_id: str,
     ref: str,
-    paid_now: Decimal,
-    total: Decimal,
-    body: GuestBookingCreate,
-    seat_label: str,
-    requested_seats: list[str],
+    paid_now: float,
+    total: float,
+    trip_title: str | None,
     passenger_name: str,
     passenger_email: str | None,
     passenger_phone: str | None,
     source: str,
+    seat_label: str,
+    requested_seats: list[str],
     metadata: dict,
     client_ip: str | None,
     user_agent: str | None,
+    mint_wallet_token: bool,
 ) -> None:
     """AADE / audit / ticket sync / office email / bell — never blocks the 201 response."""
+    tid = UUID(str(tenant_id))
+    if mint_wallet_token and passenger_email:
+        try:
+            from ticketing.wallet_magic import create_wallet_magic_token
+
+            await create_wallet_magic_token(
+                email=passenger_email,
+                booking_id=str(booking_snapshot["id"]),
+                name=passenger_name,
+                phone=passenger_phone,
+            )
+        except Exception as magic_exc:
+            logger.warning(
+                "Guest booking wallet magic skipped ref=%s: %s",
+                ref,
+                magic_exc,
+            )
+
     if paid_now > 0:
         try:
             async with AsyncSessionLocal() as aade_db:
@@ -193,15 +213,15 @@ async def _guest_booking_side_effects(
 
                 vat_base = float(paid_now) / 1.24
                 await AadeQueueService(aade_db).enqueue_invoice(
-                    tenant_id=tenant_id,
-                    booking_id=booking_snapshot["id"],
+                    tenant_id=tid,
+                    booking_id=UUID(str(booking_snapshot["id"])),
                     payload={
                         "amount_eur": float(paid_now),
                         "vat_rate": 24.0,
                         "customer_country": "GR",
                         "line_items": [
                             {
-                                "description": body.trip_title or "Εισιτήριο εκδρομής",
+                                "description": trip_title or "Εισιτήριο εκδρομής",
                                 "amount": round(vat_base, 2),
                             }
                         ],
@@ -225,9 +245,9 @@ async def _guest_booking_side_effects(
             except Exception:
                 pass
             await AuditService(audit_db).record(
-                tenant_id=tenant_id,
+                tenant_id=tid,
                 actor_id=None,
-                actor_email=body.passenger_email,
+                actor_email=passenger_email,
                 action=AuditAction.CREATE,
                 resource_type="booking",
                 resource_id=str(booking_snapshot["id"]),
@@ -254,7 +274,13 @@ async def _guest_booking_side_effects(
         from ticketing.saas_sync import upsert_ticket_booking
 
         meta = metadata or {}
-        trip_id = int(meta.get("external_trip_id") or body.external_trip_id or 1)
+        raw_tid = meta.get("external_trip_id") or meta.get("trip_id")
+        try:
+            trip_id = int(raw_tid) if raw_tid is not None else 0
+        except (TypeError, ValueError):
+            trip_id = 0
+        if trip_id <= 0:
+            raise ValueError("missing external_trip_id for ticket sync")
         seats = meta.get("seats") or requested_seats or []
         ticket_seat = seat_label or (", ".join(seats) if seats else "—")
         ticket_pay = (
@@ -265,12 +291,12 @@ async def _guest_booking_side_effects(
         await upsert_ticket_booking(
             local_id=local_id_from_reference(ref),
             trip_id=trip_id,
-            customer_name=body.passenger_name,
+            customer_name=passenger_name,
             seat_number=ticket_seat,
             payment_status=ticket_pay,
-            phone=body.phone,
+            phone=passenger_phone,
             saas_booking_id=str(booking_snapshot["id"]),
-            email=body.passenger_email,
+            email=passenger_email,
             special_requirements={
                 "passengers": meta.get("passengers") or [],
             }
@@ -295,8 +321,8 @@ async def _guest_booking_side_effects(
                 "customerName": passenger_name,
                 "passenger_name": passenger_name,
                 "email": passenger_email,
-                "tripTitle": (body.trip_title or "").strip() or "Εκδρομή",
-                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "tripTitle": (trip_title or "").strip() or "Εκδρομή",
+                "trip_title": (trip_title or "").strip() or "Εκδρομή",
                 "seat": seat_label,
                 "seat_label": seat_label,
                 "seats": requested_seats,
@@ -327,7 +353,7 @@ async def _guest_booking_side_effects(
                 "pnr": ref,
                 "tenant_id": str(tenant_id),
                 "passenger_name": passenger_name,
-                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "trip_title": (trip_title or "").strip() or "Εκδρομή",
                 "seat_label": seat_label,
                 "amount_paid": float(paid_now),
             }
@@ -344,7 +370,6 @@ async def _guest_booking_side_effects(
 
 @router.post(
     "/guest",
-    response_model=GuestBookingResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_guest_booking(
@@ -667,9 +692,8 @@ async def create_guest_booking(
             "metadata_json": dict(booking.metadata_json or {}),
         }
 
-    # Mint wallet token before responding (fast). Heavy notify runs in background
-    # so nginx never sees a bare text/plain 500 while the κρατηση already landed.
-    activate_token: str | None = None
+    # Notify + magic-token in background. Return plain JSON 201 immediately so a
+    # side-effect crash can never become nginx text/plain 500 after commit.
     src_l = source.lower()
     is_office_desk = (
         "office" in src_l
@@ -678,18 +702,9 @@ async def create_guest_booking(
         or "desk" in src_l
         or "γκισέ" in src_l
     )
-    if not wallet_email and passenger_email and not is_office_desk:
-        try:
-            from ticketing.wallet_magic import create_wallet_magic_token
-
-            activate_token = await create_wallet_magic_token(
-                email=passenger_email,
-                booking_id=str(booking_snapshot["id"]),
-                name=passenger_name,
-                phone=passenger_phone,
-            )
-        except Exception:
-            activate_token = None
+    mint_wallet_token = bool(
+        (not wallet_email) and passenger_email and (not is_office_desk)
+    )
 
     try:
         client_ip = await get_client_ip(request)
@@ -699,39 +714,45 @@ async def create_guest_booking(
 
     background_tasks.add_task(
         _guest_booking_side_effects,
-        booking_snapshot=booking_snapshot,
-        tenant_id=tenant_id,
+        booking_snapshot={
+            "id": str(booking_snapshot["id"]),
+            "reference_code": str(booking_snapshot["reference_code"]),
+            "status": str(booking_snapshot["status"]),
+            "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
+        },
+        tenant_id=str(tenant_id),
         ref=ref,
-        paid_now=paid_now,
-        total=total,
-        body=body,
-        seat_label=seat_label,
-        requested_seats=requested_seats,
+        paid_now=float(paid_now),
+        total=float(total),
+        trip_title=(body.trip_title or "").strip() or None,
         passenger_name=passenger_name,
         passenger_email=passenger_email,
         passenger_phone=passenger_phone,
         source=source,
+        seat_label=seat_label or "",
+        requested_seats=list(requested_seats),
         metadata=dict(metadata or {}),
         client_ip=client_ip,
         user_agent=user_agent,
+        mint_wallet_token=mint_wallet_token,
     )
 
-    # Coerce primitives — ResponseValidationError must not become text/plain 500.
-    return GuestBookingResponse(
-        id=UUID(str(booking_snapshot["id"])),
-        tenant_id=UUID(str(booking_snapshot["tenant_id"])),
-        reference_code=str(booking_snapshot["reference_code"]),
-        status=str(booking_snapshot["status"]),
-        payment_status=str(booking_snapshot["payment_status"]),
-        total_price=Decimal(str(booking_snapshot["total_price"] or 0)),
-        amount_paid=Decimal(str(booking_snapshot["amount_paid"] or 0)),
-        amount_eur=Decimal(str(booking_snapshot["amount_eur"] or 0)),
-        passenger_name=booking_snapshot.get("passenger_name"),
-        passenger_email=booking_snapshot.get("passenger_email"),
-        seat_label=booking_snapshot.get("seat_label"),
-        metadata_json=dict(booking_snapshot.get("metadata_json") or {}),
-        wallet_activate_token=activate_token,
-    )
+    payload = {
+        "id": str(booking_snapshot["id"]),
+        "tenant_id": str(booking_snapshot["tenant_id"]),
+        "reference_code": str(booking_snapshot["reference_code"]),
+        "status": str(booking_snapshot["status"]),
+        "payment_status": str(booking_snapshot["payment_status"]),
+        "total_price": float(booking_snapshot["total_price"] or 0),
+        "amount_paid": float(booking_snapshot["amount_paid"] or 0),
+        "amount_eur": float(booking_snapshot["amount_eur"] or 0),
+        "passenger_name": booking_snapshot.get("passenger_name"),
+        "passenger_email": booking_snapshot.get("passenger_email"),
+        "seat_label": booking_snapshot.get("seat_label"),
+        "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
+        "wallet_activate_token": None,
+    }
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload)
 
 
 @router.post(
