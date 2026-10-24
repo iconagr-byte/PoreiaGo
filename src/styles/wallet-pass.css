@@ -60,11 +60,29 @@
   gap: 0.75rem;
   padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1.1rem 0.75rem;
   flex-shrink: 0;
-  z-index: 5;
+  position: relative;
+  /* Above ticket stack peeks (inline z-index) and bottom nav (20). */
+  z-index: 80;
+  background: transparent;
+  border-bottom: 1px solid var(--wallet-stroke);
+  /* Blur on ::before so it does NOT trap position:fixed account sheet/scrim. */
+}
+
+.wallet-topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: rgba(251, 251, 253, 0.92);
   backdrop-filter: blur(18px) saturate(1.4);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  border-bottom: 1px solid var(--wallet-stroke);
+}
+
+/* Account menu open: keep header + sheet above every pass card. */
+.wallet-topbar:has(.wallet-topbar-menu.is-open),
+.wallet-app--account-open .wallet-topbar {
+  z-index: 400;
 }
 
 .wallet-topbar-btn {
@@ -220,21 +238,21 @@
 .wallet-topbar-menu {
   position: relative;
   flex-shrink: 0;
-  z-index: 30;
+  z-index: 1;
 }
 
 .wallet-topbar-menu.is-open {
-  z-index: 50;
+  z-index: 2;
 }
 
 .wallet-account-scrim {
   position: fixed;
   inset: 0;
-  z-index: 35;
+  z-index: 410;
   border: 0;
   padding: 0;
   margin: 0;
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.22);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   cursor: default;
@@ -265,12 +283,12 @@
   right: 0;
 }
 
-/* Apple-like account sheet (top-left avatar menu) */
+/* Apple-like account sheet — fixed so ticket stack cannot cover it */
 .wallet-account-sheet {
-  position: absolute;
-  top: calc(100% + 0.45rem);
-  z-index: 45;
-  left: 0;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 3.85rem);
+  left: max(0.65rem, env(safe-area-inset-left, 0px));
+  z-index: 420;
   width: min(19.5rem, calc(100vw - 1.25rem));
   max-height: min(32rem, calc(100dvh - 5.5rem));
   overflow-x: hidden;
