@@ -385,16 +385,44 @@ def _json_safe(value):
     return str(value)
 
 
+def _booking_row_snapshot(row: Booking) -> dict:
+    """Plain JSON-safe dict — never return ORM instances to the ASGI layer."""
+    status_v = row.status.value if hasattr(row.status, "value") else str(row.status)
+    pay_v = (
+        row.payment_status.value
+        if hasattr(row.payment_status, "value")
+        else str(row.payment_status)
+    )
+    return {
+        "id": str(row.id),
+        "tenant_id": str(row.tenant_id),
+        "reference_code": str(row.reference_code),
+        "status": str(status_v),
+        "payment_status": str(pay_v),
+        "total_price": float(row.total_price or 0),
+        "amount_paid": float(row.amount_paid or 0),
+        "amount_eur": float(row.amount_eur or 0),
+        "passenger_name": row.passenger_name,
+        "passenger_email": row.passenger_email,
+        "seat_label": row.seat_label,
+        "metadata_json": _json_safe(dict(row.metadata_json or {})),
+    }
+
+
 def _schedule_guest_booking_side_effects(**kwargs) -> None:
     """Fire-and-forget notify work.
 
     Do **not** use FastAPI BackgroundTasks here: uvicorn awaits them before the
     ASGI cycle ends, so slow SMTP (office + customer mail) exceeds the edge
     proxy read timeout and the client sees text/plain 500 after a durable insert.
+
+    Yield once before notify so the 201 can flush past BaseHTTPMiddleware /
+    OpenResty before SMTP starts.
     """
 
     async def _run() -> None:
         try:
+            await asyncio.sleep(0)
             await _guest_booking_side_effects(**kwargs)
         except Exception as exc:
             logger.exception(
@@ -595,54 +623,33 @@ async def create_guest_booking(
 
         # Commit κρατηση alone. AADE + audit_logs must NOT share this transaction:
         # a failed flush (schema/INET/queue) aborts Postgres and would roll back the booking.
+        # Snapshot primitives BEFORE commit/close — never touch ORM after durable insert.
+        snap = _booking_row_snapshot(row)
         await db.commit()
-        try:
-            await db.refresh(row)
-        except Exception as refresh_exc:
-            # Booking is already durable — never treat refresh failure as insert failure
-            # (heal-retry would re-insert and surface a false seat_conflict 409).
-            logger.warning(
-                "Guest booking refresh after commit skipped ref=%s: %s",
-                ref,
-                refresh_exc,
-            )
-            try:
-                await apply_tenant_rls(db, tenant_id)
-                loaded = await db.scalar(
-                    select(Booking).where(
-                        Booking.tenant_id == tenant_id,
-                        Booking.reference_code == ref,
-                    )
-                )
-                if loaded is not None:
-                    return loaded
-            except Exception:
-                pass
-        return row
+        return snap
 
-    async def _load_booking_by_ref(db) -> Booking | None:
+    async def _load_booking_snap_by_ref(db) -> dict | None:
         await apply_tenant_rls(db, tenant_id)
-        return await db.scalar(
+        loaded = await db.scalar(
             select(Booking).where(
                 Booking.tenant_id == tenant_id,
                 Booking.reference_code == ref,
             )
         )
+        return _booking_row_snapshot(loaded) if loaded is not None else None
 
-    booking = None
+    booking_snapshot: dict | None = None
     async with AsyncSessionLocal() as db:
         try:
-            booking = await _persist_guest_booking(db, heal=False)
+            booking_snapshot = await _persist_guest_booking(db, heal=False)
         except HTTPException:
             await db.rollback()
             # If a prior attempt already committed this ref, return it (not 409).
             try:
-                existing = await _load_booking_by_ref(db)
+                booking_snapshot = await _load_booking_snap_by_ref(db)
             except Exception:
-                existing = None
-            if existing is not None:
-                booking = existing
-            else:
+                booking_snapshot = None
+            if booking_snapshot is None:
                 raise
         except Exception as exc:
             await db.rollback()
@@ -650,11 +657,10 @@ async def create_guest_booking(
 
             # Prefer already-committed row (refresh/post-commit glitch) over re-insert.
             try:
-                existing = await _load_booking_by_ref(db)
+                booking_snapshot = await _load_booking_snap_by_ref(db)
             except Exception:
-                existing = None
-            if existing is not None:
-                booking = existing
+                booking_snapshot = None
+            if booking_snapshot is not None:
                 logger.warning(
                     "Guest booking recovered committed ref=%s after persist error: %s",
                     ref,
@@ -662,26 +668,22 @@ async def create_guest_booking(
                 )
             elif is_bookings_schema_drift_error(exc):
                 try:
-                    booking = await _persist_guest_booking(db, heal=True)
+                    booking_snapshot = await _persist_guest_booking(db, heal=True)
                 except HTTPException as http_exc:
                     await db.rollback()
                     try:
-                        existing = await _load_booking_by_ref(db)
+                        booking_snapshot = await _load_booking_snap_by_ref(db)
                     except Exception:
-                        existing = None
-                    if existing is not None:
-                        booking = existing
-                    else:
+                        booking_snapshot = None
+                    if booking_snapshot is None:
                         raise http_exc
                 except Exception as retry_exc:
                     await db.rollback()
                     try:
-                        existing = await _load_booking_by_ref(db)
+                        booking_snapshot = await _load_booking_snap_by_ref(db)
                     except Exception:
-                        existing = None
-                    if existing is not None:
-                        booking = existing
-                    else:
+                        booking_snapshot = None
+                    if booking_snapshot is None:
                         logger.exception(
                             "Guest booking retry after schema heal failed tenant=%s",
                             tenant_id,
@@ -707,97 +709,107 @@ async def create_guest_booking(
                     ),
                 ) from exc
 
-        if booking is None:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Αποτυχία καταχώρησης κράτησης: empty booking",
-            )
+    if not booking_snapshot:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Αποτυχία καταχώρησης κράτησης: empty booking",
+        )
 
-        # Snapshot before session closes (expire_on_commit would otherwise break access).
-        booking_snapshot = {
-            "id": booking.id,
-            "tenant_id": booking.tenant_id,
-            "reference_code": booking.reference_code,
-            "status": booking.status.value
-            if hasattr(booking.status, "value")
-            else str(booking.status),
-            "payment_status": (
-                booking.payment_status.value
-                if hasattr(booking.payment_status, "value")
-                else str(booking.payment_status)
-            ),
-            "total_price": booking.total_price,
-            "amount_paid": booking.amount_paid,
-            "amount_eur": booking.amount_eur,
-            "passenger_name": booking.passenger_name,
-            "passenger_email": booking.passenger_email,
-            "seat_label": booking.seat_label,
-            "metadata_json": dict(booking.metadata_json or {}),
-        }
-
-    # Notify + magic-token off the request path (asyncio.create_task — not
-    # BackgroundTasks). Return plain JSON 201 immediately so slow SMTP / AADE
-    # can never become nginx text/plain 500 after commit.
-    src_l = source.lower()
-    is_office_desk = (
-        "office" in src_l
-        or "walk-in" in src_l
-        or "walk_in" in src_l
-        or "desk" in src_l
-        or "γκισέ" in src_l
-    )
-    mint_wallet_token = bool(
-        (not wallet_email) and passenger_email and (not is_office_desk)
-    )
+    # From here the κρατηση is durable. Never raise — client must see 201.
+    payload = {
+        "id": booking_snapshot["id"],
+        "tenant_id": booking_snapshot["tenant_id"],
+        "reference_code": booking_snapshot["reference_code"],
+        "status": booking_snapshot["status"],
+        "payment_status": booking_snapshot["payment_status"],
+        "total_price": booking_snapshot["total_price"],
+        "amount_paid": booking_snapshot["amount_paid"],
+        "amount_eur": booking_snapshot["amount_eur"],
+        "passenger_name": booking_snapshot.get("passenger_name"),
+        "passenger_email": booking_snapshot.get("passenger_email"),
+        "seat_label": booking_snapshot.get("seat_label"),
+        "metadata_json": booking_snapshot.get("metadata_json") or {},
+        "wallet_activate_token": None,
+    }
+    try:
+        src_l = source.lower()
+        is_office_desk = (
+            "office" in src_l
+            or "walk-in" in src_l
+            or "walk_in" in src_l
+            or "desk" in src_l
+            or "γκισέ" in src_l
+        )
+        mint_wallet_token = bool(
+            (not wallet_email) and passenger_email and (not is_office_desk)
+        )
+        try:
+            client_ip = await get_client_ip(request)
+        except Exception:
+            client_ip = None
+        user_agent = request.headers.get("User-Agent")
+        _schedule_guest_booking_side_effects(
+            booking_snapshot={
+                "id": payload["id"],
+                "reference_code": payload["reference_code"],
+                "status": payload["status"],
+                "metadata_json": payload["metadata_json"],
+            },
+            tenant_id=str(tenant_id),
+            ref=ref,
+            paid_now=float(paid_now),
+            total=float(total),
+            trip_title=(body.trip_title or "").strip() or None,
+            passenger_name=passenger_name,
+            passenger_email=passenger_email,
+            passenger_phone=passenger_phone,
+            source=source,
+            seat_label=seat_label or "",
+            requested_seats=list(requested_seats),
+            metadata=_json_safe(dict(metadata or {})),
+            client_ip=client_ip,
+            user_agent=user_agent,
+            mint_wallet_token=mint_wallet_token,
+        )
+    except Exception as sched_exc:
+        logger.exception(
+            "Guest booking notify schedule failed ref=%s (still returning 201): %s",
+            ref,
+            sched_exc,
+        )
 
     try:
-        client_ip = await get_client_ip(request)
-    except Exception:
-        client_ip = None
-    user_agent = request.headers.get("User-Agent")
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=_json_safe(payload),
+        )
+    except Exception as resp_exc:
+        logger.exception(
+            "Guest booking JSONResponse failed ref=%s — minimal 201: %s",
+            ref,
+            resp_exc,
+        )
+        from starlette.responses import Response
 
-    _schedule_guest_booking_side_effects(
-        booking_snapshot={
-            "id": str(booking_snapshot["id"]),
-            "reference_code": str(booking_snapshot["reference_code"]),
-            "status": str(booking_snapshot["status"]),
-            "metadata_json": _json_safe(dict(booking_snapshot.get("metadata_json") or {})),
-        },
-        tenant_id=str(tenant_id),
-        ref=ref,
-        paid_now=float(paid_now),
-        total=float(total),
-        trip_title=(body.trip_title or "").strip() or None,
-        passenger_name=passenger_name,
-        passenger_email=passenger_email,
-        passenger_phone=passenger_phone,
-        source=source,
-        seat_label=seat_label or "",
-        requested_seats=list(requested_seats),
-        metadata=_json_safe(dict(metadata or {})),
-        client_ip=client_ip,
-        user_agent=user_agent,
-        mint_wallet_token=mint_wallet_token,
-    )
+        import json as _json
 
-    payload = _json_safe(
-        {
-            "id": str(booking_snapshot["id"]),
-            "tenant_id": str(booking_snapshot["tenant_id"]),
-            "reference_code": str(booking_snapshot["reference_code"]),
-            "status": str(booking_snapshot["status"]),
-            "payment_status": str(booking_snapshot["payment_status"]),
-            "total_price": float(booking_snapshot["total_price"] or 0),
-            "amount_paid": float(booking_snapshot["amount_paid"] or 0),
-            "amount_eur": float(booking_snapshot["amount_eur"] or 0),
-            "passenger_name": booking_snapshot.get("passenger_name"),
-            "passenger_email": booking_snapshot.get("passenger_email"),
-            "seat_label": booking_snapshot.get("seat_label"),
-            "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
-            "wallet_activate_token": None,
-        }
-    )
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload)
+        return Response(
+            content=_json.dumps(
+                {
+                    "id": payload.get("id"),
+                    "tenant_id": str(tenant_id),
+                    "reference_code": ref,
+                    "status": payload.get("status") or "paid",
+                    "payment_status": payload.get("payment_status") or "paid",
+                    "total_price": float(total),
+                    "amount_paid": float(paid_now),
+                    "amount_eur": float(total),
+                    "wallet_activate_token": None,
+                }
+            ),
+            status_code=201,
+            media_type="application/json",
+        )
 
 
 @router.post(
