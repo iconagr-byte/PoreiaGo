@@ -9,8 +9,8 @@ import {
 import '../../styles/wallet-brand-splash.css';
 
 /**
- * Qatar-style brand splash: white field, PoreiaGo wordmark, quality hook.
- * Shown once per native app session before login credentials.
+ * Apple-style brand splash: soft field, PoreiaGo wordmark, short personal hook.
+ * Shown once per native app session before role home / login.
  */
 export default function WalletBrandSplash({ onDone }) {
   const [leaving, setLeaving] = useState(false);
@@ -59,7 +59,7 @@ export default function WalletBrandSplash({ onDone }) {
         <p className="pg-wallet-splash-hook">{WALLET_SPLASH_HOOK}</p>
         <p className="pg-wallet-splash-support">{WALLET_SPLASH_SUPPORT}</p>
       </div>
-      <p className="pg-wallet-splash-hint">Πατήστε για συνέχεια</p>
+      <p className="pg-wallet-splash-hint">Αγγίξτε για συνέχεια</p>
     </div>
   );
 }
