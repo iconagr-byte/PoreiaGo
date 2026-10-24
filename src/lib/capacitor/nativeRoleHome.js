@@ -137,6 +137,7 @@ export function pathForNativeRole(role) {
 
 /**
  * Paths allowed inside the unified native shell (no marketing / admin).
+ * Includes Wallet → seat → extras → checkout so Κράτηση is not kicked home.
  */
 export function isUnifiedNativeAppPath(pathname) {
   const p = pathname || '/';
@@ -149,5 +150,11 @@ export function isUnifiedNativeAppPath(pathname) {
   if (p.startsWith('/ticket/')) return true;
   if (p.startsWith('/passenger-checkin')) return true;
   if (p.startsWith('/sign/')) return true;
+  // Bus booking flow started from Wallet (or storefront-equivalent in-app).
+  if (p === '/select-seat' || p.startsWith('/select-seat/')) return true;
+  if (p.startsWith('/book/')) return true;
+  if (p.startsWith('/checkout')) return true;
+  if (p.startsWith('/trip/')) return true;
+  if (p.startsWith('/track/')) return true;
   return false;
 }
