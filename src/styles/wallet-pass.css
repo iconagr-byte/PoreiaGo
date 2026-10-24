@@ -2349,6 +2349,25 @@
   overflow: hidden;
 }
 
+.wallet-excursion-card--bookable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.wallet-excursion-card--bookable:hover {
+  border-color: rgba(15, 76, 129, 0.28);
+  box-shadow: 0 8px 22px rgba(15, 76, 129, 0.1);
+}
+
+.wallet-excursion-card--bookable:focus-visible {
+  outline: 2px solid #0f4c81;
+  outline-offset: 2px;
+}
+
+.wallet-excursion-card--bookable:active {
+  transform: scale(0.995);
+}
+
 .wallet-excursion-cover {
   min-height: 96px;
   background:

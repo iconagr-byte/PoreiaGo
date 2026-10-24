@@ -5,7 +5,13 @@ import { formatTripDepartureLabel, sortTripsByDeparture } from '../../lib/trips/
 import { tripCoverUrl } from '../../lib/trips/tripPhotos.js';
 import { rememberWalletOfficeTrips } from '../../lib/wallet/walletOfficeTrips.js';
 import { resolveWalletHomeFeed } from '../../lib/wallet/walletHomeFeed.js';
+import {
+  walletBookNavState,
+  walletSelectSeatPath,
+} from '../../lib/wallet/walletBookTrip.js';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+
+const PREVIEW_TRIP_COUNT = 6;
 
 function euro(n, currency = 'EUR') {
   const amount = Number(n || 0);
@@ -23,6 +29,7 @@ function euro(n, currency = 'EUR') {
 /**
  * Wallet «Αρχική» — office hook, services, upcoming trips, news.
  * Same feed on phone/native and desktop main column.
+ * Κράτηση / card tap → real seat map (tenant-scoped via sealed office).
  */
 export default function WalletStartFeed({
   appearance = {},
@@ -40,6 +47,7 @@ export default function WalletStartFeed({
   );
   const [trips, setTrips] = useState([]);
   const [tripsLoading, setTripsLoading] = useState(Boolean(feed.showTrips));
+  const [showAllTrips, setShowAllTrips] = useState(false);
 
   useEffect(() => {
     if (!feed.showTrips) {
@@ -54,7 +62,8 @@ export default function WalletStartFeed({
         if (cancelled) return;
         const rows = Array.isArray(list) ? list : [];
         rememberWalletOfficeTrips(rows, tenantId || null);
-        setTrips(sortTripsByDeparture(rows).slice(0, 6));
+        setTrips(sortTripsByDeparture(rows));
+        setShowAllTrips(false);
       })
       .catch(() => {
         if (!cancelled) setTrips([]);
@@ -66,6 +75,9 @@ export default function WalletStartFeed({
       cancelled = true;
     };
   }, [tenantId, feed.showTrips]);
+
+  const visibleTrips = showAllTrips ? trips : trips.slice(0, PREVIEW_TRIP_COUNT);
+  const hasMoreTrips = trips.length > PREVIEW_TRIP_COUNT;
 
   const scrollToTrips = () => {
     const el = tripsSectionRef.current;
@@ -81,11 +93,33 @@ export default function WalletStartFeed({
   };
 
   const openAllTrips = () => {
+    if (!showAllTrips && hasMoreTrips) {
+      setShowAllTrips(true);
+      window.requestAnimationFrame?.(() => {
+        tripsSectionRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
     if (onBrowseAllTrips) {
       onBrowseAllTrips();
       return;
     }
+    // Native has no storefront home — stay on Wallet trip list.
     if (!nativeWallet) navigate('/');
+    else scrollToTrips();
+  };
+
+  /** Real booking: seat map → extras → checkout (sealed tenant). */
+  const startBooking = (trip) => {
+    const id = trip?.id;
+    if (!id) return;
+    navigate(walletSelectSeatPath(id), { state: walletBookNavState() });
+  };
+
+  const openTripInfo = (trip) => {
+    const id = trip?.id;
+    if (!id) return;
+    navigate(`/trip/${id}`, { state: walletBookNavState() });
   };
 
   return (
@@ -149,44 +183,62 @@ export default function WalletStartFeed({
             <p className="wallet-panel-lead">Δεν υπάρχουν δημοσιευμένες εκδρομές αυτή τη στιγμή.</p>
           ) : (
             <ul className="wallet-excursion-list">
-              {trips.map((trip) => {
+              {visibleTrips.map((trip) => {
                 const cover = tripCoverUrl(trip);
                 return (
-                <li key={trip.id}>
-                  <article className="wallet-excursion-card">
-                    <div
-                      className="wallet-excursion-cover"
-                      style={cover ? { backgroundImage: `url(${cover})` } : undefined}
-                      aria-hidden
-                    />
-                    <div className="wallet-excursion-body">
-                      <h3>{trip.title || trip.destination || 'Εκδρομή'}</h3>
-                      <p>
-                        {formatTripDepartureLabel(trip)}
-                        {trip.destination ? ` · ${trip.destination}` : ''}
-                      </p>
-                      <p className="wallet-excursion-price">{euro(trip.price, trip.currency)}</p>
-                      <div className="wallet-excursion-actions">
-                        {nativeWallet ? null : (
+                  <li key={trip.id}>
+                    <article
+                      className="wallet-excursion-card wallet-excursion-card--bookable"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Κράτηση: ${trip.title || trip.destination || 'Εκδρομή'}`}
+                      onClick={() => startBooking(trip)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          startBooking(trip);
+                        }
+                      }}
+                    >
+                      <div
+                        className="wallet-excursion-cover"
+                        style={cover ? { backgroundImage: `url(${cover})` } : undefined}
+                        aria-hidden
+                      />
+                      <div className="wallet-excursion-body">
+                        <h3>{trip.title || trip.destination || 'Εκδρομή'}</h3>
+                        <p>
+                          {formatTripDepartureLabel(trip)}
+                          {trip.destination ? ` · ${trip.destination}` : ''}
+                        </p>
+                        <p className="wallet-excursion-price">{euro(trip.price, trip.currency)}</p>
+                        <div className="wallet-excursion-actions">
+                          {nativeWallet ? null : (
+                            <button
+                              type="button"
+                              className="wallet-btn wallet-btn-secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openTripInfo(trip);
+                              }}
+                            >
+                              Πληροφορίες
+                            </button>
+                          )}
                           <button
                             type="button"
-                            className="wallet-btn wallet-btn-secondary"
-                            onClick={() => navigate(`/trip/${trip.id}`)}
+                            className="wallet-btn wallet-btn-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startBooking(trip);
+                            }}
                           >
-                            Πληροφορίες
+                            Κράτηση
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="wallet-btn wallet-btn-primary"
-                          onClick={() => navigate(`/select-seat/${trip.id}`)}
-                        >
-                          Κράτηση
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                </li>
+                    </article>
+                  </li>
                 );
               })}
             </ul>
@@ -198,7 +250,7 @@ export default function WalletStartFeed({
               style={{ marginTop: '0.75rem' }}
               onClick={openAllTrips}
             >
-              Όλες οι εκδρομές
+              {showAllTrips || !hasMoreTrips ? 'Όλες οι εκδρομές' : `Όλες οι εκδρομές (${trips.length})`}
             </button>
           ) : null}
         </section>

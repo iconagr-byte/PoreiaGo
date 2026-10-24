@@ -554,7 +554,7 @@ function WalletAuthenticatedApp() {
       officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
       tenantId={sealedTenantId}
       onOpenTicket={() => switchTab('pass')}
-      onBrowseAllTrips={nativeWallet ? undefined : () => navigate('/')}
+      onBrowseAllTrips={openOfficeTrips}
     />
   );
 
@@ -609,13 +609,15 @@ function WalletAuthenticatedApp() {
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
           onBrowseTrips={
-            nativeWallet ? undefined : isDesktop ? openOfficeTrips : () => navigate('/')
+            nativeWallet || isDesktop ? openOfficeTrips : () => navigate('/')
           }
-          onOpenTrip={
-            nativeWallet
-              ? undefined
-              : (trip) => navigate(trip?.id ? `/select-seat/${trip.id}` : '/')
-          }
+          onOpenTrip={(trip) => {
+            if (!trip?.id) {
+              openOfficeTrips();
+              return;
+            }
+            navigate(`/select-seat/${trip.id}`, { state: { fromWallet: true } });
+          }}
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
           layout={isDesktop ? 'desktop' : 'phone'}
@@ -821,16 +823,28 @@ function WalletAuthenticatedApp() {
               </p>
 
               {bookings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '1.5rem 0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem',
+                    alignItems: 'center',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="wallet-btn wallet-btn-primary"
+                    onClick={openOfficeTrips}
+                  >
+                    Κράτηση εκδρομής
+                  </button>
                   {nativeWallet ? (
-                    <Link to="/my-booking" className="wallet-btn wallet-btn-primary">
+                    <Link to="/my-booking" className="wallet-btn wallet-btn-ghost">
                       Εύρεση κράτησης
                     </Link>
-                  ) : (
-                    <Link to="/" className="wallet-btn wallet-btn-primary">
-                      Κράτηση εκδρομής
-                    </Link>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>
@@ -920,6 +934,7 @@ function WalletAuthenticatedApp() {
             nativeWallet={nativeWallet}
             onOpenBookings={() => switchTab('bookings')}
             onOpenPass={() => switchTab('pass')}
+            onBookTrip={openOfficeTrips}
           />
         ) : null}
 

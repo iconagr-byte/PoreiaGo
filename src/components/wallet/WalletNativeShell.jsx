@@ -34,6 +34,7 @@ export default function WalletNativeShell() {
     pathname.startsWith('/grafeia') ||
     pathname.startsWith('/sign/') ||
     pathname.startsWith('/select-seat') ||
+    pathname.startsWith('/book/') ||
     pathname.startsWith('/checkout') ||
     pathname.startsWith('/trip/') ||
     // Avoid a second dock on /wallet — SimpleWalletPage owns the 4-tab bar.

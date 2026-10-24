@@ -11,6 +11,7 @@ export default function WalletMorePanel({
   nativeWallet = false,
   onOpenBookings,
   onOpenPass,
+  onBookTrip,
 }) {
   const upcoming = bookings.filter((b) => {
     const st = String(b.status || '').toLowerCase();
@@ -49,16 +50,30 @@ export default function WalletMorePanel({
           </div>
         </div>
         {upcoming.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '0.5rem 0 0.25rem' }}>
-            {nativeWallet ? (
-              <Link to="/my-booking" className="wallet-btn wallet-btn-primary">
-                Εύρεση κράτησης
-              </Link>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '0.5rem 0 0.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              alignItems: 'center',
+            }}
+          >
+            {onBookTrip ? (
+              <button type="button" className="wallet-btn wallet-btn-primary" onClick={onBookTrip}>
+                Κράτηση εκδρομής
+              </button>
             ) : (
-              <Link to="/" className="wallet-btn wallet-btn-primary">
+              <Link to={nativeWallet ? '/wallet' : '/'} className="wallet-btn wallet-btn-primary">
                 Κράτηση εκδρομής
               </Link>
             )}
+            {nativeWallet ? (
+              <Link to="/my-booking" className="wallet-btn wallet-btn-ghost">
+                Εύρεση κράτησης
+              </Link>
+            ) : null}
           </div>
         ) : (
           <ul className="wallet-more-trip-list">
