@@ -56,7 +56,8 @@ function PassengerTicketCard({
   stackTotal = 1,
 }) {
   const seatBooking = seatBookingFor(booking, passenger);
-  const peekOnly = !isFront && compactHeader;
+  /* Stack peeks keep body in the DOM so max-height can animate smoothly. */
+  const stackPeek = !isFront && compactHeader;
 
   return (
     <article
@@ -64,7 +65,7 @@ function PassengerTicketCard({
         'wallet-pass-card',
         'wallet-pass-card-enter',
         isFront ? 'is-front' : 'is-peek',
-        peekOnly ? 'is-peek-collapsed' : '',
+        stackPeek ? 'is-peek-collapsed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -105,101 +106,107 @@ function PassengerTicketCard({
         </div>
       ) : null}
 
-      {!peekOnly ? (
-        <>
-          <div className="wallet-pass-card-top">
-            <div className="min-w-0">
-              <p className="wallet-pass-kicker">
-                {passenger.role === 'booker' ? 'Επιβάτης · αγοραστής' : 'Επιβάτης'}
-              </p>
-              <p className="wallet-pass-passenger truncate">{passenger.name || '—'}</p>
-            </div>
-            <span className={`wallet-pass-status ${status.className}`}>
-              {booking.status || (paid ? 'Πληρωμένο' : '—')}
-            </span>
+      <div
+        className="wallet-pass-card-body"
+        aria-hidden={stackPeek ? true : undefined}
+      >
+        <div className="wallet-pass-card-top">
+          <div className="min-w-0">
+            <p className="wallet-pass-kicker">
+              {passenger.role === 'booker' ? 'Επιβάτης · αγοραστής' : 'Επιβάτης'}
+            </p>
+            <p className="wallet-pass-passenger truncate">{passenger.name || '—'}</p>
           </div>
+          <span className={`wallet-pass-status ${status.className}`}>
+            {booking.status || (paid ? 'Πληρωμένο' : '—')}
+          </span>
+        </div>
 
-          <div className="wallet-pass-meta">
-            <div>
-              <p className="wallet-pass-kicker">Θέση</p>
-              <p className="wallet-pass-meta-value">{passenger.seat || '—'}</p>
-            </div>
-            <div>
-              <p className="wallet-pass-kicker">Κωδικός</p>
-              <p className="wallet-pass-meta-value wallet-pass-mono">{pnr}</p>
-            </div>
-            <div>
-              <p className="wallet-pass-kicker">Ποσό</p>
-              <p className="wallet-pass-meta-value">
-                {showActions ? `€${Number(booking.price || 0).toFixed(2)}` : '—'}
-              </p>
-            </div>
+        <div className="wallet-pass-meta">
+          <div>
+            <p className="wallet-pass-kicker">Θέση</p>
+            <p className="wallet-pass-meta-value">{passenger.seat || '—'}</p>
           </div>
+          <div>
+            <p className="wallet-pass-kicker">Κωδικός</p>
+            <p className="wallet-pass-meta-value wallet-pass-mono">{pnr}</p>
+          </div>
+          <div>
+            <p className="wallet-pass-kicker">Ποσό</p>
+            <p className="wallet-pass-meta-value">
+              {`€${Number(booking.price || 0).toFixed(2)}`}
+            </p>
+          </div>
+        </div>
 
-          {showQr ? (
-            <>
-              <div className="wallet-pass-perforation" aria-hidden>
-                <span />
-                <span />
-              </div>
+        {showQr ? (
+          <>
+            <div className="wallet-pass-perforation" aria-hidden>
+              <span />
+              <span />
+            </div>
 
-              <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
-                {offline && booking._offlineQrDataUrl && showActions ? (
-                  <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
-                    <img
-                      src={booking._offlineQrDataUrl}
-                      alt="QR εισιτηρίου"
-                      width={168}
-                      height={168}
-                    />
-                  </div>
-                ) : (
-                  <TicketQrCode
-                    booking={seatBooking}
-                    size={168}
-                    className="wallet-pass-qr"
-                    onQrChange={showActions ? onQrChange : undefined}
+            <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
+              {offline && booking._offlineQrDataUrl && showActions ? (
+                <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
+                  <img
+                    src={booking._offlineQrDataUrl}
+                    alt="QR εισιτηρίου"
+                    width={168}
+                    height={168}
                   />
-                )}
-                <p className="wallet-pass-qr-hint">
-                  {offline
-                    ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
-                    : paid
-                      ? `Δείξτε το QR για τη θέση ${passenger.seat || ''} στον οδηγό`
-                      : 'Το QR ενεργοποιείται μετά την πληρωμή'}
-                </p>
-                {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
-              </div>
-            </>
-          ) : null}
-
-          {showActions ? (
-            <div className="wallet-pass-actions">
-              <WalletDeviceSave booking={seatBooking} />
-              {!paid ? (
-                <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
-                  Λεπτομέρειες κράτησης
-                </button>
-              ) : null}
-              <div className="wallet-pass-secondary-row">
-                <button
-                  type="button"
-                  className="wallet-pass-secondary"
-                  onClick={() => onOpenDetails?.(booking)}
-                >
-                  Λεπτομέρειες
-                </button>
-                <Link
-                  to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
-                  className="wallet-pass-secondary"
-                >
-                  PDF
-                </Link>
-              </div>
+                </div>
+              ) : (
+                <TicketQrCode
+                  booking={seatBooking}
+                  size={168}
+                  className="wallet-pass-qr"
+                  onQrChange={showActions ? onQrChange : undefined}
+                />
+              )}
+              <p className="wallet-pass-qr-hint">
+                {offline
+                  ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
+                  : paid
+                    ? `Δείξτε το QR για τη θέση ${passenger.seat || ''} στον οδηγό`
+                    : 'Το QR ενεργοποιείται μετά την πληρωμή'}
+              </p>
+              {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
             </div>
-          ) : null}
-        </>
-      ) : null}
+          </>
+        ) : (
+          /* Reserve QR space while collapsed so expand height is predictable. */
+          compactHeader ? <div className="wallet-pass-qr-spacer" aria-hidden /> : null
+        )}
+
+        {showActions ? (
+          <div className="wallet-pass-actions">
+            <WalletDeviceSave booking={seatBooking} />
+            {!paid ? (
+              <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
+                Λεπτομέρειες κράτησης
+              </button>
+            ) : null}
+            <div className="wallet-pass-secondary-row">
+              <button
+                type="button"
+                className="wallet-pass-secondary"
+                onClick={() => onOpenDetails?.(booking)}
+              >
+                Λεπτομέρειες
+              </button>
+              <Link
+                to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
+                className="wallet-pass-secondary"
+              >
+                PDF
+              </Link>
+            </div>
+          </div>
+        ) : compactHeader ? (
+          <div className="wallet-pass-actions-spacer" aria-hidden />
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -324,12 +331,16 @@ export default function WalletBoardingPass({
   const scrollSlotIntoPage = (index) => {
     const el = slotRefs.current[index];
     if (!el || typeof el.scrollIntoView !== 'function') return;
+    // After max-height expand starts, ease the pass into view.
     window.requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      window.setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 40);
     });
   };
 
   const selectPass = (index, { scroll = true } = {}) => {
+    if (index === activeIndex) return;
     setActiveIndex(index);
     if (!scroll) return;
     if (scrollUnfurl) {
@@ -337,7 +348,7 @@ export default function WalletBoardingPass({
       scrollSlotIntoUnfurl(index, 'smooth');
       window.setTimeout(() => {
         skipScrollSync.current = false;
-      }, 420);
+      }, 480);
       return;
     }
     // Tap stack (native / desktop): keep the expanded pass in the page scrollport.
@@ -476,7 +487,7 @@ export default function WalletBoardingPass({
         <p className="wallet-pass-vstack-hint" role="status">
           {scrollUnfurl
             ? `${ticketList.length} εισιτήρια · κυλήστε για άνοιγμα · πατήστε κεφαλίδα`
-            : `${ticketList.length} εισιτήρια · πατήστε μία κεφαλίδα για να έρθει μπροστά`}
+            : `${ticketList.length} εισιτήρια · πατήστε κεφαλίδα για ομαλή εναλλαγή`}
         </p>
         <div
           ref={scrollUnfurl ? unfurlRef : undefined}

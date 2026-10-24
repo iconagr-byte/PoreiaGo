@@ -975,7 +975,6 @@
 .wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed {
   /* Slightly taller native hit target (~82px) */
   --wallet-peek-height: 5.15rem;
-  height: var(--wallet-peek-height);
   min-height: var(--wallet-peek-height);
   max-height: var(--wallet-peek-height);
   pointer-events: none; /* slot receives the tap */
@@ -1064,8 +1063,15 @@
     scroll-snap-type: y proximity;
   }
 
-  .wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-front .wallet-pass-card {
+  .wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-front .wallet-pass-card,
+  .wallet-pass-vstack-slot.is-front .wallet-pass-card,
+  .wallet-pass-vstack-slot.is-front .wallet-pass-qr-wrap {
     animation: none;
+  }
+
+  .wallet-pass-vstack-slot .wallet-pass-card,
+  .wallet-pass-card-body {
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1088,26 +1094,89 @@
   margin-top: 0;
   padding: 0;
   border-radius: 1.15rem;
+  overflow: hidden;
+  /* Expand/collapse between peek strip ↔ full pass (smooth ticket switch). */
+  max-height: var(--wallet-peek-height);
+  min-height: var(--wallet-peek-height);
   transition:
-    box-shadow 0.35s ease,
-    border-radius 0.35s ease,
-    height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    max-height 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s ease,
+    border-radius 0.4s ease,
+    filter 0.35s ease;
 }
 
 .wallet-pass-vstack-slot.is-front .wallet-pass-card {
+  max-height: 56rem;
+  min-height: 0;
   border-radius: 1.25rem;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 -1px 0 rgba(15, 23, 42, 0.04) inset,
     0 18px 40px rgba(15, 23, 42, 0.16),
     0 2px 8px rgba(15, 23, 42, 0.08);
+  animation: wallet-pass-unfurl-in 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wallet-pass-card-body {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.32s ease 0.06s,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wallet-pass-vstack-slot.is-peek .wallet-pass-card-body {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    transform 0.28s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.wallet-pass-vstack-slot.is-front .wallet-pass-card-body {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.wallet-pass-vstack-slot.is-front .wallet-pass-qr-wrap {
+  animation: wallet-pass-qr-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+@keyframes wallet-pass-qr-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Keep collapsed height stable while QR/actions mount only on the front pass. */
+.wallet-pass-qr-spacer {
+  height: 13.5rem;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.wallet-pass-actions-spacer {
+  height: 5.75rem;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Collapsed: clip to header strip only (Apple Wallet peek) */
 .wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed {
-  height: var(--wallet-peek-height);
-  min-height: var(--wallet-peek-height);
   max-height: var(--wallet-peek-height);
+  min-height: var(--wallet-peek-height);
   overflow: hidden;
   border-radius: 1.1rem;
   box-shadow:
@@ -1115,6 +1184,7 @@
     0 8px 20px rgba(15, 23, 42, 0.16),
     0 1px 0 rgba(15, 23, 42, 0.06);
   border-color: rgba(15, 23, 42, 0.1);
+  filter: saturate(0.96) brightness(0.98);
 }
 
 .wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
