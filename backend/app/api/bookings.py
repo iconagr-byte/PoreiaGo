@@ -349,8 +349,38 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         # Commit κρατηση alone. AADE + audit_logs must NOT share this transaction:
         # a failed flush (schema/INET/queue) aborts Postgres and would roll back the booking.
         await db.commit()
-        await db.refresh(row)
+        try:
+            await db.refresh(row)
+        except Exception as refresh_exc:
+            # Booking is already durable — never treat refresh failure as insert failure
+            # (heal-retry would re-insert and surface a false seat_conflict 409).
+            logger.warning(
+                "Guest booking refresh after commit skipped ref=%s: %s",
+                ref,
+                refresh_exc,
+            )
+            try:
+                await apply_tenant_rls(db, tenant_id)
+                loaded = await db.scalar(
+                    select(Booking).where(
+                        Booking.tenant_id == tenant_id,
+                        Booking.reference_code == ref,
+                    )
+                )
+                if loaded is not None:
+                    return loaded
+            except Exception:
+                pass
         return row
+
+    async def _load_booking_by_ref(db) -> Booking | None:
+        await apply_tenant_rls(db, tenant_id)
+        return await db.scalar(
+            select(Booking).where(
+                Booking.tenant_id == tenant_id,
+                Booking.reference_code == ref,
+            )
+        )
 
     booking = None
     async with AsyncSessionLocal() as db:
@@ -358,30 +388,64 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             booking = await _persist_guest_booking(db, heal=False)
         except HTTPException:
             await db.rollback()
-            raise
+            # If a prior attempt already committed this ref, return it (not 409).
+            try:
+                existing = await _load_booking_by_ref(db)
+            except Exception:
+                existing = None
+            if existing is not None:
+                booking = existing
+            else:
+                raise
         except Exception as exc:
             await db.rollback()
             from app.services.ensure_bookings_schema import is_bookings_schema_drift_error
 
-            if is_bookings_schema_drift_error(exc):
+            # Prefer already-committed row (refresh/post-commit glitch) over re-insert.
+            try:
+                existing = await _load_booking_by_ref(db)
+            except Exception:
+                existing = None
+            if existing is not None:
+                booking = existing
+                logger.warning(
+                    "Guest booking recovered committed ref=%s after persist error: %s",
+                    ref,
+                    exc,
+                )
+            elif is_bookings_schema_drift_error(exc):
                 try:
                     booking = await _persist_guest_booking(db, heal=True)
-                except HTTPException:
+                except HTTPException as http_exc:
                     await db.rollback()
-                    raise
+                    try:
+                        existing = await _load_booking_by_ref(db)
+                    except Exception:
+                        existing = None
+                    if existing is not None:
+                        booking = existing
+                    else:
+                        raise http_exc
                 except Exception as retry_exc:
                     await db.rollback()
-                    logger.exception(
-                        "Guest booking retry after schema heal failed tenant=%s",
-                        tenant_id,
-                    )
-                    raise HTTPException(
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=(
-                            "Αποτυχία καταχώρησης κράτησης μετά από επισκευή σχήματος: "
-                            f"{retry_exc.__class__.__name__}: {retry_exc}"
-                        ),
-                    ) from retry_exc
+                    try:
+                        existing = await _load_booking_by_ref(db)
+                    except Exception:
+                        existing = None
+                    if existing is not None:
+                        booking = existing
+                    else:
+                        logger.exception(
+                            "Guest booking retry after schema heal failed tenant=%s",
+                            tenant_id,
+                        )
+                        raise HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=(
+                                "Αποτυχία καταχώρησης κράτησης μετά από επισκευή σχήματος: "
+                                f"{retry_exc.__class__.__name__}: {retry_exc}"
+                            ),
+                        ) from retry_exc
             else:
                 logger.exception(
                     "Guest booking persist failed tenant=%s ref=%s",
@@ -395,6 +459,12 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                         f"{exc.__class__.__name__}: {exc}"
                     ),
                 ) from exc
+
+        if booking is None:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία καταχώρησης κράτησης: empty booking",
+            )
 
         # Snapshot before session closes (expire_on_commit would otherwise break access).
         booking_snapshot = {
