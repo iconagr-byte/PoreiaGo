@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -167,12 +167,191 @@ async def get_occupied_seats(
     )
 
 
+async def _guest_booking_side_effects(
+    *,
+    booking_snapshot: dict,
+    tenant_id: UUID,
+    ref: str,
+    paid_now: Decimal,
+    total: Decimal,
+    body: GuestBookingCreate,
+    seat_label: str,
+    requested_seats: list[str],
+    passenger_name: str,
+    passenger_email: str | None,
+    passenger_phone: str | None,
+    source: str,
+    metadata: dict,
+    client_ip: str | None,
+    user_agent: str | None,
+) -> None:
+    """AADE / audit / ticket sync / office email / bell — never blocks the 201 response."""
+    if paid_now > 0:
+        try:
+            async with AsyncSessionLocal() as aade_db:
+                from app.services.aade_queue_service import AadeQueueService
+
+                vat_base = float(paid_now) / 1.24
+                await AadeQueueService(aade_db).enqueue_invoice(
+                    tenant_id=tenant_id,
+                    booking_id=booking_snapshot["id"],
+                    payload={
+                        "amount_eur": float(paid_now),
+                        "vat_rate": 24.0,
+                        "customer_country": "GR",
+                        "line_items": [
+                            {
+                                "description": body.trip_title or "Εισιτήριο εκδρομής",
+                                "amount": round(vat_base, 2),
+                            }
+                        ],
+                    },
+                    idempotency_key=f"guest-{booking_snapshot['id']}",
+                )
+                await aade_db.commit()
+        except Exception as aade_exc:
+            logger.warning(
+                "Guest booking AADE enqueue skipped ref=%s: %s",
+                ref,
+                aade_exc,
+            )
+
+    try:
+        async with AsyncSessionLocal() as audit_db:
+            from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
+
+            try:
+                await ensure_audit_logs_schema(audit_db)
+            except Exception:
+                pass
+            await AuditService(audit_db).record(
+                tenant_id=tenant_id,
+                actor_id=None,
+                actor_email=body.passenger_email,
+                action=AuditAction.CREATE,
+                resource_type="booking",
+                resource_id=str(booking_snapshot["id"]),
+                ip_address=_safe_audit_ip(client_ip),
+                user_agent=(user_agent or "")[:512] or None,
+                after_state={
+                    "status": booking_snapshot["status"],
+                    "reference_code": ref,
+                    "guest": True,
+                    "source": source,
+                },
+            )
+            await audit_db.commit()
+    except Exception as audit_exc:
+        logger.warning(
+            "Guest booking audit skipped ref=%s tenant=%s: %s",
+            ref,
+            tenant_id,
+            audit_exc,
+        )
+
+    try:
+        from api.admin_booking_mapper import local_id_from_reference
+        from ticketing.saas_sync import upsert_ticket_booking
+
+        meta = metadata or {}
+        trip_id = int(meta.get("external_trip_id") or body.external_trip_id or 1)
+        seats = meta.get("seats") or requested_seats or []
+        ticket_seat = seat_label or (", ".join(seats) if seats else "—")
+        ticket_pay = (
+            "PAID"
+            if paid_now >= total and total > 0
+            else ("DEPOSIT" if paid_now > 0 else "PENDING")
+        )
+        await upsert_ticket_booking(
+            local_id=local_id_from_reference(ref),
+            trip_id=trip_id,
+            customer_name=body.passenger_name,
+            seat_number=ticket_seat,
+            payment_status=ticket_pay,
+            phone=body.phone,
+            saas_booking_id=str(booking_snapshot["id"]),
+            email=body.passenger_email,
+            special_requirements={
+                "passengers": meta.get("passengers") or [],
+            }
+            if meta.get("passengers")
+            else None,
+        )
+    except Exception:
+        pass
+
+    if paid_now > 0:
+        notify_payload = None
+        try:
+            from ticketing.payment_confirmation_email import (
+                send_payment_confirmation_notifications,
+            )
+
+            notify_payload = {
+                "id": str(booking_snapshot["id"]),
+                "pnr": booking_snapshot["reference_code"],
+                "reference_code": booking_snapshot["reference_code"],
+                "tenant_id": str(tenant_id),
+                "customerName": passenger_name,
+                "passenger_name": passenger_name,
+                "email": passenger_email,
+                "tripTitle": (body.trip_title or "").strip() or "Εκδρομή",
+                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "seat": seat_label,
+                "seat_label": seat_label,
+                "seats": requested_seats,
+                "amountPaid": float(paid_now),
+                "amount_paid": float(paid_now),
+                "price": float(total),
+                "metadata_json": booking_snapshot.get("metadata_json") or {},
+            }
+            await send_payment_confirmation_notifications(
+                notify_payload,
+                require_office=True,
+            )
+        except Exception as exc:
+            logger.error(
+                "Guest booking office payment email failed ref=%s tenant=%s: %s",
+                ref,
+                tenant_id,
+                exc,
+            )
+
+        try:
+            from travel_platform.notifications.excursion_booking_push import (
+                notify_excursion_booking_to_office,
+            )
+
+            push_payload = notify_payload or {
+                "id": str(booking_snapshot["id"]),
+                "pnr": ref,
+                "tenant_id": str(tenant_id),
+                "passenger_name": passenger_name,
+                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "seat_label": seat_label,
+                "amount_paid": float(paid_now),
+            }
+            push_payload.setdefault("tenant_id", str(tenant_id))
+            await notify_excursion_booking_to_office(push_payload)
+        except Exception as exc:
+            logger.warning(
+                "Guest booking office bell/push failed ref=%s tenant=%s: %s",
+                ref,
+                tenant_id,
+                exc,
+            )
+
+
 @router.post(
     "/guest",
     response_model=GuestBookingResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_guest_booking(body: GuestBookingCreate, request: Request):
+async def create_guest_booking(
+    body: GuestBookingCreate,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     """Public B2C / office checkout — tenant from Host when possible; body.tenant_id must match.
 
     Optional My Wallet Bearer JWT stamps the booking with the logged-in account so
@@ -488,102 +667,8 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             "metadata_json": dict(booking.metadata_json or {}),
         }
 
-    # Post-commit side effects — never roll back the κρατηση.
-    if paid_now > 0:
-        try:
-            async with AsyncSessionLocal() as aade_db:
-                from app.services.aade_queue_service import AadeQueueService
-
-                vat_base = float(paid_now) / 1.24
-                await AadeQueueService(aade_db).enqueue_invoice(
-                    tenant_id=tenant_id,
-                    booking_id=booking_snapshot["id"],
-                    payload={
-                        "amount_eur": float(paid_now),
-                        "vat_rate": 24.0,
-                        "customer_country": "GR",
-                        "line_items": [
-                            {
-                                "description": body.trip_title or "Εισιτήριο εκδρομής",
-                                "amount": round(vat_base, 2),
-                            }
-                        ],
-                    },
-                    idempotency_key=f"guest-{booking_snapshot['id']}",
-                )
-                await aade_db.commit()
-        except Exception as aade_exc:
-            logger.warning(
-                "Guest booking AADE enqueue skipped ref=%s: %s",
-                ref,
-                aade_exc,
-            )
-
-    try:
-        async with AsyncSessionLocal() as audit_db:
-            from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
-
-            try:
-                await ensure_audit_logs_schema(audit_db)
-            except Exception:
-                pass
-            await AuditService(audit_db).record(
-                tenant_id=tenant_id,
-                actor_id=None,
-                actor_email=body.passenger_email,
-                action=AuditAction.CREATE,
-                resource_type="booking",
-                resource_id=str(booking_snapshot["id"]),
-                ip_address=_safe_audit_ip(await get_client_ip(request)),
-                user_agent=(request.headers.get("User-Agent") or "")[:512] or None,
-                after_state={
-                    "status": booking_snapshot["status"],
-                    "reference_code": ref,
-                    "guest": True,
-                    "source": source,
-                },
-            )
-            await audit_db.commit()
-    except Exception as audit_exc:
-        logger.warning(
-            "Guest booking audit skipped ref=%s tenant=%s: %s",
-            ref,
-            tenant_id,
-            audit_exc,
-        )
-
-    try:
-        from api.admin_booking_mapper import local_id_from_reference
-        from ticketing.saas_sync import upsert_ticket_booking
-
-        meta = metadata
-        trip_id = int(meta.get("external_trip_id") or external_trip_id or 1)
-        seats = meta.get("seats") or []
-        ticket_seat = seat_label or (", ".join(seats) if seats else "—")
-        ticket_pay = (
-            "PAID"
-            if paid_now >= total and total > 0
-            else ("DEPOSIT" if paid_now > 0 else "PENDING")
-        )
-        await upsert_ticket_booking(
-            local_id=local_id_from_reference(ref),
-            trip_id=trip_id,
-            customer_name=body.passenger_name,
-            seat_number=ticket_seat,
-            payment_status=ticket_pay,
-            phone=body.phone,
-            saas_booking_id=str(booking_snapshot["id"]),
-            email=body.passenger_email,
-            special_requirements={
-                "passengers": meta.get("passengers") or [],
-            }
-            if meta.get("passengers")
-            else None,
-        )
-    except Exception:
-        pass
-
-    # Guest website checkout → mint one-shot activate token (not stored on booking).
+    # Mint wallet token before responding (fast). Heavy notify runs in background
+    # so nginx never sees a bare text/plain 500 while the κρατηση already landed.
     activate_token: str | None = None
     src_l = source.lower()
     is_office_desk = (
@@ -606,90 +691,45 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         except Exception:
             activate_token = None
 
-    # Mandatory server-side office (+ customer) payment emails when money was taken.
-    # Do not rely on frontend fire-and-forget notifyPaymentConfirmationSafe.
-    if paid_now > 0:
-        notify_payload = None
-        try:
-            from api.admin_booking_mapper import booking_to_admin_dict
-            from ticketing.payment_confirmation_email import (
-                send_payment_confirmation_notifications,
-            )
+    try:
+        client_ip = await get_client_ip(request)
+    except Exception:
+        client_ip = None
+    user_agent = request.headers.get("User-Agent")
 
-            # Prefer snapshot dict — ORM instance may be expired after session close.
-            notify_payload = {
-                "id": str(booking_snapshot["id"]),
-                "pnr": booking_snapshot["reference_code"],
-                "reference_code": booking_snapshot["reference_code"],
-                "tenant_id": str(tenant_id),
-                "customerName": passenger_name,
-                "passenger_name": passenger_name,
-                "email": passenger_email,
-                "tripTitle": (body.trip_title or "").strip() or "Εκδρομή",
-                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
-                "seat": seat_label,
-                "seat_label": seat_label,
-                "seats": requested_seats,
-                "amountPaid": float(paid_now),
-                "amount_paid": float(paid_now),
-                "price": float(total),
-                "metadata_json": booking_snapshot["metadata_json"],
-            }
-            try:
-                notify_payload = booking_to_admin_dict(booking) or notify_payload
-                notify_payload.setdefault("tenant_id", str(tenant_id))
-            except Exception:
-                pass
-            await send_payment_confirmation_notifications(
-                notify_payload,
-                require_office=True,
-            )
-        except Exception as exc:
-            logger.error(
-                "Guest booking office payment email failed ref=%s tenant=%s: %s",
-                ref,
-                tenant_id,
-                exc,
-            )
+    background_tasks.add_task(
+        _guest_booking_side_effects,
+        booking_snapshot=booking_snapshot,
+        tenant_id=tenant_id,
+        ref=ref,
+        paid_now=paid_now,
+        total=total,
+        body=body,
+        seat_label=seat_label,
+        requested_seats=requested_seats,
+        passenger_name=passenger_name,
+        passenger_email=passenger_email,
+        passenger_phone=passenger_phone,
+        source=source,
+        metadata=dict(metadata or {}),
+        client_ip=client_ip,
+        user_agent=user_agent,
+    )
 
-        # Admin bell + Web Push (καμπανάκι) for Wallet / B2C paid bookings.
-        try:
-            from travel_platform.notifications.excursion_booking_push import (
-                notify_excursion_booking_to_office,
-            )
-
-            push_payload = notify_payload or {
-                "id": str(booking_snapshot["id"]),
-                "pnr": ref,
-                "tenant_id": str(tenant_id),
-                "passenger_name": passenger_name,
-                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
-                "seat_label": seat_label,
-                "amount_paid": float(paid_now),
-            }
-            push_payload.setdefault("tenant_id", str(tenant_id))
-            await notify_excursion_booking_to_office(push_payload)
-        except Exception as exc:
-            logger.warning(
-                "Guest booking office bell/push failed ref=%s tenant=%s: %s",
-                ref,
-                tenant_id,
-                exc,
-            )
-
+    # Coerce primitives — ResponseValidationError must not become text/plain 500.
     return GuestBookingResponse(
-        id=booking_snapshot["id"],
-        tenant_id=booking_snapshot["tenant_id"],
-        reference_code=booking_snapshot["reference_code"],
-        status=booking_snapshot["status"],
-        payment_status=booking_snapshot["payment_status"],
-        total_price=booking_snapshot["total_price"],
-        amount_paid=booking_snapshot["amount_paid"],
-        amount_eur=booking_snapshot["amount_eur"],
-        passenger_name=booking_snapshot["passenger_name"],
-        passenger_email=booking_snapshot["passenger_email"],
-        seat_label=booking_snapshot["seat_label"],
-        metadata_json=booking_snapshot["metadata_json"],
+        id=UUID(str(booking_snapshot["id"])),
+        tenant_id=UUID(str(booking_snapshot["tenant_id"])),
+        reference_code=str(booking_snapshot["reference_code"]),
+        status=str(booking_snapshot["status"]),
+        payment_status=str(booking_snapshot["payment_status"]),
+        total_price=Decimal(str(booking_snapshot["total_price"] or 0)),
+        amount_paid=Decimal(str(booking_snapshot["amount_paid"] or 0)),
+        amount_eur=Decimal(str(booking_snapshot["amount_eur"] or 0)),
+        passenger_name=booking_snapshot.get("passenger_name"),
+        passenger_email=booking_snapshot.get("passenger_email"),
+        seat_label=booking_snapshot.get("seat_label"),
+        metadata_json=dict(booking_snapshot.get("metadata_json") or {}),
         wallet_activate_token=activate_token,
     )
 
