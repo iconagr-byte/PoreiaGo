@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   getCustomerEmail,
@@ -18,6 +18,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
   buildBookingPassengers,
@@ -28,7 +29,6 @@ import {
   clearPendingCheckout,
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
-import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
@@ -51,11 +51,15 @@ import { maskIban } from '../lib/payments/ibanValidation.js';
 import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/checkoutSettingsApi.js';
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
+  const bookState = fromWallet ? location.state : undefined;
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId);
   const [processing, setProcessing] = useState(false);
   const [demoDone, setDemoDone] = useState(null);
   const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);
@@ -76,7 +80,6 @@ export default function CheckoutPage() {
   const [accountReady, setAccountReady] = useState(
     () => Boolean(isCustomer() && getCustomerToken()),
   );
-  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   // Keep identity until logout: hydrate form from JWT + /api/auth/me.
   useEffect(() => {
@@ -116,15 +119,6 @@ export default function CheckoutPage() {
       cancelled = true;
     };
   }, []);
-
-  const trip = useMemo(() => {
-    const id = Number(tripId);
-    if (!id) return null;
-    const found = loadTrips().find((t) => t.id === id) || null;
-    if (found) return found;
-    if (isDemo) return loadPlatformDemoTrips().find((t) => t.id === id) || null;
-    return null;
-  }, [tripId, isDemo]);
 
   const pending = useMemo(() => loadPendingCheckout(), [tripId]);
   const seatCodes = useMemo(() => seatListFromBooking(pending?.seats || ''), [pending?.seats]);
@@ -206,12 +200,12 @@ export default function CheckoutPage() {
   }, [depositEnabled, paymentPlan]);
 
   useEffect(() => {
-    if (demoDone) return;
+    if (demoDone || tripLoading) return;
     if (!trip || !pending || pending.tripId !== trip.id) {
-      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true });
-      else navigate('/', { replace: true });
+      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true, state: bookState });
+      else navigate(fromWallet ? '/wallet' : '/', { replace: true });
     }
-  }, [trip, pending, navigate, demoDone]);
+  }, [trip, tripLoading, pending, navigate, demoDone, bookState, fromWallet]);
 
   useEffect(() => {
     if (isDemo || !trip || !pending) return;
@@ -252,10 +246,10 @@ export default function CheckoutPage() {
                 Ξανά επιλογή θέσης
               </Link>
               <Link
-                to="/#platform-trips"
+                to={fromWallet ? '/wallet' : '/#platform-trips'}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-on-primary px-5 py-3 text-sm font-bold hover:opacity-90"
               >
-                Πίσω στις εκδρομές
+                {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
               </Link>
             </div>
           </div>
@@ -264,7 +258,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (!trip || !pending || pending.tripId !== trip.id) {
+  if (tripLoading || !trip || !pending || pending.tripId !== trip.id) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center">
         <MinimalPageBackground />

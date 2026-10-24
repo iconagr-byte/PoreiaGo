@@ -8,8 +8,16 @@ import { getWalletTenantId } from './walletTenantSeal.js';
 
 const CACHE_KEY = 'wallet_office_trips_v1';
 
+function canUseSessionStorage() {
+  try {
+    return typeof sessionStorage !== 'undefined' && sessionStorage != null;
+  } catch {
+    return false;
+  }
+}
+
 export function rememberWalletOfficeTrips(trips, tenantId = getWalletTenantId()) {
-  if (typeof window === 'undefined') return;
+  if (!canUseSessionStorage()) return;
   const tid = String(tenantId || '').trim();
   try {
     sessionStorage.setItem(
@@ -26,7 +34,7 @@ export function rememberWalletOfficeTrips(trips, tenantId = getWalletTenantId())
 }
 
 export function getCachedWalletOfficeTrips(tenantId = getWalletTenantId()) {
-  if (typeof window === 'undefined') return [];
+  if (!canUseSessionStorage()) return [];
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return [];
@@ -62,6 +70,7 @@ export async function resolvePublicOfficeTrip(tripId, tenantId = getWalletTenant
 
   const tid = String(tenantId || '').trim();
   const list = await fetchPublicOfficeTrips(tid ? { tenantId: tid } : undefined);
-  rememberWalletOfficeTrips(list, tid || null);
-  return list.find((t) => Number(t.id) === id) || null;
+  const rows = Array.isArray(list) ? list : [];
+  rememberWalletOfficeTrips(rows, tid || null);
+  return rows.find((t) => Number(t.id) === id) || null;
 }

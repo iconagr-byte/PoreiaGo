@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import {
   applyExtrasToPending,
@@ -12,8 +12,8 @@ import {
   visibleTripExtraOptions,
 } from '../lib/trips/tripBookingExtras.js';
 import { loadPendingCheckout, savePendingCheckout } from '../lib/ticketing/pendingCheckout.js';
-import { loadPlatformDemoTrips, loadTrips } from '../lib/trips/tripStore.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
+import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/trip-extras.css';
 
@@ -24,33 +24,27 @@ import '../styles/trip-extras.css';
 export default function TripExtrasPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
+  const bookState = fromWallet ? location.state : undefined;
+  const { trip, loading: tripLoading } = usePublicOfficeTrip(tripId);
   const [pending, setPending] = useState(() => loadPendingCheckout());
   const [catalog, setCatalog] = useState([]);
   const [selection, setSelection] = useState({});
   const [loading, setLoading] = useState(true);
 
-  const trip = useMemo(() => {
-    const id = Number(tripId);
-    if (!id) return null;
-    return (
-      loadTrips().find((t) => t.id === id) ||
-      (isPlatformSeatBookingDemo()
-        ? loadPlatformDemoTrips().find((t) => t.id === id)
-        : null) ||
-      null
-    );
-  }, [tripId]);
-
   useEffect(() => {
+    if (tripLoading) return;
     const p = loadPendingCheckout();
     setPending(p);
     if (!p || !trip || p.tripId !== trip.id) {
-      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true });
-      else navigate('/', { replace: true });
+      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true, state: bookState });
+      else navigate(fromWallet ? '/wallet' : '/', { replace: true });
     }
-  }, [trip, navigate]);
+  }, [trip, tripLoading, navigate, bookState, fromWallet]);
 
   useEffect(() => {
+    if (!trip || tripLoading) return undefined;
     let cancelled = false;
     setLoading(true);
     fetchSiteAppearance()
@@ -71,11 +65,13 @@ export default function TripExtrasPage() {
             extrasSelection: {},
             total: seatSubtotal,
           });
-          navigate(`/checkout/${trip.id}`, { replace: true });
+          navigate(`/checkout/${trip.id}`, { replace: true, state: bookState });
         }
       })
       .catch(() => {
-        if (!cancelled && trip) navigate(`/checkout/${trip.id}`, { replace: true });
+        if (!cancelled && trip) {
+          navigate(`/checkout/${trip.id}`, { replace: true, state: bookState });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -83,7 +79,7 @@ export default function TripExtrasPage() {
     return () => {
       cancelled = true;
     };
-  }, [trip, navigate]);
+  }, [trip, tripLoading, navigate, bookState]);
 
   const seats = seatCountFromPending(pending);
   const seatSubtotal = Number(pending?.seatSubtotal ?? pending?.total) || 0;
@@ -104,7 +100,7 @@ export default function TripExtrasPage() {
       catalog,
     );
     savePendingCheckout(next);
-    navigate(`/checkout/${trip.id}`);
+    navigate(`/checkout/${trip.id}`, { state: bookState });
   };
 
   const skip = () => {
@@ -113,7 +109,7 @@ export default function TripExtrasPage() {
     goCheckout(cleared);
   };
 
-  if (!trip || !pending || pending.tripId !== trip.id || loading) {
+  if (tripLoading || !trip || !pending || pending.tripId !== trip.id || loading) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center">
         <MinimalPageBackground />

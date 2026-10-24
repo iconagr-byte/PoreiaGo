@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { generateSeatMap } from '../lib/seats/generateSeatMap.js';
 import {
   findSeatConflicts,
@@ -13,6 +12,7 @@ import { loadBookings } from '../lib/ticketing/bookingStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { useTripPricing } from '../hooks/useTripPricing.js';
+import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
 import LuxuryBusSeatMap from '../components/seats/LuxuryBusSeatMap.jsx';
 import SeatSelectionAside from '../components/seats/SeatSelectionAside.jsx';
@@ -23,60 +23,24 @@ import {
 } from '../lib/seats/seatPricing.js';
 import { fetchPublicSeatPricing } from '../services/seatPricingApi.js';
 import { fetchOccupiedSeats, getSaasTenantId } from '../services/saasApi.js';
-import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import {
   getSeatMapCheckoutButtonClass,
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
-
-function resolveLocalTrip(tripId) {
-  const id = Number(tripId);
-  if (!id) return null;
-  const found = loadTrips().find((t) => Number(t.id) === id) || null;
-  if (found) return found;
-  if (isPlatformSeatBookingDemo()) {
-    return loadPlatformDemoTrips().find((t) => Number(t.id) === id) || null;
-  }
-  return null;
-}
+import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [fleetCheck, setFleetCheck] = useState({ loading: true, available: true, reason: null, warning: null });
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
-  const [remoteTrip, setRemoteTrip] = useState(null);
-  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
-
-  const localTrip = useMemo(() => resolveLocalTrip(tripId), [tripId]);
-  const trip = localTrip || remoteTrip;
-
-  useEffect(() => {
-    if (localTrip) {
-      setRemoteTrip(null);
-      return undefined;
-    }
-    const id = Number(tripId);
-    if (!id) return undefined;
-    let cancelled = false;
-    fetchPublicOfficeTrips()
-      .then((list) => {
-        if (cancelled) return;
-        const hit = (list || []).find((t) => Number(t.id) === id) || null;
-        setRemoteTrip(hit);
-      })
-      .catch(() => {
-        if (!cancelled) setRemoteTrip(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tripId, localTrip]);
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId);
 
   const { pricePerSeat, quote } = useTripPricing(trip);
   const tripBasePrice = quote?.finalPrice ?? trip?.price ?? 0;
@@ -169,6 +133,15 @@ export default function SeatSelection() {
     );
   };
 
+  if (tripLoading) {
+    return (
+      <div className="relative min-h-screen bg-surface flex items-center justify-center p-6">
+        <MinimalPageBackground />
+        <p className="relative z-10 text-on-surface-variant text-sm font-semibold">Φόρτωση θέσεων…</p>
+      </div>
+    );
+  }
+
   if (!trip || !layout) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center p-6">
@@ -176,8 +149,11 @@ export default function SeatSelection() {
         <div className="relative z-10 bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl p-8 text-center max-w-sm shadow-sm border border-black/[0.05]">
           <span className="material-symbols-outlined text-4xl text-error mb-3">error</span>
           <h1 className="font-bold text-lg text-on-surface mb-2">Η εκδρομή δεν βρέθηκε</h1>
-          <Link to="/" className="text-primary font-bold text-sm hover:underline">
-            Αρχική σελίδα
+          <Link
+            to={fromWallet ? '/wallet' : '/'}
+            className="text-primary font-bold text-sm hover:underline"
+          >
+            {fromWallet ? 'Πίσω στο Wallet' : 'Αρχική σελίδα'}
           </Link>
         </div>
       </div>
@@ -232,7 +208,7 @@ export default function SeatSelection() {
         amountEur: total,
       });
     }
-    navigate(`/book/extras/${trip.id}`);
+    navigate(`/book/extras/${trip.id}`, { state: fromWallet ? location.state : undefined });
   };
 
   return (
@@ -242,13 +218,14 @@ export default function SeatSelection() {
         <button
           type="button"
           onClick={() => {
-            // Κράτηση from storefront cards lands here directly — back to trips, not a broken /trip/:id.
-            navigate('/#search-results');
+            // Wallet Κράτηση → back to Αρχική; storefront cards → trip list.
+            if (fromWallet) navigate('/wallet');
+            else navigate('/#search-results');
           }}
           className="mb-4 flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-bold text-sm"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          Πίσω στις εκδρομές
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
         </button>
 
         {isDemo ? (
