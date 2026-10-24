@@ -13,7 +13,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TicketQrCode from '../TicketQrCode.jsx';
-import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
@@ -177,13 +176,11 @@ function PassengerTicketCard({
           {showActions ? (
             <div className="wallet-pass-actions">
               <WalletDeviceSave booking={seatBooking} />
-              {paid && booking.tripId ? (
-                <PassengerTrackCTA booking={booking} showEta={false} />
-              ) : (
+              {!paid ? (
                 <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
                   Λεπτομέρειες κράτησης
                 </button>
-              )}
+              ) : null}
               <div className="wallet-pass-secondary-row">
                 <button
                   type="button"

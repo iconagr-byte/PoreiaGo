@@ -863,11 +863,6 @@ function WalletAuthenticatedApp() {
                             {b.pnr || b.id}
                             {bookingFiscalMark(b) ? ` · MARK ${bookingFiscalMark(b)}` : ''}
                           </p>
-                          {b.tripId && paid ? (
-                            <div style={{ marginTop: '0.5rem' }}>
-                              <PassengerTrackCTA booking={b} compact showEta={false} />
-                            </div>
-                          ) : null}
                           <button
                             type="button"
                             onClick={() => openTicket(b)}
