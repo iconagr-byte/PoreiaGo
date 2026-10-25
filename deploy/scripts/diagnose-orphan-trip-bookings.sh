@@ -179,15 +179,18 @@ async def main():
         if PURGE and use:
             ids = [r["id"] for r in use]
             print(f"PURGE deleting {len(ids)} bookings…")
-            await session.execute(
-                text(
-                    "DELETE FROM bookings "
-                    "WHERE tenant_id::text = :tid AND id::text = ANY(:ids)"
-                ),
-                {"tid": tid, "ids": ids},
-            )
+            deleted = 0
+            for bid in ids:
+                res = await session.execute(
+                    text(
+                        "DELETE FROM bookings "
+                        "WHERE tenant_id::text = :tid AND id::text = :bid"
+                    ),
+                    {"tid": tid, "bid": bid},
+                )
+                deleted += int(res.rowcount or 0)
             await session.commit()
-            print("PURGE done")
+            print(f"PURGE done deleted={deleted}")
         elif PURGE:
             print("PURGE: nothing to delete")
         else:
