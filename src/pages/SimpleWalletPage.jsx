@@ -20,8 +20,12 @@ import {
   walletClaimAuthPath,
   walletClaimNavState,
 } from '../lib/wallet/walletClaim.js';
-import { loadLastPass, patchLastPassQr, saveLastPass } from '../lib/wallet/lastPassSnapshot.js';
+import { loadLastPass, patchLastPassQr, saveLastPass, clearLastPass } from '../lib/wallet/lastPassSnapshot.js';
 import { setupWalletPwa } from '../lib/wallet/registerWalletPwa.js';
+import {
+  dismissWalletPass,
+  loadDismissedWalletPassIds,
+} from '../lib/wallet/walletPassLifecycle.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import {
   expandWalletTickets,
@@ -104,14 +108,14 @@ function loadMyBookings(email) {
   return loadBookingsForCustomer(email);
 }
 
-function pickFeaturedBooking(bookings, highlightId) {
+function pickFeaturedBooking(bookings, highlightId, dismissedIds = []) {
   if (!bookings.length) return null;
   if (highlightId) {
     const hit = bookings.find((b) => b.id === highlightId);
     if (hit) return hit;
   }
   // Same calendar-first order as Εισιτήριο vertical stack (earliest first).
-  const selected = selectWalletPassBookings(bookings);
+  const selected = selectWalletPassBookings(bookings, { dismissedIds });
   return selected[0] || null;
 }
 
@@ -162,6 +166,7 @@ function WalletAuthenticatedApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [dismissedPassIds, setDismissedPassIds] = useState(() => loadDismissedWalletPassIds());
   const [brandLabel, setBrandLabel] = useState('My Wallet');
   const [siteAppearance, setSiteAppearance] = useState(DEFAULT_SITE_APPEARANCE);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
@@ -395,8 +400,13 @@ function WalletAuthenticatedApp() {
   );
 
   const featured = useMemo(
-    () => pickFeaturedBooking(bookings, focusId || peekWalletFocusBooking()),
-    [bookings, focusId],
+    () =>
+      pickFeaturedBooking(
+        bookings,
+        focusId || peekWalletFocusBooking(),
+        dismissedPassIds,
+      ),
+    [bookings, focusId, dismissedPassIds],
   );
 
   const featuredCover = featured ? coverForBooking(featured) : '';
@@ -459,19 +469,49 @@ function WalletAuthenticatedApp() {
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   };
 
+  /** Apple Wallet «Remove Pass» — hide on this device only (does not cancel office booking). */
+  const handleRemovePass = useCallback(
+    (booking) => {
+      if (!booking) return;
+      const aliases = [booking.id, booking.saasBookingId, booking.pnr].filter(Boolean);
+      if (!aliases.length) return;
+      const next = dismissWalletPass(aliases);
+      setDismissedPassIds(next);
+      const snap = loadLastPass();
+      const snapId = snap?.booking?.id;
+      if (
+        snapId &&
+        aliases.map(String).includes(String(snapId))
+      ) {
+        clearLastPass();
+        setOfflineSnap(null);
+      }
+      if (focusId && aliases.map(String).includes(String(focusId))) {
+        clearWalletFocusBooking();
+        setFocusId(null);
+      }
+      setSelectedBookingId(null);
+      setActiveTab('pass');
+    },
+    [focusId],
+  );
+
   /**
    * All wallet tickets for Εισιτήριο vertical stack and the «Επόμενες» rail.
    * Must not collapse to featured-only when trip dates are past — that left the
    * rail showing 2 other bookings while the center showed a single hero.
+   * Expired trips stay visible (after active) until the customer removes the pass.
    */
   const passBookings = useMemo(() => {
     if (usingOfflinePass && displayBooking) return [displayBooking];
-    const selected = selectWalletPassBookings(bookings);
+    const selected = selectWalletPassBookings(bookings, {
+      dismissedIds: dismissedPassIds,
+    });
     if (selected.length) return selected;
     if (featured) return [featured];
     if (displayBooking) return [displayBooking];
     return [];
-  }, [bookings, featured, displayBooking, usingOfflinePass]);
+  }, [bookings, featured, displayBooking, usingOfflinePass, dismissedPassIds]);
 
   const passTickets = useMemo(
     () => expandWalletTickets(passBookings, { passengerName: displayPassenger }),
@@ -1050,8 +1090,9 @@ function WalletAuthenticatedApp() {
             brandLabel={brandLabel}
             passengerName={profile.name}
             onBookingUpdated={handleBookingUpdated}
+            onRemovePass={handleRemovePass}
             onBack={() => {
-              setActiveTab('home');
+              setActiveTab('pass');
               setSelectedBookingId(null);
             }}
           />

@@ -5,9 +5,12 @@ import {
   getBookingPassengers,
   seatListFromBooking,
   expandWalletTickets,
+  isWalletBookingExpired,
   selectWalletPassBookings,
   sortWalletBookingsByDeparture,
   walletBookingDepartureMs,
+  walletBookingExpiryMs,
+  WALLET_PASS_GRACE_HOURS,
 } from './bookingPassengers.js';
 
 describe('bookingPassengers', () => {
@@ -78,39 +81,44 @@ describe('bookingPassengers', () => {
     expect(tickets[2].passenger.seat).toBe('5F');
   });
 
-  test('expandWalletTickets keeps separate Achillio bookings sorted by date', () => {
-    const tickets = expandWalletTickets([
-      {
-        id: 'B-ioa-5d',
-        tripTitle: 'Μαγευτικά Ιωάννινα',
-        date: '2026-06-17',
-        time: '12:00 μ.μ.',
-        seat: '5D',
-        seats: ['5D'],
-        customerName: 'sdsdsdsdsdsd',
-        status: 'Επιβεβαιωμένη',
-      },
-      {
-        id: 'B-ioa-4d',
-        tripTitle: 'Μαγευτικά Ιωάννινα',
-        date: '2026-06-17',
-        time: '12:00 μ.μ.',
-        seat: '4D',
-        seats: ['4D'],
-        customerName: 'Axilleas',
-        status: 'Επιβεβαιωμένη',
-      },
-      {
-        id: 'B-met-3a',
-        tripTitle: 'Ημερήσια στα Μετέωρα',
-        date: '2026-06-15',
-        time: '08:00 π.μ.',
-        seat: '3A',
-        seats: ['3A'],
-        customerName: 'Axilleas',
-        status: 'Επιβεβαιωμένη',
-      },
-    ]);
+  test('select + expand keeps Achillio bookings active-first by date', () => {
+    const now = new Date('2026-06-10T12:00:00');
+    const selected = selectWalletPassBookings(
+      [
+        {
+          id: 'B-ioa-5d',
+          tripTitle: 'Μαγευτικά Ιωάννινα',
+          date: '2026-06-17',
+          time: '12:00 μ.μ.',
+          seat: '5D',
+          seats: ['5D'],
+          customerName: 'sdsdsdsdsdsd',
+          status: 'Επιβεβαιωμένη',
+        },
+        {
+          id: 'B-ioa-4d',
+          tripTitle: 'Μαγευτικά Ιωάννινα',
+          date: '2026-06-17',
+          time: '12:00 μ.μ.',
+          seat: '4D',
+          seats: ['4D'],
+          customerName: 'Axilleas',
+          status: 'Επιβεβαιωμένη',
+        },
+        {
+          id: 'B-met-3a',
+          tripTitle: 'Ημερήσια στα Μετέωρα',
+          date: '2026-06-15',
+          time: '08:00 π.μ.',
+          seat: '3A',
+          seats: ['3A'],
+          customerName: 'Axilleas',
+          status: 'Επιβεβαιωμένη',
+        },
+      ],
+      { now },
+    );
+    const tickets = expandWalletTickets(selected);
     expect(tickets).toHaveLength(3);
     // Μετέωρα 2026-06-15 before Ιωάννινα 2026-06-17
     expect(tickets.map((t) => t.passenger.seat)).toEqual(['3A', '4D', '5D']);
@@ -153,6 +161,14 @@ describe('bookingPassengers', () => {
     expect(tickets.map((t) => t.passenger.seat)).toEqual(['5D', '4D']);
   });
 
+  test('isWalletBookingExpired uses departure + grace hours', () => {
+    const booking = { id: 'E1', date: '2026-06-15', time: '08:00 π.μ.' };
+    const dep = walletBookingDepartureMs(booking);
+    expect(walletBookingExpiryMs(booking)).toBe(dep + WALLET_PASS_GRACE_HOURS * 3600_000);
+    expect(isWalletBookingExpired(booking, new Date(dep + 11 * 3600_000))).toBe(false);
+    expect(isWalletBookingExpired(booking, new Date(dep + 13 * 3600_000))).toBe(true);
+  });
+
   test('selectWalletPassBookings keeps past tickets when none are upcoming', () => {
     const now = new Date('2026-10-21T12:00:00');
     const selected = selectWalletPassBookings(
@@ -188,13 +204,13 @@ describe('bookingPassengers', () => {
       { now },
     );
     expect(selected).toHaveLength(3);
-    // Earliest calendar first — featured/front ticket is Μετέωρα (3A)
-    expect(selected[0].seat).toBe('3A');
-    expect(selected[0].date).toBe('2026-06-15');
-    expect(selected.map((b) => b.date)).toEqual(['2026-06-15', '2026-06-17', '2026-06-17']);
+    // All expired → newest first so recent past trips stay reachable
+    expect(selected[0].date).toBe('2026-06-17');
+    expect(selected.map((b) => b.date)).toEqual(['2026-06-17', '2026-06-17', '2026-06-15']);
+    expect(selected.every((b) => isWalletBookingExpired(b, now))).toBe(true);
   });
 
-  test('selectWalletPassBookings prefers upcoming when mixed', () => {
+  test('selectWalletPassBookings puts active ahead of expired', () => {
     const now = new Date('2026-06-16T12:00:00');
     const selected = selectWalletPassBookings(
       [
@@ -204,8 +220,34 @@ describe('bookingPassengers', () => {
       ],
       { now },
     );
-    expect(selected).toHaveLength(2);
-    expect(selected.every((b) => b.date === '2026-06-17')).toBe(true);
-    expect(selected.map((b) => b.id).sort()).toEqual(['next', 'next2']);
+    expect(selected).toHaveLength(3);
+    expect(selected.slice(0, 2).map((b) => b.id).sort()).toEqual(['next', 'next2']);
+    expect(selected[2].id).toBe('past');
+    expect(isWalletBookingExpired(selected[2], now)).toBe(true);
+  });
+
+  test('selectWalletPassBookings drops dismissed Remove Pass ids', () => {
+    const now = new Date('2026-06-16T12:00:00');
+    const selected = selectWalletPassBookings(
+      [
+        { id: 'keep', date: '2026-06-17', seat: '5D', status: 'Επιβεβαιωμένη' },
+        { id: 'gone', pnr: 'PNR-GONE', date: '2026-06-17', seat: '4D', status: 'Επιβεβαιωμένη' },
+      ],
+      { now, dismissedIds: ['PNR-GONE'] },
+    );
+    expect(selected.map((b) => b.id)).toEqual(['keep']);
+  });
+
+  test('expandWalletTickets preserves selectWalletPassBookings order', () => {
+    const now = new Date('2026-06-16T12:00:00');
+    const bookings = selectWalletPassBookings(
+      [
+        { id: 'past', date: '2026-06-15', seat: '3A', status: 'Επιβεβαιωμένη' },
+        { id: 'next', date: '2026-06-20', seat: '5D', status: 'Επιβεβαιωμένη' },
+      ],
+      { now },
+    );
+    const tickets = expandWalletTickets(bookings);
+    expect(tickets.map((t) => t.booking.id)).toEqual(['next', 'past']);
   });
 });

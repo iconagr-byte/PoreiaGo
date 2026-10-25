@@ -8,7 +8,7 @@
  * Native Capacitor: tap-to-expand only — nested scroll-snap fights .wallet-main
  * in WebView (stuck front, clipped peeks, untappable headers).
  * Desktop: tap-to-front.
- * Tickets stay chronological — earliest departure first (expandWalletTickets).
+ * Order comes from selectWalletPassBookings (active earliest-first, then expired).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -16,8 +16,16 @@ import TicketQrCode from '../TicketQrCode.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
-import { expandWalletTickets } from '../../lib/ticketing/bookingPassengers.js';
+import {
+  expandWalletTickets,
+  isWalletBookingExpired,
+} from '../../lib/ticketing/bookingPassengers.js';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+
+const EXPIRED_STATUS = {
+  className: 'wallet-pass-status--expired',
+  label: 'Ληγμένη',
+};
 
 function formatTripWhen(booking) {
   const date = booking?.date || '—';
@@ -45,6 +53,7 @@ function PassengerTicketCard({
   pnr,
   mark,
   offline,
+  expired = false,
   onOpenDetails,
   onQrChange,
   showActions,
@@ -58,6 +67,16 @@ function PassengerTicketCard({
   const seatBooking = seatBookingFor(booking, passenger);
   /* Stack peeks keep body in the DOM so max-height can animate smoothly. */
   const stackPeek = !isFront && compactHeader;
+  const statusLabel = expired
+    ? EXPIRED_STATUS.label
+    : booking.status || (paid ? 'Πληρωμένο' : '—');
+  const statusClass = expired ? EXPIRED_STATUS.className : status.className;
+  const qrLive = paid && !offline && !expired;
+
+  const openInfo = (e) => {
+    e?.stopPropagation?.();
+    onOpenDetails?.(booking);
+  };
 
   return (
     <article
@@ -66,10 +85,11 @@ function PassengerTicketCard({
         'wallet-pass-card-enter',
         isFront ? 'is-front' : 'is-peek',
         stackPeek ? 'is-peek-collapsed' : '',
+        expired ? 'is-expired' : '',
       ]
         .filter(Boolean)
         .join(' ')}
-      aria-label={`Εισιτήριο ${passenger.name || passenger.seat}`}
+      aria-label={`Εισιτήριο ${passenger.name || passenger.seat}${expired ? ' · ληγμένη' : ''}`}
       aria-current={isFront ? 'true' : undefined}
       data-stack-index={stackIndex}
       data-stack-total={stackTotal}
@@ -103,6 +123,16 @@ function PassengerTicketCard({
               {passenger.seat || '·'}
             </span>
           ) : null}
+          {isFront && onOpenDetails ? (
+            <button
+              type="button"
+              className="wallet-pass-info-btn"
+              onClick={openInfo}
+              aria-label="Πληροφορίες εισιτηρίου"
+            >
+              <span aria-hidden>ⓘ</span>
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -117,9 +147,7 @@ function PassengerTicketCard({
             </p>
             <p className="wallet-pass-passenger truncate">{passenger.name || '—'}</p>
           </div>
-          <span className={`wallet-pass-status ${status.className}`}>
-            {booking.status || (paid ? 'Πληρωμένο' : '—')}
-          </span>
+          <span className={`wallet-pass-status ${statusClass}`}>{statusLabel}</span>
         </div>
 
         <div className="wallet-pass-meta">
@@ -146,8 +174,20 @@ function PassengerTicketCard({
               <span />
             </div>
 
-            <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
-              {offline && booking._offlineQrDataUrl && showActions ? (
+            <div
+              className={`wallet-pass-qr-wrap${qrLive ? ' is-live' : ''}${expired ? ' is-expired' : ''}`}
+            >
+              {expired ? (
+                <div className="wallet-pass-expired-panel" role="status">
+                  <span className="material-symbols-outlined" aria-hidden>
+                    event_busy
+                  </span>
+                  <p>Η εκδρομή έχει λήξει</p>
+                  <p className="wallet-pass-expired-sub">
+                    Το εισιτήριο δεν είναι πλέον ενεργό για επιβίβαση
+                  </p>
+                </div>
+              ) : offline && booking._offlineQrDataUrl && showActions ? (
                 <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
                   <img
                     src={booking._offlineQrDataUrl}
@@ -164,14 +204,16 @@ function PassengerTicketCard({
                   onQrChange={showActions ? onQrChange : undefined}
                 />
               )}
-              <p className="wallet-pass-qr-hint">
-                {offline
-                  ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
-                  : paid
-                    ? `Δείξτε το QR για τη θέση ${passenger.seat || ''} στον οδηγό`
-                    : 'Το QR ενεργοποιείται μετά την πληρωμή'}
-              </p>
-              {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
+              {!expired ? (
+                <p className="wallet-pass-qr-hint">
+                  {offline
+                    ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
+                    : paid
+                      ? `Δείξτε το QR για τη θέση ${passenger.seat || ''} στον οδηγό`
+                      : 'Το QR ενεργοποιείται μετά την πληρωμή'}
+                </p>
+              ) : null}
+              {mark && !expired ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
             </div>
           </>
         ) : (
@@ -181,20 +223,13 @@ function PassengerTicketCard({
 
         {showActions ? (
           <div className="wallet-pass-actions">
-            <WalletDeviceSave booking={seatBooking} />
-            {!paid ? (
-              <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
+            {!expired ? <WalletDeviceSave booking={seatBooking} /> : null}
+            {!paid && !expired ? (
+              <button type="button" className="wallet-pass-cta" onClick={openInfo}>
                 Λεπτομέρειες κράτησης
               </button>
             ) : null}
-            <div className="wallet-pass-secondary-row">
-              <button
-                type="button"
-                className="wallet-pass-secondary"
-                onClick={() => onOpenDetails?.(booking)}
-              >
-                Λεπτομέρειες
-              </button>
+            <div className="wallet-pass-secondary-row wallet-pass-secondary-row--solo">
               <Link
                 to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
                 className="wallet-pass-secondary"
@@ -499,7 +534,8 @@ export default function WalletBoardingPass({
             const st = statusStyle(ticket.booking);
             const pnr = ticket.booking.pnr || ticket.booking.id;
             const isFront = index === activeIndex;
-            const mark = isFront ? bookingFiscalMark(ticket.booking) : null;
+            const expired = isWalletBookingExpired(ticket.booking);
+            const mark = isFront && !expired ? bookingFiscalMark(ticket.booking) : null;
             const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
             // Peeks above the front stay under it; peeks below sit on top of the front bottom edge.
             const z = isFront
@@ -515,7 +551,7 @@ export default function WalletBoardingPass({
                   slotRefs.current[index] = el;
                 }}
                 data-unfurl-index={index}
-                className={`wallet-pass-vstack-slot${isFront ? ' is-front' : ' is-peek'}`}
+                className={`wallet-pass-vstack-slot${isFront ? ' is-front' : ' is-peek'}${expired ? ' is-expired' : ''}`}
                 style={{ zIndex: z }}
                 onClick={!isFront ? bringForward : undefined}
                 onKeyDown={
@@ -546,8 +582,9 @@ export default function WalletBoardingPass({
                   pnr={pnr}
                   mark={mark}
                   offline={offline}
+                  expired={expired}
                   onOpenDetails={onOpenDetails}
-                  onQrChange={isFront ? onQrChange : undefined}
+                  onQrChange={isFront && !expired ? onQrChange : undefined}
                   showActions={isFront}
                   showQr={isFront}
                   compactHeader
@@ -573,11 +610,15 @@ export default function WalletBoardingPass({
   const paid = isPaid(single.booking);
   const st = statusStyle(single.booking);
   const pnr = single.booking.pnr || single.booking.id;
-  const mark = bookingFiscalMark(single.booking);
+  const expired = isWalletBookingExpired(single.booking);
+  const mark = expired ? null : bookingFiscalMark(single.booking);
   const cover = coverForBooking(single.booking, coverImage, tripImageFor);
 
   return (
-    <section className="wallet-pass" aria-label="Εισιτήρια επιβίβασης">
+    <section
+      className={`wallet-pass${expired ? ' wallet-pass--expired' : ''}`}
+      aria-label="Εισιτήρια επιβίβασης"
+    >
       <div
         className="wallet-pass-hero"
         style={{ backgroundImage: cover ? `url(${cover})` : undefined }}
@@ -588,6 +629,16 @@ export default function WalletBoardingPass({
           <h1 className="wallet-pass-title">{single.booking.tripTitle || 'Εκδρομή'}</h1>
           <p className="wallet-pass-when">{formatTripWhen(single.booking)}</p>
         </div>
+        {onOpenDetails ? (
+          <button
+            type="button"
+            className="wallet-pass-info-btn wallet-pass-info-btn--hero"
+            onClick={() => onOpenDetails(single.booking)}
+            aria-label="Πληροφορίες εισιτηρίου"
+          >
+            <span aria-hidden>ⓘ</span>
+          </button>
+        ) : null}
       </div>
 
       <div className="wallet-pass-stack">
@@ -601,8 +652,9 @@ export default function WalletBoardingPass({
           pnr={pnr}
           mark={mark}
           offline={offline}
+          expired={expired}
           onOpenDetails={onOpenDetails}
-          onQrChange={onQrChange}
+          onQrChange={expired ? undefined : onQrChange}
           showActions
           stackIndex={0}
           stackTotal={1}

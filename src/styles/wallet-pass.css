@@ -1367,6 +1367,100 @@
   white-space: nowrap;
 }
 
+.wallet-pass-status--expired {
+  background: rgba(15, 23, 42, 0.08);
+  color: #64748b;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+/* Apple Wallet–style discreet ⓘ — opens pass details / Remove Pass */
+.wallet-pass-info-btn {
+  position: absolute;
+  z-index: 3;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.wallet-pass-info-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.wallet-pass-info-btn--hero {
+  top: 1rem;
+  right: 1rem;
+}
+
+.wallet-pass-card.is-expired,
+.wallet-pass--expired .wallet-pass-card {
+  opacity: 0.92;
+}
+
+.wallet-pass-vstack-slot.is-expired.is-peek .wallet-pass-card {
+  filter: grayscale(0.35);
+}
+
+.wallet-pass-qr-wrap.is-expired {
+  opacity: 0.95;
+}
+
+.wallet-pass-expired-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 10.5rem;
+  padding: 1.25rem 1rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border: 1px dashed rgba(15, 23, 42, 0.14);
+  text-align: center;
+  color: #475569;
+}
+
+.wallet-pass-expired-panel .material-symbols-outlined {
+  font-size: 2rem;
+  color: #94a3b8;
+}
+
+.wallet-pass-expired-panel > p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #334155;
+}
+
+.wallet-pass-expired-sub {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  max-width: 14rem;
+  line-height: 1.35;
+}
+
+.wallet-pass-secondary-row--solo {
+  grid-template-columns: 1fr;
+}
+
 .wallet-pass-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2050,6 +2144,52 @@
 
 .wallet-ticket-email:disabled {
   opacity: 0.65;
+}
+
+/* Apple Wallet «Remove Pass» — back of pass */
+.wallet-ticket-remove {
+  margin-top: 0.35rem;
+  padding: 1.15rem 0.25rem 0.5rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  text-align: center;
+}
+
+.wallet-ticket-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #e11d48;
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  cursor: pointer;
+}
+
+.wallet-ticket-remove-btn:hover {
+  background: rgba(225, 29, 72, 0.06);
+}
+
+.wallet-ticket-remove-btn:active {
+  transform: scale(0.985);
+}
+
+.wallet-ticket-remove-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wallet-ticket-remove-hint {
+  margin: 0.15rem auto 0;
+  max-width: 18rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--wallet-muted);
 }
 
 /* Device save sheet */
