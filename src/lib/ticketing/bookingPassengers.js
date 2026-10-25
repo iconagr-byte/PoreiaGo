@@ -172,30 +172,59 @@ export function sortWalletBookingsByDeparture(bookings) {
   );
 }
 
+/** Hours after departure before the boarding pass is no longer active. */
+export const WALLET_PASS_GRACE_HOURS = 12;
+
+/**
+ * Instant after which the excursion is no longer boardable.
+ * Unknown departure → null (treat as still active — don't hide undated rows).
+ */
+export function walletBookingExpiryMs(booking, { graceHours = WALLET_PASS_GRACE_HOURS } = {}) {
+  const dep = walletBookingDepartureMs(booking);
+  if (!dep) return null;
+  return dep + Math.max(0, Number(graceHours) || 0) * 60 * 60 * 1000;
+}
+
+export function isWalletBookingExpired(booking, now = new Date(), opts) {
+  const exp = walletBookingExpiryMs(booking, opts);
+  if (exp == null) return false;
+  const t = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  return t > exp;
+}
+
 /**
  * Bookings that feed the Εισιτήριο pass (phone fan / desktop gallery).
  *
- * Prefer non-cancelled upcoming trips. When every trip date is in the past
- * (demo dates, clock skew, or travel already done), still return all
- * non-cancelled bookings — otherwise desktop collapses to a single featured
- * hero while the «Επόμενες» rail still lists the other tickets.
- *
- * Always sorted earliest departure first (same order on phone + desktop).
+ * - Drops cancelled (+ optional dismissed «Remove Pass» ids).
+ * - Active (not expired) first, earliest departure first.
+ * - Expired excursions stay visible after active ones (newest expired first)
+ *   so the stack never pretends a past trip is still boardable.
  */
-export function selectWalletPassBookings(bookings, { now = new Date() } = {}) {
-  const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
-  const active = list.filter((b) => b.status !== 'Ακυρωμένη');
-  const upcoming = sortWalletBookingsByDeparture(
-    active.filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now),
+export function selectWalletPassBookings(
+  bookings,
+  { now = new Date(), dismissedIds = [] } = {},
+) {
+  const dismissedSet = new Set((dismissedIds || []).map(String));
+  const list = (Array.isArray(bookings) ? bookings.filter(Boolean) : []).filter((b) => {
+    if (b.status === 'Ακυρωμένη') return false;
+    const aliases = [b.id, b.saasBookingId, b.pnr].filter(Boolean).map(String);
+    return !aliases.some((id) => dismissedSet.has(id));
+  });
+  const active = sortWalletBookingsByDeparture(
+    list.filter((b) => !isWalletBookingExpired(b, now)),
   );
-  if (upcoming.length) return upcoming;
-  return sortWalletBookingsByDeparture(active);
+  const expired = sortWalletBookingsByDeparture(
+    list.filter((b) => isWalletBookingExpired(b, now)),
+  ).reverse();
+  return [...active, ...expired];
 }
 
 /**
  * Flatten bookings → one wallet ticket per seat/passenger.
  * Used by My Wallet pass (Apple Wallet vertical stack) / Επόμενες rail.
- * Tickets are ordered by departure ascending so front/first pass is earliest-first.
+ * Preserves the input booking order from selectWalletPassBookings
+ * (active earliest-first, then expired newest-first) so a past trip
+ * never jumps in front of a still-boardable one.
  */
 export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
   const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
@@ -226,6 +255,5 @@ export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
       });
     });
   }
-  // Calendar-first across bookings; stable sort keeps party seat order within one booking.
-  return tickets.sort((a, b) => compareWalletBookingsByDeparture(a.booking, b.booking));
+  return tickets;
 }
