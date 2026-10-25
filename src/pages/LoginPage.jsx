@@ -5,12 +5,11 @@ import {
   getCustomerToken,
   isCustomer,
   loginAsCustomer,
-  isDriver,
+  logoutCustomer,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import {
   verifyGoogleLogin,
-  loginCustomer,
   isCustomerAuthBackendAvailable,
 } from '../services/customerAuthApi.js';
 import {
@@ -24,9 +23,13 @@ import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { isNativeUnifiedApp } from '../lib/capacitor/nativeAppId.js';
 import {
   rememberNativeRoleHome,
+  NATIVE_ROLE_DRIVER,
   NATIVE_ROLE_RENT,
   NATIVE_ROLE_WALLET,
 } from '../lib/capacitor/nativeRoleHome.js';
+import { attemptUnifiedLogin, resolveCustomerSurface } from '../lib/auth/unifiedLogin.js';
+import { clearDriverSession, getDriverSession } from '../lib/driver/driverSession.js';
+import { clearDriverShiftLaunchState } from '../lib/driver/useDriverShiftSession.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
@@ -57,15 +60,17 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const bookingPayContinue =
     typeof location.state?.from === 'string' &&
     (location.state.from.includes('/rent/book/payment') || location.state?.rentBookingPay);
-  const redirectTo = pathRent
-    ? isRentReturn(location.state?.from)
-      ? location.state.from
-      : '/rent/wallet'
-    : location.state?.from || '/wallet';
-  const rentIntent =
-    (pathRent || isRentReturn(redirectTo)) && (!isNativeApp() || allowNativeRent);
-  const walletIntent =
-    !rentIntent && (location.state?.from === '/wallet' || Boolean(location.state?.walletClaim));
+  // Deep-link /rent/* still paints green Rent chrome; plain /login auto-detects role.
+  const rentChrome =
+    (pathRent || isRentReturn(location.state?.from) || bookingPayContinue) &&
+    (!isNativeApp() || allowNativeRent);
+  const preferRentHint = Boolean(rentChrome);
+  const preferWalletHint =
+    Boolean(location.state?.walletClaim) ||
+    location.state?.from === '/wallet' ||
+    (typeof location.state?.from === 'string' && location.state.from.startsWith('/wallet'));
+  const rentIntent = rentChrome;
+  const walletIntent = !rentIntent && preferWalletHint;
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -93,41 +98,61 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }, []);
 
   useEffect(() => {
-    // Bus /login must never host rent — send rent deep-links to green /rent/login.
-    if (
-      location.pathname === '/login' &&
-      isRentReturn(location.state?.from)
-    ) {
-      navigate('/rent/login', { replace: true, state: location.state });
-    }
-  }, [location.pathname, location.state, navigate]);
-
-  useEffect(() => {
-    if (isCustomer() && getCustomerToken()) {
-      navigate(redirectTo, { replace: true });
+    // Live driver JWT → command center (no separate «Είσοδος οδηγού» link).
+    if (getDriverSession()?.accessToken) {
+      rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
+      navigate('/driver', { replace: true });
       return;
     }
-    // /login and /rent/login are customer wallets — never bounce leftover office
-    // admin sessions into Back Office (that dumped www.poreiago.com visitors).
-    if (rentIntent || walletIntent) return;
-    if (isDriver()) {
-      navigate('/driver', { replace: true });
+    // Already signed in as customer — resume last/correct surface.
+    if (isCustomer() && getCustomerToken()) {
+      const from = location.state?.from;
+      if (typeof from === 'string' && from && from !== '/login' && from !== '/rent/login') {
+        navigate(from, { replace: true });
+        return;
+      }
+      void resolveCustomerSurface({
+        preferRent: preferRentHint,
+        preferWallet: preferWalletHint || Boolean(claim),
+      }).then((surface) => {
+        rememberNativeRoleHome(surface.role);
+        navigate(surface.path, { replace: true });
+      });
     }
-  }, [navigate, redirectTo, walletIntent, rentIntent]);
+  }, [
+    navigate,
+    preferRentHint,
+    preferWalletHint,
+    claim,
+    location.state?.from,
+  ]);
 
-  const finishLogin = (email, profile = {}, accessToken = null) => {
-    loginAsCustomer(email, profile, accessToken);
-    if (isNativeApp()) {
-      rememberNativeRoleHome(rentIntent ? NATIVE_ROLE_RENT : NATIVE_ROLE_WALLET);
+  const finishCustomerLogin = (email, profile = {}, accessToken = null, surface) => {
+    try {
+      clearDriverSession();
+    } catch {
+      /* ignore */
     }
+    loginAsCustomer(email, profile, accessToken);
+    const role = surface?.role || (rentIntent ? NATIVE_ROLE_RENT : NATIVE_ROLE_WALLET);
+    const dest =
+      surface?.path ||
+      (rentIntent
+        ? isRentReturn(location.state?.from)
+          ? location.state.from
+          : '/rent/wallet'
+        : location.state?.from && !String(location.state.from).startsWith('/rent')
+          ? location.state.from
+          : '/wallet');
+    rememberNativeRoleHome(role);
     const hadClaim = Boolean(claim);
     clearWalletClaim();
     const homeState = walletHomeNavState({
       highlightBooking,
       fromClaim: hadClaim,
     });
-    // Rent: always bump location state so /rent gate remounts into the app.
-    const rentLookupState = rentIntent
+    const goingRent = role === NATIVE_ROLE_RENT || String(dest).startsWith('/rent');
+    const rentLookupState = goingRent
       ? {
           rentAuthedAt: Date.now(),
           ...(location.state?.highlightRentalBooking
@@ -141,17 +166,28 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         }
       : undefined;
     const nextState =
-      redirectTo === '/wallet' || redirectTo.startsWith('/wallet')
+      String(dest).startsWith('/wallet')
         ? homeState
-        : rentIntent
+        : goingRent
           ? rentLookupState
           : highlightBooking
             ? homeState
             : undefined;
-    navigate(redirectTo, {
+    navigate(dest, {
       replace: true,
       state: nextState,
     });
+  };
+
+  const finishDriverLogin = () => {
+    try {
+      logoutCustomer();
+    } catch {
+      /* ignore */
+    }
+    clearDriverShiftLaunchState();
+    rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
+    navigate('/driver', { replace: true });
   };
 
   const handleLogin = async (e) => {
@@ -160,9 +196,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     const email = e.target.email.value.trim().toLowerCase();
     const password = e.target.password.value;
 
-    if (email === 'admin@aerostride.com' || email === 'driver@aerostride.com') {
+    if (email === 'admin@aerostride.com') {
       setError(
-        'Αυτή η σελίδα είναι μόνο για πελάτες. Για διαχείριση χρησιμοποιήστε Admin Login.',
+        'Αυτή η σελίδα δεν είναι για διαχείριση γραφείου. Χρησιμοποιήστε Admin Login.',
       );
       return;
     }
@@ -173,8 +209,16 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
     setLoading(true);
     try {
-      const result = await loginCustomer({ email, password });
-      finishLogin(
+      const outcome = await attemptUnifiedLogin(email, password, {
+        preferRent: preferRentHint,
+        preferWallet: preferWalletHint || Boolean(claim),
+      });
+      if (outcome.kind === 'driver') {
+        finishDriverLogin();
+        return;
+      }
+      const result = outcome.result;
+      finishCustomerLogin(
         result.email,
         {
           name: result.name,
@@ -185,6 +229,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           tenant_id: result.tenant_id,
         },
         result.access_token,
+        { role: outcome.role, path: outcome.path },
       );
     } catch (err) {
       const msg = err.message || 'Αποτυχία σύνδεσης';
@@ -207,7 +252,11 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     setGoogleLoading(true);
     try {
       const profile = await verifyGoogleLogin(credential);
-      finishLogin(
+      const surface = await resolveCustomerSurface({
+        preferRent: preferRentHint,
+        preferWallet: preferWalletHint || Boolean(claim),
+      });
+      finishCustomerLogin(
         profile.email,
         {
           name: profile.name,
@@ -217,6 +266,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           tenant_id: profile.tenant_id,
         },
         profile.access_token,
+        surface,
       );
     } catch (err) {
       const msg = String(err?.message || err || '');
@@ -240,6 +290,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on return from bridge
   }, []);
 
+  const registerFrom = preferRentHint ? '/rent/wallet' : '/wallet';
   const registerState =
     claim && !rentIntent
       ? {
@@ -252,9 +303,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             source: claim.source || 'manual',
             createdAt: Date.now(),
           }),
-          from: redirectTo,
+          from: registerFrom,
         }
-      : { from: redirectTo };
+      : { from: registerFrom };
 
   const iconClass = rentIntent
     ? 'material-symbols-outlined rent-auth-icon'
@@ -279,7 +330,11 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.'
               : 'Σύνδεση για ενοικίαση οχήματος'}
           </p>
-        ) : null}
+        ) : (
+          <p className={leadClass}>
+            Ένας λογαριασμός — ανοίγει αυτόματα το σωστό wallet (πελάτης ή οδηγός).
+          </p>
+        )}
       </div>
 
       {claim && !rentIntent ? (
@@ -312,7 +367,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         ) : null}
 
         <div className="space-y-2">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">Email / χρήστης</label>
           <div className="relative">
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg">
               mail
@@ -320,9 +375,11 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             <input
               id="email"
               name="email"
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="username"
               defaultValue={prefillEmail}
-              placeholder="email@example.com"
+              placeholder="email ή όνομα χρήστη"
               required
             />
           </div>
@@ -374,23 +431,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
         </Link>
       </p>
-      {isNativeApp() && isNativeUnifiedApp() ? (
-        <p className="text-xs text-center mt-4 space-y-2">
-          {!rentIntent ? (
-            <Link to="/rent/login" state={{ from: '/rent/wallet', rentEntrance: true }} className={linkClass}>
-              Είσοδος ενοικιάσεων
-            </Link>
-          ) : (
-            <Link to="/login" state={{ from: '/wallet', walletClaim: true }} className={linkClass}>
-              Είσοδος My Wallet (λεωφορεία)
-            </Link>
-          )}
-          <br />
-          <Link to="/driver" className={linkClass}>
-            Είσοδος οδηγού
-          </Link>
-        </p>
-      ) : !isNativeApp() ? (
+      {!isNativeApp() ? (
         !rentIntent ? (
           <p className="text-xs text-center mt-3">
             <Link to="/my-booking" className={linkClass}>

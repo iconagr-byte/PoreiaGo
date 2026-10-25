@@ -6,7 +6,7 @@
  *   driver  → /driver          (DriverCommandCenter)
  *   wallet  → /wallet          (SimpleWalletPage / bus My Wallet)
  *   rent    → /rent/wallet     (RentalCustomerApp)
- *   none    → /login           (unified customer login; driver via /driver)
+ *   none    → /login           (unified login: auto-detects customer / driver / rent)
  */
 
 import { getCustomerToken, isCustomer } from '../auth.js';
