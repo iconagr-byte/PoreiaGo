@@ -112,7 +112,7 @@ export default function MasterQrGate({ onAuthenticated }) {
             </span>
           </div>
           <p className="driver-header-kicker mb-1" style={{ color: 'var(--driver-muted)' }}>
-            PoreiaGo · Οδηγός
+            Εφαρμογή οδηγού
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--driver-text)' }}>
             {mode === 'password'
