@@ -11,7 +11,7 @@ import {
   CUSTOMER_SERVICE_RENT,
 } from '../lib/customers/customerStore.js';
 import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRentalApi.js';
-import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
+import { loadBookings, cancelBooking, deleteBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
 import { ensureDriverSession } from '../services/ticketingApi.js';
@@ -1744,6 +1744,24 @@ export default function BackOffice() {
       }
     };
 
+    const handleDelete = async (bookingId) => {
+      if (
+        !window.confirm(
+          'Διαγραφή κράτησης οριστικά; Θα φύγει από τη λίστα και θα ελευθερωθούν οι θέσεις. Δεν αναιρείται.',
+        )
+      ) {
+        return;
+      }
+      try {
+        const next = await deleteBooking(bookingId);
+        setBookings(Array.isArray(next) ? next : loadBookings());
+        setSelectedBooking(null);
+        toast.success('Η κράτηση διαγράφηκε');
+      } catch (err) {
+        toast.error(err.message || 'Αποτυχία διαγραφής');
+      }
+    };
+
     if (selectedBooking) {
       const currentSelectedBooking = bookings.find(b => b.id === selectedBooking.id) || selectedBooking;
 
@@ -1756,6 +1774,7 @@ export default function BackOffice() {
             onPrint={(b) => navigate(ticketPrintPath(b.id))}
             onEmail={openEmailFromBooking}
             onCancel={handleCancel}
+            onDelete={handleDelete}
             onOpenCustomer={openCustomerProfile}
             onBookingUpdated={applyBookingUpdate}
           />

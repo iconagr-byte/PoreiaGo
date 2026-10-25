@@ -31,6 +31,7 @@ export default function BookingDetailPanel({
   onPrint,
   onEmail,
   onCancel,
+  onDelete,
   onOpenCustomer,
   onBookingUpdated,
 }) {
@@ -220,6 +221,16 @@ export default function BookingDetailPanel({
             >
               <span className="material-symbols-outlined text-[20px]">cancel</span>
               Ακύρωση
+            </button>
+          )}
+          {mode === 'admin' && onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(booking.id)}
+              className="px-5 py-2.5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 flex items-center gap-2 transition-colors text-sm shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[20px]">delete</span>
+              Διαγραφή
             </button>
           )}
         </div>
