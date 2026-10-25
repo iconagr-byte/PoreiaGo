@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from core.dependencies import get_tenant_id
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import String, cast, delete, or_, select, text
 
 router = APIRouter(tags=["admin-bookings"])
 
@@ -130,6 +130,42 @@ def _is_booking_id_type_mismatch(exc: BaseException) -> bool:
     msg = f"{exc.__class__.__name__}: {exc}".lower()
     return "text = uuid" in msg or (
         "operator does not exist" in msg and "uuid" in msg and "text" in msg
+    )
+
+
+async def _hard_delete_booking(session, booking, tenant_id: UUID) -> None:
+    """
+    Permanently delete a booking row.
+
+    Contabo stores bookings.id as TEXT while the ORM maps UUID. Session
+    ``delete(booking)`` emits ``WHERE id = $1::UUID`` → text = uuid.
+    Always delete via text cast (FK CASCADE cleans fiscal_invoices).
+    """
+    from app.models.booking import Booking
+
+    booking_id = str(booking.id)
+    # Detach so commit cannot fall back to ORM UUID-bound DELETE.
+    try:
+        session.expunge(booking)
+    except Exception:
+        pass
+
+    result = await session.execute(
+        delete(Booking).where(
+            cast(Booking.id, String) == booking_id,
+            Booking.tenant_id == tenant_id,
+        )
+    )
+    if result.rowcount and result.rowcount > 0:
+        return
+
+    # Fallback: cast both sides in SQL (TEXT PK + possible TEXT tenant_id).
+    await session.execute(
+        text(
+            "DELETE FROM bookings "
+            "WHERE id::text = :bid AND tenant_id::text = :tid"
+        ),
+        {"bid": booking_id, "tid": str(tenant_id)},
     )
 
 
@@ -361,8 +397,23 @@ async def delete_admin_booking(
             seats = list(meta.get("seats") or [])
             trip_id = meta.get("external_trip_id") or getattr(booking, "trip_id", None)
 
-            await db.delete(booking)
-            await db.commit()
+            try:
+                await _hard_delete_booking(db, booking, tenant_id)
+                await db.commit()
+            except Exception as exc:
+                if not _is_booking_id_type_mismatch(exc):
+                    raise
+                await db.rollback()
+                await apply_tenant_rls(db, tenant_id)
+                # Raw text delete only (no ORM UUID bind at all).
+                await db.execute(
+                    text(
+                        "DELETE FROM bookings "
+                        "WHERE id::text = :bid AND tenant_id::text = :tid"
+                    ),
+                    {"bid": booking_id, "tid": str(tenant_id)},
+                )
+                await db.commit()
 
         try:
             from ticketing.cancel_service import cancel_ticket_booking
