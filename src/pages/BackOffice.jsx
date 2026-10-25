@@ -38,6 +38,7 @@ import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
 import { deleteTrip as removeTripFromStore, loadTrips, getTripById } from '../lib/trips/tripStore.js';
 import { hydrateTripsFromServer } from '../services/tripsSyncApi.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
+import { bookingCoverUrl, tripCoverUrl } from '../lib/trips/tripPhotos.js';
 import {
   getTripMarket,
   MARKET_DOMESTIC,
@@ -1822,12 +1823,16 @@ export default function BackOffice() {
           tripTitle,
           tripId: trip?.id ?? null,
           draft: trip?.status === 'draft',
+          coverUrl: tripCoverUrl(trip) || '',
           bookings: [],
           dates: new Set(),
         };
       } else if (trip?.id && !groupsByKey[key].tripId) {
         groupsByKey[key].tripId = trip.id;
         groupsByKey[key].draft = trip.status === 'draft';
+        if (!groupsByKey[key].coverUrl) {
+          groupsByKey[key].coverUrl = tripCoverUrl(trip) || '';
+        }
       }
       return groupsByKey[key];
     };
@@ -1852,6 +1857,9 @@ export default function BackOffice() {
       const key = trip ? `trip:${trip.id}` : `title:${tripTitle}`;
       const group = ensureGroup(key, tripTitle, trip);
       group.bookings.push(booking);
+      if (!group.coverUrl) {
+        group.coverUrl = bookingCoverUrl(booking, officeTrips) || '';
+      }
       if (booking.date) group.dates.add(String(booking.date));
       else if (trip?.departureTime) {
         const d = String(trip.departureTime).slice(0, 10);
@@ -1960,61 +1968,132 @@ export default function BackOffice() {
           </div>
         ) : null}
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {visibleGroups.map((group) => {
             const key = group.key;
             const isExpanded = expandedTripBookings === key;
             const totalRevenue = group.bookings.reduce((sum, b) => sum + (b.price || 0), 0);
+            const checkedInCount = group.bookings.filter((b) => b.checkedIn).length;
             const dateLabel =
               group.dates.length === 0
                 ? 'Χωρίς ημερομηνία'
                 : group.dates.length === 1
-                  ? `Αναχώρηση: ${group.dates[0]}`
-                  : `${group.dates.length} αναχωρήσεις · ${group.dates[0]} → ${group.dates[group.dates.length - 1]}`;
+                  ? `Αναχώρηση ${group.dates[0]}`
+                  : `${group.dates.length} ημερομηνίες · ${group.dates[0]} → ${group.dates.at(-1)}`;
+            const cover = group.coverUrl || '';
 
             return (
-              <div key={key} className="bg-white rounded-3xl shadow-sm border border-black/[0.05] overflow-hidden transition-all">
+              <div
+                key={key}
+                className={`rounded-3xl border bg-white overflow-hidden transition-all duration-300 ${
+                  isExpanded
+                    ? 'border-primary/25 shadow-[0_12px_40px_-18px_rgba(0,80,180,0.35)]'
+                    : 'border-black/[0.06] shadow-sm hover:border-black/[0.1] hover:shadow-md'
+                }`}
+              >
                 {/* Trip Header (Accordion Toggle) */}
-                <div 
-                  className={`p-6 cursor-pointer hover:bg-gray-50 flex items-center justify-between transition-colors ${isExpanded ? 'border-b border-gray-100 bg-gray-50/50' : ''}`}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  className={`p-3.5 sm:p-4 cursor-pointer flex items-center gap-3.5 sm:gap-4 transition-colors ${
+                    isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : 'hover:bg-slate-50/60'
+                  }`}
                   onClick={() => setExpandedTripBookings(isExpanded ? null : key)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setExpandedTripBookings(isExpanded ? null : key);
+                    }
+                  }}
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[24px]">directions_bus</span>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-gray-900 text-lg truncate flex items-center gap-2">
+                  <div
+                    className="relative h-14 w-20 sm:h-16 sm:w-24 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 ring-1 ring-black/[0.06]"
+                    aria-hidden
+                  >
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">
+                        <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                      </div>
+                    )}
+                    {group.orphanDeletedTrip ? (
+                      <span className="absolute inset-0 bg-rose-900/25" />
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
+                      <h3 className="font-bold text-gray-900 text-[0.98rem] sm:text-lg truncate max-w-full">
                         {group.tripTitle}
-                        {group.draft ? (
-                          <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                            Πρόχειρο
-                          </span>
-                        ) : null}
-                        {group.orphanDeletedTrip ? (
-                          <span className="shrink-0 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800">
-                            Διαγραμμένη εκδρομή
-                          </span>
-                        ) : null}
                       </h3>
-                      <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
+                      {group.draft ? (
+                        <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                          Πρόχειρο
+                        </span>
+                      ) : null}
                       {group.orphanDeletedTrip ? (
-                        <p className="text-xs text-rose-700/90 mt-0.5">
-                          Η εκδρομή αφαιρέθηκε από Εκδρομές — μένουν {group.bookings.length} κρατήσεις
-                        </p>
+                        <span className="shrink-0 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800">
+                          Διαγραμμένη
+                        </span>
                       ) : null}
                     </div>
+                    <p className="text-[13px] text-slate-500 font-medium mt-0.5 truncate">{dateLabel}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 md:hidden">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                        {group.bookings.length} κρατ.
+                      </span>
+                      <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5">
+                        €{totalRevenue.toFixed(0)}
+                      </span>
+                      {checkedInCount > 0 ? (
+                        <span className="rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5">
+                          {checkedInCount} check-in
+                        </span>
+                      ) : null}
+                    </div>
+                    {group.orphanDeletedTrip ? (
+                      <p className="text-xs text-rose-700/90 mt-1">
+                        Η εκδρομή αφαιρέθηκε — μένουν {group.bookings.length} κρατήσεις
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-8 shrink-0">
-                    <div className="hidden md:flex gap-6 text-sm">
-                      <div className="text-center">
-                        <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Κρατήσεις</span>
-                        <span className="font-bold text-gray-900">{group.bookings.length}</span>
+
+                  <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+                    <div className="hidden md:flex items-stretch gap-3">
+                      <div className="min-w-[4.5rem] rounded-2xl bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                          Κρατήσεις
+                        </span>
+                        <span className="font-bold text-gray-900 text-base leading-none">
+                          {group.bookings.length}
+                        </span>
                       </div>
-                      <div className="text-center">
-                        <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Έσοδα</span>
-                        <span className="font-bold text-primary">€{totalRevenue.toFixed(2)}</span>
+                      <div className="min-w-[5.25rem] rounded-2xl bg-primary/[0.06] border border-primary/10 px-3 py-2 text-center">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-primary/70 mb-0.5">
+                          Έσοδα
+                        </span>
+                        <span className="font-bold text-primary text-base leading-none">
+                          €{totalRevenue.toFixed(2)}
+                        </span>
                       </div>
+                      {group.bookings.length > 0 ? (
+                        <div className="min-w-[4.5rem] rounded-2xl bg-emerald-50/80 border border-emerald-100 px-3 py-2 text-center">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700/70 mb-0.5">
+                            Check-in
+                          </span>
+                          <span className="font-bold text-emerald-800 text-base leading-none">
+                            {checkedInCount}/{group.bookings.length}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                     {group.orphanDeletedTrip ? (
                       <button
@@ -2031,7 +2110,12 @@ export default function BackOffice() {
                         Διαγραφή όλων
                       </button>
                     ) : null}
-                    <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180 text-primary' : 'text-gray-400'}`}>
+                    <span
+                      className={`material-symbols-outlined text-[26px] transition-transform duration-300 ${
+                        isExpanded ? 'rotate-180 text-primary' : 'text-slate-300'
+                      }`}
+                      aria-hidden
+                    >
                       expand_more
                     </span>
                   </div>
