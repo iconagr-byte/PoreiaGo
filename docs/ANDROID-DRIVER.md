@@ -12,7 +12,8 @@ Kept in-repo only for emergency rebuilds (`driver-run.ps1 -LegacyDriver`). New w
 ## Auth → command center (still true inside unified app)
 
 1. Cold start with a **valid driver JWT** → `/driver` command center.
-2. Otherwise unified `/login` offers «Είσοδος οδηγού» → `/driver` (`MasterQrGate`).
+2. Otherwise unified `/login` accepts driver credentials and routes to `/driver`
+   (same form as My Wallet / Rent — no separate «Είσοδος οδηγού» link).
 3. Login response `tenant_id` seals the office; API defaults to `https://www.achilliotravel.com`.
 
 Web `/driver` still clears sticky sessions on reopen. Only **native** keeps the JWT across launches.
