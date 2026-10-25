@@ -1762,6 +1762,35 @@ export default function BackOffice() {
       }
     };
 
+    /** Orphan group = bookings left after the trip was deleted from Εκδρομές. */
+    const handleDeleteOrphanGroup = async (group) => {
+      const ids = (group?.bookings || []).map((b) => b.id).filter(Boolean);
+      if (!ids.length) return;
+      if (
+        !window.confirm(
+          `Η εκδρομή «${group.tripTitle}» έχει διαγραφεί, αλλά μένουν ${ids.length} κρατήσεις.\n\nΝα διαγραφούν όλες οριστικά; Δεν αναιρείται.`,
+        )
+      ) {
+        return;
+      }
+      let next = null;
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          next = await deleteBooking(id);
+        } catch {
+          failed += 1;
+        }
+      }
+      setBookings(Array.isArray(next) ? next : loadBookings());
+      setSelectedBooking(null);
+      if (failed) {
+        toast.error(`Διαγράφηκαν ${ids.length - failed}/${ids.length} — ${failed} απέτυχαν`);
+      } else {
+        toast.success(`Διαγράφηκαν ${ids.length} κρατήσεις της διεγραμμένης εκδρομής`);
+      }
+    };
+
     if (selectedBooking) {
       const currentSelectedBooking = bookings.find(b => b.id === selectedBooking.id) || selectedBooking;
 
@@ -1851,7 +1880,14 @@ export default function BackOffice() {
             'el',
           );
         });
-        return { ...group, dates, bookings: sortedBookings };
+        // tripId missing + bookings present ⇒ trip removed from Εκδρομές, orphan accordion.
+        const orphanDeletedTrip = !group.tripId && sortedBookings.length > 0;
+        return {
+          ...group,
+          dates,
+          bookings: sortedBookings,
+          orphanDeletedTrip,
+        };
       })
       .sort((a, b) => {
         // Trips with bookings first, then by title.
@@ -1955,8 +1991,18 @@ export default function BackOffice() {
                             Πρόχειρο
                           </span>
                         ) : null}
+                        {group.orphanDeletedTrip ? (
+                          <span className="shrink-0 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800">
+                            Διαγραμμένη εκδρομή
+                          </span>
+                        ) : null}
                       </h3>
                       <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
+                      {group.orphanDeletedTrip ? (
+                        <p className="text-xs text-rose-700/90 mt-0.5">
+                          Η εκδρομή αφαιρέθηκε από Εκδρομές — μένουν {group.bookings.length} κρατήσεις
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-8 shrink-0">
@@ -1970,6 +2016,21 @@ export default function BackOffice() {
                         <span className="font-bold text-primary">€{totalRevenue.toFixed(2)}</span>
                       </div>
                     </div>
+                    {group.orphanDeletedTrip ? (
+                      <button
+                        type="button"
+                        className="hidden sm:inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-rose-800 hover:bg-rose-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOrphanGroup(group);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden>
+                          delete_forever
+                        </span>
+                        Διαγραφή όλων
+                      </button>
+                    ) : null}
                     <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180 text-primary' : 'text-gray-400'}`}>
                       expand_more
                     </span>
