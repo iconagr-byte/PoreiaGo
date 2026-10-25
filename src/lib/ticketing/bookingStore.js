@@ -12,6 +12,7 @@ import { API_BASE } from '../../config/api.js';
 import { getCustomerToken } from '../auth.js';
 import {
   cancelAdminBooking,
+  deleteAdminBooking,
   patchAdminBooking,
 } from '../../services/adminBookingsApi.js';
 import { confirmBankDepositSecure, recordCashPaymentSecure } from '../../services/paymentSettingsApi.js';
@@ -694,6 +695,55 @@ export async function recordCashPayment(bookingId, payload = {}) {
     if (!isOffline) throw err;
     throw new Error('Η καταχώρηση μετρητών απαιτεί σύνδεση με τον server');
   }
+}
+
+/**
+ * Remove a booking from the local office cache (all id aliases).
+ * @param {string} bookingId
+ */
+export function removeBookingFromStore(bookingId) {
+  const key = String(bookingId || '').trim();
+  if (!key) return loadBookings();
+  const next = loadBookings().filter((b) => {
+    const ids = [b.id, b.saasBookingId, b.pnr, b.ticketRef, b.reference_code]
+      .filter(Boolean)
+      .map((v) => String(v));
+    return !ids.includes(key);
+  });
+  saveBookings(next);
+  return next;
+}
+
+/**
+ * Μόνιμη διαγραφή κράτησης (τεστ / λάθος) — Postgres + local cache.
+ * @param {string} bookingId
+ */
+export async function deleteBooking(bookingId) {
+  const booking = getBookingById(bookingId);
+  const key =
+    booking?.saasBookingId ||
+    booking?.pnr ||
+    booking?.id ||
+    bookingId;
+  try {
+    await deleteAdminBooking(key);
+  } catch (err) {
+    // Still purge local cache if server already removed it.
+    if (!/404|not found|δεν βρέθηκε/i.test(String(err?.message || ''))) {
+      throw err;
+    }
+  }
+  // Drop every alias for this row from the office cache.
+  for (const alias of [booking?.id, booking?.saasBookingId, booking?.pnr, bookingId]) {
+    if (alias) removeBookingFromStore(alias);
+  }
+  dispatchPartnerEvent('booking.deleted', {
+    booking_id: booking?.id || bookingId,
+    trip_id: booking?.tripId,
+    trip_title: booking?.tripTitle,
+    passenger_email: booking?.email,
+  }).catch(() => {});
+  return loadBookings();
 }
 
 /**

@@ -334,6 +334,61 @@ async def cancel_admin_booking(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.delete("/api/admin/platform/bookings/{booking_key}")
+async def delete_admin_booking(
+    booking_key: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Permanently remove a booking (test rows / mistakes). Frees seats; fiscal rows cascade."""
+    import logging
+
+    from app.core.auth_deps import apply_tenant_rls
+    from app.core.database import AsyncSessionLocal
+    from api.admin_booking_mapper import local_id_from_reference
+
+    log = logging.getLogger(__name__)
+    try:
+        async with AsyncSessionLocal() as db:
+            await apply_tenant_rls(db, tenant_id)
+            booking = await _find_booking(db, tenant_id, booking_key)
+            if not booking:
+                raise HTTPException(status_code=404, detail="Booking not found")
+
+            booking_id = str(booking.id)
+            reference_code = str(booking.reference_code or "")
+            local_id = local_id_from_reference(reference_code) if reference_code else booking_id
+            meta = dict(booking.metadata_json or {})
+            seats = list(meta.get("seats") or [])
+            trip_id = meta.get("external_trip_id") or getattr(booking, "trip_id", None)
+
+            await db.delete(booking)
+            await db.commit()
+
+        try:
+            from ticketing.cancel_service import cancel_ticket_booking
+
+            await cancel_ticket_booking(local_id)
+            await cancel_ticket_booking(booking_id)
+            if reference_code:
+                await cancel_ticket_booking(reference_code)
+        except Exception:
+            log.debug("SQLite ticket cleanup after delete skipped", exc_info=True)
+
+        return {
+            "ok": True,
+            "deleted": True,
+            "id": local_id,
+            "saasBookingId": booking_id,
+            "pnr": reference_code,
+            "tripId": trip_id,
+            "seats": seats,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.post("/api/admin/platform/fiscal-invoices/{invoice_id}/retry")
 async def retry_fiscal_invoice(
     invoice_id: str,
