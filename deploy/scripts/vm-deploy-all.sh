@@ -571,6 +571,32 @@ async def main():
 asyncio.run(main())
 PY
 
+echo "==> Ensure Achillio ops driver (axdafnis) for native Wallet login"
+$COMPOSE exec -T api-blue python - <<'PY' \
+  || echo "WARNING: Achillio ops driver ensure failed"
+import asyncio
+from travel_platform.settings.drivers_store import (
+    authenticate_driver,
+    repair_achillio_ops_drivers,
+)
+
+async def main():
+    result = await repair_achillio_ops_drivers()
+    print(result)
+    tid = result.get("achillio_tenant_id")
+    if tid:
+        # Smoke: password from profile must authenticate against Achillio tenant.
+        ok = authenticate_driver(
+            "axdafnis@gmail.com",
+            "Mpouri@1234",
+            tenant_id=tid,
+            allow_demo_legacy=True,
+        )
+        print("axdafnis_auth_ok", bool(ok), "tenant", tid[:8] if tid else None)
+
+asyncio.run(main())
+PY
+
 echo "==> Custom domain / edge check"
 if [[ "$EDGE_PROXY" == "npm" ]]; then
   echo "  NPM owns TLS — check proxy hosts in NPM UI (api→:${NPM_API_PORT}, www+achillio→:${NPM_APP_PORT})"

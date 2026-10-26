@@ -180,3 +180,40 @@ async def resolve_poreiago_platform_tenant_id() -> str | None:
     except Exception:
         logger.debug("PoreiaGo platform tenant resolve failed", exc_info=True)
     return None
+
+
+async def resolve_achillio_travel_tenant_id() -> str | None:
+    """UUID of the Achillio Travel office (custom domain achilliotravel.com)."""
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import (
+            ensure_achillio_travel_office,
+            is_achillio_travel_office,
+        )
+    except Exception:
+        return None
+
+    async def _find(db: Any) -> str | None:
+        result = await db.execute(select(Tenant).limit(120))
+        for tenant in result.scalars().all():
+            if is_achillio_travel_office(tenant):
+                return str(tenant.id)
+        return None
+
+    try:
+        async with AsyncSessionLocal() as db:
+            found = await _find(db)
+            if found:
+                return found
+            try:
+                await ensure_achillio_travel_office(db)
+            except Exception:
+                logger.exception("ensure_achillio_travel_office during resolve failed")
+                return None
+            return await _find(db)
+    except Exception:
+        logger.debug("Achillio Travel tenant resolve failed", exc_info=True)
+        return None
