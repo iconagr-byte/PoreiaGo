@@ -81,13 +81,13 @@ describe('unifiedLogin', () => {
       email: 'a@b.com',
       access_token: 'tok',
     });
+    loginDriver.mockRejectedValue(new Error('Λάθος όνομα χρήστη ή κωδικός'));
     const out = await attemptUnifiedLogin('a@b.com', 'secret');
     expect(out.kind).toBe('customer');
     expect(out.path).toBe('/wallet');
-    expect(loginDriver).not.toHaveBeenCalled();
   });
 
-  it('falls through to driver when customer credentials fail', async () => {
+  it('opens driver when only driver credentials match', async () => {
     loginCustomer.mockRejectedValue(new Error('Λάθος email ή κωδικός'));
     loginDriver.mockResolvedValue({ accessToken: 'drv' });
     const out = await attemptUnifiedLogin('driver@office.com', 'pw');
@@ -95,10 +95,33 @@ describe('unifiedLogin', () => {
     expect(out.path).toBe('/driver');
   });
 
-  it('does not try driver on network failure', async () => {
+  it('prefers driver when both succeed and last role was driver', async () => {
+    rememberNativeRoleHome('driver');
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('driver');
+  });
+
+  it('prefers customer when both succeed without driver memory', async () => {
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('customer');
+  });
+
+  it('surfaces office-scoped driver error over generic customer error', async () => {
+    loginCustomer.mockRejectedValue(new Error('Λάθος email ή κωδικός'));
+    loginDriver.mockRejectedValue(
+      new Error('Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο'),
+    );
+    await expect(attemptUnifiedLogin('a@b.com', 'pw')).rejects.toThrow(/άλλο γραφείο/);
+  });
+
+  it('does not swallow network failure from customer', async () => {
     loginCustomer.mockRejectedValue(new Error('Δεν υπάρχει σύνδεση με τον server'));
+    loginDriver.mockRejectedValue(new Error('Λάθος'));
     await expect(attemptUnifiedLogin('a@b.com', 'pw')).rejects.toThrow(/σύνδεση/);
-    expect(loginDriver).not.toHaveBeenCalled();
   });
 
   it('routes rent-only customers to Rent Wallet', async () => {

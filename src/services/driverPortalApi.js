@@ -15,6 +15,13 @@ import { fetchBoardingManifest, adminScanTicket } from './ticketingApi.js';
 export { adminScanTicket, fetchBoardingManifest };
 
 const DEFAULT_NATIVE_DRIVER_HOST = 'https://www.achilliotravel.com';
+/** Offices to try when Host-scoped login fails (driver may live on PoreiaGo vs Achillio). */
+const DRIVER_OFFICE_HOSTS = [
+  'https://www.achilliotravel.com',
+  'https://achilliotravel.com',
+  'https://www.poreiago.com',
+  'https://poreiago.com',
+];
 
 function defaultDriverApiHost() {
   return (
@@ -22,6 +29,20 @@ function defaultDriverApiHost() {
       .trim()
       .replace(/\/$/, '') || DEFAULT_NATIVE_DRIVER_HOST
   );
+}
+
+function uniqueApiHosts(...hosts) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of hosts) {
+    const h = String(raw || '')
+      .trim()
+      .replace(/\/$/, '');
+    if (!h || seen.has(h)) continue;
+    seen.add(h);
+    out.push(h);
+  }
+  return out;
 }
 
 function mapSessionPayload(data) {
@@ -84,64 +105,60 @@ async function postDriverLogin(apiHost, username, password) {
 }
 
 export async function loginDriver(username, password) {
-  const primary = getApiBase() || defaultDriverApiHost();
-  const fallback = defaultDriverApiHost();
   const seal = getDriverOfficeSeal();
   const sealedHost = String(seal?.apiHost || '')
     .trim()
     .replace(/\/$/, '');
+  // Prefer sealed / current API host, then known office apex+www (Achillio + PoreiaGo).
+  // Server error text conflates wrong password with wrong office — must try peers.
+  const hosts = uniqueApiHosts(
+    sealedHost,
+    getApiBase(),
+    defaultDriverApiHost(),
+    ...DRIVER_OFFICE_HOSTS,
+  );
 
-  let attempt;
-  try {
-    attempt = await postDriverLogin(primary, username, password);
-  } catch {
-    if (import.meta.env.DEV) {
-      saveDriverSession(DEV_SESSION);
-      return DEV_SESSION;
+  let lastMessage = '';
+  let sawNetwork = false;
+
+  for (const host of hosts) {
+    let attempt;
+    try {
+      attempt = await postDriverLogin(host, username, password);
+    } catch {
+      sawNetwork = true;
+      continue;
     }
-    // Stale native seal pointing at a dead/wrong host — clear and retry Achillio.
-    if (sealedHost && sealedHost !== fallback) {
-      clearDriverOfficeSeal();
-      try {
-        attempt = await postDriverLogin(fallback, username, password);
-      } catch {
-        throw new Error('Δεν υπάρχει σύνδεση με τον server');
+
+    if (attempt.res.ok) {
+      if (sealedHost && sealedHost !== attempt.apiHost) {
+        clearDriverOfficeSeal();
       }
-    } else {
-      throw new Error('Δεν υπάρχει σύνδεση με τον server');
+      const session = saveMappedSession(attempt.data, attempt.apiHost);
+      if (attempt.data.trip_id) await cacheManifestForOffline(attempt.data.trip_id);
+      return session;
     }
-  }
 
-  if (!attempt.res.ok) {
     const msg =
       typeof attempt.data?.detail === 'string' ? attempt.data.detail : '';
-    // Only retry when the Host office rejected us — not on wrong password.
-    const wrongOffice = /άλλο γραφείο|domain του γραφείου/i.test(msg);
-    if (
-      wrongOffice &&
-      sealedHost &&
-      sealedHost !== fallback &&
-      primary !== fallback
-    ) {
-      clearDriverOfficeSeal();
-      try {
-        const retry = await postDriverLogin(fallback, username, password);
-        if (retry.res.ok) {
-          const session = saveMappedSession(retry.data, retry.apiHost);
-          if (retry.data.trip_id) await cacheManifestForOffline(retry.data.trip_id);
-          return session;
-        }
-        attempt = retry;
-      } catch {
-        /* keep first error */
-      }
+    lastMessage = msg || lastMessage;
+    // 401/403: try next office Host (driver may belong there).
+    if (attempt.res.status === 401 || attempt.res.status === 403) {
+      continue;
     }
-    throw new Error(msg || 'Λάθος όνομα χρήστη ή κωδικός');
+    // Unexpected status — stop with that message.
+    throw new Error(msg || `Αποτυχία σύνδεσης οδηγού (${attempt.res.status})`);
   }
 
-  const session = saveMappedSession(attempt.data, attempt.apiHost);
-  if (attempt.data.trip_id) await cacheManifestForOffline(attempt.data.trip_id);
-  return session;
+  if (import.meta.env.DEV && sawNetwork && !lastMessage) {
+    saveDriverSession(DEV_SESSION);
+    return DEV_SESSION;
+  }
+
+  if (!lastMessage && sawNetwork) {
+    throw new Error('Δεν υπάρχει σύνδεση με τον server');
+  }
+  throw new Error(lastMessage || 'Λάθος όνομα χρήστη ή κωδικός');
 }
 
 /** Request password-reset email for fleet driver PWA. */
