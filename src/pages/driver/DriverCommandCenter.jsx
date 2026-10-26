@@ -35,11 +35,11 @@ import DriverAccountSplash, {
 } from '../../components/driver/DriverAccountSplash.jsx';
 
 const TABS = [
-  { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
+  { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχική' },
   { id: 'chat', icon: 'chat', label: 'Chat', short: 'Chat' },
-  { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'GPS' },
-  { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan' },
-  { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS' },
+  { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'Θέση' },
+  { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan', primary: true },
+  { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS', danger: true },
   { id: 'summary', icon: 'event_seat', label: 'Κρατήσεις', short: 'Κρατ.' },
 ];
 
@@ -552,26 +552,36 @@ export default function DriverCommandCenter() {
           </main>
         </div>
 
-        <nav className="driver-nav" aria-label="Driver navigation">
+        <nav className="driver-nav" aria-label="Μενού οδηγού">
           <div className="driver-nav-inner">
             {TABS.map((t) => {
+              const isActive = tab === t.id;
               const showChatBadge = t.id === 'chat' && chatUnread > 0;
+              const classes = [
+                isActive ? 'active' : '',
+                t.primary ? 'driver-nav-item--primary' : '',
+                t.danger ? 'driver-nav-item--sos' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
               return (
                 <button
                   key={t.id}
                   type="button"
-                  className={tab === t.id ? 'active' : ''}
+                  className={classes}
                   onClick={() => {
-                    // Tab enter (Αρχική / Θέση / Scan / Chat / SOS / Ημέρα) never starts shift.
+                    // Tab enter never starts a shift — only GPS «Έναρξη βάρδιας» does.
                     setTab(t.id);
                   }}
                   aria-label={
                     showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label
                   }
-                  aria-current={tab === t.id ? 'page' : undefined}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   <span className="driver-nav-icon-wrap">
-                    <span className="material-symbols-outlined">{t.icon}</span>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {t.icon}
+                    </span>
                     {showChatBadge ? (
                       <span className="driver-nav-badge">
                         {chatUnread > 99 ? '99+' : chatUnread}
@@ -579,14 +589,7 @@ export default function DriverCommandCenter() {
                     ) : null}
                   </span>
                   <span className="driver-nav-label">
-                    {device.isTablet ? (
-                      <span>{t.label}</span>
-                    ) : (
-                      <>
-                        <span className="hidden min-[360px]:inline">{t.label}</span>
-                        <span className="min-[360px]:hidden">{t.short}</span>
-                      </>
-                    )}
+                    {device.isTablet ? t.label : t.short}
                   </span>
                 </button>
               );
