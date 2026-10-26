@@ -75,6 +75,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const claim = useMemo(() => {
     const fromState = location.state?.walletClaim
@@ -92,6 +95,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   const prefillEmail = claim?.email || getCustomerEmail() || '';
   const highlightBooking = claim?.bookingId || location.state?.highlightBooking;
+
+  // Controlled fields (Capacitor WebView): uncontrolled + autofill often looks focused but ignores keys.
+  useEffect(() => {
+    if (prefillEmail && !email) setEmail(String(prefillEmail).trim().toLowerCase());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once from claim/session
+  }, [prefillEmail]);
 
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
@@ -193,23 +202,27 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    const email = e.target.email.value.trim().toLowerCase();
-    const password = e.target.password.value;
+    const emailN = email.trim().toLowerCase();
+    const passwordN = password;
 
-    if (email === 'admin@aerostride.com') {
+    if (emailN === 'admin@aerostride.com') {
       setError(
         'Αυτή η σελίδα δεν είναι για διαχείριση γραφείου. Χρησιμοποιήστε Admin Login.',
       );
       return;
     }
-    if (!password.trim()) {
+    if (!emailN) {
+      setError('Εισάγετε email ή όνομα χρήστη.');
+      return;
+    }
+    if (!passwordN.trim()) {
       setError('Εισάγετε κωδικό πρόσβασης.');
       return;
     }
 
     setLoading(true);
     try {
-      const outcome = await attemptUnifiedLogin(email, password, {
+      const outcome = await attemptUnifiedLogin(emailN, passwordN, {
         preferRent: preferRentHint,
         preferWallet: preferWalletHint || Boolean(claim),
       });
@@ -369,7 +382,10 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         <div className="space-y-2">
           <label htmlFor="email">Email / χρήστης</label>
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg">
+            <span
+              className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
+              aria-hidden
+            >
               mail
             </span>
             <input
@@ -378,9 +394,15 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               type="text"
               inputMode="email"
               autoComplete="username"
-              defaultValue={prefillEmail}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="email ή όνομα χρήστη"
               required
+              disabled={loading || googleLoading}
             />
           </div>
         </div>
@@ -393,10 +415,37 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             </Link>
           </div>
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg">
+            <span
+              className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
+              aria-hidden
+            >
               lock
             </span>
-            <input id="password" name="password" type="password" placeholder="••••••••" required />
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              enterKeyHint="go"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Κωδικός πρόσβασης"
+              required
+              disabled={loading || googleLoading}
+              style={{ paddingRight: '2.75rem' }}
+            />
+            <button
+              type="button"
+              className={`${linkClass} absolute right-3 top-1/2 -translate-y-1/2 p-1`}
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+              aria-pressed={showPassword}
+              tabIndex={-1}
+            >
+              <span className="material-symbols-outlined text-lg text-[#8e8e93]" aria-hidden>
+                {showPassword ? 'visibility_off' : 'visibility'}
+              </span>
+            </button>
           </div>
         </div>
 

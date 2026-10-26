@@ -96,6 +96,22 @@ html[data-poreiago-app='wallet'] .wallet-auth-card h1 {
   letter-spacing: -0.045em;
 }
 
+/* Unified shell uses data-poreiago-app=app — same auth typing guarantees. */
+html[data-poreiago-app='app'] .wallet-auth-card input,
+html[data-poreiago-app='wallet'] .wallet-auth-card input,
+html[data-poreiago-app='app'] .rent-auth-card input,
+html[data-poreiago-app='wallet'] .rent-auth-card input {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+  font-size: max(1rem, 16px) !important;
+}
+
+html[data-poreiago-app='app'] .wallet-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined {
+  pointer-events: none !important;
+}
+
 html[data-poreiago-app='wallet'] .wallet-phone-stage,
 html[data-poreiago-app='wallet'] .wallet-phone-stage--native,
 html[data-poreiago-app='wallet'] .wallet-phone-stage--phone {

@@ -3329,9 +3329,18 @@ button.wallet-account-row--action.is-open {
   background: #f5f5f7;
   padding: 0.98rem 1.05rem;
   font: inherit;
-  font-size: 1.02rem;
+  /* 16px floor: Android WebView IME / zoom quirks when font-size < 16 */
+  font-size: max(1rem, 16px);
   letter-spacing: -0.01em;
   color: #1d1d1f;
+  -webkit-user-select: text;
+  user-select: text;
+  pointer-events: auto;
+  -webkit-touch-callout: default;
+}
+
+.wallet-auth-card .relative > .material-symbols-outlined {
+  pointer-events: none;
 }
 
 .wallet-auth-card .relative input[type='email'],

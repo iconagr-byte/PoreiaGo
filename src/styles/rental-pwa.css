@@ -5005,7 +5005,15 @@
   background: #f2f4f7;
   padding: 0.95rem 1.1rem;
   font: inherit;
+  font-size: max(1rem, 16px);
   color: #1d1d1f;
+  -webkit-user-select: text;
+  user-select: text;
+  pointer-events: auto;
+}
+
+.rent-auth-card .relative > .material-symbols-outlined {
+  pointer-events: none;
 }
 
 .rent-auth-card .relative input[type='email'],
