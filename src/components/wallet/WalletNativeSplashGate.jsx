@@ -6,18 +6,18 @@ import {
   hasSeenWalletBrandSplash,
   markWalletBrandSplashSeen,
 } from '../../lib/wallet/walletBrandSplash.js';
+import { resolveOfficeSplashBrand } from '../../lib/wallet/officeSplashBrand.js';
+import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
+import { getDriverSession } from '../../lib/driver/driverSession.js';
+import { getWalletTenantId } from '../../lib/wallet/walletTenantSeal.js';
 import WalletBrandSplash from './WalletBrandSplash.jsx';
 
 /** Absolute ceiling so splash never blocks the role router forever. */
-const SPLASH_FAILSAFE_MS = WALLET_SPLASH_DURATION_MS + 2000;
+const SPLASH_FAILSAFE_MS = WALLET_SPLASH_DURATION_MS + 2800;
 
 /**
- * Capacitor cold start: show PoreiaGo brand splash once, then the role home
- * (wallet / driver / rent / login) from NativeUnifiedBoot.
- *
- * Skipped for website and legacy driver-only APK (com.poreiago.driver).
- * Unified app (VITE_NATIVE_APP=app|wallet) always gets the brand splash on
- * cold start — including when early boot rewrote `/` → `/driver`.
+ * Capacitor cold start: office-logo splash (when brand loads), then role home.
+ * Skipped for website and legacy driver-only APK.
  */
 export default function WalletNativeSplashGate({ children }) {
   const skip = !isNativeApp() || isNativeDriverApp();
@@ -26,13 +26,37 @@ export default function WalletNativeSplashGate({ children }) {
     if (skip) return false;
     return !hasSeenWalletBrandSplash();
   });
+  const [officeLogoUrl, setOfficeLogoUrl] = useState('');
+  const [officeName, setOfficeName] = useState('');
 
-  // Hand off: Android Theme.SplashScreen → React brand splash (or app UI).
   useEffect(() => {
     void hideNativeSplash();
   }, [showSplash, skip]);
 
-  // Failsafe: never leave the user on a stuck splash.
+  useEffect(() => {
+    if (skip || !showSplash) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const driverTid = String(getDriverSession()?.tenantId || '').trim();
+        const sealedTid = String(getWalletTenantId() || '').trim();
+        const tenantId = driverTid || sealedTid;
+        const appearance = await fetchSiteAppearance(
+          tenantId ? { tenantId } : undefined,
+        );
+        if (cancelled) return;
+        const brand = resolveOfficeSplashBrand(appearance);
+        if (brand.hasLogo) setOfficeLogoUrl(brand.logoUrl);
+        if (brand.name) setOfficeName(brand.name);
+      } catch {
+        /* keep PoreiaGo fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [skip, showSplash]);
+
   useEffect(() => {
     if (skip || !showSplash) return undefined;
     const t = window.setTimeout(() => {
@@ -48,6 +72,8 @@ export default function WalletNativeSplashGate({ children }) {
   if (showSplash) {
     return (
       <WalletBrandSplash
+        officeLogoUrl={officeLogoUrl}
+        officeName={officeName}
         onDone={() => {
           markWalletBrandSplashSeen();
           setShowSplash(false);
