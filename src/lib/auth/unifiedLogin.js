@@ -1,9 +1,9 @@
 /**
  * Single login form → detect account role and home path.
  *
- * Order: customer auth → (on credential failure) driver portal.
- * Customer surface: explicit hint → remembered role → rent preference →
- * booking probe (rent-only → Rent Wallet, else My Wallet).
+ * Tries customer + driver in parallel. Driver wins when both succeed and the
+ * last native role was driver; otherwise customer wallet/rent. Multi-host
+ * driver login (Achillio + PoreiaGo) lives in driverPortalApi.loginDriver.
  */
 
 import { loginCustomer } from '../../services/customerAuthApi.js';
@@ -78,6 +78,37 @@ export async function resolveCustomerSurface(hints = {}) {
   return { role: NATIVE_ROLE_WALLET, path: pathForNativeRole(NATIVE_ROLE_WALLET) };
 }
 
+async function tryCustomer(emailN, passwordN, hints) {
+  const result = await loginCustomer({ email: emailN, password: passwordN });
+  const surface = await resolveCustomerSurface(hints);
+  return {
+    kind: 'customer',
+    result,
+    role: surface.role,
+    path: surface.path,
+  };
+}
+
+async function tryDriver(emailN, passwordN) {
+  const session = await loginDriver(emailN, passwordN);
+  return {
+    kind: 'driver',
+    session,
+    role: NATIVE_ROLE_DRIVER,
+    path: pathForNativeRole(NATIVE_ROLE_DRIVER),
+  };
+}
+
+function pickFailure(customerErr, driverErr) {
+  const dMsg = String(driverErr?.message || '');
+  const cMsg = String(customerErr?.message || '');
+  // Prefer office-scoped driver hint over generic customer wrong-password.
+  if (/άλλο γραφείο|domain του γραφείου/i.test(dMsg)) {
+    return driverErr;
+  }
+  return customerErr || driverErr || new Error('Λάθος email ή κωδικός');
+}
+
 /**
  * @param {string} email
  * @param {string} password
@@ -91,31 +122,35 @@ export async function attemptUnifiedLogin(email, password, hints = {}) {
   const emailN = String(email || '').trim().toLowerCase();
   const passwordN = String(password || '');
 
-  let customerErr = null;
-  try {
-    const result = await loginCustomer({ email: emailN, password: passwordN });
-    const surface = await resolveCustomerSurface(hints);
-    return {
-      kind: 'customer',
-      result,
-      role: surface.role,
-      path: surface.path,
-    };
-  } catch (err) {
-    if (isNetworkAuthError(err)) throw err;
-    customerErr = err;
-  }
+  const settled = await Promise.all([
+    tryCustomer(emailN, passwordN, hints).then(
+      (ok) => ({ ok: true, value: ok }),
+      (err) => {
+        if (isNetworkAuthError(err)) throw err;
+        return { ok: false, err };
+      },
+    ),
+    tryDriver(emailN, passwordN).then(
+      (ok) => ({ ok: true, value: ok }),
+      (err) => {
+        if (isNetworkAuthError(err)) throw err;
+        return { ok: false, err };
+      },
+    ),
+  ]);
 
-  try {
-    const session = await loginDriver(emailN, passwordN);
-    return {
-      kind: 'driver',
-      session,
-      role: NATIVE_ROLE_DRIVER,
-      path: pathForNativeRole(NATIVE_ROLE_DRIVER),
-    };
-  } catch (err) {
-    if (isNetworkAuthError(err)) throw err;
-    throw customerErr || err;
+  const customer = settled[0];
+  const driver = settled[1];
+
+  if (customer.ok && driver.ok) {
+    // Same credentials work for both — honor last driver session if remembered.
+    if (getRememberedNativeRoleHome() === NATIVE_ROLE_DRIVER) {
+      return driver.value;
+    }
+    return customer.value;
   }
+  if (driver.ok) return driver.value;
+  if (customer.ok) return customer.value;
+
+  throw pickFailure(customer.err, driver.err);
 }
