@@ -67,13 +67,12 @@ function DriverHeader({
   const name = String(session?.driverName || '').trim() || 'Οδηγός';
   const plate = String(session?.vehiclePlate || session?.vehicleCode || '').trim();
   const photoUrl = session?.photoUrl ? resolveSiteAssetUrl(session.photoUrl) : '';
-  const busUrl = session?.vehicleImageUrl ? resolveSiteAssetUrl(session.vehicleImageUrl) : '';
   const unread = Math.max(0, Number(chatUnread) || 0);
   // Name as title (readable); plate / status as short kicker — avoids ΔΑ… / Ε… truncation.
   const displayKicker =
     kicker || plate || (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια');
   const displayTitle = title || name;
-  const endLabel = kicker === 'Pre-trip' ? 'Έξοδος' : 'Τέλος';
+  const logoutLabel = kicker === 'Pre-trip' ? 'Έξοδος' : 'Αποσύνδεση';
 
   return (
     <header className="driver-header driver-shell">
@@ -88,13 +87,6 @@ function DriverHeader({
             ) : (
               <div className="driver-avatar driver-avatar--initials" aria-hidden>
                 {driverInitials(name)}
-              </div>
-            )}
-            {busUrl ? (
-              <img src={busUrl} alt="" className="driver-bus-thumb" />
-            ) : (
-              <div className="driver-bus-thumb" aria-hidden>
-                <span className="material-symbols-outlined">directions_bus</span>
               </div>
             )}
           </div>
@@ -152,12 +144,12 @@ function DriverHeader({
           <button
             type="button"
             onClick={onLogout}
-            className="driver-header-btn shrink-0"
-            aria-label={endLabel}
+            className="driver-account-btn shrink-0"
+            aria-label={logoutLabel}
+            title={logoutLabel}
           >
-            <span className="driver-header-btn-label">{endLabel}</span>
-            <span className="material-symbols-outlined driver-header-btn-icon" aria-hidden>
-              logout
+            <span className="material-symbols-outlined" aria-hidden>
+              person
             </span>
           </button>
         </div>
