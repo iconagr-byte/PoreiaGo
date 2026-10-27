@@ -417,6 +417,105 @@ function Wait-ForBootCompleted([int]$minutes = 2) {
   return $false
 }
 
+# boot_completed=1 can race ahead of PackageManager on API 35/36 AVDs.
+# adb install then fails with: cmd: Can't find service: package
+function Test-PackageServiceReady {
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $out = (& $adb shell cmd package list packages 2>&1 | Out-String)
+  $ErrorActionPreference = $prevEap
+  if ($LASTEXITCODE -ne 0) { return $false }
+  if ($out -match "Can't find service:\s*package") { return $false }
+  if ($out -match "(?m)^package:") { return $true }
+  # Empty but successful listpackages is rare; treat as not ready.
+  return $false
+}
+
+function Wait-ForPackageService([int]$minutes = 3) {
+  Write-Host "==> waiting for PackageManager (cmd package) ..." -ForegroundColor Cyan
+  $started = Get-Date
+  $deadline = $started.AddMinutes($minutes)
+  $nudgeAdb = $false
+  while ((Get-Date) -lt $deadline) {
+    if (Test-PackageServiceReady) {
+      Write-Host "OK: package service ready" -ForegroundColor Green
+      return $true
+    }
+    # One adb bounce mid-wait — often unsticks a half-booted emulator.
+    if (-not $nudgeAdb -and ((Get-Date) - $started).TotalSeconds -ge [Math]::Max(20, ($minutes * 30))) {
+      Restart-AdbServer
+      $nudgeAdb = $true
+    }
+    Start-Sleep -Seconds 3
+  }
+  Write-Host "WARN: package service still missing - install may fail" -ForegroundColor Yellow
+  return $false
+}
+
+function Install-WalletApk([string]$apkPath) {
+  Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+  & $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
+  & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
+  $ErrorActionPreference = $prevEap
+
+  $attempts = @(
+    @{ Args = @("install", "-r", "-t", "--user", "0", $apkPath); Label = "install --user 0" },
+    @{ Args = @("install", "-r", "-t", $apkPath); Label = "install -r" }
+  )
+
+  foreach ($attempt in $attempts) {
+    Write-Host ("==> " + $attempt.Label) -ForegroundColor DarkGray
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $log = & $adb @($attempt.Args) 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
+    if ($log.Trim()) { Write-Host $log.Trim() }
+    if ($code -eq 0) { return $true }
+
+    if ($log -match "Can't find service:\s*package") {
+      Write-Host "PackageManager not up yet - waiting + adb restart..." -ForegroundColor Yellow
+      Restart-AdbServer
+      [void](Wait-ForBootCompleted 2)
+      [void](Wait-ForPackageService 3)
+    }
+  }
+
+  # Last chance after cold adb + package wait
+  Write-Host "==> final install -r after package wait" -ForegroundColor Yellow
+  [void](Wait-ForPackageService 2)
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb install -r -t $apkPath 2>&1 | Out-Host
+  $ok = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = $prevEap
+  return $ok
+}
+
+function Show-PackageServiceHelp([string]$apkPath) {
+  Write-Host ""
+  Write-Host "=== INSTALL FAILED: Can't find service: package ===" -ForegroundColor Red
+  Write-Host "EN: Emulator booted but PackageManager is not ready (half-booted AVD)." -ForegroundColor Yellow
+  Write-Host "EL: Το emulator άνοιξε, αλλά το PackageManager δεν είναι έτοιμο." -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host ("APK ready: " + $apkPath) -ForegroundColor Green
+  Write-Host "Recover:" -ForegroundColor Cyan
+  Write-Host "  1) Close the emulator window" -ForegroundColor Yellow
+  Write-Host "  2) Device Manager -> Cold Boot Now (or Wipe Data)" -ForegroundColor Yellow
+  Write-Host "  3) Wait until you see the Android home screen" -ForegroundColor Yellow
+  Write-Host "  4) Then install without rebuilding:" -ForegroundColor Yellow
+  Write-Host "     powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
+  Write-Host "  Or:" -ForegroundColor Yellow
+  Write-Host ("     & `"$adb`" kill-server; & `"$adb`" start-server") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" wait-for-device") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" shell cmd package list packages | Select-Object -First 3") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" install -r `"$apkPath`"") -ForegroundColor Cyan
+  Write-Host ""
+}
+
 function Show-InstallTimeoutHelp([string]$apkPath) {
   Write-Host ""
   Write-Host "=== TIMEOUT: no adb device in state 'device' ===" -ForegroundColor Red
@@ -532,25 +631,12 @@ if (-not $online -or $online.Count -eq 0) {
 }
 
 [void](Wait-ForBootCompleted 2)
+[void](Wait-ForPackageService 3)
 
-Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
-# adb writes "Failed" to stderr when the package is already gone; with
-# ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
-# Uninstall already removes app data - do not pm clear after uninstall.
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
-& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
-& $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
-& $adb uninstall com.poreiago.wallet 2>$null | Out-Null
-$ErrorActionPreference = $prevEap
-# Fresh install for user 0 - avoids Error type 3 on API 36/37 when a stale
-# Studio deploy left a package with no launcher activities.
-& $adb install -r -t --user 0 $apk
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "install --user 0 failed - retry plain install -r" -ForegroundColor Yellow
-  & $adb install -r $apk
+if (-not (Install-WalletApk $apk)) {
+  Show-PackageServiceHelp $apk
+  throw "install failed (PackageManager not ready — Cold Boot the AVD, then wallet-boot-and-install.ps1)"
 }
-if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
 $ErrorActionPreference = "Continue"
 & $adb shell pm enable com.poreiago.wallet/com.poreiago.wallet.MainActivity 2>$null | Out-Null
