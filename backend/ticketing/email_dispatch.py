@@ -116,15 +116,73 @@ def _should_fail_hard() -> bool:
     return _is_production() and os.getenv("SMTP_FAIL_HARD", "").lower() in ("1", "true", "yes")
 
 
-async def send_email(to: str, subject: str, body_html: str, *, skip_queue: bool = False) -> str:
+async def _try_send_via_tenant_mailbox(
+    tenant_id: str,
+    to: str,
+    subject: str,
+    body_html: str,
+) -> str | None:
+    """Prefer the office Email Hub SMTP (e.g. Achillio info@…) when configured."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return None
+    try:
+        from email_client.dynamic_mailer import send_email_smtp
+        from email_client.settings_store import get_settings, list_settings
+
+        accounts = await list_settings(owner_key=f"tenant:{tid}", active_only=True)
+        if not accounts:
+            return None
+        account = await get_settings(str(accounts[0]["id"]), with_password=True)
+        if not account or not str(account.get("smtp_host") or "").strip():
+            return None
+        ref = await send_email_smtp(
+            account,
+            to=to,
+            subject=subject,
+            body_html=body_html,
+        )
+        logger.info(
+            "Booking/office email sent via tenant mailbox tenant=%s from=%s to=%s",
+            tid,
+            account.get("email_address") or account.get("mail_username"),
+            to,
+        )
+        return ref if str(ref).startswith("email-") else f"email-tenant-smtp-{to}"
+    except Exception as exc:
+        logger.warning(
+            "Tenant mailbox SMTP failed tenant=%s to=%s — falling back to platform SMTP: %s",
+            tid,
+            to,
+            exc,
+        )
+        return None
+
+
+async def send_email(
+    to: str,
+    subject: str,
+    body_html: str,
+    *,
+    skip_queue: bool = False,
+    tenant_id: str | None = None,
+) -> str:
     from_addr = os.getenv("SMTP_FROM", "noreply@aerostride.app")
     ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
 
-    allowed, block_reason = check_email_spam_filter(to)
+    allowed, block_reason = check_email_spam_filter(to, tenant_id=tenant_id)
     if not allowed:
         _append_log(f"[{ts}] SPAM_BLOCKED to={to} reason={block_reason} subject={subject}")
         logger.info("Email blocked by spam filter to=%s reason=%s", to, block_reason)
         return f"email-spam-blocked-{to}"
+
+    if tenant_id:
+        tenant_ref = await _try_send_via_tenant_mailbox(tenant_id, to, subject, body_html)
+        if tenant_ref:
+            _append_log(
+                f"[{ts}] EMAIL_TENANT to={to} tenant={tenant_id} subject={subject} ref={tenant_ref}"
+            )
+            return tenant_ref
 
     _append_log(f"[{ts}] EMAIL to={to} from={from_addr} subject={subject}")
 
