@@ -47,9 +47,9 @@ async def notify_excursion_booking_to_office(booking: dict[str, Any]) -> dict[st
     )
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_email,
         send_push_to_subscription,
-        web_push_configured,
     )
     from travel_platform.telemetry.alerts import TelemetryAlertBus
 
@@ -122,10 +122,10 @@ async def notify_excursion_booking_to_office(booking: dict[str, Any]) -> dict[st
             logger.debug("NEW_BOOKING redis publish skipped", exc_info=True)
 
     ensure_web_push_keys()
-    if not web_push_configured():
+    if not push_configured():
         return {
             "skipped": True,
-            "reason": "vapid_not_configured",
+            "reason": "push_not_configured",
             "alert_id": alert.get("id"),
         }
 

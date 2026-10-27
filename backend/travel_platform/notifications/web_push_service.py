@@ -17,6 +17,18 @@ def web_push_configured() -> bool:
     return bool(_vapid_private_key() and _vapid_public_key())
 
 
+def push_configured() -> bool:
+    """True when at least one delivery channel is ready (Web Push and/or FCM)."""
+    if web_push_configured():
+        return True
+    try:
+        from travel_platform.notifications.fcm_push_service import fcm_configured
+
+        return fcm_configured()
+    except Exception:
+        return False
+
+
 def _vapid_public_key() -> str:
     return os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
 
@@ -222,6 +234,11 @@ def _send_sync(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[st
 
 
 async def send_push_to_subscription(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    from travel_platform.notifications.fcm_push_service import is_fcm_subscription, send_fcm_to_subscription
+
+    if is_fcm_subscription(subscription):
+        return await send_fcm_to_subscription(subscription, payload)
+
     if not web_push_configured():
         ensure_web_push_keys()
     if not web_push_configured():
@@ -248,10 +265,9 @@ async def send_push_to_subscription(subscription: dict[str, Any], payload: dict[
 async def send_push_to_email(email: str, payload: dict[str, Any]) -> dict[str, Any]:
     from travel_platform.notifications.push_subscription_store import list_subscriptions_for_email
 
-    if not web_push_configured():
-        ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    ensure_web_push_keys()
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     subs = list_subscriptions_for_email(email)
     if not subs:

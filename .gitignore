@@ -21,6 +21,9 @@ dist-ssr
 deploy/gcp/domain-contact.yaml
 deploy/.vapid_private.pem
 deploy/.vapid_public.key
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-adminsdk*.json
 
 # Accidental nested workspace copies
 /Booking Travel/

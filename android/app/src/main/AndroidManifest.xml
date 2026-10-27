@@ -42,4 +42,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ notification permission for FCM / Capacitor Push -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

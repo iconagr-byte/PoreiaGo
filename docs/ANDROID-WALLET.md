@@ -165,4 +165,4 @@ If Gradle says `InternalProblems ... removed in Gradle 9.6.0`: force **wrapper**
 - [x] Client filters + storage namespace by office
 - [x] Offline last-pass namespaced by office; cleared on office switch / logout
 - [x] Cross-office Host/JWT mismatch → 403
-- [ ] Native FCM/APNs push (later)
+- [x] Native FCM push (see `docs/NATIVE-FCM-PUSH.md`; needs `google-services.json` + server credentials)

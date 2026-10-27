@@ -153,28 +153,56 @@ def upsert_subscription(
     *,
     email: str,
     endpoint: str,
-    keys: dict[str, str],
+    keys: dict[str, str] | None = None,
     user_agent: str | None = None,
     tenant_id: str | None = None,
     audience: str = "customer",
     driver_id: str | None = None,
+    channel: str = "web",
+    platform: str | None = None,
+    fcm_token: str | None = None,
 ) -> dict[str, Any]:
     normalized_email = _normalize_email(email)
+    channel_norm = str(channel or "web").strip().lower() or "web"
+    token = str(fcm_token or "").strip()
     endpoint = str(endpoint or "").strip()
-    p256dh = str((keys or {}).get("p256dh") or "").strip()
-    auth = str((keys or {}).get("auth") or "").strip()
-    if not normalized_email or not endpoint or not p256dh or not auth:
+
+    if channel_norm == "fcm":
+        if not token and endpoint.startswith("fcm:"):
+            token = endpoint[4:].strip()
+        if not token and endpoint and not endpoint.startswith("http"):
+            # Native clients may pass the raw FCM registration token as endpoint.
+            token = endpoint
+        if not token:
+            raise ValueError("Invalid FCM push subscription payload")
+        endpoint = f"fcm:{token}"
+        p256dh = "fcm"
+        auth = "fcm"
+    else:
+        p256dh = str((keys or {}).get("p256dh") or "").strip()
+        auth = str((keys or {}).get("auth") or "").strip()
+        if not normalized_email or not endpoint or not p256dh or not auth:
+            raise ValueError("Invalid push subscription payload")
+        token = None
+
+    if not normalized_email or not endpoint:
         raise ValueError("Invalid push subscription payload")
 
     data = _load()
     rows: list[dict[str, Any]] = list(data.get("subscriptions") or [])
     now = _now_iso()
+    platform_norm = str(platform or "").strip().lower() or None
 
     for row in rows:
         if row.get("endpoint") == endpoint:
             row["email"] = normalized_email
             row["keys"] = {"p256dh": p256dh, "auth": auth}
             row["user_agent"] = user_agent or row.get("user_agent") or ""
+            row["channel"] = channel_norm
+            if token:
+                row["fcm_token"] = token
+            if platform_norm:
+                row["platform"] = platform_norm
             if tenant_id:
                 row["tenant_id"] = str(tenant_id)
             if audience:
@@ -194,6 +222,9 @@ def upsert_subscription(
         "tenant_id": str(tenant_id) if tenant_id else None,
         "audience": audience or "customer",
         "driver_id": str(driver_id).strip() if driver_id else None,
+        "channel": channel_norm,
+        "fcm_token": token,
+        "platform": platform_norm,
         "created_at": now,
         "updated_at": now,
     }

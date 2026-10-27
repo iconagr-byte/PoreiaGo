@@ -48,7 +48,7 @@ class DriverShiftInvitePushTests(unittest.IsolatedAsyncioTestCase):
         from travel_platform.notifications.driver_push_service import send_driver_shift_invite_push
 
         with patch(
-            "travel_platform.notifications.driver_push_service.web_push_configured",
+            "travel_platform.notifications.driver_push_service.push_configured",
             return_value=False,
         ):
             result = await send_driver_shift_invite_push(
@@ -73,7 +73,7 @@ class DriverShiftInvitePushTests(unittest.IsolatedAsyncioTestCase):
                     driver_id="drv-1",
                 )
                 with patch(
-                    "travel_platform.notifications.driver_push_service.web_push_configured",
+                    "travel_platform.notifications.driver_push_service.push_configured",
                     return_value=True,
                 ), patch(
                     "travel_platform.notifications.driver_push_service.send_push_to_subscription",
