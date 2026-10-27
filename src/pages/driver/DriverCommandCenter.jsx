@@ -565,7 +565,7 @@ export default function DriverCommandCenter() {
                   type="button"
                   className={classes}
                   onClick={() => {
-                    // Tab enter never starts a shift — only GPS «Έναρξη βάρδιας» does.
+                    // Tab enter (Αρχική / Θέση / Scan / Chat / SOS / Ημέρα) never starts shift.
                     setTab(t.id);
                   }}
                   aria-label={
