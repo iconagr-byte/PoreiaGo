@@ -12,6 +12,7 @@ import {
   isAdmin,
   logoutCustomer,
 } from '../lib/auth.js';
+import { clearNativeRoleHome } from '../lib/capacitor/nativeRoleHome.js';
 import {
   clearWalletFocusBooking,
   getWalletClaim,
@@ -375,6 +376,7 @@ function WalletAuthenticatedApp() {
 
   const handleLogout = () => {
     logoutCustomer();
+    clearNativeRoleHome();
     navigate('/login', { replace: true, state: { from: '/wallet' } });
   };
 

@@ -29,10 +29,8 @@ import {
   clearDriverNotifications,
   resetDriverEntryAlerts,
 } from '../../lib/driver/clearDriverNotifications.js';
-import DriverAccountSplash, {
-  clearDriverAccountSplashSeen,
-  hasSeenDriverAccountSplash,
-} from '../../components/driver/DriverAccountSplash.jsx';
+import { clearNativeRoleHome } from '../../lib/capacitor/nativeRoleHome.js';
+import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 
 const TABS = [
   { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχική' },
@@ -196,20 +194,18 @@ export default function DriverCommandCenter() {
 
   const [onBreak, setOnBreak] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
-  const [showAccountSplash, setShowAccountSplash] = useState(false);
   const shift = useDriverShiftSession({
     driverName: session?.driverName || 'Οδηγός',
     enabled: authenticated,
   });
-
-  useEffect(() => {
-    if (!authenticated || !session?.driverId) {
-      setShowAccountSplash(false);
-      return;
-    }
-    setShowAccountSplash(!hasSeenDriverAccountSplash(session));
-  }, [authenticated, session?.driverId, session?.tenantId]);
   const telemetryOnline = shift.online;
+
+  // Unified native app: unauthenticated /driver → central /login (not driver-only gate).
+  useEffect(() => {
+    if (authenticated) return;
+    if (!isNativeApp() || isNativeDriverApp()) return;
+    navigate('/login', { replace: true });
+  }, [authenticated, navigate]);
   // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login.
   const tachograph = useTachograph({
     active: telemetryOnline,
@@ -365,7 +361,6 @@ export default function DriverCommandCenter() {
 
   const logout = async () => {
     resetDriverEntryAlerts().catch(() => {});
-    clearDriverAccountSplashSeen(session);
     // Await shift/end (+ office push) while the access token is still present.
     try {
       await shift.goOffline({ silent: true });
@@ -373,31 +368,37 @@ export default function DriverCommandCenter() {
       /* still clear local session */
     }
     clearDriverSession();
+    clearNativeRoleHome();
     setAuthenticated(false);
-    navigate('/driver', { replace: true });
+    // Unified app → central login for customer / driver / rent (not driver-only gate).
+    navigate('/login', { replace: true });
   };
 
-  // Guest / share / PWA → driver login in-place on /driver (never /driver/login deep-link 404).
+  // Web / PWA / legacy driver APK: login in-place on /driver.
+  // Unified Capacitor app redirects to /login (see effect above).
   let body = null;
   if (!authenticated) {
-    body = (
-      <MasterQrGate
-        onAuthenticated={() => {
-          resetDriverEntryAlerts().catch(() => {});
-          // Login never starts a shift — clear any stale flag before shell mounts.
-          clearDriverShiftLaunchState();
-          clearDriverAccountSplashSeen(getDriverSession());
-          setAuthenticated(true);
-          setProfileTick((n) => n + 1);
-          window.setTimeout(() => {
-            toast.success('Συνδεθήκατε — πατήστε Έναρξη βάρδιας', {
-              id: 'driver-shift-login',
-              duration: 3200,
-            });
-          }, 80);
-        }}
-      />
-    );
+    if (isNativeApp() && !isNativeDriverApp()) {
+      body = null;
+    } else {
+      body = (
+        <MasterQrGate
+          onAuthenticated={() => {
+            resetDriverEntryAlerts().catch(() => {});
+            // Login never starts a shift — clear any stale flag before shell mounts.
+            clearDriverShiftLaunchState();
+            setAuthenticated(true);
+            setProfileTick((n) => n + 1);
+            window.setTimeout(() => {
+              toast.success('Συνδεθήκατε — πατήστε Έναρξη βάρδιας', {
+                id: 'driver-shift-login',
+                duration: 3200,
+              });
+            }, 80);
+          }}
+        />
+      );
+    }
   } else {
     const startShiftNow = () => {
       setTab('gps');
@@ -412,12 +413,6 @@ export default function DriverCommandCenter() {
         data-device-form={device.form}
         data-orientation={device.orientation}
       >
-        {showAccountSplash ? (
-          <DriverAccountSplash
-            session={session}
-            onDone={() => setShowAccountSplash(false)}
-          />
-        ) : null}
         <div className="driver-app-body">
           <DriverHeader
             session={session}
@@ -570,7 +565,7 @@ export default function DriverCommandCenter() {
                   type="button"
                   className={classes}
                   onClick={() => {
-                    // Tab enter never starts a shift — only GPS «Έναρξη βάρδιας» does.
+                    // Tab enter (Αρχική / Θέση / Scan / Chat / SOS / Ημέρα) never starts shift.
                     setTab(t.id);
                   }}
                   aria-label={
