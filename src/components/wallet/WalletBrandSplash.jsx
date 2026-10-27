@@ -9,19 +9,11 @@ import {
 import '../../styles/wallet-brand-splash.css';
 
 /**
- * Native account splash — office logo when available, else PoreiaGo wordmark.
- * Shown on Capacitor cold start and after login while the account home loads.
+ * Apple-style brand splash: soft field, PoreiaGo wordmark, short personal hook.
+ * Shown once per native app session before role home / login.
  */
-export default function WalletBrandSplash({
-  onDone,
-  officeLogoUrl = '',
-  officeName = '',
-  hook = WALLET_SPLASH_HOOK,
-  support = WALLET_SPLASH_SUPPORT,
-  durationMs = WALLET_SPLASH_DURATION_MS,
-}) {
+export default function WalletBrandSplash({ onDone }) {
   const [leaving, setLeaving] = useState(false);
-  const hasOfficeLogo = Boolean(officeLogoUrl);
 
   const finish = () => {
     if (leaving) return;
@@ -33,26 +25,22 @@ export default function WalletBrandSplash({
   };
 
   useEffect(() => {
-    const t = window.setTimeout(finish, Math.max(1600, Number(durationMs) || WALLET_SPLASH_DURATION_MS));
+    const t = window.setTimeout(finish, WALLET_SPLASH_DURATION_MS);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once auto-advance
   }, []);
 
-  const brand = officeName || WALLET_SPLASH_BRAND;
-  const splitAt = !hasOfficeLogo && brand.toLowerCase().endsWith('go') ? brand.length - 2 : brand.length;
+  // Brand signal first: "Poreia" + accent "Go" (never a generic headline over the mark).
+  const brand = WALLET_SPLASH_BRAND;
+  const splitAt = brand.toLowerCase().endsWith('go') ? brand.length - 2 : brand.length;
   const brandMain = brand.slice(0, splitAt);
   const brandAccent = brand.slice(splitAt);
-  const ariaLabel = hasOfficeLogo
-    ? `${officeName || 'Γραφείο'} — ${hook}`
-    : `${WALLET_SPLASH_BRAND} — ${hook}`;
 
   return (
     <div
-      className={`pg-wallet-splash${leaving ? ' pg-wallet-splash--out' : ''}${
-        hasOfficeLogo ? ' pg-wallet-splash--office' : ''
-      }`}
+      className={`pg-wallet-splash${leaving ? ' pg-wallet-splash--out' : ''}`}
       role="dialog"
-      aria-label={ariaLabel}
+      aria-label={`${WALLET_SPLASH_BRAND} — ${WALLET_SPLASH_HOOK}`}
       onClick={finish}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -63,26 +51,13 @@ export default function WalletBrandSplash({
       tabIndex={0}
     >
       <div className="pg-wallet-splash-mark">
-        {hasOfficeLogo ? (
-          <>
-            <div className="pg-wallet-splash-logo-wrap">
-              <img
-                src={officeLogoUrl}
-                alt={officeName || 'Λογότυπο γραφείου'}
-                className="pg-wallet-splash-logo"
-              />
-            </div>
-            {officeName ? <p className="pg-wallet-splash-office-name">{officeName}</p> : null}
-          </>
-        ) : (
-          <h1 className="pg-wallet-splash-wordmark">
-            {brandMain}
-            <span>{brandAccent}</span>
-          </h1>
-        )}
+        <h1 className="pg-wallet-splash-wordmark">
+          {brandMain}
+          <span>{brandAccent}</span>
+        </h1>
         <hr className="pg-wallet-splash-rule" aria-hidden />
-        <p className="pg-wallet-splash-hook">{hook}</p>
-        <p className="pg-wallet-splash-support">{support}</p>
+        <p className="pg-wallet-splash-hook">{WALLET_SPLASH_HOOK}</p>
+        <p className="pg-wallet-splash-support">{WALLET_SPLASH_SUPPORT}</p>
       </div>
       <p className="pg-wallet-splash-hint">Αγγίξτε για συνέχεια</p>
     </div>
