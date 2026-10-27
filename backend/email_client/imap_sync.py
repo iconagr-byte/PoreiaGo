@@ -354,9 +354,12 @@ async def sync_account_imap(
         ),
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
 
     from .settings_store import record_sync_result
 
@@ -364,9 +367,10 @@ async def sync_account_imap(
     await record_sync_result(settings_id, error=err_text)
 
     return {
-        "ok": bool(messages) or not errors,
+        # Success when IMAP fetch worked (even if every message was already cached).
+        "ok": (not errors) or bool(messages),
         "email_settings_id": settings_id,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "error": ("; ".join(errors) if errors and not messages else None),
@@ -445,12 +449,15 @@ async def sync_imap_to_database_async(
         None, lambda: _fetch_all_from_imap(cfg, batch_per_folder=batch_per_folder)
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
     return {
         "ok": True,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "legacy_env": True,

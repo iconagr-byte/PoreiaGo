@@ -157,11 +157,15 @@ async def sync_subscribers_from_accounts() -> None:
     await db.commit()
 
 
-async def upsert_message(data: dict) -> dict | None:
-    """Εισαγωγή ή ενημέρωση αν υπάρχει το ίδιο message_id (+ λογαριασμός)."""
+async def upsert_message(data: dict) -> tuple[dict | None, bool]:
+    """Εισαγωγή ή ενημέρωση αν υπάρχει το ίδιο message_id (+ λογαριασμός).
+
+    Returns ``(message, created)`` — ``created`` is True only on first insert
+    so IMAP sync can report truly new mail instead of re-counted upserts.
+    """
     mid = (data.get("message_id") or "").strip()
     if not mid:
-        return None
+        return None, False
     sid = data.get("email_settings_id")
     db = get_db()
     existing = None
@@ -231,7 +235,7 @@ async def upsert_message(data: dict) -> dict | None:
             ),
         )
         await db.commit()
-        return await get_message(eid)
+        return await get_message(eid), False
 
     eid = _new_id("EM")
     await db.execute(
@@ -260,7 +264,7 @@ async def upsert_message(data: dict) -> dict | None:
         ),
     )
     await db.commit()
-    return await get_message(eid)
+    return await get_message(eid), True
 
 
 async def get_message(message_pk: str) -> dict | None:
@@ -382,7 +386,7 @@ async def record_sent_local(
     message_id: str | None = None,
     email_settings_id: str | None = None,
 ) -> dict:
-    return await upsert_message(
+    msg, _created = await upsert_message(
         {
             "message_id": message_id or f"sent-{_new_id('m')}@local",
             "email_settings_id": email_settings_id,
@@ -394,7 +398,8 @@ async def record_sent_local(
             "is_read": True,
             "date": _now(),
         }
-    )  # type: ignore[return-value]
+    )
+    return msg  # type: ignore[return-value]
 
 
 # --- Subscribers ---
