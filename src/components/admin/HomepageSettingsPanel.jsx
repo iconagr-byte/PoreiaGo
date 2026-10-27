@@ -12,6 +12,7 @@ import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
 import RentBrandDesigner from './RentBrandDesigner.jsx';
+import WalletHomeCopyEditor from './WalletHomeCopyEditor.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
 import HeroImageBlock from './homepage/HeroImageBlock.jsx';
 import {
@@ -58,6 +59,7 @@ import {
 import {
   DEFAULT_OFFICE_MODULES,
   contractDesignLabel,
+  designPagesForModules,
   fetchAdminOfficeModules,
   officeModeFromModules,
   resolveDesignPageForModules,
@@ -82,6 +84,21 @@ const DESIGN_PAGES = [
     icon: 'directions_bus',
     accentFrom: 'from-sky-700',
     accentVia: 'via-indigo-700',
+    accentTo: 'to-slate-800',
+  },
+  {
+    id: 'wallet',
+    label: 'Wallet',
+    title: 'My Wallet · Αρχική',
+    blurb: 'Κείμενα και παροχές της Αρχικής στην εφαρμογή πελάτη — χωρίς rebuild.',
+    previewTo: '/wallet',
+    previewLabel: 'Άνοιγμα /wallet',
+    previewSrc: '/wallet',
+    previewPathLabel: '/wallet',
+    openSiteHref: '/wallet',
+    icon: 'account_balance_wallet',
+    accentFrom: 'from-blue-700',
+    accentVia: 'via-sky-700',
     accentTo: 'to-slate-800',
   },
   {
@@ -120,10 +137,21 @@ const RENT_SECTIONS = [
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
 ];
 
+const WALLET_SECTIONS = [
+  { id: 'copy', label: 'Κείμενα', icon: 'edit_note', accent: 'bg-sky-600' },
+];
+
 const DEFAULT_SECTION = 'themes';
 
 function sanitizeDesignPage(value) {
-  return value === 'rent' ? 'rent' : 'home';
+  if (value === 'rent') return 'rent';
+  if (value === 'wallet') return 'wallet';
+  return 'home';
+}
+
+function designPageQueryValue(id) {
+  if (id === 'rent' || id === 'wallet') return id;
+  return '';
 }
 
 function PanelCard({ title, description, children, action }) {
@@ -575,10 +603,14 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     const requested = initialDesignPage || pageFromQuery;
     const next = resolveDesignPageForModules(requested, modules);
     setDesignPage((prev) => (prev === next ? prev : next));
-    const cur = pageFromQuery === 'rent' ? 'rent' : pageFromQuery === 'home' ? 'home' : '';
+    const cur =
+      pageFromQuery === 'rent' || pageFromQuery === 'wallet' || pageFromQuery === 'home'
+        ? pageFromQuery
+        : '';
     if (requested && resolveDesignPageForModules(requested, modules) !== sanitizeDesignPage(requested)) {
       const params = new URLSearchParams(window.location.search);
-      if (next === 'rent') params.set('page', 'rent');
+      const q = designPageQueryValue(next);
+      if (q) params.set('page', q);
       else params.delete('page');
       params.delete('designPage');
       setSearchParams(params, { replace: true });
@@ -589,7 +621,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     }
   }, [modulesReady, modules, initialDesignPage, pageFromQuery, officeMode, setSearchParams]);
 
-  const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
+  const navSections =
+    designPage === 'rent'
+      ? RENT_SECTIONS
+      : designPage === 'wallet'
+        ? WALLET_SECTIONS
+        : HOME_SECTIONS;
 
   const selectSection = useCallback(
     (id) => {
@@ -655,18 +692,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     setDesignPage(next);
     setSection(DEFAULT_SECTION);
     const params = new URLSearchParams(searchParams);
-    if (next === 'rent') params.set('page', 'rent');
+    const q = designPageQueryValue(next);
+    if (q) params.set('page', q);
     else params.delete('page');
     params.delete('designPage');
     params.delete('section');
     setSearchParams(params, { replace: true });
   };
 
-  const availablePages = DESIGN_PAGES.filter((p) => {
-    if (officeMode === 'rent_only') return p.id === 'rent';
-    if (officeMode === 'trips_only') return p.id === 'home';
-    return true;
-  });
+  const allowedDesignIds = new Set(designPagesForModules(modules).map((p) => p.id));
+  const availablePages = DESIGN_PAGES.filter((p) => allowedDesignIds.has(p.id));
   const canSwitchPages = availablePages.length > 1;
   const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || availablePages[0] || DESIGN_PAGES[0];
   const onPlatformHost = isPlatformMarketingHost();
@@ -955,6 +990,18 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
   const sectionContent = (
     <div className="space-y-6 min-w-0">
+        {designPage === 'wallet' ? (
+          <PanelCard
+            title="Κείμενα Αρχικής Wallet"
+            description="Hook, τίτλος, περιγραφή, παροχές και λίστα εκδρομών — εμφανίζονται στην εφαρμογή πελάτη μετά την αποθήκευση."
+          >
+            <WalletHomeCopyEditor
+              embedded
+              onSaved={() => setPreviewRefreshToken((n) => n + 1)}
+            />
+          </PanelCard>
+        ) : null}
+
         {designPage === 'rent' ? (
           <>
             {section === 'themes' && (
@@ -1390,11 +1437,17 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         previewPathLabel={previewPathLabel}
         openSiteHref={openSiteHref}
         copyLinkHref={copyLinkHref}
-        siteLabel={designPage === 'rent' ? 'Ενοικιάσεις' : 'Ιστοσελίδα γραφείου'}
+        siteLabel={
+          designPage === 'rent'
+            ? 'Ενοικιάσεις'
+            : designPage === 'wallet'
+              ? 'My Wallet'
+              : 'Ιστοσελίδα γραφείου'
+        }
         brandName={brandName}
         saving={saving}
-        dirty={dirty}
-        onSave={saveAll}
+        dirty={designPage === 'wallet' ? false : dirty}
+        onSave={designPage === 'wallet' ? undefined : saveAll}
         previewRefreshToken={previewRefreshToken}
         editorSparse={
           builderActive ||

@@ -62,6 +62,10 @@ function sectionGroup(id, designPage) {
     if (id === 'slider') return 'Περιεχόμενο';
     return 'Ιστοσελίδα';
   }
+  if (designPage === 'wallet') {
+    if (id === 'copy') return 'Εφαρμογή';
+    return 'Wallet';
+  }
   if (id === 'themes' || id === 'general' || id === 'header' || id === 'hero') return 'Εμφάνιση';
   if (id === 'slider' || id === 'trips') return 'Περιεχόμενο';
   if (id === 'branding' || id === 'footer') return 'Μάρκα';
@@ -79,7 +83,7 @@ const SECTION_HINTS = {
   trips: 'Ένα Builder δεξιά στον τίτλο «Εκδρομές» — διάταξη και πρότυπο για όλες τις κάρτες.',
   branding: 'Επωνυμία γραφείου, λογότυπο και hero εικόνα.',
   footer: 'Inline Builder πάνω στο footer του preview.',
-  copy: 'Όνομα και κείμενα της σελίδας /rent.',
+  copy: 'Κείμενα Αρχικής — /rent ή My Wallet.',
   fleet: 'Διάταξη και στυλ καρτών στόλου ενοικίασης.',
 };
 
@@ -144,7 +148,9 @@ export default function PageDesignWizardShell({
   const heroClass =
     designPage === 'rent'
       ? 'page-design-wizard__hero is-rent'
-      : 'page-design-wizard__hero';
+      : designPage === 'wallet'
+        ? 'page-design-wizard__hero is-wallet'
+        : 'page-design-wizard__hero';
 
   const showPreview =
     effectiveLayout === 'split' ||
@@ -178,7 +184,11 @@ export default function PageDesignWizardShell({
 
   const iframeSrc =
     previewSrc ||
-    (designPage === 'rent' ? '/rent?preview=1' : '/storefront?preview=1');
+    (designPage === 'rent'
+      ? '/rent?preview=1'
+      : designPage === 'wallet'
+        ? '/wallet'
+        : '/storefront?preview=1');
 
   const dismissHint = () => {
     setHintDismissed(true);
@@ -209,7 +219,11 @@ export default function PageDesignWizardShell({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="page-design-wizard__toolbar-kicker">
-                {designPage === 'rent' ? 'Σελίδα ενοικιάσεων' : 'Ιστοσελίδα γραφείου'}
+                {designPage === 'rent'
+                  ? 'Σελίδα ενοικιάσεων'
+                  : designPage === 'wallet'
+                    ? 'My Wallet · Αρχική'
+                    : 'Ιστοσελίδα γραφείου'}
               </p>
               <span className="page-design-wizard__live-badge" title="Ζωντανή προεπισκόπηση draft">
                 {liveBadge}
@@ -453,7 +467,8 @@ export default function PageDesignWizardShell({
             <div className="page-design-wizard__nav">
               {navSections.map((s, idx) => {
                 const active = section === s.id;
-                const accent = designPage === 'rent' ? 'teal' : 'violet';
+                const accent =
+                  designPage === 'rent' ? 'teal' : designPage === 'wallet' ? 'sky' : 'violet';
                 const group = sectionGroup(s.id, designPage);
                 const showGroup = group && group !== lastGroup;
                 if (showGroup) lastGroup = group;

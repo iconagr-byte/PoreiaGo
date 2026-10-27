@@ -248,6 +248,31 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "intl_section_subtitle": (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     ),
+    # My Wallet «Αρχική» — empty → client falls back to hero / brand
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
 }
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)

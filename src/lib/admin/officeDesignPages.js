@@ -14,7 +14,8 @@ export function officeModeFromModules(modules) {
 
 /**
  * Which landing pages the office may design, based on paid contract modules.
- * @returns {{ id: 'home'|'rent', allowed: boolean }[]}
+ * Wallet Αρχική follows trips (bus) contracts — same copy drives the customer app.
+ * @returns {{ id: 'home'|'wallet'|'rent', allowed: boolean }[]}
  */
 export function designPagesForModules(modules) {
   const mode = officeModeFromModules(modules);
@@ -22,10 +23,14 @@ export function designPagesForModules(modules) {
     return [{ id: 'rent', allowed: true }];
   }
   if (mode === 'trips_only') {
-    return [{ id: 'home', allowed: true }];
+    return [
+      { id: 'home', allowed: true },
+      { id: 'wallet', allowed: true },
+    ];
   }
   return [
     { id: 'home', allowed: true },
+    { id: 'wallet', allowed: true },
     { id: 'rent', allowed: true },
   ];
 }
@@ -33,7 +38,8 @@ export function designPagesForModules(modules) {
 /** Resolve design page id against contract; falls back to first allowed. */
 export function resolveDesignPageForModules(requested, modules) {
   const allowed = designPagesForModules(modules).map((p) => p.id);
-  const want = requested === 'rent' ? 'rent' : 'home';
+  const want =
+    requested === 'rent' ? 'rent' : requested === 'wallet' ? 'wallet' : 'home';
   if (allowed.includes(want)) return want;
   return allowed[0] || 'home';
 }
