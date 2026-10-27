@@ -14,10 +14,13 @@ describe('navServiceScope', () => {
     expect(navItemServiceScope('routes')).toBe('buses');
     expect(navItemServiceScope('fleet')).toBe('buses');
     expect(navItemServiceScope('fleet_rental_vehicles')).toBe('rent');
+    expect(navItemServiceScope('wallet_registrations')).toBe('shared');
     expect(isSharedNavItem('email')).toBe(true);
+    expect(isSharedNavItem('wallet_registrations')).toBe(true);
   });
 
   it('filters by service mode', () => {
+    expect(navItemVisibleInServiceMode('wallet_registrations', 'rent')).toBe(true);
     expect(navItemVisibleInServiceMode('dashboard', 'rent')).toBe(true);
     expect(navItemVisibleInServiceMode('routes', 'rent')).toBe(false);
     expect(navItemVisibleInServiceMode('routes', 'buses')).toBe(true);
