@@ -89,6 +89,7 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [checkedIds, setCheckedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const autoSyncedFor = useRef('');
+  const syncInFlight = useRef(false);
 
   const loadFolders = useCallback(async () => {
     try {
@@ -158,6 +159,8 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         if (!quiet) mailboxToastError('Επιλέξτε λογαριασμό email');
         return;
       }
+      if (syncInFlight.current) return;
+      syncInFlight.current = true;
       setSyncing(true);
       try {
         const r = await syncMailbox(emailSettingsId);
@@ -170,10 +173,10 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         setLastSyncError('');
         if (!quiet) {
           toast.success(
-            n ? `Συγχρονίστηκαν ${n} μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα',
+            n ? `Συγχρονίστηκαν ${n} νέα μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα',
           );
         } else if (n) {
-          toast.success(`Συγχρονίστηκαν ${n} μηνύματα`, { id: 'mailbox-auto-sync' });
+          toast.success(`Συγχρονίστηκαν ${n} νέα μηνύματα`, { id: 'mailbox-auto-sync' });
         }
         if (Array.isArray(r.errors) && r.errors.length) {
           setLastSyncError(r.errors[0]);
@@ -182,8 +185,9 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         await loadFolders();
         await loadMessages();
       } catch (err) {
-        mailboxToastError(err.message);
+        if (!quiet) mailboxToastError(err.message);
       } finally {
+        syncInFlight.current = false;
         setSyncing(false);
       }
     },
@@ -196,6 +200,15 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     if (autoSyncedFor.current === emailSettingsId) return;
     autoSyncedFor.current = emailSettingsId;
     runSync({ quiet: true });
+  }, [emailSettingsId, runSync]);
+
+  // While the mailbox tab is open, poll IMAP every 5s for new mail.
+  useEffect(() => {
+    if (!emailSettingsId) return undefined;
+    const id = window.setInterval(() => {
+      runSync({ quiet: true });
+    }, 5000);
+    return () => window.clearInterval(id);
   }, [emailSettingsId, runSync]);
 
   const selectMessage = async (id) => {

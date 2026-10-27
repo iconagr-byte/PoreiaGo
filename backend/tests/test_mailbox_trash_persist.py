@@ -39,7 +39,7 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_does_not_resurrect_trashed_message(self):
         from email_client.store import list_messages, update_message, upsert_message
 
-        msg = await upsert_message(
+        msg, created = await upsert_message(
             {
                 "message_id": "<re-onlyfans@test>",
                 "email_settings_id": "EMS-1",
@@ -53,11 +53,12 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         self.assertIsNotNone(msg)
+        self.assertTrue(created)
         trashed = await update_message(msg["id"], {"folder": "Trash", "is_read": True})
         self.assertEqual(trashed["folder"], "Trash")
 
         # Simulate IMAP sync re-importing the same Message-ID from INBOX.
-        revived = await upsert_message(
+        revived, revived_created = await upsert_message(
             {
                 "message_id": "<re-onlyfans@test>",
                 "email_settings_id": "EMS-1",
@@ -70,6 +71,7 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
                 "imap_uid": "42",
             }
         )
+        self.assertFalse(revived_created)
         self.assertEqual(revived["id"], msg["id"])
         self.assertEqual(revived["folder"], "Trash")
         inbox = await list_messages(folder="Inbox", email_settings_id="EMS-1")
@@ -80,7 +82,7 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_can_still_update_active_inbox_message(self):
         from email_client.store import upsert_message
 
-        msg = await upsert_message(
+        msg, created = await upsert_message(
             {
                 "message_id": "<alive@test>",
                 "email_settings_id": "EMS-1",
@@ -92,7 +94,8 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
                 "date": "2026-03-01T00:00:00+00:00",
             }
         )
-        updated = await upsert_message(
+        self.assertTrue(created)
+        updated, updated_created = await upsert_message(
             {
                 "message_id": "<alive@test>",
                 "email_settings_id": "EMS-1",
@@ -105,6 +108,7 @@ class TrashPersistUpsertTests(unittest.IsolatedAsyncioTestCase):
                 "date": "2026-03-01T00:00:00+00:00",
             }
         )
+        self.assertFalse(updated_created)
         self.assertEqual(updated["id"], msg["id"])
         self.assertEqual(updated["folder"], "Inbox")
         self.assertEqual(updated["subject"], "Hello again")
@@ -139,7 +143,7 @@ class MoveToTrashImapTests(unittest.IsolatedAsyncioTestCase):
         from email_client.mailbox_service import move_to_trash
         from email_client.store import upsert_message
 
-        msg = await upsert_message(
+        msg, _ = await upsert_message(
             {
                 "message_id": "<bulk@test>",
                 "email_settings_id": "EMS-imap",
@@ -183,7 +187,7 @@ class MoveToTrashImapTests(unittest.IsolatedAsyncioTestCase):
         from email_client.mailbox_service import move_to_trash
         from email_client.store import upsert_message
 
-        msg = await upsert_message(
+        msg, _ = await upsert_message(
             {
                 "message_id": "<offline@test>",
                 "email_settings_id": "EMS-imap",

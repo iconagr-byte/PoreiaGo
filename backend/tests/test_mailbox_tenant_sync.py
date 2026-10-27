@@ -59,7 +59,7 @@ class ListAllActiveSettingsTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_claims_orphan_message(self):
         from email_client.store import list_messages, upsert_message
 
-        orphan = await upsert_message(
+        orphan, orphan_created = await upsert_message(
             {
                 "message_id": "<orphan@test>",
                 "subject": "Hi",
@@ -71,7 +71,8 @@ class ListAllActiveSettingsTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         self.assertIsNotNone(orphan)
-        claimed = await upsert_message(
+        self.assertTrue(orphan_created)
+        claimed, claimed_created = await upsert_message(
             {
                 "message_id": "<orphan@test>",
                 "email_settings_id": "EMS-claim",
@@ -83,6 +84,7 @@ class ListAllActiveSettingsTests(unittest.IsolatedAsyncioTestCase):
                 "date": "2026-01-01T00:00:00+00:00",
             }
         )
+        self.assertFalse(claimed_created)
         self.assertEqual(claimed["id"], orphan["id"])
         self.assertEqual(claimed["email_settings_id"], "EMS-claim")
         self.assertEqual(claimed["subject"], "Hi2")
