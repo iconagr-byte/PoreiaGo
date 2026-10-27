@@ -37,6 +37,8 @@
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ notification permission for FCM / Capacitor Push -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Driver shift GPS + ticket QR scan -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

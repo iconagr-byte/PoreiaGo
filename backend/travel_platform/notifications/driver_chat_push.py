@@ -62,13 +62,13 @@ async def notify_office_message_to_driver(
     from travel_platform.notifications.push_subscription_store import list_subscriptions_for_driver
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_subscription,
-        web_push_configured,
     )
 
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     tid = str(tenant_id or "").strip()
     did = str(driver_id or "").strip()
@@ -147,14 +147,14 @@ async def notify_driver_message_to_office(
     )
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_email,
         send_push_to_subscription,
-        web_push_configured,
     )
 
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     tid = str(tenant_id or "").strip()
     did = str(driver_id or "").strip()

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import { readStoredFcmToken } from '../../lib/capacitor/nativePush.js';
 import {
   fetchPushConfig,
   fetchPushStatus,
@@ -10,9 +11,7 @@ import {
 } from '../../services/pushNotificationApi.js';
 
 /**
- * Customer Web Push (service worker / VAPID) panel.
- * Capacitor WebViews often fail PushManager / secure-context checks — never show the
- * browser “HTTPS ή localhost” warning inside the native app.
+ * Customer push panel — Web Push (VAPID) in browser, FCM in Capacitor native apps.
  */
 export default function PushNotificationsPanel({ email }) {
   const native = typeof window !== 'undefined' && isNativeApp();
@@ -20,12 +19,10 @@ export default function PushNotificationsPanel({ email }) {
   const [serverEnabled, setServerEnabled] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [devices, setDevices] = useState(0);
-  const [loading, setLoading] = useState(!native);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (native) return undefined;
-
     let cancelled = false;
     const load = async () => {
       const pushSupported = isPushSupported();
@@ -40,8 +37,12 @@ export default function PushNotificationsPanel({ email }) {
           fetchPushStatus().catch(() => ({ subscribed: false, devices: 0 })),
         ]);
         if (cancelled) return;
-        setServerEnabled(Boolean(config.enabled && config.public_key));
-        setSubscribed(Boolean(status.subscribed));
+        const ok = native
+          ? Boolean(config.enabled || config.fcm)
+          : Boolean(config.enabled && config.public_key);
+        setServerEnabled(ok);
+        const localNative = native ? Boolean(readStoredFcmToken()) : false;
+        setSubscribed(Boolean(status.subscribed) || localNative);
         setDevices(Number(status.devices || 0));
       } finally {
         if (!cancelled) setLoading(false);
@@ -59,7 +60,11 @@ export default function PushNotificationsPanel({ email }) {
       const result = await subscribePushNotifications();
       setSubscribed(true);
       setDevices(Number(result.devices || 1));
-      toast.success('Ενεργοποιήθηκαν push ειδοποιήσεις για φορολογικές αποδείξεις');
+      toast.success(
+        native
+          ? 'Ενεργοποιήθηκαν native ειδοποιήσεις'
+          : 'Ενεργοποιήθηκαν push ειδοποιήσεις για φορολογικές αποδείξεις',
+      );
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενεργοποίησης push');
     } finally {
@@ -75,15 +80,13 @@ export default function PushNotificationsPanel({ email }) {
       setDevices(0);
       toast.success('Απενεργοποιήθηκαν οι push ειδοποιήσεις');
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία απενεργοποίησης push');
+      toast.error(err.message || 'Αποτυχία απενεργοποίησης');
     } finally {
       setBusy(false);
     }
   };
 
-  // Native Capacitor shell: Web Push is a browser API — hide subscribe UI and the
-  // misleading insecure-context banner. FCM / native push can replace this later.
-  if (native) {
+  if (!supported && native) {
     return (
       <section className="wallet-panel">
         <div className="wallet-panel-head">
@@ -92,18 +95,8 @@ export default function PushNotificationsPanel({ email }) {
           </span>
           <div>
             <h3>Push ειδοποιήσεις</h3>
-            <p>
-              Στην εφαρμογή κινητού οι ειδοποιήσεις θα έρχονται μέσω της native εφαρμογής (όχι
-              browser Web Push).
-            </p>
+            <p>Χρειάζεται rebuild του APK με το plugin Push Notifications.</p>
           </div>
-        </div>
-        <div className="wallet-notice wallet-notice-muted">
-          <span className="material-symbols-outlined">smartphone</span>
-          <p>
-            Οι native ειδοποιήσεις θα ενεργοποιηθούν σε επόμενη ενημέρωση. Δεν χρειάζεται HTTPS /
-            Web Push από το browser.
-          </p>
         </div>
       </section>
     );
@@ -116,69 +109,40 @@ export default function PushNotificationsPanel({ email }) {
           <span className="material-symbols-outlined">notifications_active</span>
         </span>
         <div>
-          <h3>Push ειδοποιήσεις (MARK)</h3>
+          <h3>{native ? 'Push ειδοποιήσεις (FCM)' : 'Push ειδοποιήσεις (MARK)'}</h3>
           <p>
-            Λάβετε browser ειδοποίηση όταν εκδοθεί φορολογική απόδειξη (myDATA MARK) για κράτηση με
-            email <strong>{email}</strong>.
+            {native
+              ? 'Native ειδοποιήσεις στο κινητό για αποδείξεις και ενημερώσεις κράτησης.'
+              : 'Web Push για φορολογικές αποδείξεις σε αυτό το browser.'}
           </p>
         </div>
       </div>
 
       {loading ? (
-        <p className="wallet-empty-copy">Φόρτωση…</p>
+        <p className="wallet-muted text-sm">Έλεγχος…</p>
       ) : !supported ? (
-        <div className="wallet-notice wallet-notice-warn">
-          <span className="material-symbols-outlined">warning</span>
-          <p>
-            Το browser σας δεν υποστηρίζει Web Push ή τρέχετε σε μη ασφαλές περιβάλλον (χρειάζεται
-            HTTPS ή localhost).
-          </p>
-        </div>
-      ) : !serverEnabled ? (
         <div className="wallet-notice wallet-notice-muted">
-          <span className="material-symbols-outlined">settings</span>
-          <p>
-            Ο server δεν έχει ρυθμιστεί ακόμα (WEB_PUSH_VAPID_*). Ζητήστε από τον διαχειριστή να
-            ενεργοποιήσει Web Push.
+          <span className="material-symbols-outlined">info</span>
+          <p>Το browser δεν υποστηρίζει Web Push.</p>
+        </div>
+      ) : !serverEnabled && !native ? (
+        <div className="wallet-notice wallet-notice-muted">
+          <span className="material-symbols-outlined">info</span>
+          <p>Οι ειδοποιήσεις δεν είναι ρυθμισμένες ακόμα στον server.</p>
+        </div>
+      ) : subscribed ? (
+        <div className="space-y-2">
+          <p className="text-sm text-emerald-700 font-semibold">
+            Ενεργές σε αυτή τη συσκευή{devices > 1 ? ` · ${devices} συσκευές` : ''}
           </p>
+          <button type="button" className="wallet-btn-secondary" disabled={busy} onClick={handleDisable}>
+            {busy ? '…' : 'Απενεργοποίηση'}
+          </button>
         </div>
       ) : (
-        <div className="wallet-form">
-          <div className={`wallet-meta-tile ${subscribed ? 'is-active' : 'is-idle'}`}>
-            <p className="wallet-pass-kicker">Κατάσταση</p>
-            <p className="wallet-pass-meta-value">{subscribed ? 'Ενεργές' : 'Ανενεργές'}</p>
-            {subscribed ? (
-              <p className="wallet-field-hint" style={{ marginTop: '0.35rem' }}>
-                Συνδεδεμένες συσκευές: <strong>{devices}</strong>
-              </p>
-            ) : (
-              <p className="wallet-field-hint" style={{ marginTop: '0.35rem' }}>
-                Ενεργοποιήστε για άμεση ειδοποίηση μετά την έκδοση MARK — χωρίς SMS κόστος.
-              </p>
-            )}
-          </div>
-
-          {subscribed ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleDisable}
-              className="wallet-btn wallet-btn-danger"
-            >
-              Απενεργοποίηση push
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleEnable}
-              className="wallet-btn wallet-btn-primary"
-            >
-              <span className="material-symbols-outlined text-[18px]">notifications</span>
-              {busy ? 'Ενεργοποίηση…' : 'Ενεργοποίηση push'}
-            </button>
-          )}
-        </div>
+        <button type="button" className="wallet-btn-primary" disabled={busy} onClick={handleEnable}>
+          {busy ? '…' : 'Ενεργοποίηση ειδοποιήσεων'}
+        </button>
       )}
     </section>
   );

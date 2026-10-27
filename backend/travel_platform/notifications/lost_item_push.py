@@ -36,14 +36,14 @@ async def notify_lost_item_to_office(item: dict[str, Any]) -> dict[str, Any]:
     )
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_email,
         send_push_to_subscription,
-        web_push_configured,
     )
 
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     item_id = str(item.get("id") or "")
     category = str(item.get("itemCategory") or item.get("item_category") or "Αντικείμενο")
