@@ -526,6 +526,14 @@ class TenantSiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = []
+    wallet_home_news: list[dict] = []
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
 
 
 class TenantSiteAppearanceUpdate(BaseModel):
@@ -612,6 +620,14 @@ class TenantSiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 class TenantPlatformSettingsResponse(BaseModel):

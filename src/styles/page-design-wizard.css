@@ -367,6 +367,13 @@
     0 18px 40px rgba(8, 145, 178, 0.28);
 }
 
+.page-design-wizard__hero.is-wallet {
+  background: linear-gradient(145deg, #1d4ed8 0%, #0284c7 52%, #0f172a 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 18px 40px rgba(2, 132, 199, 0.28);
+}
+
 .page-design-wizard__hero-kicker {
   font-size: 0.62rem;
   font-weight: 700;

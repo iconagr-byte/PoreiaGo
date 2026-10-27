@@ -60,7 +60,11 @@ export default function PageDesignLivePreview({
 
   const chromePath =
     previewPathLabel ||
-    (designPage === 'rent' ? '/rent?preview=1' : '/storefront?preview=1');
+    (designPage === 'rent'
+      ? '/rent?preview=1'
+      : designPage === 'wallet'
+        ? '/wallet'
+        : '/storefront?preview=1');
 
   const onIframeLoad = () => {
     // Brief delay so the overlay doesn't flash on fast loads.
