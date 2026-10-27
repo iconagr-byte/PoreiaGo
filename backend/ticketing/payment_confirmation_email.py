@@ -21,6 +21,7 @@ EVENT_BANK_PENDING = "bank_pending"
 EVENT_BANK_CONFIRMED = "bank_confirmed"
 EVENT_CASH_PAYMENT = "cash_payment"
 EVENT_FISCAL_RECEIPT = "fiscal_receipt_issued"
+EVENT_NEW_BOOKING = "new_booking"
 
 INVOICE_KIND_LABELS = {
     "down_payment": "Προκαταβολή",
@@ -152,6 +153,24 @@ async def _tenant_office_emails(tenant_id: str) -> list[str]:
     return found
 
 
+async def _tenant_mailbox_email(tenant_id: str) -> str | None:
+    """Active Email Hub mailbox address for the office (e.g. info@achilliotravel.com)."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return None
+    try:
+        from email_client.settings_store import list_settings
+
+        accounts = await list_settings(owner_key=f"tenant:{tid}", active_only=True)
+        for row in accounts:
+            email = _valid_email(row.get("email_address") or row.get("mail_username"))
+            if email:
+                return email
+    except Exception:
+        logger.debug("tenant mailbox lookup failed tenant=%s", tid, exc_info=True)
+    return None
+
+
 async def resolve_office_recipient(
     tenant_id: str | None = None,
     *,
@@ -167,6 +186,9 @@ async def resolve_office_recipient(
     if tid:
         for email in await _tenant_office_emails(tid):
             return email
+        mailbox = await _tenant_mailbox_email(tid)
+        if mailbox:
+            return mailbox
 
     # Global fallbacks (platform / env) — used when tenant has no contact configured.
     return _admin_recipient(None)
@@ -461,6 +483,7 @@ def build_customer_payment_email(booking: dict[str, Any], event: str) -> tuple[s
 def build_admin_payment_email(booking: dict[str, Any], event: str) -> tuple[str, str]:
     pnr = booking.get("pnr") or booking.get("id") or "—"
     labels = {
+        EVENT_NEW_BOOKING: "Νέα κράτηση εκδρομής",
         EVENT_BANK_PENDING: "Νέα κράτηση — εκκρεμής τραπεζική κατάθεση",
         EVENT_ONLINE_DEPOSIT: "Νέα κράτηση — προκαταβολή online",
         EVENT_BANK_CONFIRMED: "Κατάθεση επιβεβαιώθηκε",
@@ -560,10 +583,10 @@ async def send_payment_confirmation_notifications(
         "require_office": require_office,
     }
 
-    if send_customer and customer_email:
+    if send_customer and customer_email and ev != EVENT_NEW_BOOKING:
         try:
             subject, html = build_customer_payment_email(booking, ev)
-            ref = await send_email(customer_email, subject, html)
+            ref = await send_email(customer_email, subject, html, tenant_id=tenant_id)
             results["customer"] = {"email": customer_email, "reference": ref}
 
             if ev in (EVENT_ONLINE_FULL, EVENT_ONLINE_DEPOSIT, EVENT_BANK_CONFIRMED, EVENT_CASH_PAYMENT):
@@ -578,7 +601,7 @@ async def send_payment_confirmation_notifications(
         if admin_to:
             try:
                 subject, html = build_admin_payment_email(booking, ev)
-                ref = await send_email(admin_to, subject, html)
+                ref = await send_email(admin_to, subject, html, tenant_id=tenant_id)
                 results["admin"] = {"email": admin_to, "reference": ref}
                 logger.info(
                     "Office payment email sent event=%s pnr=%s to=%s tenant=%s",

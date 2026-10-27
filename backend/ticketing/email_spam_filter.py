@@ -45,11 +45,11 @@ SUSPICIOUS_LOCAL_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def _read_spam_settings() -> dict[str, Any]:
+def _read_spam_settings(tenant_id: str | None = None) -> dict[str, Any]:
     try:
         from travel_platform.settings.payment_settings_store import read_payment_settings
 
-        security = read_payment_settings().get("security") or {}
+        security = read_payment_settings(tenant_id).get("security") or {}
     except Exception:
         security = {}
     blocked_raw = security.get("blocked_email_domains") or []
@@ -82,12 +82,12 @@ def extract_domain(email: str) -> str:
     return parts[1] if len(parts) == 2 else ""
 
 
-def check_email_spam_filter(email: str) -> tuple[bool, str]:
+def check_email_spam_filter(email: str, *, tenant_id: str | None = None) -> tuple[bool, str]:
     """
     Returns (allowed, reason).
     reason empty when allowed.
     """
-    cfg = _read_spam_settings()
+    cfg = _read_spam_settings(tenant_id)
     if not cfg["enabled"]:
         return True, ""
 

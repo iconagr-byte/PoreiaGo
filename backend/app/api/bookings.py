@@ -306,66 +306,73 @@ async def _guest_booking_side_effects(
     except Exception:
         pass
 
-    if paid_now > 0:
-        notify_payload = None
-        try:
-            from ticketing.payment_confirmation_email import (
-                send_payment_confirmation_notifications,
-            )
+    # Always notify the office on every new guest booking (paid or unpaid hold).
+    # Prefer tenant Email Hub SMTP so Achillio mail lands in the office mailbox.
+    notify_payload = {
+        "id": str(booking_snapshot["id"]),
+        "pnr": booking_snapshot["reference_code"],
+        "reference_code": booking_snapshot["reference_code"],
+        "tenant_id": str(tenant_id),
+        "customerName": passenger_name,
+        "passenger_name": passenger_name,
+        "email": passenger_email,
+        "phone": passenger_phone,
+        "tripTitle": (trip_title or "").strip() or "Εκδρομή",
+        "trip_title": (trip_title or "").strip() or "Εκδρομή",
+        "seat": seat_label,
+        "seat_label": seat_label,
+        "seats": requested_seats,
+        "amountPaid": float(paid_now),
+        "amount_paid": float(paid_now),
+        "price": float(total),
+        "balanceDue": max(float(total) - float(paid_now), 0.0),
+        "metadata_json": booking_snapshot.get("metadata_json") or {},
+        "status": "Επιβεβαιωμένη" if paid_now > 0 else "Εκκρεμής",
+        "paymentStatus": "PAID" if paid_now >= total and total > 0 else ("DEPOSIT" if paid_now > 0 else "PENDING"),
+    }
+    try:
+        from ticketing.payment_confirmation_email import (
+            EVENT_NEW_BOOKING,
+            EVENT_ONLINE_DEPOSIT,
+            EVENT_ONLINE_FULL,
+            send_payment_confirmation_notifications,
+        )
 
-            notify_payload = {
-                "id": str(booking_snapshot["id"]),
-                "pnr": booking_snapshot["reference_code"],
-                "reference_code": booking_snapshot["reference_code"],
-                "tenant_id": str(tenant_id),
-                "customerName": passenger_name,
-                "passenger_name": passenger_name,
-                "email": passenger_email,
-                "tripTitle": (trip_title or "").strip() or "Εκδρομή",
-                "trip_title": (trip_title or "").strip() or "Εκδρομή",
-                "seat": seat_label,
-                "seat_label": seat_label,
-                "seats": requested_seats,
-                "amountPaid": float(paid_now),
-                "amount_paid": float(paid_now),
-                "price": float(total),
-                "metadata_json": booking_snapshot.get("metadata_json") or {},
-            }
-            await send_payment_confirmation_notifications(
-                notify_payload,
-                require_office=True,
-            )
-        except Exception as exc:
-            logger.error(
-                "Guest booking office payment email failed ref=%s tenant=%s: %s",
-                ref,
-                tenant_id,
-                exc,
-            )
+        if paid_now <= 0:
+            notify_event = EVENT_NEW_BOOKING
+        elif paid_now < total:
+            notify_event = EVENT_ONLINE_DEPOSIT
+        else:
+            notify_event = EVENT_ONLINE_FULL
+        await send_payment_confirmation_notifications(
+            notify_payload,
+            event=notify_event,
+            require_office=True,
+            notify_customer=paid_now > 0,
+        )
+    except Exception as exc:
+        logger.error(
+            "Guest booking office payment email failed ref=%s tenant=%s: %s",
+            ref,
+            tenant_id,
+            exc,
+        )
 
-        try:
-            from travel_platform.notifications.excursion_booking_push import (
-                notify_excursion_booking_to_office,
-            )
+    try:
+        from travel_platform.notifications.excursion_booking_push import (
+            notify_excursion_booking_to_office,
+        )
 
-            push_payload = notify_payload or {
-                "id": str(booking_snapshot["id"]),
-                "pnr": ref,
-                "tenant_id": str(tenant_id),
-                "passenger_name": passenger_name,
-                "trip_title": (trip_title or "").strip() or "Εκδρομή",
-                "seat_label": seat_label,
-                "amount_paid": float(paid_now),
-            }
-            push_payload.setdefault("tenant_id", str(tenant_id))
-            await notify_excursion_booking_to_office(push_payload)
-        except Exception as exc:
-            logger.warning(
-                "Guest booking office bell/push failed ref=%s tenant=%s: %s",
-                ref,
-                tenant_id,
-                exc,
-            )
+        push_payload = dict(notify_payload)
+        push_payload.setdefault("tenant_id", str(tenant_id))
+        await notify_excursion_booking_to_office(push_payload)
+    except Exception as exc:
+        logger.warning(
+            "Guest booking office bell/push failed ref=%s tenant=%s: %s",
+            ref,
+            tenant_id,
+            exc,
+        )
 
 
 def _json_safe(value):
