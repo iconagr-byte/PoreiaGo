@@ -157,6 +157,29 @@ def get_customer(tenant_id: str | None, customer_id: str) -> dict[str, Any] | No
     return None
 
 
+def get_customer_by_email(
+    tenant_id: str | None,
+    email: str,
+    *,
+    service_scope: str | None = "buses",
+) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    needle = _normalize_email(email)
+    if not needle:
+        return None
+    scope = _normalize_scope(service_scope) if service_scope else None
+    with _LOCK:
+        for row in _read()["customers"]:
+            if row.get("tenant_id") != tid or row.get("deleted"):
+                continue
+            if _normalize_email(row.get("email")) != needle:
+                continue
+            if scope and _normalize_scope(row.get("serviceScope")) != scope:
+                continue
+            return _public(row)
+    return None
+
+
 def upsert_customer(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     email = _normalize_email(body.get("email"))
