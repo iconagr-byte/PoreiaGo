@@ -411,6 +411,8 @@ class TeltonikaDeviceUpsert(BaseModel):
 
 
 class TeltonikaDeviceResponse(BaseModel):
+    model_config = {"extra": "ignore"}
+
     id: str
     imei: str
     tenant_id: str
@@ -425,6 +427,9 @@ class TeltonikaDeviceResponse(BaseModel):
     last_lng: float | None = None
     last_speed_kmh: float | None = None
     points_accepted: int = 0
+    last_hw_lat: float | None = None
+    last_hw_lng: float | None = None
+    last_fix_source: str | None = None
 
 
 class TeltonikaServerStatusResponse(BaseModel):

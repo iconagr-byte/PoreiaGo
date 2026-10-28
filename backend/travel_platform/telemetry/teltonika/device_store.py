@@ -168,6 +168,102 @@ def upsert_device(body: dict[str, Any], *, tenant_id: str) -> dict[str, Any]:
         return deepcopy(row_out)
 
 
+# Known production trackers that must not vanish from Achillio Travel admin.
+# (IMEI was bound before; empty dropdown after redeploy / wrong-tenant bind.)
+ACHILLIO_DEFAULT_TRACKERS: tuple[dict[str, str], ...] = (
+    {
+        "imei": "861076085468260",
+        "vehicle_code": "EEX5670",
+        "label": "Λεωφορείο με GPS",
+    },
+)
+
+
+def rebind_device_to_tenant(
+    imei: str,
+    tenant_id: str,
+    *,
+    vehicle_code: str | None = None,
+    label: str | None = None,
+    enabled: bool = True,
+) -> dict[str, Any] | None:
+    """Move an existing IMEI binding to ``tenant_id`` (fix platform mis-bind)."""
+    key = normalize_imei(imei)
+    tid = str(tenant_id or "").strip()
+    if not key or not tid:
+        return None
+    with _LOCK:
+        data = _read()
+        for row in data.get("devices") or []:
+            if normalize_imei(row.get("imei")) != key:
+                continue
+            row["tenant_id"] = tid
+            if vehicle_code:
+                row["vehicle_code"] = str(vehicle_code).strip()
+            if label is not None and str(label).strip():
+                row["label"] = str(label).strip()
+            row["enabled"] = bool(enabled)
+            row["updated_at"] = _now()
+            _write(data)
+            return deepcopy(row)
+    return None
+
+
+def ensure_office_default_trackers(
+    tenant_id: str,
+    *,
+    trackers: tuple[dict[str, str], ...] | list[dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    """If this office has no devices, restore known IMEI bindings (rebind or create).
+
+    Does nothing when the office already has ≥1 device — never clobber a custom fleet.
+    """
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return []
+    existing = list_devices(tid)
+    if existing:
+        return existing
+
+    restored: list[dict[str, Any]] = []
+    for spec in trackers or ACHILLIO_DEFAULT_TRACKERS:
+        imei = normalize_imei(spec.get("imei"))
+        plate = str(spec.get("vehicle_code") or "").strip()
+        label = str(spec.get("label") or "").strip() or f"Teltonika {imei[-6:]}"
+        if not imei or not plate:
+            continue
+        found = get_device_by_imei(imei)
+        if found:
+            if str(found.get("tenant_id") or "") == tid:
+                restored.append(found)
+                continue
+            moved = rebind_device_to_tenant(
+                imei,
+                tid,
+                vehicle_code=plate,
+                label=label or found.get("label"),
+                enabled=True,
+            )
+            if moved:
+                restored.append(moved)
+            continue
+        try:
+            restored.append(
+                upsert_device(
+                    {
+                        "imei": imei,
+                        "vehicle_code": plate,
+                        "label": label,
+                        "enabled": True,
+                    },
+                    tenant_id=tid,
+                )
+            )
+        except ValueError:
+            continue
+    return restored or list_devices(tid)
+
+
 def delete_device(device_id: str, *, tenant_id: str) -> bool:
     did = str(device_id or "").strip()
     tid = str(tenant_id)
