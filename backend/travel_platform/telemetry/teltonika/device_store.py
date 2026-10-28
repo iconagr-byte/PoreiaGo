@@ -305,20 +305,24 @@ def touch_device(
                 continue
             now = _now()
             row["last_seen_at"] = now
-            # Browser «Η θέση μου» must never write lat/lng into the device store —
-            # that polluted Δοκιμαστικό pin with the PC location.
-            if from_hardware and lat is not None:
+            if lat is not None:
                 row["last_lat"] = lat
-                row["last_hw_lat"] = lat
-                row["last_hw_at"] = now
-                row["last_fix_source"] = "teltonika"
                 if not row.get("first_fix_at"):
                     row["first_fix_at"] = now
                     row["tracking_started_at"] = now
-            if from_hardware and lng is not None:
+                if from_hardware:
+                    # Codec TCP — durable hardware fix for Δοκιμαστικό pin.
+                    row["last_hw_lat"] = lat
+                    row["last_hw_at"] = now
+                    row["last_fix_source"] = "teltonika"
+                else:
+                    # Manual / browser must not count as hardware (see hardware_last_fix).
+                    row["last_fix_source"] = "manual"
+            if lng is not None:
                 row["last_lng"] = lng
-                row["last_hw_lng"] = lng
-            if from_hardware and speed_kmh is not None:
+                if from_hardware:
+                    row["last_hw_lng"] = lng
+            if speed_kmh is not None:
                 row["last_speed_kmh"] = speed_kmh
             if points:
                 row["points_accepted"] = int(row.get("points_accepted") or 0) + int(points)

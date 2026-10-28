@@ -26,7 +26,7 @@ class HardwareLastFixTests(unittest.TestCase):
             os.environ["TELTONIKA_DEVICES_STORE"] = self._prev
         self.tmp.cleanup()
 
-    def test_browser_touch_does_not_overwrite_store_coords(self):
+    def test_manual_touch_does_not_replace_hardware_fix(self):
         from travel_platform.telemetry.teltonika.device_store import (
             get_device_by_imei,
             hardware_last_fix,
@@ -51,7 +51,7 @@ class HardwareLastFixTests(unittest.TestCase):
             points=1,
             from_hardware=True,
         )
-        # Browser «Η θέση μου» must not write lat/lng into the device store.
+        # Manual/browser may update last_lat, but last_hw stays Codec-only.
         touch_device(
             "861076085468260",
             lat=37.98381,
@@ -62,7 +62,8 @@ class HardwareLastFixTests(unittest.TestCase):
         )
         device = get_device_by_imei("861076085468260")
         self.assertIsNotNone(device)
-        self.assertEqual(float(device["last_lat"]), 40.80894)
+        self.assertEqual(float(device["last_lat"]), 37.98381)
+        self.assertEqual(device["last_fix_source"], "manual")
         self.assertEqual(float(device["last_hw_lat"]), 40.80894)
         self.assertEqual(hardware_last_fix(device), (40.80894, 22.85134))
 
