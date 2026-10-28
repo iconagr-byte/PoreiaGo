@@ -485,39 +485,40 @@ async def admin_teltonika_test_ping(
         raise HTTPException(status_code=400, detail="Η συσκευή είναι ανενεργή")
 
     req = body or TeltonikaTestPingRequest()
-    from travel_platform.telemetry.teltonika.device_store import hardware_last_fix
+    from travel_platform.telemetry.teltonika.device_store import resolve_hardware_fix
 
     speed = float(req.speed_kmh or 0)
-    use_hw = bool(req.use_hardware) or (req.latitude is None or req.longitude is None)
+    force_hw = bool(req.use_hardware) or (
+        req.latitude is None or req.longitude is None
+    )
+    fix_origin = "browser"
 
-    if use_hw and bool(req.use_hardware):
-        # Δοκιμαστικό pin: always hardware — ignore any lat/lng from the browser form.
-        hw = hardware_last_fix(device)
-        if not hw:
+    if force_hw:
+        # Δοκιμαστικό pin: Codec last_hw or live Teltonika fleet — never PC Lat/Lng.
+        resolved = resolve_hardware_fix(device, tenant_id=tid)
+        if not resolved:
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    "Δεν υπάρχει ακόμα σήμα από το GPS hardware (IMEI). "
-                    "Περιμένετε Codec fix από τον tracker — όχι θέση υπολογιστή."
+                    "Δεν βρέθηκε σήμα Teltonika online για αυτό το IMEI. "
+                    "Περιμένετε Codec TCP fix από τον tracker — όχι θέση υπολογιστή."
                 ),
             )
-        lat, lng = hw
-    elif req.latitude is not None and req.longitude is not None:
+        lat, lng, fix_origin = resolved
+        # Persist live Codec coords so the next click uses last_hw.
+        if fix_origin == "live_fleet":
+            touch_device(
+                str(device.get("imei")),
+                lat=lat,
+                lng=lng,
+                speed_kmh=speed,
+                points=1,
+                from_hardware=True,
+            )
+    else:
         lat = float(req.latitude)
         lng = float(req.longitude)
-    else:
-        # Legacy empty body without use_hardware flag: prefer hardware, else last stored.
-        hw = hardware_last_fix(device)
-        if hw:
-            lat, lng = hw
-        elif device.get("last_lat") is not None and device.get("last_lng") is not None:
-            lat = float(device["last_lat"])
-            lng = float(device["last_lng"])
-        else:
-            raise HTTPException(
-                status_code=409,
-                detail="Δεν υπάρχει αποθηκευμένη θέση για αυτή τη συσκευή.",
-            )
+        fix_origin = "browser"
 
     vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
     driver_name = str(device.get("label") or f"GPS {vehicle_code}")
@@ -533,27 +534,20 @@ async def admin_teltonika_test_ping(
         "driver_name": driver_name,
         "driver_id": device.get("driver_id") or None,
         "imei": device.get("imei"),
-        "source": "teltonika_test_ping",
+        # Hardware pin keeps teltonika provenance; browser stays test_ping.
+        "source": "teltonika" if force_hw else "teltonika_test_ping",
         "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
     result = await process_telemetry_payload(payload)
-    # Browser «Η θέση μου» must not overwrite last_hw_* Codec coordinates.
-    if bool(req.use_hardware) or (req.latitude is None or req.longitude is None):
+    # Never write browser coords into the IMEI device store.
+    if force_hw and fix_origin != "live_fleet":
         touch_device(str(device.get("imei")), points=1)
-    else:
-        touch_device(
-            str(device.get("imei")),
-            lat=lat,
-            lng=lng,
-            speed_kmh=speed,
-            points=1,
-            from_hardware=False,
-        )
     refreshed = get_device_by_imei(str(device.get("imei"))) or device
     return TeltonikaTestPingResponse(
-        device=TeltonikaDeviceResponse(**refreshed),
+        device=TeltonikaDeviceResponse.model_validate(refreshed),
         vehicle_id=str(result.vehicle_id),
         latitude=lat,
         longitude=lng,
-        source="test_ping",
+        source="test_ping" if not force_hw else "teltonika",
+        fix_origin=fix_origin,
     )

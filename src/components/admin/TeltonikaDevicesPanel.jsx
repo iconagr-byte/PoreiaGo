@@ -347,10 +347,16 @@ export default function TeltonikaDevicesPanel() {
         return [...rest, pin];
       });
       setSelectedId(deviceId);
+      const origin =
+        res.fix_origin === 'live_fleet'
+          ? 'Teltonika live'
+          : res.fix_origin === 'last_hw'
+            ? 'Teltonika last Codec'
+            : forceHardware
+              ? 'Teltonika'
+              : 'υπολογιστής';
       toast.success(
-        forceHardware
-          ? `Hardware GPS: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`
-          : `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+        `${origin}: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
       );
       await load();
     } catch (err) {

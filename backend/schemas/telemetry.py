@@ -462,3 +462,5 @@ class TeltonikaTestPingResponse(BaseModel):
     latitude: float
     longitude: float
     source: str = "test_ping"
+    # Where coords came from for Δοκιμαστικό pin (last_hw | live_fleet | browser).
+    fix_origin: str | None = None
