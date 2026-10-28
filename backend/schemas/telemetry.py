@@ -447,6 +447,8 @@ class TeltonikaTestPingRequest(BaseModel):
     latitude: float | None = Field(None, ge=-90, le=90)
     longitude: float | None = Field(None, ge=-180, le=180)
     speed_kmh: float = Field(0, ge=0, le=300)
+    # True = use last Codec/hardware fix only (never browser «Η θέση μου»).
+    use_hardware: bool = False
 
 
 class TeltonikaTestPingResponse(BaseModel):

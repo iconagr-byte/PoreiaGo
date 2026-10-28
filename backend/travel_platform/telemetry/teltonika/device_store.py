@@ -193,7 +193,13 @@ def touch_device(
     lng: float | None = None,
     speed_kmh: float | None = None,
     points: int = 0,
+    from_hardware: bool = False,
 ) -> None:
+    """Update last-seen / last fix.
+
+    ``from_hardware=True`` (Codec TCP) also stamps ``last_hw_lat/lng`` so admin
+    «Δοκιμαστικό pin» can prefer the tracker, not a browser «Η θέση μου» ping.
+    """
     key = normalize_imei(imei)
     with _LOCK:
         data = _read()
@@ -208,8 +214,16 @@ def touch_device(
                 if not row.get("first_fix_at"):
                     row["first_fix_at"] = now
                     row["tracking_started_at"] = now
+                if from_hardware:
+                    row["last_hw_lat"] = lat
+                    row["last_hw_at"] = now
+                    row["last_fix_source"] = "teltonika"
+                elif not row.get("last_fix_source"):
+                    row["last_fix_source"] = "manual"
             if lng is not None:
                 row["last_lng"] = lng
+                if from_hardware:
+                    row["last_hw_lng"] = lng
             if speed_kmh is not None:
                 row["last_speed_kmh"] = speed_kmh
             if points:
@@ -218,3 +232,29 @@ def touch_device(
             break
         if changed:
             _write(data)
+
+
+def hardware_last_fix(device: dict | None) -> tuple[float, float] | None:
+    """Return last Codec/hardware lat/lng when available."""
+    if not isinstance(device, dict):
+        return None
+    hw_lat = device.get("last_hw_lat")
+    hw_lng = device.get("last_hw_lng")
+    if hw_lat is not None and hw_lng is not None:
+        try:
+            return float(hw_lat), float(hw_lng)
+        except (TypeError, ValueError):
+            return None
+    # Legacy rows: only real TCP ever wrote last_lat before browser test-pings
+    # existed — accept last_lat when source is missing or teltonika.
+    src = str(device.get("last_fix_source") or "").strip().lower()
+    if src and src not in ("teltonika", "tracker", "hardware"):
+        return None
+    lat = device.get("last_lat")
+    lng = device.get("last_lng")
+    if lat is None or lng is None:
+        return None
+    try:
+        return float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None

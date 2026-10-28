@@ -386,6 +386,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     lng=last.longitude,
                     speed_kmh=last.speed_kmh,
                     points=accepted,
+                    from_hardware=True,
                 )
     except asyncio.TimeoutError:
         logger.debug("Teltonika timeout peer=%s imei=%s", peer, imei)

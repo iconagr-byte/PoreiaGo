@@ -319,13 +319,21 @@ export default function TeltonikaDevicesPanel() {
     setTestingId(deviceId);
     try {
       const body = {};
-      const latSrc = coordsOverride?.lat ?? testCoords.lat;
-      const lngSrc = coordsOverride?.lng ?? testCoords.lng;
-      const latN = Number(latSrc);
-      const lngN = Number(lngSrc);
-      if (Number.isFinite(latN) && Number.isFinite(lngN) && latSrc !== '' && lngSrc !== '') {
-        body.latitude = latN;
-        body.longitude = lngN;
+      // Δοκιμαστικό pin → always hardware IMEI fix (never browser / leftover Lat/Lng).
+      const forceHardware = !coordsOverride || coordsOverride.useHardware === true;
+      if (forceHardware) {
+        body.use_hardware = true;
+      } else {
+        const latSrc = coordsOverride?.lat ?? '';
+        const lngSrc = coordsOverride?.lng ?? '';
+        const latN = Number(latSrc);
+        const lngN = Number(lngSrc);
+        if (Number.isFinite(latN) && Number.isFinite(lngN) && latSrc !== '' && lngSrc !== '') {
+          body.latitude = latN;
+          body.longitude = lngN;
+        } else {
+          body.use_hardware = true;
+        }
       }
       const res = await testPingTeltonikaDevice(deviceId, body);
       const pin = buildTestPin(
@@ -340,7 +348,9 @@ export default function TeltonikaDevicesPanel() {
       });
       setSelectedId(deviceId);
       toast.success(
-        `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+        forceHardware
+          ? `Hardware GPS: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`
+          : `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
       );
       await load();
     } catch (err) {
@@ -364,7 +374,8 @@ export default function TeltonikaDevicesPanel() {
         const lat = pos.coords.latitude.toFixed(6);
         const lng = pos.coords.longitude.toFixed(6);
         setTestCoords({ lat: String(lat), lng: String(lng) });
-        onTestPing(selectedId, { lat: String(lat), lng: String(lng) });
+        // Explicit browser coords — never confuse with hardware test pin.
+        onTestPing(selectedId, { lat: String(lat), lng: String(lng), useHardware: false });
       },
       () => toast.error('Αποτυχία ανάγνωσης θέσης'),
       { enableHighAccuracy: true, timeout: 12000 },
@@ -510,8 +521,8 @@ export default function TeltonikaDevicesPanel() {
         <div>
           <h3 className="font-bold text-lg text-slate-900">Μενού τεστ GPS</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. Δοκιμαστικό pin / Η θέση μου
-            αντικαθιστούν προσωρινά. Ζωντανός χάρτης στόλου → κουμπί δεξιά.
+            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. «Δοκιμαστικό pin» = σήμα από το
+            GPS hardware (IMEI). «Η θέση μου» = θέση υπολογιστή/browser. Ζωντανός χάρτης → δεξιά.
           </p>
         </div>
 
@@ -553,8 +564,8 @@ export default function TeltonikaDevicesPanel() {
           </label>
         </div>
         <p className="text-[11px] text-slate-500">
-          Άδειο Lat/Lng στο Δοκιμαστικό pin → last fix ή Αθήνα. «Η θέση μου» βάζει αμέσως pin στη
-          θέση σου.
+          Δοκιμαστικό pin αγνοεί Lat/Lng φόρμας και παίρνει το τελευταίο Codec fix του tracker.
+          «Η θέση μου» βάζει pin στη θέση του υπολογιστή σου (όχι hardware).
         </p>
         <div className="flex flex-wrap gap-2">
           <button
