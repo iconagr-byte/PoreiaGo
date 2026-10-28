@@ -294,7 +294,7 @@ def touch_device(
     """Update last-seen / last fix.
 
     ``from_hardware=True`` (Codec TCP) also stamps ``last_hw_lat/lng`` so admin
-    «Δοκιμαστικό pin» can prefer the tracker, not a browser «Η θέση μου» ping.
+    «Δοκιμαστικό pin» / «Η θέση μου» prefer the tracker, not browser/PC geolocation.
     """
     key = normalize_imei(imei)
     with _LOCK:
