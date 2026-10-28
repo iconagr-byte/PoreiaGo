@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("AUTH_JWT_SECRET", "test-teltonika-hw-pin-jwt-secret-32chars!")
@@ -25,7 +26,7 @@ class HardwareLastFixTests(unittest.TestCase):
             os.environ["TELTONIKA_DEVICES_STORE"] = self._prev
         self.tmp.cleanup()
 
-    def test_hardware_touch_keeps_hw_coords_after_browser_ping(self):
+    def test_manual_touch_does_not_replace_hardware_fix(self):
         from travel_platform.telemetry.teltonika.device_store import (
             get_device_by_imei,
             hardware_last_fix,
@@ -50,7 +51,7 @@ class HardwareLastFixTests(unittest.TestCase):
             points=1,
             from_hardware=True,
         )
-        # Browser «Η θέση μου» must not replace hardware last fix.
+        # Manual/browser may update last_lat, but last_hw stays Codec-only.
         touch_device(
             "861076085468260",
             lat=37.98381,
@@ -62,27 +63,71 @@ class HardwareLastFixTests(unittest.TestCase):
         device = get_device_by_imei("861076085468260")
         self.assertIsNotNone(device)
         self.assertEqual(float(device["last_lat"]), 37.98381)
-        hw = hardware_last_fix(device)
-        self.assertEqual(hw, (40.80894, 22.85134))
+        self.assertEqual(device["last_fix_source"], "manual")
+        self.assertEqual(float(device["last_hw_lat"]), 40.80894)
+        self.assertEqual(hardware_last_fix(device), (40.80894, 22.85134))
 
-    def test_legacy_last_lat_accepted_when_no_manual_source(self):
+    def test_rejects_polluted_last_lat_without_codec_source(self):
         from travel_platform.telemetry.teltonika.device_store import hardware_last_fix
 
-        hw = hardware_last_fix(
-            {"last_lat": 40.8, "last_lng": 22.8, "last_fix_source": None}
+        self.assertIsNone(
+            hardware_last_fix(
+                {"last_lat": 37.9, "last_lng": 23.7, "last_fix_source": None}
+            )
         )
-        self.assertEqual(hw, (40.8, 22.8))
         self.assertIsNone(
             hardware_last_fix(
                 {
                     "last_lat": 37.9,
                     "last_lng": 23.7,
                     "last_fix_source": "manual",
-                    "last_hw_lat": None,
-                    "last_hw_lng": None,
                 }
             )
         )
+        self.assertEqual(
+            hardware_last_fix(
+                {
+                    "last_lat": 40.8,
+                    "last_lng": 22.8,
+                    "last_fix_source": "teltonika",
+                }
+            ),
+            (40.8, 22.8),
+        )
+
+    def test_resolve_falls_back_to_live_fleet_teltonika(self):
+        from travel_platform.telemetry.teltonika.device_store import (
+            resolve_hardware_fix,
+            upsert_device,
+        )
+
+        device = upsert_device(
+            {
+                "imei": "861076085468260",
+                "vehicle_code": "EEX5670",
+                "label": "Λεωφορείο με GPS",
+                "enabled": True,
+            },
+            tenant_id="office-a",
+        )
+        fleet = MagicMock()
+        fleet._vehicles = {
+            "v1": {
+                "tenant_id": "office-a",
+                "vehicle_code": "EEX5670",
+                "bus_plate": "EEX5670",
+                "imei": "861076085468260",
+                "source": "teltonika",
+                "lat": 40.80111,
+                "lng": 22.85001,
+            }
+        }
+        with patch(
+            "travel_platform.telemetry.processor.get_live_fleet",
+            return_value=fleet,
+        ):
+            resolved = resolve_hardware_fix(device, tenant_id="office-a")
+        self.assertEqual(resolved, (40.80111, 22.85001, "live_fleet"))
 
 
 if __name__ == "__main__":

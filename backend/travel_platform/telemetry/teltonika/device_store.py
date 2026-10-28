@@ -311,10 +311,12 @@ def touch_device(
                     row["first_fix_at"] = now
                     row["tracking_started_at"] = now
                 if from_hardware:
+                    # Codec TCP — durable hardware fix for Δοκιμαστικό pin.
                     row["last_hw_lat"] = lat
                     row["last_hw_at"] = now
                     row["last_fix_source"] = "teltonika"
-                elif not row.get("last_fix_source"):
+                else:
+                    # Manual / browser must not count as hardware (see hardware_last_fix).
                     row["last_fix_source"] = "manual"
             if lng is not None:
                 row["last_lng"] = lng
@@ -331,7 +333,7 @@ def touch_device(
 
 
 def hardware_last_fix(device: dict | None) -> tuple[float, float] | None:
-    """Return last Codec/hardware lat/lng when available."""
+    """Return last Codec/hardware lat/lng only — never browser/manual last_lat."""
     if not isinstance(device, dict):
         return None
     hw_lat = device.get("last_hw_lat")
@@ -341,10 +343,10 @@ def hardware_last_fix(device: dict | None) -> tuple[float, float] | None:
             return float(hw_lat), float(hw_lng)
         except (TypeError, ValueError):
             return None
-    # Legacy rows: only real TCP ever wrote last_lat before browser test-pings
-    # existed — accept last_lat when source is missing or teltonika.
+    # Accept last_lat only when we know it came from Codec (never when source missing —
+    # missing used to mean «polluted by Η θέση μου»).
     src = str(device.get("last_fix_source") or "").strip().lower()
-    if src and src not in ("teltonika", "tracker", "hardware"):
+    if src not in ("teltonika", "tracker", "hardware"):
         return None
     lat = device.get("last_lat")
     lng = device.get("last_lng")
@@ -354,3 +356,90 @@ def hardware_last_fix(device: dict | None) -> tuple[float, float] | None:
         return float(lat), float(lng)
     except (TypeError, ValueError):
         return None
+
+
+def live_teltonika_fix(
+    tenant_id: str,
+    *,
+    imei: str | None = None,
+    vehicle_code: str | None = None,
+) -> tuple[float, float] | None:
+    """Read the current live-fleet pin when it is Teltonika/Codec-sourced."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return None
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+    except Exception:
+        return None
+
+    want_imei = normalize_imei(imei)
+    want_plate = normalize_vehicle_plate(vehicle_code)
+    fleet = get_live_fleet()
+    metas = list((getattr(fleet, "_vehicles", None) or {}).values())
+
+    def _is_tracker_meta(meta: dict) -> bool:
+        src = str(meta.get("source") or "").strip().lower()
+        if src.startswith("teltonika") or src in {"tracker", "hardware"}:
+            return True
+        # Dual-badge / soft-ack: imei present and not a pure phone source.
+        if meta.get("imei") and src and ("driver" in src or "pwa" in src or src == "app"):
+            sources = meta.get("gps_sources") or []
+            return "teltonika" in [str(s).lower() for s in sources]
+        return bool(meta.get("imei") and not src)
+
+    for meta in metas:
+        if not isinstance(meta, dict):
+            continue
+        if str(meta.get("tenant_id") or "") != tid:
+            continue
+        if not _is_tracker_meta(meta):
+            continue
+        meta_imei = normalize_imei(meta.get("imei"))
+        meta_plate = normalize_vehicle_plate(
+            meta.get("vehicle_code") or meta.get("bus_plate")
+        )
+        matched = False
+        if want_imei and meta_imei and meta_imei == want_imei:
+            matched = True
+        elif want_plate and meta_plate and meta_plate == want_plate and (
+            meta_imei or str(meta.get("source") or "").lower().startswith("teltonika")
+        ):
+            matched = True
+        if not matched:
+            continue
+        try:
+            lat = float(meta.get("lat"))
+            lng = float(meta.get("lng"))
+        except (TypeError, ValueError):
+            continue
+        if abs(lat) < 0.01 and abs(lng) < 0.01:
+            continue
+        return lat, lng
+    return None
+
+
+def resolve_hardware_fix(
+    device: dict | None,
+    *,
+    tenant_id: str | None = None,
+) -> tuple[float, float, str] | None:
+    """Prefer durable Codec last_hw, then live Teltonika fleet pin.
+
+    Returns ``(lat, lng, origin)`` where origin is ``last_hw`` or ``live_fleet``.
+    """
+    if not isinstance(device, dict):
+        return None
+    hw = hardware_last_fix(device)
+    if hw:
+        return hw[0], hw[1], "last_hw"
+    tid = str(tenant_id or device.get("tenant_id") or "").strip()
+    live = live_teltonika_fix(
+        tid,
+        imei=str(device.get("imei") or ""),
+        vehicle_code=str(device.get("vehicle_code") or ""),
+    )
+    if live:
+        return live[0], live[1], "live_fleet"
+    return None

@@ -252,22 +252,26 @@ export default function TeltonikaDevicesPanel() {
     [fleetByPlate, liveFleet],
   );
 
-  /** Live last-fix pins from the device store + any explicit test pins. */
+  /** Live last-fix pins — prefer Codec last_hw_* over polluted browser last_lat. */
   const liveDevicePins = useMemo(() => {
     return devices
-      .filter(
-        (d) =>
-          d?.enabled !== false &&
-          d?.last_lat != null &&
-          d?.last_lng != null &&
-          Number.isFinite(Number(d.last_lat)) &&
-          Number.isFinite(Number(d.last_lng)),
-      )
-      .map((d) =>
-        buildTestPin(d, d.last_lat, d.last_lng, {
+      .map((d) => {
+        const lat = d?.last_hw_lat ?? d?.last_lat;
+        const lng = d?.last_hw_lng ?? d?.last_lng;
+        if (
+          d?.enabled === false ||
+          lat == null ||
+          lng == null ||
+          !Number.isFinite(Number(lat)) ||
+          !Number.isFinite(Number(lng))
+        ) {
+          return null;
+        }
+        return buildTestPin(d, lat, lng, {
           online: deviceSignalFresh(d),
-        }),
-      );
+        });
+      })
+      .filter(Boolean);
   }, [devices, buildTestPin]);
 
   const mapPins = useMemo(() => {
@@ -347,10 +351,16 @@ export default function TeltonikaDevicesPanel() {
         return [...rest, pin];
       });
       setSelectedId(deviceId);
+      const origin =
+        res.fix_origin === 'live_fleet'
+          ? 'Teltonika live'
+          : res.fix_origin === 'last_hw'
+            ? 'Teltonika last Codec'
+            : forceHardware
+              ? 'Teltonika'
+              : 'υπολογιστής';
       toast.success(
-        forceHardware
-          ? `Hardware GPS: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`
-          : `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+        `${origin}: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
       );
       await load();
     } catch (err) {
