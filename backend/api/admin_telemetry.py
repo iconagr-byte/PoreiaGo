@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -410,10 +410,32 @@ async def admin_teltonika_status(tenant_id: Annotated[UUID, Depends(get_tenant_i
 
 
 @router.get("/teltonika/devices", response_model=list[TeltonikaDeviceResponse])
-async def admin_list_teltonika_devices(tenant_id: Annotated[UUID, Depends(get_tenant_id)]):
-    from travel_platform.telemetry.teltonika import list_devices
+async def admin_list_teltonika_devices(
+    request: Request,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import (
+        ensure_office_default_trackers,
+        list_devices,
+    )
 
-    return [TeltonikaDeviceResponse(**row) for row in list_devices(str(tenant_id))]
+    tid = str(tenant_id)
+    host = (request.headers.get("host") or request.headers.get("x-forwarded-host") or "").lower()
+    # Achillio Travel: if the dropdown went empty (redeploy / wrong-tenant bind),
+    # restore the known FTC961 IMEI so «Συσκευή» is never blank for that office.
+    if "achilliotravel" in host or "achillio" in host:
+        try:
+            ensure_office_default_trackers(tid)
+        except Exception:
+            pass
+
+    out: list[TeltonikaDeviceResponse] = []
+    for row in list_devices(tid):
+        try:
+            out.append(TeltonikaDeviceResponse.model_validate(row))
+        except Exception:
+            continue
+    return out
 
 
 @router.post("/teltonika/devices", response_model=TeltonikaDeviceResponse)
