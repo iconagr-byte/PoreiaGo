@@ -131,6 +131,13 @@ async def _issue_customer_token(
     cid = str((fresh or {}).get("customer_id") or "").strip()
     if cid:
         payload_extra["customer_id"] = cid
+    # Keep office Πελάτες in sync with wallet name / Google profile.
+    try:
+        from travel_platform.settings.wallet_crm_bridge import mirror_wallet_account_to_crm
+
+        mirror_wallet_account_to_crm(tid, fresh)
+    except Exception:
+        pass
     return create_customer_token(email, extra=payload_extra), tid, fresh
 
 

@@ -1190,8 +1190,17 @@ async def list_office_customers(
     service_scope: str | None = Query(default=None, alias="serviceScope"),
 ):
     from travel_platform.settings.office_customers_store import list_customers
+    from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
 
     tid = _request_tenant_id(request)
+    # Buses CRM: pull My Wallet accounts sealed to this office so Google /
+    # register profiles appear with their wallet name (not only booking surnames).
+    scope = (service_scope or "").strip().lower()
+    if not scope or scope in ("buses", "bus", "excursions"):
+        try:
+            await sync_wallet_accounts_into_crm(tid)
+        except Exception:
+            pass
     return {"customers": list_customers(tid, service_scope=service_scope)}
 
 
