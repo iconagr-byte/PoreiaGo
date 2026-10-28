@@ -100,26 +100,43 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     }
   }, [emailSettingsId]);
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await fetchMailboxMessages(activeFolder, {
-        accountId: emailSettingsId || undefined,
-      });
-      setMessages(list);
-      if (selectedId && !list.find((m) => m.id === selectedId)) {
-        setSelectedId(null);
-        setDetail(null);
-        setCustomer(null);
+  const loadMessages = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!silent) setLoading(true);
+      try {
+        const list = await fetchMailboxMessages(activeFolder, {
+          accountId: emailSettingsId || undefined,
+        });
+        setMessages((prev) => {
+          // Avoid re-render jitter when poll returns the same rows.
+          if (
+            prev.length === list.length &&
+            prev.every(
+              (m, i) =>
+                m.id === list[i]?.id &&
+                m.is_read === list[i]?.is_read &&
+                m.subject === list[i]?.subject,
+            )
+          ) {
+            return prev;
+          }
+          return list;
+        });
+        if (selectedId && !list.find((m) => m.id === selectedId)) {
+          setSelectedId(null);
+          setDetail(null);
+          setCustomer(null);
+        }
+        return list;
+      } catch (err) {
+        if (!silent) mailboxToastError(err.message);
+        return [];
+      } finally {
+        if (!silent) setLoading(false);
       }
-      return list;
-    } catch (err) {
-      mailboxToastError(err.message);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [activeFolder, selectedId, emailSettingsId]);
+    },
+    [activeFolder, selectedId, emailSettingsId],
+  );
 
   useEffect(() => {
     loadFolders();
@@ -161,7 +178,9 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       }
       if (syncInFlight.current) return;
       syncInFlight.current = true;
-      setSyncing(true);
+      // Quiet background polls must not flip syncing/loading UI — that
+      // inserted «Φόρτωση…» and spun the button every 5s (list jitter).
+      if (!quiet) setSyncing(true);
       try {
         const r = await syncMailbox(emailSettingsId);
         if (!r?.ok) {
@@ -180,15 +199,20 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         }
         if (Array.isArray(r.errors) && r.errors.length) {
           setLastSyncError(r.errors[0]);
-          toast.error(r.errors[0], { id: 'mailbox-sync-warn', duration: 6000 });
+          if (!quiet) {
+            toast.error(r.errors[0], { id: 'mailbox-sync-warn', duration: 6000 });
+          }
         }
-        await loadFolders();
-        await loadMessages();
+        // Quiet poll with zero new mail: leave the list alone (no layout shift).
+        if (!quiet || n > 0) {
+          await loadFolders();
+          await loadMessages({ silent: quiet });
+        }
       } catch (err) {
         if (!quiet) mailboxToastError(err.message);
       } finally {
         syncInFlight.current = false;
-        setSyncing(false);
+        if (!quiet) setSyncing(false);
       }
     },
     [emailSettingsId, loadFolders, loadMessages],

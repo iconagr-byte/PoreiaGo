@@ -217,6 +217,7 @@
 }
 
 .embox-list {
+  position: relative;
   width: 300px;
   flex-shrink: 0;
   display: flex;
@@ -255,6 +256,18 @@
   text-align: center;
   font-size: 0.8125rem;
   color: var(--embox-muted);
+}
+
+/* Keep list position stable while a non-silent refresh shows «Φόρτωση…». */
+.embox-list-loading {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2.75rem;
+  z-index: 1;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
 }
 
 .embox-msg-btn {
