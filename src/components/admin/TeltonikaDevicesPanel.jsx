@@ -370,26 +370,13 @@ export default function TeltonikaDevicesPanel() {
     }
   };
 
+  /** «Η θέση μου» = last Codec / live Teltonika for the selected bus — never office PC. */
   const useMyLocation = () => {
     if (!selectedId) {
       toast.error('Διάλεξε συσκευή');
       return;
     }
-    if (!navigator.geolocation) {
-      toast.error('Δεν υποστηρίζεται geolocation');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lng = pos.coords.longitude.toFixed(6);
-        setTestCoords({ lat: String(lat), lng: String(lng) });
-        // Explicit browser coords — never confuse with hardware test pin.
-        onTestPing(selectedId, { lat: String(lat), lng: String(lng), useHardware: false });
-      },
-      () => toast.error('Αποτυχία ανάγνωσης θέσης'),
-      { enableHighAccuracy: true, timeout: 12000 },
-    );
+    onTestPing(selectedId);
   };
 
   const clearTestPins = () => {
@@ -442,7 +429,7 @@ export default function TeltonikaDevicesPanel() {
           <div>
             <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Ζωντανή τελευταία θέση από το tracker · δοκιμαστικό pin / Η θέση μου από πάνω.
+              Ζωντανή τελευταία θέση από το Teltonika · «Η θέση μου» / δοκιμαστικό pin από πάνω.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -531,8 +518,9 @@ export default function TeltonikaDevicesPanel() {
         <div>
           <h3 className="font-bold text-lg text-slate-900">Μενού τεστ GPS</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. «Δοκιμαστικό pin» = σήμα από το
-            GPS hardware (IMEI). «Η θέση μου» = θέση υπολογιστή/browser. Ζωντανός χάρτης → δεξιά.
+            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. «Η θέση μου» και «Δοκιμαστικό
+            pin» = σήμα από το GPS hardware (IMEI), όχι από τον υπολογιστή του γραφείου. Ζωντανός
+            χάρτης → δεξιά.
           </p>
         </div>
 
@@ -574,23 +562,24 @@ export default function TeltonikaDevicesPanel() {
           </label>
         </div>
         <p className="text-[11px] text-slate-500">
-          Δοκιμαστικό pin αγνοεί Lat/Lng φόρμας και παίρνει το τελευταίο Codec fix του tracker.
-          «Η θέση μου» βάζει pin στη θέση του υπολογιστή σου (όχι hardware).
+          «Η θέση μου» και δοκιμαστικό pin αγνοούν Lat/Lng φόρμας και παίρνουν το τελευταίο Codec /
+          live fix του tracker (όχι geolocation browser).
         </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={useMyLocation}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+            disabled={!selectedId || testingId === selectedId}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">near_me</span>
-            Η θέση μου
+            {testingId === selectedId ? 'Teltonika…' : 'Η θέση μου'}
           </button>
           <button
             type="button"
             onClick={() => onTestPing(selectedId)}
             disabled={!selectedId || testingId === selectedId}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">my_location</span>
             {testingId === selectedId ? 'Test…' : 'Δοκιμαστικό pin'}
