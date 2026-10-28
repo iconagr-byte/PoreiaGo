@@ -463,16 +463,39 @@ async def admin_teltonika_test_ping(
         raise HTTPException(status_code=400, detail="Η συσκευή είναι ανενεργή")
 
     req = body or TeltonikaTestPingRequest()
-    # Prefer last real fix; else Athens demo pin so the map always has something visible.
-    lat = req.latitude
-    lng = req.longitude
-    if lat is None or lng is None:
-        if device.get("last_lat") is not None and device.get("last_lng") is not None:
+    from travel_platform.telemetry.teltonika.device_store import hardware_last_fix
+
+    speed = float(req.speed_kmh or 0)
+    use_hw = bool(req.use_hardware) or (req.latitude is None or req.longitude is None)
+
+    if use_hw and bool(req.use_hardware):
+        # Δοκιμαστικό pin: always hardware — ignore any lat/lng from the browser form.
+        hw = hardware_last_fix(device)
+        if not hw:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Δεν υπάρχει ακόμα σήμα από το GPS hardware (IMEI). "
+                    "Περιμένετε Codec fix από τον tracker — όχι θέση υπολογιστή."
+                ),
+            )
+        lat, lng = hw
+    elif req.latitude is not None and req.longitude is not None:
+        lat = float(req.latitude)
+        lng = float(req.longitude)
+    else:
+        # Legacy empty body without use_hardware flag: prefer hardware, else last stored.
+        hw = hardware_last_fix(device)
+        if hw:
+            lat, lng = hw
+        elif device.get("last_lat") is not None and device.get("last_lng") is not None:
             lat = float(device["last_lat"])
             lng = float(device["last_lng"])
         else:
-            lat, lng = 37.983810, 23.727539
-    speed = float(req.speed_kmh or 0)
+            raise HTTPException(
+                status_code=409,
+                detail="Δεν υπάρχει αποθηκευμένη θέση για αυτή τη συσκευή.",
+            )
 
     vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
     driver_name = str(device.get("label") or f"GPS {vehicle_code}")
@@ -492,13 +515,18 @@ async def admin_teltonika_test_ping(
         "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
     result = await process_telemetry_payload(payload)
-    touch_device(
-        str(device.get("imei")),
-        lat=lat,
-        lng=lng,
-        speed_kmh=speed,
-        points=1,
-    )
+    # Browser «Η θέση μου» must not overwrite last_hw_* Codec coordinates.
+    if bool(req.use_hardware) or (req.latitude is None or req.longitude is None):
+        touch_device(str(device.get("imei")), points=1)
+    else:
+        touch_device(
+            str(device.get("imei")),
+            lat=lat,
+            lng=lng,
+            speed_kmh=speed,
+            points=1,
+            from_hardware=False,
+        )
     refreshed = get_device_by_imei(str(device.get("imei"))) or device
     return TeltonikaTestPingResponse(
         device=TeltonikaDeviceResponse(**refreshed),
