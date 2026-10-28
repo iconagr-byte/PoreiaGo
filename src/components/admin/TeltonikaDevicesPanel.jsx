@@ -252,22 +252,26 @@ export default function TeltonikaDevicesPanel() {
     [fleetByPlate, liveFleet],
   );
 
-  /** Live last-fix pins from the device store + any explicit test pins. */
+  /** Live last-fix pins — prefer Codec last_hw_* over polluted browser last_lat. */
   const liveDevicePins = useMemo(() => {
     return devices
-      .filter(
-        (d) =>
-          d?.enabled !== false &&
-          d?.last_lat != null &&
-          d?.last_lng != null &&
-          Number.isFinite(Number(d.last_lat)) &&
-          Number.isFinite(Number(d.last_lng)),
-      )
-      .map((d) =>
-        buildTestPin(d, d.last_lat, d.last_lng, {
+      .map((d) => {
+        const lat = d?.last_hw_lat ?? d?.last_lat;
+        const lng = d?.last_hw_lng ?? d?.last_lng;
+        if (
+          d?.enabled === false ||
+          lat == null ||
+          lng == null ||
+          !Number.isFinite(Number(lat)) ||
+          !Number.isFinite(Number(lng))
+        ) {
+          return null;
+        }
+        return buildTestPin(d, lat, lng, {
           online: deviceSignalFresh(d),
-        }),
-      );
+        });
+      })
+      .filter(Boolean);
   }, [devices, buildTestPin]);
 
   const mapPins = useMemo(() => {
