@@ -86,14 +86,43 @@ def mirror_wallet_account_to_crm(tenant_id: str | None, account: dict[str, Any] 
 async def sync_wallet_accounts_into_crm(tenant_id: str | None) -> int:
     """Persist every wallet account sealed to this office into buses CRM.
 
+    Also upgrades existing CRM rows (booking surnames) by looking up the
+    same email in ``customer_accounts`` — so «Dodopoulos» becomes the
+    Google/wallet name «Axilleas Charalambidis» even when the account was
+    booked before Wallet bind, as long as home office is this tenant or unset.
+
     Returns how many accounts were considered (mirrored or attempted).
     """
     tid = str(tenant_id or "").strip()
     if not tid:
         return 0
-    from ticketing.customer_accounts import list_accounts_for_tenant
+    from ticketing.customer_accounts import get_account, list_accounts_for_tenant
+    from travel_platform.settings.office_customers_store import list_customers
 
+    seen: set[str] = set()
     accounts = await list_accounts_for_tenant(tid)
     for acc in accounts:
         mirror_wallet_account_to_crm(tid, acc)
-    return len(accounts)
+        email = str((acc or {}).get("email") or "").strip().lower()
+        if email:
+            seen.add(email)
+
+    # CRM-first: upgrade booking-only rows from wallet profile by email.
+    for row in list_customers(tid, service_scope="buses"):
+        email = str((row or {}).get("email") or "").strip().lower()
+        if not email or email in seen or "@" not in email:
+            continue
+        try:
+            acc = await get_account(email)
+        except Exception:
+            continue
+        if not acc:
+            continue
+        home = str(acc.get("wallet_tenant_id") or "").strip()
+        # Never pull another office's wallet into this CRM.
+        if home and home != tid:
+            continue
+        mirror_wallet_account_to_crm(tid, acc)
+        seen.add(email)
+
+    return len(seen)
