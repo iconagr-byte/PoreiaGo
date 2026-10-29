@@ -22,7 +22,7 @@ def prefer_display_name(crm_name: str | None, wallet_name: str | None) -> str:
     if not c:
         return w
     if w.lower() == c.lower():
-        return c
+        return w
     if len(w.split()) > len(c.split()):
         return w
     # Same token count but wallet looks like a real full name (contains space).
@@ -39,23 +39,30 @@ def mirror_wallet_account_to_crm(tenant_id: str | None, account: dict[str, Any] 
     email = str(account.get("email") or "").strip().lower()
     if not tid or not email or "@" not in email:
         return None
+    # Diagnostic smoke accounts must never pollute office Πελάτες.
+    if email.startswith("diagnose-reg-") or email.startswith("diagnose-"):
+        return None
 
     from travel_platform.settings.office_customers_store import get_customer_by_email, upsert_customer
 
     existing = get_customer_by_email(tid, email, service_scope="buses")
-    name = prefer_display_name(
-        (existing or {}).get("name"),
-        account.get("name"),
-    )
+    auth = str(account.get("auth_provider") or account.get("authProvider") or "email").strip() or "email"
+    wallet_name = str(account.get("name") or "").strip()
+    # Google profile name is source of truth — never keep booking surname «Dodopoulos».
+    if auth == "google" and wallet_name:
+        name = wallet_name
+    else:
+        name = prefer_display_name((existing or {}).get("name"), wallet_name)
     phone = str(
         account.get("phone")
         or (existing or {}).get("phone")
         or ""
     ).strip()
-    auth = str(account.get("auth_provider") or account.get("authProvider") or "email").strip() or "email"
     prev_source = str((existing or {}).get("source") or "").strip()
     # Keep explicit CRM sources; mark pure wallet inserts as wallet.
-    source = prev_source if prev_source and prev_source not in ("wallet", "google") else "wallet"
+    source = prev_source if prev_source and prev_source not in ("wallet", "google", "booking") else "wallet"
+    if auth == "google":
+        source = "wallet"
 
     try:
         return upsert_customer(
@@ -97,7 +104,7 @@ async def sync_wallet_accounts_into_crm(tenant_id: str | None) -> int:
     if not tid:
         return 0
     from ticketing.customer_accounts import get_account, list_accounts_for_tenant
-    from travel_platform.settings.office_customers_store import list_customers
+    from travel_platform.settings.office_customers_store import delete_customer, list_customers
 
     seen: set[str] = set()
     accounts = await list_accounts_for_tenant(tid)
@@ -108,9 +115,19 @@ async def sync_wallet_accounts_into_crm(tenant_id: str | None) -> int:
             seen.add(email)
 
     # CRM-first: upgrade booking-only rows from wallet profile by email.
+    # If the email is already in THIS office CRM, refresh name/photo even when
+    # wallet_tenant_id is unset or drifted — the booking tied the email here.
     for row in list_customers(tid, service_scope="buses"):
         email = str((row or {}).get("email") or "").strip().lower()
-        if not email or email in seen or "@" not in email:
+        if not email or "@" not in email:
+            continue
+        if email.startswith("diagnose-reg-") or email.startswith("diagnose-"):
+            try:
+                delete_customer(tid, email, service_scope="buses")
+            except Exception:
+                pass
+            continue
+        if email in seen:
             continue
         try:
             acc = await get_account(email)
@@ -118,10 +135,7 @@ async def sync_wallet_accounts_into_crm(tenant_id: str | None) -> int:
             continue
         if not acc:
             continue
-        home = str(acc.get("wallet_tenant_id") or "").strip()
-        # Never pull another office's wallet into this CRM.
-        if home and home != tid:
-            continue
+        # Email already in this office CRM → always refresh from wallet profile.
         mirror_wallet_account_to_crm(tid, acc)
         seen.add(email)
 

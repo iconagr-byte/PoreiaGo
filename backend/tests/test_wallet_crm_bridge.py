@@ -93,6 +93,69 @@ class MirrorWalletCrmTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Axilleas Charalambidis")
         self.assertEqual(rows[0]["phone"], "6976678967")
+        self.assertEqual(rows[0]["source"], "wallet")
+
+    def test_google_name_always_wins_over_booking_surname(self):
+        from travel_platform.settings.office_customers_store import list_customers, upsert_customer
+        from travel_platform.settings.wallet_crm_bridge import mirror_wallet_account_to_crm
+
+        upsert_customer(
+            "office-achillio",
+            {
+                "email": "iconagr@gmail.com",
+                "name": "Dodopoulos",
+                "source": "booking",
+                "serviceScope": "buses",
+            },
+        )
+        mirror_wallet_account_to_crm(
+            "office-achillio",
+            {
+                "email": "iconagr@gmail.com",
+                "name": "Axilleas Charalambidis",
+                "auth_provider": "google",
+            },
+        )
+        self.assertEqual(
+            list_customers("office-achillio", service_scope="buses")[0]["name"],
+            "Axilleas Charalambidis",
+        )
+
+    async def test_sync_upgrades_even_when_wallet_home_mismatched(self):
+        from travel_platform.settings.office_customers_store import list_customers, upsert_customer
+        from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
+
+        upsert_customer(
+            "office-achillio",
+            {
+                "email": "iconagr@gmail.com",
+                "name": "Dodopoulos",
+                "source": "booking",
+                "serviceScope": "buses",
+            },
+        )
+        with (
+            patch(
+                "ticketing.customer_accounts.list_accounts_for_tenant",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "ticketing.customer_accounts.get_account",
+                new_callable=AsyncMock,
+                return_value={
+                    "email": "iconagr@gmail.com",
+                    "name": "Axilleas Charalambidis",
+                    "auth_provider": "google",
+                    "wallet_tenant_id": "some-other-office",
+                },
+            ),
+        ):
+            await sync_wallet_accounts_into_crm("office-achillio")
+        self.assertEqual(
+            list_customers("office-achillio", service_scope="buses")[0]["name"],
+            "Axilleas Charalambidis",
+        )
 
     async def test_sync_pulls_tenant_wallet_accounts(self):
         from travel_platform.settings.office_customers_store import list_customers

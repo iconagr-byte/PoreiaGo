@@ -7,6 +7,7 @@ import {
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
   hydrateCustomersFromServer,
+  preferDisplayName,
   CUSTOMER_SERVICE_BUSES,
   CUSTOMER_SERVICE_RENT,
 } from '../lib/customers/customerStore.js';
@@ -1042,7 +1043,9 @@ export default function BackOffice() {
               </thead>
               <tbody className="divide-y divide-black/[0.04]">
                 {bookings.map((booking) => {
-                  const customer = booking.customerName || booking.user || '—';
+                  const crm = getCustomerByEmail(booking.email, CUSTOMER_SERVICE_BUSES);
+                  const customer =
+                    preferDisplayName(crm?.name, booking.customerName || booking.user) || '—';
                   const route = booking.tripTitle || booking.trip || '—';
                   const amount = booking.amount || (booking.seats ? booking.seats.length * 45 : 45);
                   const balanceDue =
@@ -2228,7 +2231,10 @@ export default function BackOffice() {
                                       className="hover:text-primary transition-colors flex items-center gap-2 text-left"
                                       title="Καρτέλα πελάτη"
                                     >
-                                      {customerData?.name || booking?.customerName || 'Unknown'}
+                                      {preferDisplayName(
+                                        customerData?.name,
+                                        booking?.customerName,
+                                      ) || 'Unknown'}
                                       <span className="material-symbols-outlined text-[16px] text-primary opacity-70 group-hover:opacity-100">
                                         open_in_new
                                       </span>
