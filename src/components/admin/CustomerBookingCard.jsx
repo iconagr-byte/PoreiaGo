@@ -6,7 +6,7 @@ import {
   paymentStyle,
 } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
-import StaticTicketQr from '../StaticTicketQr.jsx';
+import PersonalTicketPassList from '../booking/PersonalTicketPass.jsx';
 
 export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicket }) {
   const pay = parsePaymentMethod(booking);
@@ -117,38 +117,14 @@ export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicke
           </div>
 
           {booking.boardingPassIssued && (
-            <div className="lg:col-span-2 space-y-3 p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-sky-50">
-              <div className="text-center sm:text-left">
-                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">
-                  {Array.isArray(booking.seats) && booking.seats.length > 1
-                    ? 'Προσωπικά εισιτήρια'
-                    : 'Εισιτήριο'}
-                </p>
-                <p className="font-mono font-bold text-lg tracking-widest text-slate-900">{pnr}</p>
-              </div>
-              <div className="flex flex-wrap justify-center sm:justify-start gap-4">
-                {(Array.isArray(booking.seats) && booking.seats.length
-                  ? booking.seats
-                  : String(booking.seat || '')
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                ).map((seat) => (
-                  <div key={seat} className="text-center">
-                    <p className="text-[10px] font-bold text-indigo-500 mb-1">Θέση {seat}</p>
-                    <StaticTicketQr
-                      booking={{ ...booking, seat, seats: [seat] }}
-                      size={100}
-                    />
-                  </div>
-                ))}
-                {!(
-                  (Array.isArray(booking.seats) && booking.seats.length) ||
-                  String(booking.seat || '').trim()
-                ) ? (
-                  <StaticTicketQr booking={booking} size={120} />
-                ) : null}
-              </div>
+            <div className="lg:col-span-2 rounded-[22px] border border-black/[0.05] bg-[#f5f5f7] p-4 sm:p-5">
+              <PersonalTicketPassList
+                booking={booking}
+                compact
+                wide
+                qrSize={104}
+                brandLabel="Boarding pass"
+              />
             </div>
           )}
 
