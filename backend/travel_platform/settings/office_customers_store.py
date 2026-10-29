@@ -143,6 +143,28 @@ def list_customers(
     return sorted(rows, key=lambda r: str(r.get("name") or r.get("email") or "").lower())
 
 
+def has_customer_history(
+    tenant_id: str | None,
+    *,
+    service_scope: str | None = None,
+) -> bool:
+    """True when any CRM row exists for the tenant (including soft-deleted).
+
+    Used so a stale browser cache cannot re-seed / resurrect people that were
+    already deleted on another computer.
+    """
+    tid = _normalize_tenant(tenant_id)
+    scope = _normalize_scope(service_scope) if service_scope else None
+    with _LOCK:
+        for row in _read()["customers"]:
+            if row.get("tenant_id") != tid:
+                continue
+            if scope and _normalize_scope(row.get("serviceScope")) != scope:
+                continue
+            return True
+    return False
+
+
 def get_customer(tenant_id: str | None, customer_id: str) -> dict[str, Any] | None:
     tid = _normalize_tenant(tenant_id)
     cid = str(customer_id or "").strip()
@@ -180,7 +202,7 @@ def get_customer_by_email(
     return None
 
 
-def upsert_customer(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
+def upsert_customer(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any] | None:
     tid = _normalize_tenant(tenant_id)
     email = _normalize_email(body.get("email"))
     if not email or "@" not in email:
@@ -196,14 +218,20 @@ def upsert_customer(tenant_id: str | None, body: dict[str, Any]) -> dict[str, An
         existing: dict[str, Any] | None = None
         idx = -1
 
+        revive = bool(body.get("revive"))
+
         if customer_id:
             for i, row in enumerate(rows):
                 if row.get("tenant_id") == tid and str(row.get("id")) == customer_id:
+                    if row.get("deleted") and not revive:
+                        return None
                     existing = row
                     idx = i
                     break
 
         if existing is None:
+            live_idx = -1
+            tomb_idx = -1
             for i, row in enumerate(rows):
                 if row.get("tenant_id") != tid:
                     continue
@@ -211,9 +239,24 @@ def upsert_customer(tenant_id: str | None, body: dict[str, Any]) -> dict[str, An
                     continue
                 if _normalize_scope(row.get("serviceScope")) != service_scope:
                     continue
-                existing = row
-                idx = i
-                break
+                if row.get("deleted"):
+                    tomb_idx = i
+                else:
+                    live_idx = i
+                    break
+            if live_idx >= 0:
+                existing = rows[live_idx]
+                idx = live_idx
+            elif tomb_idx >= 0:
+                if not revive:
+                    # Soft-deleted CRM rows stay gone — wallet/booking sync must
+                    # not resurrect them on another computer.
+                    return None
+                existing = rows[tomb_idx]
+                idx = tomb_idx
+
+        if existing and existing.get("deleted") and not revive:
+            return None
 
         name = str(body.get("name") or "").strip() or (
             (existing or {}).get("name") or email.split("@")[0]
@@ -338,6 +381,12 @@ def replace_customers_for_tenant(
             key = (email, scope)
             kept_keys.add(key)
             prev = by_key.get(key)
+            # Stale browser seed must not revive soft-deleted CRM rows.
+            if prev and prev.get("deleted"):
+                tomb = deepcopy(prev)
+                tomb["updated_at"] = now
+                next_rows.append(tomb)
+                continue
             next_rows.append(
                 {
                     "id": str(raw.get("id") or (prev or {}).get("id") or f"CUST-{uuid4().hex[:8].upper()}"),

@@ -446,16 +446,16 @@ export default function BackOffice() {
       .then(async (merged) => {
         if (cancelled) return;
         setBookings(merged);
-        // Seed missing booking emails locally first (won't clobber wallet names).
-        syncCustomersFromBookings(merged);
         if (scope === CUSTOMER_SERVICE_BUSES) {
-          // Then pull server CRM (wallet/Google names) so Axilleas wins over Dodopoulos.
-          const rows = await hydrateCustomersFromServer(CUSTOMER_SERVICE_BUSES);
+          // Server first so soft-deletes/tombstones from other PCs land before
+          // booking sync (which must not resurrect deleted CRM names).
+          await hydrateCustomersFromServer(CUSTOMER_SERVICE_BUSES);
+          syncCustomersFromBookings(merged);
           if (!cancelled) {
-            setCustomers(
-              Array.isArray(rows) ? rows : loadCustomersByService(CUSTOMER_SERVICE_BUSES),
-            );
+            setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
           }
+        } else {
+          syncCustomersFromBookings(merged);
         }
       })
       .catch(() => {

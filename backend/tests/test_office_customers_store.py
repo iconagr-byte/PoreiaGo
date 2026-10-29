@@ -61,6 +61,61 @@ class OfficeCustomersStoreTests(unittest.TestCase):
         self.assertEqual([c["email"] for c in buses], ["a@x.com"])
         self.assertEqual([c["email"] for c in rent], ["b@x.com"])
 
+    def test_soft_delete_not_revived_without_flag(self):
+        row = self.store.upsert_customer(
+            "tenant-a",
+            {
+                "name": "Μαρία Παπαδοπούλου",
+                "email": "maria.pap@example.com",
+                "serviceScope": "buses",
+            },
+        )
+        self.assertTrue(self.store.delete_customer("tenant-a", row["id"]))
+        self.assertEqual(self.store.list_customers("tenant-a", service_scope="buses"), [])
+        self.assertTrue(self.store.has_customer_history("tenant-a", service_scope="buses"))
+
+        # Wallet / booking sync style upsert must not resurrect.
+        revived = self.store.upsert_customer(
+            "tenant-a",
+            {
+                "name": "Μαρία Παπαδοπούλου",
+                "email": "maria.pap@example.com",
+                "serviceScope": "buses",
+                "revive": False,
+            },
+        )
+        self.assertIsNone(revived)
+        self.assertEqual(self.store.list_customers("tenant-a", service_scope="buses"), [])
+
+        # Bulk replace from a stale PC must not revive either.
+        self.store.replace_customers_for_tenant(
+            "tenant-a",
+            [
+                {
+                    "name": "Μαρία Παπαδοπούλου",
+                    "email": "maria.pap@example.com",
+                    "serviceScope": "buses",
+                }
+            ],
+        )
+        self.assertEqual(self.store.list_customers("tenant-a", service_scope="buses"), [])
+
+        # Explicit admin create may revive.
+        back = self.store.upsert_customer(
+            "tenant-a",
+            {
+                "name": "Μαρία Παπαδοπούλου",
+                "email": "maria.pap@example.com",
+                "serviceScope": "buses",
+                "revive": True,
+            },
+        )
+        self.assertIsNotNone(back)
+        self.assertEqual(
+            [c["email"] for c in self.store.list_customers("tenant-a", service_scope="buses")],
+            ["maria.pap@example.com"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

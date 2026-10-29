@@ -220,6 +220,36 @@ class MirrorWalletCrmTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["name"], "Axilleas Charalambidis")
         self.assertEqual(rows[0]["phone"], "6976678967")
 
+    def test_mirror_does_not_revive_soft_deleted(self):
+        from travel_platform.settings.office_customers_store import (
+            delete_customer,
+            list_customers,
+            upsert_customer,
+        )
+        from travel_platform.settings.wallet_crm_bridge import mirror_wallet_account_to_crm
+
+        row = upsert_customer(
+            "office-achillio",
+            {
+                "email": "evangelia@example.com",
+                "name": "Παπαλαζάρου Ευαγγελία",
+                "serviceScope": "buses",
+                "source": "booking",
+            },
+        )
+        self.assertTrue(delete_customer("office-achillio", row["id"]))
+        mirrored = mirror_wallet_account_to_crm(
+            "office-achillio",
+            {
+                "email": "evangelia@example.com",
+                "name": "Παπαλαζάρου Ευαγγελία",
+                "auth_provider": "email",
+                "wallet_tenant_id": "office-achillio",
+            },
+        )
+        self.assertIsNone(mirrored)
+        self.assertEqual(list_customers("office-achillio", service_scope="buses"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
