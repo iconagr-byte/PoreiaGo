@@ -65,6 +65,7 @@ def mirror_wallet_account_to_crm(tenant_id: str | None, account: dict[str, Any] 
         source = "wallet"
 
     try:
+        # Never revive soft-deleted CRM rows (delete must stick across PCs).
         return upsert_customer(
             tid,
             {
@@ -80,6 +81,7 @@ def mirror_wallet_account_to_crm(tenant_id: str | None, account: dict[str, Any] 
                 else True,
                 "tags": (existing or {}).get("tags") or [],
                 "tier": (existing or {}).get("tier") or "Silver",
+                "revive": False,
             },
         )
     except ValueError as exc:

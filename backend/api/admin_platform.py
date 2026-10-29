@@ -1189,7 +1189,10 @@ async def list_office_customers(
     request: Request,
     service_scope: str | None = Query(default=None, alias="serviceScope"),
 ):
-    from travel_platform.settings.office_customers_store import list_customers
+    from travel_platform.settings.office_customers_store import (
+        has_customer_history,
+        list_customers,
+    )
     from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
 
     tid = _request_tenant_id(request)
@@ -1201,7 +1204,12 @@ async def list_office_customers(
             await sync_wallet_accounts_into_crm(tid)
         except Exception:
             pass
-    return {"customers": list_customers(tid, service_scope=service_scope)}
+    return {
+        "customers": list_customers(tid, service_scope=service_scope),
+        # True even when the live list is empty after soft-deletes — stops
+        # another PC from re-seeding deleted names from localStorage.
+        "hasHistory": has_customer_history(tid, service_scope=service_scope),
+    }
 
 
 @router.post("/customers", status_code=201)
@@ -1209,10 +1217,15 @@ async def create_office_customer(request: Request, body: OfficeCustomerIn):
     from travel_platform.settings.office_customers_store import upsert_customer
 
     tid = _request_tenant_id(request)
+    payload = body.model_dump()
+    # Explicit admin create may revive a previously soft-deleted email.
+    payload["revive"] = True
     try:
-        row = upsert_customer(tid, body.model_dump())
+        row = upsert_customer(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=400, detail="Αποτυχία αποθήκευσης πελάτη")
     return row
 
 
@@ -1223,10 +1236,13 @@ async def update_office_customer(request: Request, customer_id: str, body: Offic
     tid = _request_tenant_id(request)
     payload = body.model_dump()
     payload["id"] = customer_id
+    payload["revive"] = True
     try:
         row = upsert_customer(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="Customer not found")
     return row
 
 
