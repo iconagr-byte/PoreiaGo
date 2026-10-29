@@ -497,11 +497,13 @@ async def admin_teltonika_test_ping(
         # Δοκιμαστικό pin: Codec last_hw or live Teltonika fleet — never PC Lat/Lng.
         resolved = resolve_hardware_fix(device, tenant_id=tid)
         if not resolved:
+            # Stale last_lat (old PC/test) must not satisfy «Η θέση μου».
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    "Δεν βρέθηκε σήμα Teltonika online για αυτό το IMEI. "
-                    "Περιμένετε Codec TCP fix από τον tracker — όχι θέση υπολογιστή."
+                    "Δεν βρέθηκε σήμα Teltonika (Codec TCP / live) για αυτό το IMEI. "
+                    "Ο tracker δεν έχει στείλει ακόμα fix στο VPS — "
+                    "έλεγξε Configurator IP+port 5027. Δεν χρησιμοποιείται θέση υπολογιστή."
                 ),
             )
         lat, lng, fix_origin = resolved

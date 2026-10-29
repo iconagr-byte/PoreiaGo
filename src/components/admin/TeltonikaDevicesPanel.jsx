@@ -57,6 +57,23 @@ function deviceSignalFresh(d, maxMs = 90_000) {
   return Date.now() - t <= maxMs;
 }
 
+/** Match backend hardware_last_fix — never browser/manual last_lat on the map. */
+function hardwareCoords(d) {
+  if (!d) return null;
+  const hwLat = d.last_hw_lat;
+  const hwLng = d.last_hw_lng;
+  if (hwLat != null && hwLng != null && Number.isFinite(Number(hwLat)) && Number.isFinite(Number(hwLng))) {
+    return { lat: Number(hwLat), lng: Number(hwLng) };
+  }
+  const src = String(d.last_fix_source || '')
+    .trim()
+    .toLowerCase();
+  if (!['teltonika', 'tracker', 'hardware'].includes(src)) return null;
+  if (d.last_lat == null || d.last_lng == null) return null;
+  if (!Number.isFinite(Number(d.last_lat)) || !Number.isFinite(Number(d.last_lng))) return null;
+  return { lat: Number(d.last_lat), lng: Number(d.last_lng) };
+}
+
 function deviceStatus(d, liveCodes) {
   const plate = normalizePlate(d.vehicle_code);
   const onMap = plate ? liveCodes.has(plate) : false;
@@ -252,22 +269,14 @@ export default function TeltonikaDevicesPanel() {
     [fleetByPlate, liveFleet],
   );
 
-  /** Live last-fix pins — prefer Codec last_hw_* over polluted browser last_lat. */
+  /** Live last-fix pins — Codec last_hw / Teltonika source only (never PC last_lat). */
   const liveDevicePins = useMemo(() => {
     return devices
       .map((d) => {
-        const lat = d?.last_hw_lat ?? d?.last_lat;
-        const lng = d?.last_hw_lng ?? d?.last_lng;
-        if (
-          d?.enabled === false ||
-          lat == null ||
-          lng == null ||
-          !Number.isFinite(Number(lat)) ||
-          !Number.isFinite(Number(lng))
-        ) {
-          return null;
-        }
-        return buildTestPin(d, lat, lng, {
+        if (d?.enabled === false) return null;
+        const hw = hardwareCoords(d);
+        if (!hw) return null;
+        return buildTestPin(d, hw.lat, hw.lng, {
           online: deviceSignalFresh(d),
         });
       })
