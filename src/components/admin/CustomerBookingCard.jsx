@@ -117,12 +117,37 @@ export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicke
           </div>
 
           {booking.boardingPassIssued && (
-            <div className="lg:col-span-2 flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-sky-50">
-              <StaticTicketQr booking={booking} size={120} />
+            <div className="lg:col-span-2 space-y-3 p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-sky-50">
               <div className="text-center sm:text-left">
-                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Εισιτήριο</p>
+                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">
+                  {Array.isArray(booking.seats) && booking.seats.length > 1
+                    ? 'Προσωπικά εισιτήρια'
+                    : 'Εισιτήριο'}
+                </p>
                 <p className="font-mono font-bold text-lg tracking-widest text-slate-900">{pnr}</p>
-                <p className="text-xs text-slate-500 mt-1">Σκανάρετε κατά την επιβίβαση</p>
+              </div>
+              <div className="flex flex-wrap justify-center sm:justify-start gap-4">
+                {(Array.isArray(booking.seats) && booking.seats.length
+                  ? booking.seats
+                  : String(booking.seat || '')
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                ).map((seat) => (
+                  <div key={seat} className="text-center">
+                    <p className="text-[10px] font-bold text-indigo-500 mb-1">Θέση {seat}</p>
+                    <StaticTicketQr
+                      booking={{ ...booking, seat, seats: [seat] }}
+                      size={100}
+                    />
+                  </div>
+                ))}
+                {!(
+                  (Array.isArray(booking.seats) && booking.seats.length) ||
+                  String(booking.seat || '').trim()
+                ) ? (
+                  <StaticTicketQr booking={booking} size={120} />
+                ) : null}
               </div>
             </div>
           )}
