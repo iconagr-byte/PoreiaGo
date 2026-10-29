@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import StaticTicketQr from '../StaticTicketQr.jsx';
 import RecordCashPaymentModal from '../admin/RecordCashPaymentModal.jsx';
 import FiscalReceiptsSection from '../admin/FiscalReceiptsSection.jsx';
 import { useCustomerFiscalPoll } from '../../lib/fiscal/useCustomerFiscalPoll.js';
@@ -20,19 +19,7 @@ import {
 import { getBookingPassengers } from '../../lib/ticketing/bookingPassengers.js';
 import { sendTicketEmail } from '../../services/ticketingApi.js';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
-
-/** One QR / print identity per seat (wallet-style personal ticket). */
-function seatScopedBooking(booking, passenger) {
-  if (!booking || !passenger) return booking;
-  const seat = String(passenger.seat || '').trim();
-  return {
-    ...booking,
-    seat: seat || booking.seat,
-    seats: seat ? [seat] : booking.seats,
-    customerName: passenger.name || booking.customerName,
-    passengerName: passenger.name || booking.passengerName,
-  };
-}
+import PersonalTicketPassList from './PersonalTicketPass.jsx';
 
 /**
  * Κοινή προβολή κράτησης — Control Panel & καρτέλα πελάτη.
@@ -447,72 +434,9 @@ export default function BookingDetailPanel({
           ) : null}
 
           <div
-            className={`bg-white p-6 md:p-8 ${cardRound} border border-black/[0.05] shadow-xl relative overflow-hidden`}
+            className={`bg-[#f5f5f7] p-5 md:p-7 ${cardRound} border border-black/[0.04] shadow-[0_12px_40px_rgba(0,0,0,0.06)]`}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-            <div className="relative text-center mb-5">
-              <h3 className="font-bold text-gray-900 mb-1 text-lg">
-                {passengers.length > 1 ? 'Προσωπικά εισιτήρια' : 'Εισιτήριο'}
-              </h3>
-              <p className="text-xs text-gray-500">
-                {passengers.length > 1
-                  ? `${passengers.length} QR · ένα ανά θέση / επιβάτη`
-                  : 'Σκανάρετε κατά την επιβίβαση'}
-              </p>
-              <div className="font-mono font-bold text-sm text-gray-500 tracking-[0.15em] mt-2">
-                {pnr}
-              </div>
-            </div>
-
-            <div className={`relative space-y-5 ${passengers.length > 1 ? '' : 'text-center'}`}>
-              {(passengers.length ? passengers : [{ seat: booking.seat || '', name: booking.customerName || '', role: 'booker' }]).map(
-                (passenger, index) => {
-                  const seatBooking = seatScopedBooking(booking, passenger);
-                  const label =
-                    String(passenger.name || '').trim() ||
-                    (passenger.role === 'booker'
-                      ? booking.customerName || 'Αγοραστής'
-                      : 'Συνοδός (χωρίς όνομα)');
-                  return (
-                    <div
-                      key={`${passenger.seat || 'seat'}-${index}`}
-                      className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 text-center"
-                    >
-                      <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
-                        {passenger.seat ? (
-                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
-                            Θέση {passenger.seat}
-                          </span>
-                        ) : null}
-                        <span className="text-sm font-bold text-gray-900">{label}</span>
-                        {passenger.role === 'booker' ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                            αγοραστής
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="inline-block p-3 rounded-2xl border-2 border-dashed border-primary/20 bg-white">
-                        <StaticTicketQr booking={seatBooking} size={passengers.length > 1 ? 140 : 160} />
-                      </div>
-                    </div>
-                  );
-                },
-              )}
-            </div>
-
-            <div className="mt-5 relative">
-              {booking.checkedIn ? (
-                <div className="py-3 bg-emerald-50 text-emerald-700 rounded-xl font-bold flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined">check_circle</span>
-                  Επιβιβάστηκε
-                </div>
-              ) : (
-                <div className="py-3 bg-slate-50 text-slate-600 rounded-xl font-bold flex items-center justify-center gap-2 border border-slate-200">
-                  <span className="material-symbols-outlined">pending</span>
-                  Εκκρεμεί επιβίβαση
-                </div>
-              )}
-            </div>
+            <PersonalTicketPassList booking={booking} wide brandLabel="Boarding pass" />
           </div>
 
           <div className={`bg-white p-6 md:p-8 ${cardRound} border border-black/[0.05] shadow-lg`}>
