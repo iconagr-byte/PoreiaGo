@@ -145,12 +145,22 @@ export function loadAllCustomers() {
   return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, 'el'));
 }
 
+function isDiagnosticCustomerEmail(email) {
+  const key = String(email || '')
+    .trim()
+    .toLowerCase();
+  return key.startsWith('diagnose-reg-') || key.startsWith('diagnose-');
+}
+
 /** CRM list for one service — buses and rent never mix. */
 export function loadCustomersByService(serviceScope) {
   const scope = normalizeCustomerServiceScope(serviceScope);
-  return loadAllCustomers().filter(
-    (c) => normalizeCustomerServiceScope(c.serviceScope, c) === scope,
-  );
+  return loadAllCustomers().filter((c) => {
+    if (normalizeCustomerServiceScope(c.serviceScope, c) !== scope) return false;
+    // Hide smoke-test diagnose accounts from office Πελάτες.
+    if (isDiagnosticCustomerEmail(c.email)) return false;
+    return true;
+  });
 }
 
 export function getCustomerByEmail(email, serviceScope = CUSTOMER_SERVICE_BUSES) {
