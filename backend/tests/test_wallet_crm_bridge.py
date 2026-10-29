@@ -117,6 +117,46 @@ class MirrorWalletCrmTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Axilleas Charalambidis")
 
+    async def test_sync_upgrades_crm_row_by_email_when_unbound(self):
+        """Booking surname in CRM + wallet Google name → CRM shows wallet name."""
+        from travel_platform.settings.office_customers_store import list_customers, upsert_customer
+        from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
+
+        upsert_customer(
+            "office-achillio",
+            {
+                "email": "iconagr@gmail.com",
+                "name": "Dodopoulos",
+                "phone": "6976678867",
+                "source": "booking",
+                "serviceScope": "buses",
+            },
+        )
+        with (
+            patch(
+                "ticketing.customer_accounts.list_accounts_for_tenant",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "ticketing.customer_accounts.get_account",
+                new_callable=AsyncMock,
+                return_value={
+                    "email": "iconagr@gmail.com",
+                    "name": "Axilleas Charalambidis",
+                    "phone": "6976678967",
+                    "auth_provider": "google",
+                    "wallet_tenant_id": None,
+                },
+            ),
+        ):
+            n = await sync_wallet_accounts_into_crm("office-achillio")
+        self.assertGreaterEqual(n, 1)
+        rows = list_customers("office-achillio", service_scope="buses")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "Axilleas Charalambidis")
+        self.assertEqual(rows[0]["phone"], "6976678967")
+
 
 if __name__ == "__main__":
     unittest.main()

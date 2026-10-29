@@ -282,14 +282,33 @@ export function upsertCustomer(input) {
   return record;
 }
 
+/** Prefer the richer display name (wallet/Google over short booking surname). */
+export function preferDisplayName(a, b) {
+  const x = String(a || '').trim();
+  const y = String(b || '').trim();
+  if (!x) return y;
+  if (!y) return x;
+  if (x.toLowerCase() === y.toLowerCase()) return x;
+  const xt = x.split(/\s+/).filter(Boolean).length;
+  const yt = y.split(/\s+/).filter(Boolean).length;
+  if (yt > xt) return y;
+  if (xt > yt) return x;
+  if (y.includes(' ') && !x.includes(' ')) return y;
+  if (x.includes(' ') && !y.includes(' ')) return x;
+  return x;
+}
+
 export function ensureCustomerForPassenger({ name, email, phone }) {
   if (!email) return null;
+  const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
   return upsertCustomer({
-    name,
+    name: preferDisplayName(existing?.name, name),
     email,
-    phone,
+    phone: String(existing?.phone || '').trim() || phone || '',
     serviceScope: CUSTOMER_SERVICE_BUSES,
-    source: 'booking',
+    source: existing?.source === 'wallet' || existing?.authProvider === 'google'
+      ? existing.source || 'wallet'
+      : 'booking',
   });
 }
 
@@ -315,13 +334,25 @@ export function syncCustomersFromBookings(bookings = []) {
     const email = String(booking.email || booking.customerEmail || '').trim();
     if (!email || !email.includes('@')) continue;
     if (isDeletedEmail(email, CUSTOMER_SERVICE_BUSES)) continue;
-    const existed = Boolean(getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES));
+    const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
+    const existed = Boolean(existing);
+    const bookingName =
+      booking.customerName || booking.passenger_name || booking.passengerName || '';
+    const bookingPhone = booking.phone || booking.customerPhone || '';
+    // Never clobber wallet/Google full name with a short booking surname
+    // (e.g. «Dodopoulos» over «Axilleas Charalambidis»).
+    const keepWallet =
+      existing?.source === 'wallet' ||
+      existing?.authProvider === 'google' ||
+      String(existing?.source || '').toLowerCase() === 'google';
     const row = upsertCustomer({
-      name: booking.customerName || booking.passenger_name || booking.passengerName || '',
+      name: preferDisplayName(existing?.name, bookingName),
       email,
-      phone: booking.phone || booking.customerPhone || '',
+      phone: String(existing?.phone || '').trim() || bookingPhone || '',
       serviceScope: CUSTOMER_SERVICE_BUSES,
-      source: 'booking',
+      source: keepWallet ? existing.source || 'wallet' : existing?.source || 'booking',
+      authProvider: existing?.authProvider,
+      picture: existing?.picture,
     });
     if (row && !existed) created += 1;
   }
@@ -471,9 +502,18 @@ export async function hydrateCustomersFromServer(serviceScope) {
       remote = await replaceOfficeCustomers(local);
     }
     for (const row of remote || []) {
+      const scope = row.serviceScope || serviceScope;
+      const existing = getCustomerByEmail(row.email, scope);
       upsertCustomer({
         ...row,
-        serviceScope: row.serviceScope || serviceScope,
+        name: preferDisplayName(row.name, existing?.name),
+        phone: String(row.phone || '').trim() || existing?.phone || '',
+        serviceScope: scope,
+        source:
+          existing?.source === 'wallet' || row.source === 'wallet'
+            ? 'wallet'
+            : row.source || existing?.source,
+        authProvider: row.authProvider || existing?.authProvider,
       });
     }
     return loadCustomersByService(serviceScope);
