@@ -10,7 +10,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.65rem;
+  gap: 0.85rem;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -21,13 +21,13 @@
 .ptp-stack-head {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  margin-bottom: 0.1rem;
+  gap: 0.2rem;
+  margin-bottom: 0.15rem;
 }
 
 .ptp-stack-kicker {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -36,7 +36,7 @@
 
 .ptp-stack-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
@@ -44,7 +44,7 @@
 
 .ptp-stack-sub {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
   word-break: break-all;
@@ -54,7 +54,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.85rem;
   min-width: 0;
   width: 100%;
 }
@@ -65,14 +65,14 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  max-width: 22.5rem; /* Apple-pass width — not full panel */
+  max-width: 30rem; /* Readable mid size — between tiny strip and full panel */
   overflow: hidden;
-  border-radius: 0.95rem;
+  border-radius: 1.05rem;
   background: var(--ptp-surface);
   border: 1px solid var(--ptp-line);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04),
-    0 8px 22px rgba(0, 0, 0, 0.05);
+    0 10px 28px rgba(0, 0, 0, 0.06);
   animation: ptp-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   backface-visibility: hidden;
 }
@@ -104,32 +104,32 @@
 
 .ptp-pass-hero {
   position: relative;
-  padding: 0.7rem 0.85rem 0.65rem;
+  padding: 0.85rem 1rem 0.8rem;
   background:
     linear-gradient(135deg, rgba(0, 113, 227, 0.11) 0%, rgba(0, 113, 227, 0.03) 45%, transparent 72%),
     linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
   border-bottom: 1px solid var(--ptp-line);
-  border-radius: 0.95rem 0.95rem 0 0;
+  border-radius: 1.05rem 1.05rem 0 0;
 }
 
 .ptp-pass-hero-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 
 .ptp-pass-hero-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.65rem;
   width: 100%;
 }
 
 .ptp-pass-brand {
   margin: 0;
-  font-size: 0.55rem;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -137,19 +137,19 @@
 }
 
 .ptp-pass-trip {
-  margin: 0.1rem 0 0;
-  font-size: 0.95rem;
+  margin: 0.12rem 0 0;
+  font-size: 1.08rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
-  line-height: 1.2;
+  line-height: 1.22;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .ptp-pass-when {
-  margin: 0.2rem 0 0;
-  font-size: 0.72rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -158,9 +158,9 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.5rem;
+  padding: 0.28rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   background: rgba(52, 199, 89, 0.12);
@@ -174,20 +174,20 @@
   border-color: rgba(0, 0, 0, 0.08);
 }
 
-/* Info + QR on one row — dense Apple strip */
+/* Info + QR on one row — readable mid density */
 .ptp-pass-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.55rem 0.7rem;
+  gap: 0.7rem 1rem;
   align-items: center;
-  padding: 0.7rem 0.8rem 0.75rem;
+  padding: 0.9rem 1rem 0.95rem;
   min-width: 0;
 }
 
 .ptp-pass-main {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.55rem;
   min-width: 0;
   grid-column: 1;
   grid-row: 1;
@@ -196,13 +196,13 @@
 .ptp-pass-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem 0.65rem;
+  gap: 0.45rem 0.85rem;
   align-items: start;
 }
 
 .ptp-field-label {
   margin: 0;
-  font-size: 0.52rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -210,18 +210,18 @@
 }
 
 .ptp-field-value {
-  margin: 0.12rem 0 0;
-  font-size: 0.88rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--ptp-ink);
-  line-height: 1.2;
+  line-height: 1.25;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .ptp-field-value.is-seat {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   letter-spacing: -0.04em;
   color: var(--ptp-blue);
   text-align: right;
@@ -230,8 +230,8 @@
 }
 
 .ptp-field-hint {
-  margin: 0.08rem 0 0;
-  font-size: 0.62rem;
+  margin: 0.12rem 0 0;
+  font-size: 0.68rem;
   font-weight: 600;
   color: var(--ptp-muted);
 }
@@ -239,17 +239,17 @@
 .ptp-meta-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.3rem 0.4rem;
+  gap: 0.4rem 0.55rem;
 }
 
 .ptp-meta-row .ptp-field-value {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
 }
 
 .ptp-meta-row .ptp-field-value.is-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   letter-spacing: -0.02em;
   word-break: break-all;
 }
@@ -262,7 +262,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -276,8 +276,8 @@
   flex-direction: column;
   align-items: center;
   flex: 0 0 auto;
-  padding: 0.35rem;
-  border-radius: 0.7rem;
+  padding: 0.45rem;
+  border-radius: 0.8rem;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   max-width: 100%;
@@ -285,8 +285,8 @@
 }
 
 .ptp-qr-frame .bg-white {
-  padding: 0.2rem !important;
-  border-radius: 0.5rem !important;
+  padding: 0.28rem !important;
+  border-radius: 0.55rem !important;
   max-width: 100%;
 }
 
@@ -297,13 +297,13 @@
 }
 
 .ptp-qr-frame p {
-  margin-top: 0.2rem !important;
-  font-size: 0.5rem !important;
+  margin-top: 0.28rem !important;
+  font-size: 0.55rem !important;
   color: var(--ptp-muted) !important;
   letter-spacing: -0.01em;
   text-align: center;
-  line-height: 1.2;
-  max-width: 6.5rem;
+  line-height: 1.25;
+  max-width: 7.5rem;
   white-space: normal;
 }
 
@@ -311,13 +311,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.2rem;
+  gap: 0.25rem;
   width: auto;
   max-width: 100%;
   margin: 0;
-  padding: 0.22rem 0.45rem;
+  padding: 0.32rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.58rem;
+  font-size: 0.68rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   background: var(--ptp-shade);
@@ -336,26 +336,26 @@
   font-size: 0.85rem;
 }
 
-/* Extra-tight when compact prop is set */
+/* Slightly tighter on customer cards — still readable */
 .ptp-pass.is-compact {
-  max-width: 21rem;
+  max-width: 28rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-hero {
-  padding: 0.6rem 0.75rem 0.55rem;
+  padding: 0.75rem 0.9rem 0.7rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-trip {
-  font-size: 0.88rem;
+  font-size: 1rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-body {
-  padding: 0.6rem 0.7rem 0.65rem;
-  gap: 0.45rem 0.55rem;
+  padding: 0.8rem 0.9rem 0.85rem;
+  gap: 0.6rem 0.85rem;
 }
 
 .ptp-pass.is-compact .ptp-field-value.is-seat {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
 }
 
 /* Narrow phones: stack QR under fields so nothing clips */
