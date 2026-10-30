@@ -10,7 +10,9 @@ from unittest.mock import patch
 from travel_platform.operations.achillio_seed_trips import (
     ACHILLIO_SEED_TRIP_IDS,
     achillio_seed_trip_catalog,
+    refresh_achillio_seed_if_stale,
     seed_achillio_office_excursions,
+    seed_catalog_needs_refresh,
 )
 from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
 
@@ -48,6 +50,26 @@ class AchillioSeedTripsTests(unittest.TestCase):
             self.assertGreater(dep, now, msg=t["title"])
             # Must stay boardable for My Wallet (12h grace after departure).
             self.assertGreater((dep - now).total_seconds(), 12 * 3600)
+        self.assertFalse(seed_catalog_needs_refresh(trips))
+
+    def test_refresh_noop_when_fresh_and_rolls_when_stale(self):
+        seed_achillio_office_excursions(self.tenant)
+        noop = refresh_achillio_seed_if_stale(self.tenant)
+        self.assertFalse(noop.get("refreshed"))
+
+        from travel_platform.operations import tenant_trip_catalog_store as store
+
+        rows = list_tenant_trips(self.tenant, published_only=False)
+        for row in rows:
+            if row.get("id") in ACHILLIO_SEED_TRIP_IDS:
+                row["departureTime"] = "2026-06-15T08:00:00Z"
+                row["arrivalTime"] = "2026-06-15T12:30:00Z"
+        store.upsert_tenant_trips(self.tenant, rows)
+        self.assertTrue(seed_catalog_needs_refresh(list_tenant_trips(self.tenant, published_only=False)))
+        rolled = refresh_achillio_seed_if_stale(self.tenant)
+        self.assertTrue(rolled.get("refreshed"))
+        fresh = list_tenant_trips(self.tenant, published_only=True)
+        self.assertFalse(seed_catalog_needs_refresh(fresh))
 
     def test_seed_upserts_into_tenant_catalog_idempotently(self):
         first = seed_achillio_office_excursions(self.tenant)

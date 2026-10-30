@@ -534,15 +534,20 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
 
     trips_seeded = 0
     bookings_healed = 0
-    try:
-        from travel_platform.operations.achillio_seed_trips import (
-            achillio_seed_trip_catalog,
-            heal_achillio_seed_booking_departures,
-            seed_achillio_office_excursions,
-        )
+    from travel_platform.operations.achillio_seed_trips import (
+        achillio_seed_trip_catalog,
+        heal_achillio_seed_booking_departures,
+        seed_achillio_office_excursions,
+    )
 
+    try:
         seed_result = seed_achillio_office_excursions(str(office.id))
         trips_seeded = int(seed_result.get("saved") or 0)
+    except Exception:
+        logger.exception("Achillio office excursion seed failed")
+        seed_result = {}
+
+    try:
         heal = await heal_achillio_seed_booking_departures(
             session,
             tenant_id=str(office.id),
@@ -550,7 +555,10 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
         )
         bookings_healed = int(heal.get("updated") or 0)
     except Exception:
-        logger.exception("Achillio office excursion seed failed")
+        logger.exception(
+            "Achillio seed booking departure heal failed (catalog saved=%s)",
+            trips_seeded,
+        )
 
     return {
         "created": created,

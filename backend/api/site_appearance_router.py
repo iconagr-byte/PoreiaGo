@@ -1465,12 +1465,19 @@ async def get_public_office_trips(
     2. Host / X-Forwarded-Host → DomainResolver.
     3. Office Bearer JWT tenant (Back Office hydrate on marketing host).
     """
+    from travel_platform.operations.achillio_seed_trips import (
+        refresh_achillio_seed_and_heal_bookings,
+    )
     from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
 
     # Sealed My Wallet (desktop + native): prefer explicit office UUID.
     # Published trips are public per office — same as appearance/modules.
     explicit_tid = (tenant_id or "").strip() or None
     if explicit_tid:
+        try:
+            await refresh_achillio_seed_and_heal_bookings(explicit_tid)
+        except Exception:
+            logger.debug("achillio seed refresh skipped", exc_info=True)
         rows = list_tenant_trips(explicit_tid, published_only=True)
         return [PublicTripResponse(**row) for row in rows]
 
@@ -1518,5 +1525,9 @@ async def get_public_office_trips(
     if not tid:
         return []
 
+    try:
+        await refresh_achillio_seed_and_heal_bookings(tid)
+    except Exception:
+        logger.debug("achillio seed refresh skipped", exc_info=True)
     rows = list_tenant_trips(tid, published_only=True)
     return [PublicTripResponse(**row) for row in rows]
