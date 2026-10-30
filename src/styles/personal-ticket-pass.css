@@ -367,10 +367,19 @@
   max-width: 28rem;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 640px) {
   .ptp-grid.is-multi .ptp-pass.is-compact {
     max-width: none;
   }
+}
+
+/* Keep QR from crushing the text column in 2-up layout */
+.ptp-grid.is-multi .ptp-qr-frame {
+  max-width: 7.5rem;
+}
+
+.ptp-grid.is-multi .ptp-qr-frame .bg-white {
+  width: 100% !important;
 }
 
 .ptp-pass.is-compact .ptp-pass-hero {
