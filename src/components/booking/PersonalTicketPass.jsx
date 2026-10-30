@@ -53,7 +53,7 @@ export function PersonalTicketPass({
     booking.checkedIn ||
     booking.checkInStatus === 'CHECKED_IN' ||
     booking.checkInStatus === 'BOARDED';
-  const size = qrSize ?? (compact ? 88 : 96);
+  const size = qrSize ?? (compact ? 112 : 120);
   const roleHint =
     passenger.role === 'booker' ? 'Αγοραστής' : passenger.role === 'companion' ? 'Συνοδός' : null;
 
