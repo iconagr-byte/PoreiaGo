@@ -82,6 +82,8 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
     for alias in booking_id_aliases(key):
         filters.append(Booking.reference_code == normalize_reference(alias))
         filters.append(Booking.reference_code == alias.upper())
+        filters.append(Booking.reference_code == alias)
+        filters.append(cast(Booking.id, String) == alias)
     # De-dupe while preserving order
     seen: set[str] = set()
     unique_filters = []

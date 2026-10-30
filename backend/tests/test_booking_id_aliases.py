@@ -28,6 +28,12 @@ class BookingIdAliasTests(unittest.TestCase):
         self.assertEqual(normalize_reference("B95F8658"), "BK-B95F8658")
         self.assertEqual(normalize_reference("B-B95F8658"), "BK-B95F8658")
 
+    def test_aliases_include_bare_core_for_meteora_style_ids(self):
+        aliases = booking_id_aliases("B-B606D55B")
+        self.assertIn("B-B606D55B", aliases)
+        self.assertIn("BK-B606D55B", aliases)
+        self.assertIn("B606D55B", aliases)
+
     def test_deposit_counts_as_paid_for_boarding(self):
         self.assertTrue(is_paid("DEPOSIT"))
         self.assertTrue(is_paid("PAID (SaaS)"))
