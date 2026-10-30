@@ -33,6 +33,10 @@ class SiteTripsByTenantIdTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
+                "travel_platform.operations.achillio_seed_trips.refresh_achillio_seed_and_heal_bookings",
+                new=AsyncMock(return_value={"refreshed": False}),
+            ) as refreshed,
+            patch(
                 "travel_platform.operations.tenant_trip_catalog_store.list_tenant_trips",
                 return_value=rows,
             ) as listed,
@@ -47,6 +51,7 @@ class SiteTripsByTenantIdTests(unittest.IsolatedAsyncioTestCase):
                 tenant_id="11111111-1111-1111-1111-111111111111",
             )
 
+        refreshed.assert_awaited_once_with("11111111-1111-1111-1111-111111111111")
         listed.assert_called_once_with(
             "11111111-1111-1111-1111-111111111111",
             published_only=True,

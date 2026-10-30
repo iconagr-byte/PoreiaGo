@@ -228,6 +228,34 @@ def achillio_seed_trip_catalog(
     ]
 
 
+def _seed_departure_stale(departure_iso: str | None, *, grace_hours: float = 12) -> bool:
+    """True when a stored seed departure is already past wallet boarding grace."""
+    raw = str(departure_iso or "").strip()
+    if not raw:
+        return True
+    try:
+        dep = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if dep.tzinfo is None:
+        dep = dep.replace(tzinfo=timezone.utc)
+    limit = dep + timedelta(hours=max(0.0, float(grace_hours)))
+    return datetime.now(timezone.utc) > limit
+
+
+def seed_catalog_needs_refresh(trips: list[dict[str, Any]] | None) -> bool:
+    """Any Achillio officeSeed trip past boarding grace → re-roll departures."""
+    rows = trips or []
+    seed_rows = [
+        t
+        for t in rows
+        if t.get("id") in ACHILLIO_SEED_TRIP_IDS or t.get("officeSeed")
+    ]
+    if not seed_rows:
+        return False
+    return any(_seed_departure_stale(t.get("departureTime")) for t in seed_rows)
+
+
 def seed_achillio_office_excursions(tenant_id: str | None) -> dict[str, Any]:
     """
     Upsert starter excursions into Achillio Travel's durable trip catalog.
@@ -264,6 +292,63 @@ def seed_achillio_office_excursions(tenant_id: str | None) -> dict[str, Any]:
     }
 
 
+def refresh_achillio_seed_if_stale(tenant_id: str | None) -> dict[str, Any]:
+    """
+    Re-upsert rolling seed departures when catalog rows are past wallet grace.
+    Cheap no-op when dates are still boardable — safe on every /api/site/trips hit.
+    """
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return {"refreshed": False, "reason": "missing_tenant_id"}
+
+    from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
+
+    existing = list_tenant_trips(tid, published_only=False)
+    seed_existing = [t for t in existing if t.get("id") in ACHILLIO_SEED_TRIP_IDS]
+    if seed_existing and not seed_catalog_needs_refresh(seed_existing):
+        return {"refreshed": False, "saved": 0}
+    result = seed_achillio_office_excursions(tid)
+    return {
+        "refreshed": True,
+        "saved": int(result.get("saved") or 0),
+        "trips": result.get("trips") or [],
+    }
+
+
+async def refresh_achillio_seed_and_heal_bookings(tenant_id: str | None) -> dict[str, Any]:
+    """Catalog refresh + Postgres booking departure heal (wallet remirror)."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return {"refreshed": False, "healed": 0}
+    refresh = refresh_achillio_seed_if_stale(tid)
+    if not refresh.get("refreshed"):
+        return {**refresh, "healed": 0}
+    try:
+        from app.core.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            heal = await heal_achillio_seed_booking_departures(
+                session,
+                tenant_id=tid,
+                trips=achillio_seed_trip_catalog(),
+            )
+        return {**refresh, "healed": int(heal.get("updated") or 0)}
+    except Exception:
+        logger.exception("Achillio seed booking heal after catalog refresh failed")
+        return {**refresh, "healed": 0, "heal_error": True}
+
+
+def _booking_skip_departure_heal(meta: dict[str, Any], booking: Any) -> bool:
+    """Skip cancelled / boarded seed bookings — never invent a future live pass."""
+    status = str(getattr(booking, "status", "") or meta.get("status") or "").strip().lower()
+    if status in {"cancelled", "canceled", "ακυρωμένη", "ακυρωμενη"}:
+        return True
+    if meta.get("checked_in") is True:
+        return True
+    check = str(meta.get("check_in_status") or "").upper()
+    return check in {"CHECKED_IN", "BOARDED"}
+
+
 async def heal_achillio_seed_booking_departures(
     session,
     *,
@@ -273,10 +358,14 @@ async def heal_achillio_seed_booking_departures(
     """
     Push rolling seed departure times onto existing Postgres bookings for
     trips 91001–91003 so My Wallet stops showing «Ληγμένη» for June demos.
+
+    Skips cancelled / already boarded rows so we never resurrect a finished
+    check-in with a live QR on a future date.
     """
-    from sqlalchemy import select
+    from sqlalchemy import select, text
 
     from api.admin_booking_mapper import booking_to_admin_dict
+    from app.core.tenant_rls import apply_tenant_rls
     from app.models.booking import Booking
     from ticketing.wallet_booking_reconcile import mirror_admin_booking_to_wallet
 
@@ -284,14 +373,24 @@ async def heal_achillio_seed_booking_departures(
     catalog = trips or achillio_seed_trip_catalog()
     by_id = {int(t["id"]): t for t in catalog if t.get("id") in ACHILLIO_SEED_TRIP_IDS}
     if not tid or not by_id:
-        return {"updated": 0, "mirrored": 0}
+        return {"updated": 0, "mirrored": 0, "skipped_boarded": 0}
 
     try:
         from uuid import UUID
 
         tenant_uuid = UUID(tid)
     except ValueError:
-        return {"updated": 0, "mirrored": 0, "reason": "bad_tenant"}
+        return {"updated": 0, "mirrored": 0, "skipped_boarded": 0, "reason": "bad_tenant"}
+
+    # Forced RLS on bookings needs tenant GUC (commit earlier cleared SET LOCAL).
+    try:
+        await apply_tenant_rls(session, tenant_uuid)
+    except Exception:
+        logger.debug("apply_tenant_rls for seed heal failed", exc_info=True)
+    try:
+        await session.execute(text("SET LOCAL row_security = off"))
+    except Exception:
+        logger.debug("row_security off for seed heal failed", exc_info=True)
 
     result = await session.execute(
         select(Booking).where(Booking.tenant_id == tenant_uuid)
@@ -299,6 +398,7 @@ async def heal_achillio_seed_booking_departures(
     rows = list(result.scalars().all())
     updated = 0
     mirrored = 0
+    skipped_boarded = 0
     for booking in rows:
         meta = dict(booking.metadata_json or {})
         raw_tid = meta.get("external_trip_id") or meta.get("trip_id") or booking.trip_id
@@ -308,6 +408,9 @@ async def heal_achillio_seed_booking_departures(
             continue
         trip = by_id.get(trip_id)
         if not trip:
+            continue
+        if _booking_skip_departure_heal(meta, booking):
+            skipped_boarded += 1
             continue
         dep = str(trip.get("departureTime") or "")
         if not dep:
@@ -331,9 +434,14 @@ async def heal_achillio_seed_booking_departures(
     if updated:
         await session.commit()
     logger.info(
-        "Achillio seed booking departures healed tenant=%s updated=%s mirrored=%s",
+        "Achillio seed booking departures healed tenant=%s updated=%s mirrored=%s skipped_boarded=%s",
         tid,
         updated,
         mirrored,
+        skipped_boarded,
     )
-    return {"updated": updated, "mirrored": mirrored}
+    return {
+        "updated": updated,
+        "mirrored": mirrored,
+        "skipped_boarded": skipped_boarded,
+    }
