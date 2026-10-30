@@ -32,6 +32,22 @@ describe('bookingPassengers', () => {
     expect(validateCompanionNames(['5A'], [])).toBeNull();
   });
 
+  test('rejects phone/id as companion name', async () => {
+    const { isPlausiblePassengerName } = await import('./bookingPassengers.js');
+    expect(isPlausiblePassengerName('2344455')).toBe(false);
+    expect(validateCompanionNames(['1B', '4B'], ['2344455'])).toMatch(/τηλεφώνου|4B/);
+    expect(
+      getBookingPassengers({
+        customerName: 'Axilleas',
+        seats: ['1B', '4B'],
+        passengers: [
+          { seat: '1B', name: 'Axilleas', role: 'booker' },
+          { seat: '4B', name: '2344455', role: 'companion' },
+        ],
+      })[1].name,
+    ).toBe('');
+  });
+
   test('reads legacy booking without passengers array', () => {
     const list = getBookingPassengers({
       customerName: 'Μαρία',

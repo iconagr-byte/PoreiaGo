@@ -306,6 +306,75 @@ async def _guest_booking_side_effects(
     except Exception:
         pass
 
+    # Immediate desktop ↔ wallet mirror so My Wallet shows the new booking
+    # without waiting for an admin list refresh.
+    try:
+        from api.admin_booking_mapper import booking_to_admin_dict, local_id_from_reference
+        from ticketing.wallet_booking_reconcile import mirror_admin_booking_to_wallet
+
+        # Rebuild a lightweight admin dict from the durable snapshot.
+        snap_meta = dict(booking_snapshot.get("metadata_json") or metadata or {})
+        admin_view = {
+            "id": local_id_from_reference(ref) if ref else str(booking_snapshot["id"]),
+            "saasBookingId": str(booking_snapshot["id"]),
+            "syncedToSaas": True,
+            "customerName": passenger_name,
+            "tripTitle": (trip_title or "").strip() or snap_meta.get("trip_title") or "—",
+            "tripId": snap_meta.get("external_trip_id") or 0,
+            "seats": list(requested_seats or snap_meta.get("seats") or []),
+            "seat": seat_label or ", ".join(requested_seats or []),
+            "price": float(total),
+            "amount": float(total),
+            "amountPaid": float(paid_now),
+            "balanceDue": max(0.0, round(float(total) - float(paid_now), 2)),
+            "email": passenger_email,
+            "phone": passenger_phone or "",
+            "pnr": ref,
+            "status": "Επιβεβαιωμένη" if paid_now > 0 else "Εκκρεμής",
+            "paymentStatus": (
+                "PAID (SaaS)"
+                if paid_now >= total and total > 0
+                else ("DEPOSIT" if paid_now > 0 else "PENDING")
+            ),
+            "checkInStatus": "NONE",
+            "checkedIn": False,
+            "boardingPassIssued": True,
+            "bookingSource": source or "My Wallet",
+            "tenant_id": str(tenant_id),
+            "tenantId": str(tenant_id),
+            "passengers": snap_meta.get("passengers") or [],
+            "departureAt": snap_meta.get("departure_at"),
+            "date": None,
+            "time": None,
+        }
+        dep_raw = snap_meta.get("departure_at")
+        if dep_raw:
+            try:
+                from datetime import datetime
+
+                dep = datetime.fromisoformat(str(dep_raw).replace("Z", "+00:00"))
+                admin_view["date"] = dep.strftime("%Y-%m-%d")
+                admin_view["time"] = dep.strftime("%H:%M")
+            except ValueError:
+                pass
+        # Prefer ORM mapper when we can cheaply reload — fallback to admin_view.
+        try:
+            async with AsyncSessionLocal() as mirror_db:
+                await apply_tenant_rls(mirror_db, tid)
+                loaded = await mirror_db.scalar(
+                    select(Booking).where(
+                        Booking.tenant_id == tid,
+                        Booking.reference_code == ref,
+                    )
+                )
+                if loaded is not None:
+                    admin_view = booking_to_admin_dict(loaded)
+        except Exception:
+            pass
+        await mirror_admin_booking_to_wallet(admin_view)
+    except Exception:
+        logger.debug("Guest booking wallet mirror skipped ref=%s", ref, exc_info=True)
+
     # Always notify the office on every new guest booking (paid or unpaid hold).
     # Prefer tenant Email Hub SMTP so Achillio mail lands in the office mailbox.
     notify_payload = {

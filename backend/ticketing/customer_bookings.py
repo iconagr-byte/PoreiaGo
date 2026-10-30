@@ -217,6 +217,91 @@ async def upsert_many_for_customer(
     return await list_bookings_for_email(key, tenant_id=tid)
 
 
+async def delete_booking_for_customer(
+    booking_id: str,
+    *,
+    email: str,
+    tenant_id: str | None = None,
+) -> bool:
+    """Delete one wallet cache row — must match customer email (+ optional office)."""
+    bid = str(booking_id or "").strip()
+    key = str(email or "").strip().lower()
+    if not bid or not key:
+        return False
+    tid = _normalize_tenant(tenant_id)
+    db = get_db()
+    if tid:
+        cur = await db.execute(
+            """
+            DELETE FROM customer_bookings
+            WHERE id = ? AND customer_email = ? AND tenant_id = ?
+            """,
+            (bid, key, tid),
+        )
+    else:
+        cur = await db.execute(
+            "DELETE FROM customer_bookings WHERE id = ? AND customer_email = ?",
+            (bid, key),
+        )
+    await db.commit()
+    return bool(cur.rowcount)
+
+
+async def delete_booking_by_aliases(
+    aliases: list[str],
+    *,
+    email: str | None = None,
+    tenant_id: str | None = None,
+) -> int:
+    """
+    Hard-delete wallet cache rows matching any id / saas id / PNR alias.
+    Used when desktop permanently deletes a booking.
+    """
+    keys = [str(a).strip() for a in (aliases or []) if str(a or "").strip()]
+    if not keys:
+        return 0
+    tid = _normalize_tenant(tenant_id)
+    email_key = str(email or "").strip().lower() or None
+    db = get_db()
+    # Load candidate rows then filter aliases in Python (payload may hold saasBookingId).
+    if tid and email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ? AND tenant_id = ?",
+            (email_key, tid),
+        )
+    elif email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ?",
+            (email_key,),
+        )
+    elif tid:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE tenant_id = ?",
+            (tid,),
+        )
+    else:
+        cur = await db.execute("SELECT * FROM customer_bookings")
+    rows = await cur.fetchall()
+    alias_set = {k for k in keys} | {k.upper() for k in keys} | {k.lower() for k in keys}
+    deleted = 0
+    for row in rows:
+        booking = _row_to_booking(row)
+        candidates = {
+            str(booking.get("id") or ""),
+            str(booking.get("saasBookingId") or ""),
+            str(booking.get("pnr") or ""),
+            str(booking.get("ticketRef") or ""),
+            str(row["id"] or ""),
+        }
+        if not (candidates & alias_set):
+            continue
+        await db.execute("DELETE FROM customer_bookings WHERE id = ?", (row["id"],))
+        deleted += 1
+    if deleted:
+        await db.commit()
+    return deleted
+
+
 async def seed_customer_bookings_if_empty() -> None:
     db = get_db()
     cur = await db.execute("SELECT COUNT(*) AS c FROM customer_bookings")
