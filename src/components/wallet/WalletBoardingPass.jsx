@@ -213,6 +213,14 @@ function PassengerTicketCard({
                       : 'Το QR ενεργοποιείται μετά την πληρωμή'}
                 </p>
               ) : null}
+              {!expired && (booking.checkedIn || booking.checkInStatus === 'CHECKED_IN' || booking.checkInStatus === 'BOARDED') ? (
+                <p className="wallet-ticket-boarded">
+                  <span className="material-symbols-outlined" aria-hidden>
+                    check_circle
+                  </span>
+                  Επιβιβάστηκε · συγχρονισμένο με γραφείο
+                </p>
+              ) : null}
               {mark && !expired ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
             </div>
           </>

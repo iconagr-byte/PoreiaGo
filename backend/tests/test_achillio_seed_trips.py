@@ -38,6 +38,17 @@ class AchillioSeedTripsTests(unittest.TestCase):
             self.assertTrue(t.get("officeSeed"))
             self.assertIn(t["id"], ACHILLIO_SEED_TRIP_IDS)
 
+    def test_seed_departures_roll_forward_past_june_2026(self):
+        from datetime import datetime, timezone
+
+        trips = achillio_seed_trip_catalog()
+        now = datetime.now(timezone.utc)
+        for t in trips:
+            dep = datetime.fromisoformat(t["departureTime"].replace("Z", "+00:00"))
+            self.assertGreater(dep, now, msg=t["title"])
+            # Must stay boardable for My Wallet (12h grace after departure).
+            self.assertGreater((dep - now).total_seconds(), 12 * 3600)
+
     def test_seed_upserts_into_tenant_catalog_idempotently(self):
         first = seed_achillio_office_excursions(self.tenant)
         self.assertEqual(first["saved"], 3)
