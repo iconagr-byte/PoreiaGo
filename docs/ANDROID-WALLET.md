@@ -67,7 +67,19 @@ What the script does: reset to **`main`** → wipe stale `dist`/assets → `npm 
 
 ### If build OK but install hangs
 
-`adb devices` is empty **or** shows `emulator-5554   offline`.
+`adb devices` is empty **or** shows `emulator-5554   offline`, **or** Studio toast:
+
+> **Medium Phone is already running as process NNNNN**
+
+That toast means a zombie emulator still holds the AVD lock (Device Manager may still show ▶ Play). Clear it, then Cold Boot:
+
+```powershell
+cd C:\Users\User\poreiago
+# optional: -PidHint 38904  (use the PID from the Studio toast)
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-kill-emulator.ps1
+# Device Manager → Medium Phone → ▾ → Cold Boot Now → wait for HOME screen
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+```
 
 **Important:** `offline` is **not** ready. Only state `device` can install. Scripts wait for `device` + `sys.boot_completed=1`, and will try `adb kill-server` / relaunch the AVD if stuck offline.
 
