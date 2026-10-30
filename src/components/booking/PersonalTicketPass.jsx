@@ -33,12 +33,12 @@ function passengerLabel(passenger, booking) {
 
 /**
  * Apple Wallet–style boarding pass for one seat / passenger.
+ * Vertical layout: trip → passenger/seat/meta → QR (nothing overlaps).
  */
 export function PersonalTicketPass({
   booking,
   passenger,
   compact = false,
-  wide = true,
   qrSize,
   showBoarding = true,
   brandLabel = 'Εισιτήριο',
@@ -53,31 +53,27 @@ export function PersonalTicketPass({
     booking.checkedIn ||
     booking.checkInStatus === 'CHECKED_IN' ||
     booking.checkInStatus === 'BOARDED';
-  const size = qrSize ?? (compact ? 108 : 132);
+  const size = qrSize ?? (compact ? 120 : 148);
   const roleHint =
     passenger.role === 'booker' ? 'Αγοραστής' : passenger.role === 'companion' ? 'Συνοδός' : null;
 
   return (
     <article
-      className={[
-        'ptp-pass',
-        compact ? 'is-compact' : '',
-        wide ? 'is-wide' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+      className={['ptp-pass', compact ? 'is-compact' : ''].filter(Boolean).join(' ')}
       aria-label={`Εισιτήριο ${name}${passenger.seat ? ` · θέση ${passenger.seat}` : ''}`}
     >
       <header className="ptp-pass-hero">
         <div className="ptp-pass-hero-row">
-          <div className="min-w-0">
+          <div className="ptp-pass-hero-top">
             <p className="ptp-pass-brand">{brandLabel}</p>
-            <h3 className="ptp-pass-trip truncate">{booking.tripTitle || 'Εκδρομή'}</h3>
+            <span className={`ptp-pass-status${paid ? '' : ' is-pending'}`}>
+              {paid ? booking.status || 'Πληρωμένο' : 'Εκκρεμεί'}
+            </span>
+          </div>
+          <div>
+            <h3 className="ptp-pass-trip">{booking.tripTitle || 'Εκδρομή'}</h3>
             <p className="ptp-pass-when">{formatTripWhen(booking)}</p>
           </div>
-          <span className={`ptp-pass-status${paid ? '' : ' is-pending'}`}>
-            {paid ? booking.status || 'Πληρωμένο' : 'Εκκρεμεί'}
-          </span>
         </div>
       </header>
 
@@ -86,7 +82,7 @@ export function PersonalTicketPass({
           <div className="ptp-pass-fields">
             <div className="min-w-0">
               <p className="ptp-field-label">Επιβάτης</p>
-              <p className="ptp-field-value truncate">{name}</p>
+              <p className="ptp-field-value">{name}</p>
               {roleHint ? <p className="ptp-field-hint">{roleHint}</p> : null}
             </div>
             <div>
@@ -111,11 +107,11 @@ export function PersonalTicketPass({
               <p className="ptp-field-value is-mono">{pnr}</p>
             </div>
           </div>
+        </div>
 
-          <div className="ptp-perforation" aria-hidden>
-            <span />
-            <span />
-          </div>
+        <div className="ptp-perforation" aria-hidden>
+          <span />
+          <span />
         </div>
 
         <div className="ptp-qr-col">
@@ -137,12 +133,11 @@ export function PersonalTicketPass({
 }
 
 /**
- * Stack / grid of personal passes for a booking.
+ * Stack of personal passes for a booking (one full-width pass per seat).
  */
 export default function PersonalTicketPassList({
   booking,
   compact = false,
-  wide = true,
   qrSize,
   brandLabel,
   heading = true,
@@ -177,14 +172,13 @@ export default function PersonalTicketPassList({
           <p className="ptp-stack-sub font-mono">{pnr}</p>
         </div>
       ) : null}
-      <div className={`ptp-grid${multi ? ' is-multi' : ''}`}>
+      <div className="ptp-grid">
         {list.map((passenger, index) => (
           <PersonalTicketPass
             key={`${passenger.seat || 'seat'}-${index}`}
             booking={booking}
             passenger={passenger}
             compact={compact}
-            wide={wide}
             qrSize={qrSize}
             brandLabel={brandLabel}
           />

@@ -5,12 +5,16 @@
   --ptp-muted: #6e6e73;
   --ptp-line: rgba(0, 0, 0, 0.08);
   --ptp-blue: #0071e3;
-  --ptp-blue-soft: #e8f1fc;
   --ptp-surface: #ffffff;
   --ptp-shade: #f5f5f7;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  contain: inline-size;
 }
 
 .ptp-stack-head {
@@ -42,23 +46,25 @@
   font-size: 0.82rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
+  word-break: break-all;
 }
 
+/* Always one column — side-by-side cards crush fields under the QR. */
 .ptp-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
-}
-
-@media (min-width: 720px) {
-  .ptp-grid.is-multi {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  min-width: 0;
+  width: 100%;
 }
 
 .ptp-pass {
   position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   border-radius: 1.15rem;
   background: var(--ptp-surface);
@@ -67,6 +73,8 @@
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 12px 32px rgba(0, 0, 0, 0.06);
   animation: ptp-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Avoid subpixel transform jitter after the entrance animation settles. */
+  backface-visibility: hidden;
 }
 
 .ptp-pass:nth-child(2) {
@@ -80,28 +88,43 @@
 @keyframes ptp-rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translate3d(0, 10px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ptp-pass {
+    animation: none;
   }
 }
 
 .ptp-pass-hero {
   position: relative;
-  padding: 1rem 1.1rem 0.95rem;
+  padding: 1rem 1.15rem 0.95rem;
   background:
     linear-gradient(135deg, rgba(0, 113, 227, 0.12) 0%, rgba(0, 113, 227, 0.04) 42%, transparent 70%),
     linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
   border-bottom: 1px solid var(--ptp-line);
+  border-radius: 1.15rem 1.15rem 0 0;
 }
 
 .ptp-pass-hero-row {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.ptp-pass-hero-top {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  width: 100%;
 }
 
 .ptp-pass-brand {
@@ -114,17 +137,19 @@
 }
 
 .ptp-pass-trip {
-  margin: 0.28rem 0 0;
-  font-size: 1.05rem;
+  margin: 0.2rem 0 0;
+  font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
-  line-height: 1.2;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ptp-pass-when {
-  margin: 0.3rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -149,30 +174,32 @@
   border-color: rgba(0, 0, 0, 0.08);
 }
 
+/* Vertical Apple pass: details → tear → QR. Never overlap. */
 .ptp-pass-body {
-  display: grid;
-  gap: 0.85rem;
-  padding: 1rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.05rem 1.15rem 1.15rem;
+  min-width: 0;
 }
 
-@media (min-width: 520px) {
-  .ptp-pass.is-wide .ptp-pass-body {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 1rem 1.25rem;
-  }
+.ptp-pass-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
 }
 
 .ptp-pass-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) auto;
-  gap: 0.75rem 1rem;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1.1rem;
+  align-items: start;
 }
 
 .ptp-field-label {
   margin: 0;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -180,24 +207,28 @@
 }
 
 .ptp-field-value {
-  margin: 0.2rem 0 0;
-  font-size: 1rem;
+  margin: 0.25rem 0 0;
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--ptp-ink);
-  line-height: 1.2;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ptp-field-value.is-seat {
-  font-size: 1.55rem;
+  font-size: 1.65rem;
   letter-spacing: -0.04em;
   color: var(--ptp-blue);
   text-align: right;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .ptp-field-hint {
-  margin: 0.15rem 0 0;
-  font-size: 0.68rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--ptp-muted);
 }
@@ -205,12 +236,12 @@
 .ptp-meta-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
-  padding-top: 0.15rem;
+  gap: 0.65rem 0.75rem;
+  padding-top: 0.1rem;
 }
 
 .ptp-meta-row .ptp-field-value {
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -225,7 +256,7 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  margin: 0.15rem 0;
+  margin: 0.1rem 0;
   color: rgba(0, 0, 0, 0.12);
 }
 
@@ -243,38 +274,50 @@
   background: currentColor;
 }
 
-@media (min-width: 520px) {
-  .ptp-pass.is-wide .ptp-perforation {
-    display: none;
-  }
-}
-
 .ptp-qr-col {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.45rem;
-  justify-self: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ptp-qr-frame {
-  padding: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0.65rem;
   border-radius: 1rem;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  max-width: 100%;
+  /* Keep QR column width stable while the countdown ticks. */
+  font-variant-numeric: tabular-nums;
 }
 
 .ptp-qr-frame .bg-white {
-  padding: 0.35rem !important;
+  padding: 0.4rem !important;
   border-radius: 0.7rem !important;
+  max-width: 100%;
+}
+
+.ptp-qr-frame svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .ptp-qr-frame p {
-  margin-top: 0.35rem !important;
-  font-size: 0.58rem !important;
+  margin-top: 0.4rem !important;
+  font-size: 0.62rem !important;
   color: var(--ptp-muted) !important;
   letter-spacing: -0.01em;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .ptp-board {
@@ -283,10 +326,11 @@
   justify-content: center;
   gap: 0.35rem;
   width: 100%;
-  margin-top: 0.15rem;
-  padding: 0.55rem 0.75rem;
+  max-width: 22rem;
+  margin-top: 0.1rem;
+  padding: 0.6rem 0.85rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   background: var(--ptp-shade);
@@ -305,24 +349,24 @@
 }
 
 .ptp-pass.is-compact .ptp-pass-hero {
-  padding: 0.85rem 0.95rem 0.75rem;
+  padding: 0.9rem 1rem 0.8rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-trip {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-body {
-  padding: 0.85rem 0.95rem 0.95rem;
+  padding: 0.9rem 1rem 1rem;
 }
 
 .ptp-pass.is-compact .ptp-field-value.is-seat {
-  font-size: 1.3rem;
+  font-size: 1.4rem;
 }
 
-@media (max-width: 519px) {
+@media (max-width: 420px) {
   .ptp-meta-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr;
   }
 
   .ptp-meta-row > :last-child {
