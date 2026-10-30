@@ -179,7 +179,7 @@ export default function PersonalTicketPassList({
             booking={booking}
             passenger={passenger}
             compact={compact}
-            qrSize={qrSize ?? (multi ? (compact ? 96 : 104) : undefined)}
+            qrSize={qrSize ?? (multi ? (compact ? 100 : 108) : undefined)}
             brandLabel={brandLabel}
           />
         ))}

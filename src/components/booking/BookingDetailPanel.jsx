@@ -433,12 +433,6 @@ export default function BookingDetailPanel({
             </div>
           ) : null}
 
-          <div
-            className={`bg-[#f5f5f7] p-4 md:p-5 ${cardRound} border border-black/[0.04] shadow-[0_8px_28px_rgba(0,0,0,0.05)]`}
-          >
-            <PersonalTicketPassList booking={booking} compact brandLabel="Boarding pass" />
-          </div>
-
           <div className={`bg-white p-6 md:p-8 ${cardRound} border border-black/[0.05] shadow-lg`}>
             <h3 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
               <span className="material-symbols-outlined text-blue-500">groups</span>
@@ -491,6 +485,13 @@ export default function BookingDetailPanel({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Full-width like CRM customer cards — room for two horizontal passes */}
+      <div
+        className={`bg-[#f5f5f7] p-4 md:p-5 ${cardRound} border border-black/[0.04] shadow-[0_8px_28px_rgba(0,0,0,0.05)]`}
+      >
+        <PersonalTicketPassList booking={booking} compact brandLabel="Boarding pass" />
       </div>
 
       <RecordCashPaymentModal
