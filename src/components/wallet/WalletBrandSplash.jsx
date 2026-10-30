@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react';
 import {
   WALLET_SPLASH_BRAND,
   WALLET_SPLASH_DURATION_MS,
-  WALLET_SPLASH_HOOK,
-  WALLET_SPLASH_SUPPORT,
   markWalletBrandSplashSeen,
 } from '../../lib/wallet/walletBrandSplash.js';
 import '../../styles/wallet-brand-splash.css';
 
 /**
- * Apple-style brand splash: soft field, PoreiaGo wordmark, short personal hook.
+ * Generic brand splash: PoreiaGo wordmark only (no marketing copy).
  * Shown once per native app session before role home / login.
  */
 export default function WalletBrandSplash({ onDone }) {
@@ -30,7 +28,7 @@ export default function WalletBrandSplash({ onDone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once auto-advance
   }, []);
 
-  // Brand signal first: "Poreia" + accent "Go" (never a generic headline over the mark).
+  // Brand signal first: "Poreia" + accent "Go".
   const brand = WALLET_SPLASH_BRAND;
   const splitAt = brand.toLowerCase().endsWith('go') ? brand.length - 2 : brand.length;
   const brandMain = brand.slice(0, splitAt);
@@ -40,7 +38,7 @@ export default function WalletBrandSplash({ onDone }) {
     <div
       className={`pg-wallet-splash${leaving ? ' pg-wallet-splash--out' : ''}`}
       role="dialog"
-      aria-label={`${WALLET_SPLASH_BRAND} — ${WALLET_SPLASH_HOOK}`}
+      aria-label={WALLET_SPLASH_BRAND}
       onClick={finish}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -55,11 +53,7 @@ export default function WalletBrandSplash({ onDone }) {
           {brandMain}
           <span>{brandAccent}</span>
         </h1>
-        <hr className="pg-wallet-splash-rule" aria-hidden />
-        <p className="pg-wallet-splash-hook">{WALLET_SPLASH_HOOK}</p>
-        <p className="pg-wallet-splash-support">{WALLET_SPLASH_SUPPORT}</p>
       </div>
-      <p className="pg-wallet-splash-hint">Αγγίξτε για συνέχεια</p>
     </div>
   );
 }
