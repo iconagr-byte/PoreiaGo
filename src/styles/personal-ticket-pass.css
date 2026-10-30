@@ -59,13 +59,34 @@
   width: 100%;
 }
 
+/* Multi-seat: side-by-side on desktop, stack on narrow phones */
+.ptp-grid.is-multi {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+@media (min-width: 720px) {
+  .ptp-grid.is-multi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 0.9rem;
+  }
+
+  .ptp-grid.is-multi .ptp-pass {
+    max-width: none;
+    width: 100%;
+    height: 100%;
+  }
+}
+
 .ptp-pass {
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  max-width: 30rem; /* Readable mid size — between tiny strip and full panel */
+  max-width: 30rem; /* Single-pass mid size; multi overrides above */
   overflow: hidden;
   border-radius: 1.05rem;
   background: var(--ptp-surface);
@@ -339,6 +360,12 @@
 /* Slightly tighter on customer cards — still readable */
 .ptp-pass.is-compact {
   max-width: 28rem;
+}
+
+@media (min-width: 720px) {
+  .ptp-grid.is-multi .ptp-pass.is-compact {
+    max-width: none;
+  }
 }
 
 .ptp-pass.is-compact .ptp-pass-hero {
