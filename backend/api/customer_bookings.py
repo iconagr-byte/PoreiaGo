@@ -13,9 +13,7 @@ from api.customer_wallet_seal import resolve_sealed_wallet_tenant
 from ticketing.customer_bookings import (
     get_booking,
     list_all_bookings,
-    list_bookings_for_email,
     upsert_booking,
-    upsert_many_for_customer,
 )
 
 
@@ -57,9 +55,24 @@ async def my_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
+    """
+    My Wallet list — Postgres (desktop) is source of truth.
+    Reconciles into the sealed SQLite cache so tickets match BackOffice.
+    """
     tid = await _wallet_tenant(request, account)
-    items = await list_bookings_for_email(account["email"], tenant_id=tid)
-    return {"items": items, "total": len(items), "tenant_id": tid}
+    from ticketing.wallet_booking_reconcile import reconcile_wallet_bookings
+
+    items = await reconcile_wallet_bookings(
+        email=account["email"],
+        tenant_id=tid,
+        customer_id=account.get("customer_id"),
+    )
+    return {
+        "items": items,
+        "total": len(items),
+        "tenant_id": tid,
+        "source": "postgres",
+    }
 
 
 @router.post("/api/customer/bookings/sync")
@@ -68,32 +81,27 @@ async def sync_my_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    """Bulk upsert — client στέλνει τοπικές κρατήσεις, server επιστρέφει πλήρη λίστα."""
+    """
+    Pull-first sync — never let localStorage invent seats over Contabo Postgres.
+
+    Client payloads are ignored for office truth fields; we only reconcile from
+    desktop bookings and return the sealed list. (Body kept for API compat.)
+    """
+    del body  # localStorage must not overwrite Postgres seats / passengers
     tid = await _wallet_tenant(request, account)
-    # Never accept another office's bookings into this sealed wallet.
-    # Unscoped locals are stamped to the seal; foreign tenant_id rows are dropped.
-    sealed_locals = []
-    for b in body.bookings or []:
-        if not isinstance(b, dict):
-            continue
-        row_tid = str(b.get("tenant_id") or b.get("tenantId") or "").strip()
-        if row_tid and row_tid != tid:
-            continue
-        sealed_locals.append(b)
-    try:
-        items = await upsert_many_for_customer(
-            account["email"],
-            account.get("customer_id"),
-            sealed_locals,
-            tenant_id=tid,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    from ticketing.wallet_booking_reconcile import reconcile_wallet_bookings
+
+    items = await reconcile_wallet_bookings(
+        email=account["email"],
+        tenant_id=tid,
+        customer_id=account.get("customer_id"),
+    )
     return {
         "items": items,
         "total": len(items),
-        "synced": len(sealed_locals),
+        "synced": 0,
         "tenant_id": tid,
+        "source": "postgres",
     }
 
 
@@ -103,6 +111,12 @@ async def upsert_my_booking(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
+    """
+    Claim / refresh one booking into the wallet cache.
+
+    If the booking exists on desktop (Postgres), return the Postgres shape —
+    client cannot change seats, passengers, payment, or status.
+    """
     tid = await _wallet_tenant(request, account)
     foreign = str((body.booking or {}).get("tenant_id") or "").strip()
     if foreign and foreign != tid:
@@ -110,9 +124,70 @@ async def upsert_my_booking(
             status_code=403,
             detail="Η κράτηση ανήκει σε άλλο γραφείο.",
         )
+    from ticketing.wallet_booking_reconcile import (
+        fetch_postgres_wallet_bookings,
+        reconcile_wallet_bookings,
+    )
+
+    # Always refresh office truth first.
+    await reconcile_wallet_bookings(
+        email=account["email"],
+        tenant_id=tid,
+        customer_id=account.get("customer_id"),
+    )
+
+    incoming = body.booking or {}
+    aliases = {
+        str(incoming.get("id") or "").strip(),
+        str(incoming.get("saasBookingId") or "").strip(),
+        str(incoming.get("pnr") or "").strip(),
+        str(incoming.get("ticketRef") or "").strip(),
+    }
+    aliases = {a for a in aliases if a}
+
+    pg_ok, pg_items = await fetch_postgres_wallet_bookings(
+        email=account["email"], tenant_id=tid
+    )
+    if pg_ok:
+        for item in pg_items:
+            item_aliases = {
+                str(item.get("id") or "").strip(),
+                str(item.get("saasBookingId") or "").strip(),
+                str(item.get("pnr") or "").strip(),
+                str(item.get("ticketRef") or "").strip(),
+            }
+            if aliases & {a for a in item_aliases if a}:
+                # Desktop wins — mirror PG row only.
+                try:
+                    return await upsert_booking(
+                        item,
+                        customer_email=account["email"],
+                        customer_id=account.get("customer_id"),
+                        tenant_id=tid,
+                    )
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        # Reconcile may already have cached it under the local B- id.
+        for alias in aliases:
+            cached = await get_booking(alias, tenant_id=tid)
+            if cached and str(cached.get("email", "")).lower() == account["email"]:
+                return cached
+
+        # No Postgres match — refuse inventing a wallet-only booking (security).
+        if aliases:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Η κράτηση δεν βρέθηκε στο γραφείο. "
+                    "Το My Wallet δεν δημιουργεί εισιτήρια χωρίς εγγραφή στην πλατφόρμα."
+                ),
+            )
+
+    # Postgres unreachable — allow cache upsert for offline claim of known rows.
     try:
         saved = await upsert_booking(
-            body.booking,
+            incoming,
             customer_email=account["email"],
             customer_id=account.get("customer_id"),
             tenant_id=tid,
@@ -129,6 +204,13 @@ async def get_my_booking(
     account: dict = Depends(get_current_customer),
 ):
     tid = await _wallet_tenant(request, account)
+    from ticketing.wallet_booking_reconcile import reconcile_wallet_bookings
+
+    await reconcile_wallet_bookings(
+        email=account["email"],
+        tenant_id=tid,
+        customer_id=account.get("customer_id"),
+    )
     booking = await get_booking(booking_id, tenant_id=tid)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")

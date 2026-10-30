@@ -51,6 +51,18 @@ export function buildBookingPassengers({ seats, bookerName, companionNames = [] 
   });
 }
 
+/** Reject phone/id-looking “names” (e.g. 2344455) so tickets stay human-readable. */
+export function isPlausiblePassengerName(name) {
+  const raw = String(name || '').trim();
+  if (raw.length < 2) return false;
+  // Digits / punctuation only — not a person name.
+  if (/^[\d\s+()./-]+$/.test(raw)) return false;
+  // Mostly digits (allow a short letter prefix like "A1" seat codes slipping in).
+  const digits = (raw.match(/\d/g) || []).length;
+  if (digits >= 5 && digits / raw.replace(/\s/g, '').length >= 0.6) return false;
+  return true;
+}
+
 /** Validate companion names when seat count > 1. Returns error message or null. */
 export function validateCompanionNames(seats, companionNames) {
   const seatList = seatListFromBooking(seats);
@@ -58,8 +70,8 @@ export function validateCompanionNames(seats, companionNames) {
   const needed = seatList.length - 1;
   for (let i = 0; i < needed; i += 1) {
     const name = String(companionNames?.[i] || '').trim();
-    if (name.length < 2) {
-      return `Συμπληρώστε το ονοματεπώνυμο για τη θέση ${seatList[i + 1]}`;
+    if (!isPlausiblePassengerName(name)) {
+      return `Συμπληρώστε έγκυρο ονοματεπώνυμο για τη θέση ${seatList[i + 1]} (όχι αριθμό τηλεφώνου)`;
     }
   }
   return null;
@@ -108,9 +120,13 @@ export function getBookingPassengers(booking) {
     );
     const byIndex = fromRaw[index];
     const existing = bySeat || byIndex;
-    const name =
+    let name =
       String(existing?.name || '').trim() ||
       (index === 0 ? String(booker).trim() : '');
+    // Hide leaked phone/id values that were wrongly stored as passenger names.
+    if (name && !isPlausiblePassengerName(name)) {
+      name = index === 0 && isPlausiblePassengerName(booker) ? String(booker).trim() : '';
+    }
     return {
       seat,
       name,

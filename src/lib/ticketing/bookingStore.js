@@ -22,7 +22,7 @@ import {
 } from '../../services/paymentNotificationApi.js';
 import {
   fetchAllBookingsFromServer,
-  syncMyBookingsToServer,
+  fetchMyBookingsFromServer,
   upsertBookingOnServer,
 } from '../../services/customerBookingsApi.js';
 import { CHECK_IN } from './constants.js';
@@ -109,11 +109,30 @@ export function mergeBookingsIntoStore(incoming) {
   if (!incoming?.length) return loadBookings();
   const map = new Map(loadBookings().map((b) => [b.id, b]));
   for (const b of incoming) {
-    map.set(b.id, { ...map.get(b.id), ...b });
+    // Server (Postgres) wins on conflict — never keep stale local seats over remote.
+    map.set(b.id, { ...(map.get(b.id) || {}), ...b });
   }
   const merged = [...map.values()];
   saveBookings(merged);
   return merged;
+}
+
+/**
+ * Replace one customer's bookings with the Postgres-reconciled wallet list.
+ * Drops orphans / inflated seat lists that localStorage invented.
+ */
+export function replaceCustomerBookingsInStore(email, remoteBookings) {
+  const key = String(email || '').trim().toLowerCase();
+  const others = loadBookings().filter(
+    (b) => String(b.email || '').toLowerCase() !== key,
+  );
+  const incoming = Array.isArray(remoteBookings) ? remoteBookings.filter(Boolean) : [];
+  const stamped = incoming.map((b) => ({
+    ...b,
+    email: key || b.email,
+  }));
+  saveBookings([...others, ...stamped]);
+  return stamped;
 }
 
 /** Control Panel — φόρτωση από server. */
@@ -127,7 +146,7 @@ export async function loadAllBookingsAsync() {
   return loadBookings();
 }
 
-/** My Wallet — sync κρατήσεων πελάτη με server (μόνο sealed office). */
+/** My Wallet — pull Postgres-reconciled bookings (desktop source of truth). */
 export async function loadBookingsForCustomer(email) {
   const key = String(email || '').trim().toLowerCase();
   const sealed = getWalletTenantId();
@@ -141,15 +160,16 @@ export async function loadBookingsForCustomer(email) {
   }
 
   try {
-    const synced = await syncMyBookingsToServer(localForUser);
-    const sealedSynced = filterBookingsForWalletOffice(synced, sealed);
-    mergeBookingsIntoStore(sealedSynced);
+    // Pull-first — never push inflated localStorage seats to the server.
+    const remote = await fetchMyBookingsFromServer();
+    const sealedRemote = filterBookingsForWalletOffice(remote, sealed);
+    replaceCustomerBookingsInStore(key, sealedRemote);
     return filterBookingsForWalletOffice(
       loadBookings().filter((b) => String(b.email || '').toLowerCase() === key),
       sealed,
     );
   } catch (err) {
-    console.warn('[bookings] customer sync failed', err);
+    console.warn('[bookings] customer pull failed', err);
     return localForUser;
   }
 }

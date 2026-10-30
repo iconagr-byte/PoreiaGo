@@ -170,12 +170,11 @@ async def _hard_delete_booking(session, booking, tenant_id: UUID) -> None:
 
 
 async def _sync_sqlite_cache(admin_dict: dict[str, Any]) -> None:
+    """Immediate desktop → My Wallet mirror (seats / status / passengers)."""
     try:
-        from ticketing.customer_bookings import upsert_booking
+        from ticketing.wallet_booking_reconcile import mirror_admin_booking_to_wallet
 
-        email = admin_dict.get("email") or "unknown@local.invalid"
-        tid = admin_dict.get("tenant_id") or admin_dict.get("tenantId")
-        await upsert_booking(admin_dict, customer_email=email, tenant_id=str(tid) if tid else None)
+        await mirror_admin_booking_to_wallet(admin_dict)
     except Exception:
         pass
 
@@ -424,6 +423,17 @@ async def delete_admin_booking(
                 await cancel_ticket_booking(reference_code)
         except Exception:
             log.debug("SQLite ticket cleanup after delete skipped", exc_info=True)
+
+        # Drop My Wallet cache so desktop delete vanishes from customer tickets immediately.
+        try:
+            from ticketing.wallet_booking_reconcile import purge_wallet_booking_aliases
+
+            await purge_wallet_booking_aliases(
+                aliases=[local_id, booking_id, reference_code],
+                tenant_id=str(tenant_id),
+            )
+        except Exception:
+            log.debug("Wallet cache purge after delete skipped", exc_info=True)
 
         return {
             "ok": True,

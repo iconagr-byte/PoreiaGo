@@ -254,35 +254,52 @@ function WalletAuthenticatedApp() {
 
   useEffect(() => {
     let cancelled = false;
+    const applyList = (list, { silent = false } = {}) => {
+      if (cancelled) return;
+      // Κρατήσεις + pass feeds: earliest excursion first (date+time).
+      let sorted = sortWalletBookingsByDeparture(list);
+      const focus = focusId || peekWalletFocusBooking();
+      if (focus && !sorted.some((b) => b.id === focus)) {
+        const local = getBookingById(focus);
+        if (local && String(local.email || '').toLowerCase() === email) {
+          sorted = sortWalletBookingsByDeparture([...sorted, local]);
+        }
+      }
+      setBookings(sorted);
+      if (!sorted.length) {
+        setOfflineSnap(loadLastPass());
+      }
+      if (!silent) setLoadingBookings(false);
+    };
+
     setLoadingBookings(true);
     loadMyBookings(email)
-      .then((list) => {
-        if (cancelled) return;
-        // Κρατήσεις + pass feeds: earliest excursion first (date+time).
-        let sorted = sortWalletBookingsByDeparture(list);
-        const focus = focusId || peekWalletFocusBooking();
-        if (focus && !sorted.some((b) => b.id === focus)) {
-          const local = getBookingById(focus);
-          if (local && String(local.email || '').toLowerCase() === email) {
-            sorted = sortWalletBookingsByDeparture([...sorted, local]);
-          }
-        }
-        setBookings(sorted);
-        if (!sorted.length) {
-          setOfflineSnap(loadLastPass());
-        }
-      })
+      .then((list) => applyList(list))
       .catch(() => {
         if (!cancelled) {
           setBookings([]);
           setOfflineSnap(loadLastPass());
+          setLoadingBookings(false);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingBookings(false);
       });
+
+    // Desktop ↔ wallet live sync: re-pull Postgres truth when tab is focused.
+    const refresh = () => {
+      if (document.visibilityState && document.visibilityState !== 'visible') return;
+      loadMyBookings(email)
+        .then((list) => applyList(list, { silent: true }))
+        .catch(() => {});
+    };
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', refresh);
+    const poll = window.setInterval(refresh, 20000);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', refresh);
+      window.clearInterval(poll);
     };
   }, [email, focusId]);
 
