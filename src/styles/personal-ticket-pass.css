@@ -12,6 +12,9 @@
   gap: 1rem;
   min-width: 0;
   width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  contain: inline-size;
 }
 
 .ptp-stack-head {
@@ -61,7 +64,8 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  overflow: visible;
+  max-width: 100%;
+  overflow: hidden;
   border-radius: 1.15rem;
   background: var(--ptp-surface);
   border: 1px solid var(--ptp-line);
@@ -69,6 +73,8 @@
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 12px 32px rgba(0, 0, 0, 0.06);
   animation: ptp-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Avoid subpixel transform jitter after the entrance animation settles. */
+  backface-visibility: hidden;
 }
 
 .ptp-pass:nth-child(2) {
@@ -82,11 +88,17 @@
 @keyframes ptp-rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translate3d(0, 10px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ptp-pass {
+    animation: none;
   }
 }
 
@@ -269,17 +281,22 @@
   gap: 0.55rem;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ptp-qr-frame {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 0 0 auto;
   padding: 0.65rem;
   border-radius: 1rem;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   max-width: 100%;
+  /* Keep QR column width stable while the countdown ticks. */
+  font-variant-numeric: tabular-nums;
 }
 
 .ptp-qr-frame .bg-white {

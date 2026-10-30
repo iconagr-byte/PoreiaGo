@@ -59,11 +59,23 @@ export default function TicketQrCode({ booking, size = 150, className = '', onQr
     );
   }
 
+  // Fixed outer width so the 1s countdown ("7s" → "10s") never reflows
+  // neighbouring boarding-pass columns left/right.
+  const framePad = 12;
+  const frameW = Number(size) + framePad * 2;
+
   return (
-    <div ref={wrapRef} className={`bg-white p-3 rounded-2xl ${className}`}>
+    <div
+      ref={wrapRef}
+      className={`bg-white p-3 rounded-2xl box-border ${className}`}
+      style={{ width: frameW, maxWidth: '100%' }}
+    >
       <QRCode value={qrValue} size={size} level="M" />
-      <p className="text-[10px] text-center text-gray-400 mt-2">
-        Ανανεώνεται κάθε 30s · λήγει σε {expiresIn}s
+      <p
+        className="text-[10px] text-center text-gray-400 mt-2 tabular-nums whitespace-nowrap leading-tight"
+        style={{ minHeight: '1rem' }}
+      >
+        Ανανεώνεται κάθε 30s · λήγει σε {String(expiresIn).padStart(2, '0')}s
       </p>
     </div>
   );
