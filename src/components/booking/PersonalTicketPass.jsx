@@ -172,14 +172,14 @@ export default function PersonalTicketPassList({
           <p className="ptp-stack-sub font-mono">{pnr}</p>
         </div>
       ) : null}
-      <div className="ptp-grid">
+      <div className={`ptp-grid${multi ? ' is-multi' : ''}`}>
         {list.map((passenger, index) => (
           <PersonalTicketPass
             key={`${passenger.seat || 'seat'}-${index}`}
             booking={booking}
             passenger={passenger}
             compact={compact}
-            qrSize={qrSize}
+            qrSize={qrSize ?? (multi ? (compact ? 96 : 104) : undefined)}
             brandLabel={brandLabel}
           />
         ))}
