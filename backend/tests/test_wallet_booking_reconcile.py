@@ -142,6 +142,120 @@ class WalletBookingReconcileTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["source"], "postgres")
         self.assertEqual(out["items"][0]["id"], "B-REAL")
 
+    async def test_reconcile_overwrites_stale_wallet_money(self):
+        """Office cash must win over unpaid localStorage → SQLite cache."""
+        from ticketing.customer_bookings import list_bookings_for_email, upsert_booking
+        from ticketing.wallet_booking_reconcile import reconcile_wallet_bookings
+
+        email = "money@example.com"
+        tid = str(uuid4())
+        await upsert_booking(
+            {
+                "id": "B-CASH1",
+                "email": email,
+                "price": 90.0,
+                "amountPaid": 0,
+                "balanceDue": 90.0,
+                "paymentStatus": "PENDING",
+                "tenant_id": tid,
+            },
+            customer_email=email,
+            tenant_id=tid,
+        )
+        pg_row = {
+            "id": "B-CASH1",
+            "email": email,
+            "price": 90.0,
+            "amountPaid": 90.0,
+            "balanceDue": 0.0,
+            "paymentStatus": "PAID (Cash)",
+            "tenant_id": tid,
+            "tenantId": tid,
+        }
+        with patch(
+            "ticketing.wallet_booking_reconcile.fetch_postgres_wallet_bookings",
+            new=AsyncMock(return_value=(True, [pg_row])),
+        ):
+            items = await reconcile_wallet_bookings(email=email, tenant_id=tid)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(float(items[0]["amountPaid"]), 90.0)
+        self.assertEqual(float(items[0]["balanceDue"]), 0.0)
+        self.assertIn("PAID", str(items[0]["paymentStatus"]).upper())
+        cached = await list_bookings_for_email(email, tenant_id=tid)
+        self.assertEqual(float(cached[0]["amountPaid"]), 90.0)
+
+
+class AdminMoneyMapperTests(unittest.TestCase):
+    def test_balance_due_prefers_columns_over_stale_meta(self):
+        from decimal import Decimal
+        from types import SimpleNamespace
+        from uuid import uuid4
+
+        from api.admin_booking_mapper import booking_to_admin_dict
+        from app.models.booking import BookingStatus
+
+        booking = SimpleNamespace(
+            id=uuid4(),
+            tenant_id=uuid4(),
+            reference_code="BK-MONEY1",
+            passenger_name="Test",
+            passenger_email="money@example.com",
+            passenger_vat_id=None,
+            fiscal_mark=None,
+            customer_user_id=None,
+            seat_label="1A",
+            status=BookingStatus.CONFIRMED,
+            total_price=Decimal("100.00"),
+            amount_paid=Decimal("100.00"),
+            amount_eur=Decimal("100.00"),
+            created_at=None,
+            trip_id=None,
+            notes=None,
+            # Stale after cash capture — would wrongly show €100 due.
+            metadata_json={
+                "balance_due": 100,
+                "amount_paid": 0,
+                "payment_status": "PENDING",
+                "seats": ["1A"],
+            },
+        )
+        out = booking_to_admin_dict(booking)
+        self.assertEqual(out["amountPaid"], 100.0)
+        self.assertEqual(out["balanceDue"], 0.0)
+        self.assertIn("PAID", str(out["paymentStatus"]).upper())
+
+    def test_unpaid_does_not_invent_amount_paid_from_amount_eur(self):
+        from decimal import Decimal
+        from types import SimpleNamespace
+        from uuid import uuid4
+
+        from api.admin_booking_mapper import booking_to_admin_dict
+        from app.models.booking import BookingStatus
+
+        booking = SimpleNamespace(
+            id=uuid4(),
+            tenant_id=uuid4(),
+            reference_code="BK-UNPAID1",
+            passenger_name="Test",
+            passenger_email="u@example.com",
+            passenger_vat_id=None,
+            fiscal_mark=None,
+            customer_user_id=None,
+            seat_label="2A",
+            status=BookingStatus.PENDING,
+            total_price=Decimal("50.00"),
+            amount_paid=None,
+            amount_eur=Decimal("50.00"),
+            created_at=None,
+            trip_id=None,
+            notes=None,
+            metadata_json={"seats": ["2A"]},
+        )
+        out = booking_to_admin_dict(booking)
+        self.assertEqual(out["amountPaid"], 0.0)
+        self.assertEqual(out["balanceDue"], 50.0)
+
 
 class PassengerNameGuardTests(unittest.TestCase):
     def test_numeric_companion_rejected_in_js_contract(self):

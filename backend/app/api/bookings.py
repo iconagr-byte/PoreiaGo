@@ -326,6 +326,7 @@ async def _guest_booking_side_effects(
             "price": float(total),
             "amount": float(total),
             "amountPaid": float(paid_now),
+            "balanceDue": max(0.0, round(float(total) - float(paid_now), 2)),
             "email": passenger_email,
             "phone": passenger_phone or "",
             "pnr": ref,

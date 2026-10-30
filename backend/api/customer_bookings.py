@@ -184,7 +184,14 @@ async def upsert_my_booking(
                 ),
             )
 
-    # Postgres unreachable — allow cache upsert for offline claim of known rows.
+    # Postgres unreachable — never let localStorage clobber office money already
+    # in the sealed cache. Prefer returning the cached row; only upsert when
+    # the booking is brand-new to this wallet (offline claim of an empty slot).
+    for alias in aliases:
+        cached = await get_booking(alias, tenant_id=tid)
+        if cached and str(cached.get("email", "")).lower() == account["email"]:
+            return cached
+
     try:
         saved = await upsert_booking(
             incoming,
