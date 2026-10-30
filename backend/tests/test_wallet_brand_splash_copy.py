@@ -1,4 +1,4 @@
-"""Wallet brand splash copy stays quality-first (not marketing platform B2B)."""
+"""Wallet brand splash is generic: PoreiaGo wordmark only (no marketing copy)."""
 
 from __future__ import annotations
 
@@ -7,15 +7,25 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SPLASH_JS = ROOT / "src" / "lib" / "wallet" / "walletBrandSplash.js"
+SPLASH_JSX = ROOT / "src" / "components" / "wallet" / "WalletBrandSplash.jsx"
 
 
 class WalletBrandSplashCopyTests(unittest.TestCase):
-    def test_brand_and_hook_present(self):
+    def test_brand_only_no_greek_marketing(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
         self.assertIn("PoreiaGo", text)
-        self.assertIn("Τα εισιτήριά σας. Πάντα έτοιμα.", text)
-        self.assertIn("Επιβίβαση με ένα άγγιγμα", text)
+        self.assertIn("WALLET_SPLASH_BRAND", text)
         self.assertIn("seenThisRuntime", text)
+        self.assertNotIn("Τα εισιτήριά σας", text)
+        self.assertNotIn("Επιβίβαση με ένα άγγιγμα", text)
+        self.assertNotIn("WALLET_SPLASH_HOOK", text)
+        self.assertNotIn("WALLET_SPLASH_SUPPORT", text)
+
+    def test_component_renders_wordmark_only(self):
+        jsx = SPLASH_JSX.read_text(encoding="utf-8")
+        self.assertIn("pg-wallet-splash-wordmark", jsx)
+        self.assertNotIn("pg-wallet-splash-hook", jsx)
+        self.assertNotIn("Αγγίξτε για συνέχεια", jsx)
 
     def test_not_b2b_office_platform_line(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
