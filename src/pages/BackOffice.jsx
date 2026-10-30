@@ -1763,23 +1763,35 @@ export default function BackOffice() {
   };
 
   const renderBookings = () => {
-    const handleCheckIn = async (e, bookingId) => {
+    const handleCheckIn = async (e, booking) => {
       e.stopPropagation();
-      const current = bookings.find((b) => b.id === bookingId);
+      const current =
+        booking && typeof booking === 'object'
+          ? booking
+          : bookings.find((b) => b.id === booking);
+      const bookingId = current?.id || booking;
+      const lookupKey =
+        current?.saasBookingId ||
+        current?.pnr ||
+        current?.ticketRef ||
+        bookingId;
       const nextChecked = !current?.checkedIn;
       try {
-        const updated = await patchAdminBooking(bookingId, {
+        const updated = await patchAdminBooking(lookupKey, {
           checkedIn: nextChecked,
           checkInStatus: nextChecked ? 'CHECKED_IN' : 'NONE',
         });
-        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...updated } : b)));
-        toast.success(nextChecked ? 'Επιτυχές Check-In!' : 'Check-In ακυρώθηκε');
-      } catch (err) {
         setBookings((prev) =>
           prev.map((b) =>
-            b.id === bookingId ? { ...b, checkedIn: nextChecked } : b,
+            b.id === bookingId ||
+            b.saasBookingId === lookupKey ||
+            b.pnr === lookupKey
+              ? { ...b, ...updated }
+              : b,
           ),
         );
+        toast.success(nextChecked ? 'Επιτυχές Check-In!' : 'Check-In ακυρώθηκε');
+      } catch (err) {
         toast.error(err.message || 'Αποτυχία ενημέρωσης check-in');
       }
     };
@@ -2344,14 +2356,16 @@ export default function BackOffice() {
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {booking.checkedIn ? (
                                     <button 
-                                      onClick={(e) => handleCheckIn(e, booking.id)}
+                                      type="button"
+                                      onClick={(e) => handleCheckIn(e, booking)}
                                       className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-sm font-bold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                                     >
                                       <span className="material-symbols-outlined text-[18px]">check_circle</span> Checked
                                     </button>
                                   ) : (
                                     <button 
-                                      onClick={(e) => handleCheckIn(e, booking.id)}
+                                      type="button"
+                                      onClick={(e) => handleCheckIn(e, booking)}
                                       className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors shadow-sm"
                                     >
                                       <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span> Check In

@@ -72,9 +72,18 @@ def booking_id_aliases(booking_id: str) -> list[str]:
     upper = raw.upper().replace(" ", "")
     canon = local_id_from_reference(upper)
     pnr = normalize_reference(upper)
-    candidates = [raw, upper, canon, pnr]
+    # Bare hex core (Contabo sometimes stores reference_code without BK-/B-).
+    core = pnr[3:] if pnr.startswith("BK-") else upper
+    while core.startswith("B-") and not core.startswith("BK-"):
+        core = core[2:]
+    if core.startswith("BK-"):
+        core = core[3:]
+    candidates = [raw, upper, canon, pnr, core]
     if pnr.startswith("BK-"):
         candidates.append(f"B-{pnr}")  # legacy B-BK-HEX
+    if core:
+        candidates.append(f"B-{core}")
+        candidates.append(f"BK-{core}")
     out: list[str] = []
     seen: set[str] = set()
     for c in candidates:

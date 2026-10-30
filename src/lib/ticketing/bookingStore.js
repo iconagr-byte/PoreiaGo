@@ -255,8 +255,11 @@ export function markCheckedIn(bookingId, status = CHECK_IN.BOARDED) {
 }
 
 export async function markCheckedInAsync(bookingId, status = CHECK_IN.BOARDED) {
+  const booking = getBookingById(bookingId);
+  const key =
+    booking?.saasBookingId || booking?.pnr || booking?.ticketRef || bookingId;
   try {
-    const saved = await patchAdminBooking(bookingId, {
+    const saved = await patchAdminBooking(key, {
       checkedIn: true,
       checkInStatus: status,
     });
@@ -779,8 +782,10 @@ export async function cancelBooking(bookingId) {
     return booking;
   }
 
+  const lookupKey =
+    booking.saasBookingId || booking.pnr || booking.ticketRef || bookingId;
   try {
-    const fromPg = await cancelAdminBooking(bookingId);
+    const fromPg = await cancelAdminBooking(lookupKey);
     mergeBookingsIntoStore([fromPg]);
     dispatchPartnerEvent('booking.cancelled', {
       booking_id: fromPg.id,
