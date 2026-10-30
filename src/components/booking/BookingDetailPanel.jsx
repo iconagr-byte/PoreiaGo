@@ -434,9 +434,9 @@ export default function BookingDetailPanel({
           ) : null}
 
           <div
-            className={`bg-[#f5f5f7] p-5 md:p-7 ${cardRound} border border-black/[0.04] shadow-[0_12px_40px_rgba(0,0,0,0.06)]`}
+            className={`bg-[#f5f5f7] p-3.5 md:p-4 ${cardRound} border border-black/[0.04] shadow-[0_8px_28px_rgba(0,0,0,0.05)]`}
           >
-            <PersonalTicketPassList booking={booking} brandLabel="Boarding pass" />
+            <PersonalTicketPassList booking={booking} compact brandLabel="Boarding pass" />
           </div>
 
           <div className={`bg-white p-6 md:p-8 ${cardRound} border border-black/[0.05] shadow-lg`}>

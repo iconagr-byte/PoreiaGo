@@ -121,7 +121,7 @@ export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicke
               <PersonalTicketPassList
                 booking={booking}
                 compact
-                qrSize={128}
+                qrSize={88}
                 brandLabel="Boarding pass"
               />
             </div>

@@ -1,4 +1,4 @@
-/* Apple Wallet–inspired boarding passes for office / booking detail */
+/* Compact Apple Wallet–style boarding passes */
 
 .ptp-stack {
   --ptp-ink: #0a0a0a;
@@ -9,7 +9,8 @@
   --ptp-shade: #f5f5f7;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  align-items: stretch;
+  gap: 0.65rem;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -20,13 +21,13 @@
 .ptp-stack-head {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.15rem;
+  gap: 0.15rem;
+  margin-bottom: 0.1rem;
 }
 
 .ptp-stack-kicker {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -35,7 +36,7 @@
 
 .ptp-stack-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
@@ -43,17 +44,17 @@
 
 .ptp-stack-sub {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
   word-break: break-all;
 }
 
-/* Always one column — side-by-side cards crush fields under the QR. */
 .ptp-grid {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.65rem;
   min-width: 0;
   width: 100%;
 }
@@ -64,31 +65,30 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  max-width: 100%;
+  max-width: 22.5rem; /* Apple-pass width — not full panel */
   overflow: hidden;
-  border-radius: 1.15rem;
+  border-radius: 0.95rem;
   background: var(--ptp-surface);
   border: 1px solid var(--ptp-line);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04),
-    0 12px 32px rgba(0, 0, 0, 0.06);
-  animation: ptp-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  /* Avoid subpixel transform jitter after the entrance animation settles. */
+    0 8px 22px rgba(0, 0, 0, 0.05);
+  animation: ptp-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   backface-visibility: hidden;
 }
 
 .ptp-pass:nth-child(2) {
-  animation-delay: 0.06s;
+  animation-delay: 0.05s;
 }
 
 .ptp-pass:nth-child(3) {
-  animation-delay: 0.12s;
+  animation-delay: 0.1s;
 }
 
 @keyframes ptp-rise {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
@@ -104,52 +104,52 @@
 
 .ptp-pass-hero {
   position: relative;
-  padding: 1rem 1.15rem 0.95rem;
+  padding: 0.7rem 0.85rem 0.65rem;
   background:
-    linear-gradient(135deg, rgba(0, 113, 227, 0.12) 0%, rgba(0, 113, 227, 0.04) 42%, transparent 70%),
+    linear-gradient(135deg, rgba(0, 113, 227, 0.11) 0%, rgba(0, 113, 227, 0.03) 45%, transparent 72%),
     linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
   border-bottom: 1px solid var(--ptp-line);
-  border-radius: 1.15rem 1.15rem 0 0;
+  border-radius: 0.95rem 0.95rem 0 0;
 }
 
 .ptp-pass-hero-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.55rem;
+  gap: 0.3rem;
 }
 
 .ptp-pass-hero-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
 }
 
 .ptp-pass-brand {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ptp-blue);
 }
 
 .ptp-pass-trip {
-  margin: 0.2rem 0 0;
-  font-size: 1.12rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
-  line-height: 1.25;
+  line-height: 1.2;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .ptp-pass-when {
-  margin: 0.35rem 0 0;
-  font-size: 0.84rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
   color: var(--ptp-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -158,9 +158,9 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  padding: 0.32rem 0.65rem;
+  padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   background: rgba(52, 199, 89, 0.12);
@@ -174,61 +174,64 @@
   border-color: rgba(0, 0, 0, 0.08);
 }
 
-/* Vertical Apple pass: details → tear → QR. Never overlap. */
+/* Info + QR on one row — dense Apple strip */
 .ptp-pass-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 1.05rem 1.15rem 1.15rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem 0.7rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem 0.75rem;
   min-width: 0;
 }
 
 .ptp-pass-main {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.45rem;
   min-width: 0;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .ptp-pass-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem 1.1rem;
+  gap: 0.35rem 0.65rem;
   align-items: start;
 }
 
 .ptp-field-label {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: 0.52rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ptp-muted);
 }
 
 .ptp-field-value {
-  margin: 0.25rem 0 0;
-  font-size: 1.02rem;
+  margin: 0.12rem 0 0;
+  font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--ptp-ink);
-  line-height: 1.3;
+  line-height: 1.2;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .ptp-field-value.is-seat {
-  font-size: 1.65rem;
+  font-size: 1.25rem;
   letter-spacing: -0.04em;
   color: var(--ptp-blue);
   text-align: right;
-  line-height: 1.1;
+  line-height: 1.05;
   white-space: nowrap;
 }
 
 .ptp-field-hint {
-  margin: 0.2rem 0 0;
-  font-size: 0.72rem;
+  margin: 0.08rem 0 0;
+  font-size: 0.62rem;
   font-weight: 600;
   color: var(--ptp-muted);
 }
@@ -236,53 +239,36 @@
 .ptp-meta-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem 0.75rem;
-  padding-top: 0.1rem;
+  gap: 0.3rem 0.4rem;
 }
 
 .ptp-meta-row .ptp-field-value {
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
 
 .ptp-meta-row .ptp-field-value.is-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.78rem;
+  font-size: 0.64rem;
   letter-spacing: -0.02em;
   word-break: break-all;
 }
 
 .ptp-perforation {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0.1rem 0;
-  color: rgba(0, 0, 0, 0.12);
-}
-
-.ptp-perforation::before,
-.ptp-perforation::after {
-  content: '';
-  flex: 1;
-  border-top: 1px dashed rgba(0, 0, 0, 0.14);
-}
-
-.ptp-perforation span {
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: currentColor;
+  display: none; /* tear line unused in dense side-by-side body */
 }
 
 .ptp-qr-col {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  width: 100%;
+  gap: 0.3rem;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .ptp-qr-frame {
@@ -290,18 +276,17 @@
   flex-direction: column;
   align-items: center;
   flex: 0 0 auto;
-  padding: 0.65rem;
-  border-radius: 1rem;
+  padding: 0.35rem;
+  border-radius: 0.7rem;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   max-width: 100%;
-  /* Keep QR column width stable while the countdown ticks. */
   font-variant-numeric: tabular-nums;
 }
 
 .ptp-qr-frame .bg-white {
-  padding: 0.4rem !important;
-  border-radius: 0.7rem !important;
+  padding: 0.2rem !important;
+  border-radius: 0.5rem !important;
   max-width: 100%;
 }
 
@@ -312,30 +297,33 @@
 }
 
 .ptp-qr-frame p {
-  margin-top: 0.4rem !important;
-  font-size: 0.62rem !important;
+  margin-top: 0.2rem !important;
+  font-size: 0.5rem !important;
   color: var(--ptp-muted) !important;
   letter-spacing: -0.01em;
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.2;
+  max-width: 6.5rem;
+  white-space: normal;
 }
 
 .ptp-board {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  width: 100%;
-  max-width: 22rem;
-  margin-top: 0.1rem;
-  padding: 0.6rem 0.85rem;
+  gap: 0.2rem;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.22rem 0.45rem;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.58rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   background: var(--ptp-shade);
   color: var(--ptp-muted);
   border: 1px solid var(--ptp-line);
+  white-space: nowrap;
 }
 
 .ptp-board.is-done {
@@ -345,26 +333,43 @@
 }
 
 .ptp-board .material-symbols-outlined {
-  font-size: 1rem;
+  font-size: 0.85rem;
+}
+
+/* Extra-tight when compact prop is set */
+.ptp-pass.is-compact {
+  max-width: 21rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-hero {
-  padding: 0.9rem 1rem 0.8rem;
+  padding: 0.6rem 0.75rem 0.55rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-trip {
-  font-size: 1.02rem;
+  font-size: 0.88rem;
 }
 
 .ptp-pass.is-compact .ptp-pass-body {
-  padding: 0.9rem 1rem 1rem;
+  padding: 0.6rem 0.7rem 0.65rem;
+  gap: 0.45rem 0.55rem;
 }
 
 .ptp-pass.is-compact .ptp-field-value.is-seat {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
 }
 
-@media (max-width: 420px) {
+/* Narrow phones: stack QR under fields so nothing clips */
+@media (max-width: 360px) {
+  .ptp-pass-body {
+    grid-template-columns: 1fr;
+  }
+
+  .ptp-qr-col {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+  }
+
   .ptp-meta-row {
     grid-template-columns: 1fr 1fr;
   }
