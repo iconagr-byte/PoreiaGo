@@ -1350,20 +1350,28 @@ export default function BackOffice() {
     }));
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
-    const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);
     const totalExpenses = rows.reduce((sum, f) => sum + Number(f.financials?.expenses || 0), 0);
 
+    const urgentCount = fleetCards?.urgent_count ?? rows.filter((f) => f.service_status === 'Urgent').length;
+    const warnCount = fleetCards?.warning_count ?? rows.filter((f) => f.service_status === 'Warning').length;
+    const alertsCount = fleetCards?.alerts_count ?? fleetAlerts.length;
+    const monthlyCost = Number(fleetCards?.monthly_cost_estimate || totalExpenses || 0);
+
+    const runFleetScan = async () => {
+      const updated = await scanFleetAlerts();
+      setFleetAlerts(updated);
+      const cards = await fetchFleetDashboard();
+      setFleetCards(cards);
+      toast.success('Ολοκληρώθηκε νέος προγνωστικός έλεγχος');
+    };
+
     return (
-      <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="fleet-mgmt-apple fleet-mgmt-shell relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="fleet-mgmt-header">
           <div>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              Διαχείριση Στόλου
-            </h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-              Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
-            </p>
-            <div className="mt-5">
+            <h2>Διαχείριση Στόλου</h2>
+            <p>Οχήματα, συντήρηση και κόστος — καθαρή επισκόπηση χωρίς θόρυβο.</p>
+            <div className="fleet-mgmt-hub-nav">
               <FleetOpsHubNav
                 activeTab="fleet"
                 onNavigate={(id) => {
@@ -1377,16 +1385,14 @@ export default function BackOffice() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setAddVehicleOpen(true)}
-              className="px-6 py-2 bg-gray-900 text-white font-label-md text-label-md rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-md"
-            >
-              <span className="material-symbols-outlined text-sm">add</span> Νέο όχημα
+          <div className="fleet-mgmt-actions">
+            <button type="button" className="fleet-mgmt-btn" onClick={runFleetScan}>
+              <span className="material-symbols-outlined">radar</span>
+              Έλεγχος
             </button>
             <button
               type="button"
+              className="fleet-mgmt-btn"
               onClick={() => {
                 setServiceModalOpen(true);
                 setServiceForm((prev) => ({
@@ -1394,82 +1400,45 @@ export default function BackOffice() {
                   vehicle_id: selectedFleetVehicleId || fleetVehicles[0]?.id || '',
                 }));
               }}
-              className="px-6 py-2 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md"
             >
-              <span className="material-symbols-outlined text-sm">build</span> Καταχώριση Service
-            </button>
-          </div>
-        </div>
-
-        {/* KPI Cards (Hybrid Top) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">directions_bus</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Κατάσταση Στόλου</div>
-              <div className="text-3xl font-display-sm font-bold text-gray-900">{activeFleet} <span className="text-lg text-gray-400">/ {totalFleet} Ενεργά</span></div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">payments</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Συνολικά Έσοδα</div>
-              <div className="text-3xl font-display-sm font-bold text-emerald-600">€{(totalRevenue / 1000).toFixed(1)}k</div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">receipt_long</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Λειτουργικά Έξοδα</div>
-              <div className="text-3xl font-display-sm font-bold text-rose-600">€{(totalExpenses / 1000).toFixed(1)}k</div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
               <span className="material-symbols-outlined">build</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Απαιτούν Άμεση Ενέργεια</div>
-              <div className="text-3xl font-display-sm font-bold text-amber-600">
-                {fleetCards?.urgent_count ?? (totalFleet - activeFleet)} <span className="text-lg text-gray-400">επείγοντα</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4">
-            <div className="text-xs text-gray-500 font-bold uppercase mb-1">Προβλεπτικές ειδοποιήσεις</div>
-            <div className="text-2xl font-bold text-rose-600">{fleetCards?.alerts_count ?? fleetAlerts.length}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4">
-            <div className="text-xs text-gray-500 font-bold uppercase mb-1">Οχήματα σε προειδοποίηση</div>
-            <div className="text-2xl font-bold text-amber-600">{fleetCards?.warning_count ?? 0}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Μηνιαίο κόστος στόλου</div>
-              <div className="text-2xl font-bold text-primary">€{Number(fleetCards?.monthly_cost_estimate || 0).toLocaleString('el-GR')}</div>
-            </div>
+              Service
+            </button>
             <button
               type="button"
-              onClick={async () => {
-                const updated = await scanFleetAlerts();
-                setFleetAlerts(updated);
-                const cards = await fetchFleetDashboard();
-                setFleetCards(cards);
-                toast.success('Ολοκληρώθηκε νέος προγνωστικός έλεγχος');
-              }}
-              className="px-3 py-2 rounded-full bg-primary text-white text-xs font-bold hover:opacity-90"
+              className="fleet-mgmt-btn fleet-mgmt-btn--primary"
+              onClick={() => setAddVehicleOpen(true)}
             >
-              Έλεγχος
+              <span className="material-symbols-outlined">add</span>
+              Νέο όχημα
             </button>
+          </div>
+        </div>
+
+        <div className="fleet-mgmt-kpi">
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Στόλος ενεργός</div>
+            <div className="fleet-mgmt-kpi__value is-ok">
+              {activeFleet} <span>/ {totalFleet}</span>
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Προειδοποιήσεις</div>
+            <div className={`fleet-mgmt-kpi__value${warnCount || alertsCount ? ' is-warn' : ''}`}>
+              {alertsCount} <span>· {warnCount} οχήματα</span>
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Επείγοντα</div>
+            <div className={`fleet-mgmt-kpi__value${urgentCount ? ' is-danger' : ''}`}>
+              {urgentCount}
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Μηνιαίο κόστος</div>
+            <div className="fleet-mgmt-kpi__value is-accent">
+              €{monthlyCost.toLocaleString('el-GR')}
+            </div>
           </div>
         </div>
 
@@ -1507,84 +1476,158 @@ export default function BackOffice() {
         />
 
         {serviceModalOpen && (
-          <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-4">
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const payload = {
-                    ...serviceForm,
-                    mileage: Number(serviceForm.mileage || 0),
-                    cost: Number(serviceForm.cost || 0),
-                    parts_replaced: String(serviceForm.parts_replaced || '')
-                      .split(',')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  };
-                  const event = await createMaintenanceEvent(payload);
-                  for (const file of serviceFiles) {
-                    await uploadMaintenanceAttachment(event.id, file);
+          <div className="fleet-mgmt-apple">
+            <div className="fleet-mgmt-modal-backdrop">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const payload = {
+                      ...serviceForm,
+                      mileage: Number(serviceForm.mileage || 0),
+                      cost: Number(serviceForm.cost || 0),
+                      parts_replaced: String(serviceForm.parts_replaced || '')
+                        .split(',')
+                        .map((x) => x.trim())
+                        .filter(Boolean),
+                    };
+                    const event = await createMaintenanceEvent(payload);
+                    for (const file of serviceFiles) {
+                      await uploadMaintenanceAttachment(event.id, file);
+                    }
+                    toast.success('Το συμβάν συντήρησης αποθηκεύτηκε');
+                    setServiceModalOpen(false);
+                    setServiceFiles([]);
+                    const [vehicles, cards, alerts, events] = await Promise.all([
+                      fetchFleetVehicles(),
+                      fetchFleetDashboard(),
+                      fetchFleetAlerts(true),
+                      fetchMaintenanceEvents(payload.vehicle_id),
+                    ]);
+                    setFleetVehicles(vehicles);
+                    setFleetCards(cards);
+                    setFleetAlerts(alerts);
+                    setFleetVehicleEvents(events);
+                  } catch (err) {
+                    toast.error(err.message || 'Αποτυχία αποθήκευσης συμβάντος συντήρησης');
                   }
-                  toast.success('Το συμβάν συντήρησης αποθηκεύτηκε');
-                  setServiceModalOpen(false);
-                  setServiceFiles([]);
-                  const [vehicles, cards, alerts, events] = await Promise.all([
-                    fetchFleetVehicles(),
-                    fetchFleetDashboard(),
-                    fetchFleetAlerts(true),
-                    fetchMaintenanceEvents(payload.vehicle_id),
-                  ]);
-                  setFleetVehicles(vehicles);
-                  setFleetCards(cards);
-                  setFleetAlerts(alerts);
-                  setFleetVehicleEvents(events);
-                } catch (err) {
-                  toast.error(err.message || 'Αποτυχία αποθήκευσης συμβάντος συντήρησης');
-                }
-              }}
-              className="bg-white rounded-[24px] p-6 w-full max-w-2xl space-y-4 shadow-2xl"
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-bold text-gray-900">Νέο συμβάν συντήρησης</h4>
-                <button type="button" onClick={() => setServiceModalOpen(false)} className="text-gray-500 hover:text-gray-900">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-sm font-medium text-gray-700">Όχημα
-                  <select className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.vehicle_id} onChange={(e) => setServiceForm((p) => ({ ...p, vehicle_id: e.target.value }))}>
-                    {(fleetVehicles.length ? fleetVehicles : rows).map((v) => (
-                      <option key={v.id} value={v.id}>{v.plate_number || v.licensePlate} · {v.make ? `${v.make} ${v.model}` : v.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-sm font-medium text-gray-700">Χιλιόμετρα
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="number" min="0" value={serviceForm.mileage} onChange={(e) => setServiceForm((p) => ({ ...p, mileage: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700">Τύπος service
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.service_type} onChange={(e) => setServiceForm((p) => ({ ...p, service_type: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700">Κόστος (€)
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="number" min="0" step="0.01" value={serviceForm.cost} onChange={(e) => setServiceForm((p) => ({ ...p, cost: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Συνεργείο / Μηχανικός
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.shop_or_mechanic} onChange={(e) => setServiceForm((p) => ({ ...p, shop_or_mechanic: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Ανταλλακτικά (χωρισμένα με κόμμα)
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.parts_replaced} onChange={(e) => setServiceForm((p) => ({ ...p, parts_replaced: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Περιγραφή
-                  <textarea className="mt-1 w-full rounded-xl border px-3 py-2" rows={3} value={serviceForm.description} onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Τιμολόγια / Φωτογραφίες
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="file" multiple onChange={(e) => setServiceFiles(Array.from(e.target.files || []))} />
-                </label>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setServiceModalOpen(false)} className="px-4 py-2 rounded-full border font-bold text-sm">Άκυρο</button>
-                <button type="submit" className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm">Αποθήκευση συμβάντος</button>
-              </div>
-            </form>
+                }}
+                className="fleet-mgmt-modal"
+              >
+                <div className="fleet-mgmt-modal__head">
+                  <div>
+                    <h4>Νέο συμβάν συντήρησης</h4>
+                    <p>Καταχώρισε service, κόστος και συνοδευτικά αρχεία.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="fleet-mgmt-icon-btn"
+                    onClick={() => setServiceModalOpen(false)}
+                    aria-label="Κλείσιμο"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+                <div className="fleet-mgmt-form">
+                  <label>
+                    Όχημα
+                    <select
+                      value={serviceForm.vehicle_id}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, vehicle_id: e.target.value }))
+                      }
+                    >
+                      {(fleetVehicles.length ? fleetVehicles : rows).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.plate_number || v.licensePlate} ·{' '}
+                          {v.make ? `${v.make} ${v.model}` : v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Χιλιόμετρα
+                    <input
+                      type="number"
+                      min="0"
+                      value={serviceForm.mileage}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, mileage: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Τύπος service
+                    <input
+                      value={serviceForm.service_type}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, service_type: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Κόστος (€)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={serviceForm.cost}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, cost: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Συνεργείο / Μηχανικός
+                    <input
+                      value={serviceForm.shop_or_mechanic}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, shop_or_mechanic: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Ανταλλακτικά (χωρισμένα με κόμμα)
+                    <input
+                      value={serviceForm.parts_replaced}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, parts_replaced: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Περιγραφή
+                    <textarea
+                      rows={3}
+                      value={serviceForm.description}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, description: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Τιμολόγια / Φωτογραφίες
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => setServiceFiles(Array.from(e.target.files || []))}
+                    />
+                  </label>
+                </div>
+                <div className="fleet-mgmt-modal__foot">
+                  <button
+                    type="button"
+                    className="fleet-mgmt-btn"
+                    onClick={() => setServiceModalOpen(false)}
+                  >
+                    Άκυρο
+                  </button>
+                  <button type="submit" className="fleet-mgmt-btn fleet-mgmt-btn--accent">
+                    Αποθήκευση συμβάντος
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
