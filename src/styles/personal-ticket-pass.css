@@ -67,7 +67,7 @@
   justify-items: stretch;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 640px) {
   .ptp-grid.is-multi {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.85rem 0.9rem;
@@ -164,8 +164,9 @@
   letter-spacing: -0.03em;
   color: var(--ptp-ink);
   line-height: 1.22;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 .ptp-pass-when {
@@ -195,11 +196,11 @@
   border-color: rgba(0, 0, 0, 0.08);
 }
 
-/* Info + QR on one row — readable mid density */
+/* Info + QR on one row — text stays horizontal (never letter-stack) */
 .ptp-pass-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.7rem 1rem;
+  grid-template-columns: minmax(10.5rem, 1fr) auto;
+  gap: 0.7rem 0.85rem;
   align-items: center;
   padding: 0.9rem 1rem 0.95rem;
   min-width: 0;
@@ -237,8 +238,9 @@
   letter-spacing: -0.025em;
   color: var(--ptp-ink);
   line-height: 1.25;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 .ptp-field-value.is-seat {
@@ -266,13 +268,16 @@
 .ptp-meta-row .ptp-field-value {
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ptp-meta-row .ptp-field-value.is-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.72rem;
   letter-spacing: -0.02em;
-  word-break: break-all;
+  word-break: normal;
 }
 
 .ptp-perforation {
