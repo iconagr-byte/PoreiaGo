@@ -56,6 +56,7 @@ import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/ch
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
+import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
@@ -287,7 +288,12 @@ export default function CheckoutPage() {
   const total = checkoutTotal;
 
   const handleChange = (field) => (e) => {
-    let { value } = e.target;
+    const input = e.target;
+    let { value } = input;
+    const scrollY =
+      typeof window !== 'undefined'
+        ? window.scrollY || document.documentElement.scrollTop || 0
+        : 0;
     if (field === 'cardNumber') {
       value = value.replace(/\D/g, '').slice(0, 16);
       value = value.replace(/(.{4})/g, '$1 ').trim();
@@ -298,6 +304,13 @@ export default function CheckoutPage() {
     }
     if (field === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
     setForm((prev) => ({ ...prev, [field]: value }));
+    // Android WebView: reformatting card digits can reset window scroll to top.
+    if (typeof window !== 'undefined' && (field === 'cardNumber' || field === 'expiry' || field === 'cvv')) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+        document.documentElement.scrollTop = scrollY;
+      });
+    }
   };
 
   const handleAccountLogin = (profile) => {
@@ -508,9 +521,14 @@ export default function CheckoutPage() {
   };
 
   const nativeApp = isNativeApp();
+  // Soft-input resize used to yank scroll to top while typing card digits.
+  useNativeInputScrollLock(nativeApp);
 
   return (
-    <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
+    <div
+      className="relative min-h-screen bg-surface py-6 px-4 md:py-10"
+      style={{ overflowAnchor: 'none' }}
+    >
       {/* Decorative blur orbs break Android WebView IME — skip on Capacitor. */}
       {nativeApp ? null : <MinimalPageBackground />}
       <div className="relative z-10 max-w-5xl mx-auto">
@@ -608,9 +626,13 @@ export default function CheckoutPage() {
                     required
                     type="text"
                     name="passenger-name"
+                    lang="el"
                     autoComplete="name"
                     inputMode="text"
                     enterKeyHint="next"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={form.name}
                     onChange={handleChange('name')}
                     className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
@@ -674,9 +696,11 @@ export default function CheckoutPage() {
                           type="text"
                           name={`companion-${seat}`}
                           minLength={2}
+                          lang="el"
                           inputMode="text"
                           enterKeyHint="next"
-                          autoCapitalize="words"
+                          // "words" breaks Greek IME on Android WebView (Latin-only glyphs).
+                          autoCapitalize="off"
                           autoCorrect="off"
                           spellCheck={false}
                           value={companionNames[index] || ''}
