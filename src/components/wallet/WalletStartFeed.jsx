@@ -29,7 +29,7 @@ function euro(n, currency = 'EUR') {
 /**
  * Wallet «Αρχική» — office hook, services, upcoming trips, news.
  * Same feed on phone/native and desktop main column.
- * Κράτηση / card tap → real seat map (tenant-scoped via sealed office).
+ * Card tap → trip details first; seat booking starts from that page.
  */
 export default function WalletStartFeed({
   appearance = {},
@@ -177,7 +177,7 @@ export default function WalletStartFeed({
           id="wallet-upcoming-trips"
         >
           <h2>{feed.tripsTitle}</h2>
-          <p className="wallet-panel-lead">Επιλέξτε και κλείστε θέση από το Wallet.</p>
+          <p className="wallet-panel-lead">Δείτε στοιχεία εκδρομής και μετά κλείστε θέση.</p>
           {tripsLoading ? (
             <p className="wallet-panel-lead">Φόρτωση…</p>
           ) : trips.length === 0 ? (
@@ -186,18 +186,19 @@ export default function WalletStartFeed({
             <ul className="wallet-excursion-list">
               {visibleTrips.map((trip) => {
                 const cover = tripCoverUrl(trip);
+                const title = trip.title || trip.destination || 'Εκδρομή';
                 return (
                   <li key={trip.id}>
                     <article
                       className="wallet-excursion-card wallet-excursion-card--bookable"
                       role="button"
                       tabIndex={0}
-                      aria-label={`Κράτηση: ${trip.title || trip.destination || 'Εκδρομή'}`}
-                      onClick={() => startBooking(trip)}
+                      aria-label={`Λεπτομέρειες: ${title}`}
+                      onClick={() => openTripInfo(trip)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          startBooking(trip);
+                          openTripInfo(trip);
                         }
                       }}
                     >
@@ -207,28 +208,26 @@ export default function WalletStartFeed({
                         aria-hidden
                       />
                       <div className="wallet-excursion-body">
-                        <h3>{trip.title || trip.destination || 'Εκδρομή'}</h3>
+                        <h3>{title}</h3>
                         <p>
                           {formatTripDepartureLabel(trip)}
                           {trip.destination ? ` · ${trip.destination}` : ''}
                         </p>
                         <p className="wallet-excursion-price">{euro(trip.price, trip.currency)}</p>
                         <div className="wallet-excursion-actions">
-                          {nativeWallet ? null : (
-                            <button
-                              type="button"
-                              className="wallet-btn wallet-btn-secondary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openTripInfo(trip);
-                              }}
-                            >
-                              Πληροφορίες
-                            </button>
-                          )}
                           <button
                             type="button"
                             className="wallet-btn wallet-btn-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openTripInfo(trip);
+                            }}
+                          >
+                            Λεπτομέρειες
+                          </button>
+                          <button
+                            type="button"
+                            className="wallet-btn wallet-btn-secondary"
                             onClick={(e) => {
                               e.stopPropagation();
                               startBooking(trip);
