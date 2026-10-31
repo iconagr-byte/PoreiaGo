@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -56,17 +56,16 @@ import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/ch
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
+import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
 import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
-import {
-  CheckoutCardNumberInput,
-  CheckoutCvvInput,
-  CheckoutExpiryInput,
-} from '../components/checkout/CheckoutCardNumberInput.jsx';
+import CheckoutCardPaymentFields from '../components/checkout/CheckoutCardPaymentFields.jsx';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  // Pin scroll while typing — Android WebView otherwise snaps to top on each digit.
+  useNativeInputScrollLock(true);
   const fromWallet = isWalletBookFlow(location.state);
   const bookState = fromWallet ? location.state : undefined;
   const seedTrip = officeTripFromWalletState(location.state, tripId);
@@ -90,6 +89,7 @@ export default function CheckoutPage() {
     cvv: '',
   });
   const [companionNames, setCompanionNames] = useState([]);
+  const cardFieldsRef = useRef(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [accountReady, setAccountReady] = useState(
     () => Boolean(isCustomer() && getCustomerToken()),
@@ -297,10 +297,6 @@ export default function CheckoutPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const setCardField = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
   const handleAccountLogin = (profile) => {
     setAccountReady(true);
     setForm((prev) => ({
@@ -331,17 +327,29 @@ export default function CheckoutPage() {
       return false;
     }
     if (paymentMethod === 'card') {
-      const digits = form.cardNumber.replace(/\s/g, '');
+      const card = cardFieldsRef.current?.getValues?.() || {
+        cardNumber: form.cardNumber,
+        expiry: form.expiry,
+        cvv: form.cvv,
+      };
+      // Keep form in sync for any downstream readers (demo / analytics).
+      setForm((prev) => ({
+        ...prev,
+        cardNumber: card.cardNumber || '',
+        expiry: card.expiry || '',
+        cvv: card.cvv || '',
+      }));
+      const digits = String(card.cardNumber || '').replace(/\s/g, '');
       if (digits.length < 16) {
         toast.error('Συμπληρώστε τον αριθμό κάρτας');
         return false;
       }
-      const expDigits = form.expiry.replace(/\D/g, '');
+      const expDigits = String(card.expiry || '').replace(/\D/g, '');
       if (expDigits.length !== 4) {
         toast.error('Μη έγκυρη λήξη (MM/YY)');
         return false;
       }
-      if (form.cvv.replace(/\D/g, '').length < 3) {
+      if (String(card.cvv || '').replace(/\D/g, '').length < 3) {
         toast.error('Συμπληρώστε CVV');
         return false;
       }
@@ -783,54 +791,7 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {paymentMethod === 'card' && (
-                <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
-                  <div className="block">
-                    <label
-                      htmlFor="checkout-card-number"
-                      className="font-bold text-xs text-on-surface-variant uppercase"
-                    >
-                      Αριθμός κάρτας
-                    </label>
-                    <CheckoutCardNumberInput
-                      id="checkout-card-number"
-                      value={form.cardNumber}
-                      onChange={setCardField('cardNumber')}
-                      className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="block">
-                      <label
-                        htmlFor="checkout-card-expiry"
-                        className="font-bold text-xs text-on-surface-variant uppercase"
-                      >
-                        Λήξη
-                      </label>
-                      <CheckoutExpiryInput
-                        id="checkout-card-expiry"
-                        value={form.expiry}
-                        onChange={setCardField('expiry')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                      />
-                    </div>
-                    <div className="block">
-                      <label
-                        htmlFor="checkout-card-cvv"
-                        className="font-bold text-xs text-on-surface-variant uppercase"
-                      >
-                        CVV
-                      </label>
-                      <CheckoutCvvInput
-                        id="checkout-card-cvv"
-                        value={form.cvv}
-                        onChange={setCardField('cvv')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {paymentMethod === 'card' ? <CheckoutCardPaymentFields ref={cardFieldsRef} /> : null}
 
               {paymentMethod === 'paypal' && (
                 <p className="text-sm text-on-surface-variant p-4 rounded-xl bg-[#0070ba]/10 border border-[#0070ba]/20">
