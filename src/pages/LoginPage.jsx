@@ -343,11 +343,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.'
               : 'Σύνδεση για ενοικίαση οχήματος'}
           </p>
-        ) : (
-          <p className={leadClass}>
-            Ένας λογαριασμός — ανοίγει αυτόματα το σωστό wallet (πελάτης ή οδηγός).
-          </p>
-        )}
+        ) : null}
       </div>
 
       {claim && !rentIntent ? (
