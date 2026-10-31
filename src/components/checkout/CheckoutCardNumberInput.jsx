@@ -1,4 +1,8 @@
-import { useEffect, useRef } from 'react';
+/**
+ * Card digit fields — format in React state only.
+ * Never assign input.value in onChange: Android numeric IME drops subsequent
+ * keypresses when the DOM value is rewritten mid-input.
+ */
 
 function formatCardNumber(raw) {
   const digits = String(raw || '')
@@ -21,102 +25,59 @@ function formatCvv(raw) {
     .slice(0, 4);
 }
 
-/**
- * Uncontrolled-while-focused card digit fields.
- * Controlled value= + space formatting was remounting layout and scrolling
- * the Android WebView to the top on every keypress.
- */
+const fieldClass =
+  'mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none';
+
 export function CheckoutCardNumberInput({ value = '', onChange, className = '', ...rest }) {
   return (
-    <DigitFormatInput
-      value={value}
-      onChange={onChange}
-      className={className}
-      format={formatCardNumber}
+    <input
+      {...rest}
+      type="text"
       inputMode="numeric"
       autoComplete="cc-number"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
       placeholder="4242 4242 4242 4242"
-      {...rest}
+      value={value}
+      onChange={(e) => onChange?.(formatCardNumber(e.target.value))}
+      className={className || fieldClass}
     />
   );
 }
 
 export function CheckoutExpiryInput({ value = '', onChange, className = '', ...rest }) {
   return (
-    <DigitFormatInput
-      value={value}
-      onChange={onChange}
-      className={className}
-      format={formatExpiry}
+    <input
+      {...rest}
+      type="text"
       inputMode="numeric"
       autoComplete="cc-exp"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
       placeholder="MM/YY"
-      {...rest}
+      value={value}
+      onChange={(e) => onChange?.(formatExpiry(e.target.value))}
+      className={className || fieldClass}
     />
   );
 }
 
 export function CheckoutCvvInput({ value = '', onChange, className = '', ...rest }) {
   return (
-    <DigitFormatInput
-      value={value}
-      onChange={onChange}
-      className={className}
-      format={formatCvv}
-      inputMode="numeric"
-      autoComplete="cc-csc"
-      placeholder="123"
-      {...rest}
-    />
-  );
-}
-
-function DigitFormatInput({ value = '', onChange, format, className = '', ...rest }) {
-  const ref = useRef(null);
-  const focusedRef = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || focusedRef.current) return;
-    const next = value || '';
-    if (el.value !== next) el.value = next;
-  }, [value]);
-
-  return (
     <input
       {...rest}
-      ref={ref}
       type="text"
-      defaultValue={value || ''}
-      className={className}
-      onFocus={(e) => {
-        focusedRef.current = true;
-        rest.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        focusedRef.current = false;
-        const formatted = format(e.target.value);
-        e.target.value = formatted;
-        onChange?.(formatted);
-        rest.onBlur?.(e);
-      }}
-      onChange={(e) => {
-        const el = e.target;
-        const prev = el.value;
-        const caret = el.selectionStart ?? prev.length;
-        const formatted = format(prev);
-        if (formatted !== prev) {
-          el.value = formatted;
-          const delta = formatted.length - prev.length;
-          const nextCaret = Math.max(0, caret + delta);
-          try {
-            el.setSelectionRange(nextCaret, nextCaret);
-          } catch {
-            /* ignore */
-          }
-        }
-        onChange?.(el.value);
-      }}
+      inputMode="numeric"
+      autoComplete="cc-csc"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      placeholder="123"
+      value={value}
+      onChange={(e) => onChange?.(formatCvv(e.target.value))}
+      className={className || fieldClass}
     />
   );
 }
