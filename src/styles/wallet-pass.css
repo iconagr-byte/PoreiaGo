@@ -3264,44 +3264,77 @@ button.wallet-account-row--action.is-open {
 }
 
 .wallet-auth-hero {
-  margin: 0 0 2rem;
+  margin: 0 0 2.35rem;
+  padding-top: 0.15rem;
 }
 
 .wallet-auth-card .wallet-auth-icon {
   display: grid;
   place-items: center;
-  width: 4.5rem;
-  height: 4.5rem;
-  margin: 0 auto 1.15rem;
-  font-size: 2.05rem;
+  width: 5.15rem;
+  height: 5.15rem;
+  margin: 0 auto 1.35rem;
+  font-size: 2.35rem;
   line-height: 1;
   color: #ffffff;
-  background: linear-gradient(165deg, #3aa0ff 0%, #0071e3 55%, #0060c4 100%);
-  border-radius: 1.2rem;
+  background: linear-gradient(160deg, #64b5ff 0%, #0071e3 48%, #0055c4 100%);
+  border-radius: 1.35rem;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.35) inset,
-    0 10px 28px rgba(0, 113, 227, 0.28);
+    0 1px 0 rgba(255, 255, 255, 0.42) inset,
+    0 1px 2px rgba(0, 56, 128, 0.12),
+    0 14px 36px rgba(0, 113, 227, 0.32);
   font-variation-settings: 'FILL' 1;
+  animation: walletAuthIconIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .wallet-auth-card h1 {
   margin: 0;
   text-align: center;
-  font-size: 2.05rem;
+  font-size: clamp(2.15rem, 6.5vw, 2.55rem);
   font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1.08;
+  letter-spacing: -0.055em;
+  line-height: 1.05;
   color: #1d1d1f;
+  animation: walletAuthTitleIn 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .wallet-auth-card .wallet-auth-lead {
-  margin: 0.45rem 0 0;
+  margin: 0.55rem 0 0;
   text-align: center;
   color: #86868b;
   font-size: 0.95rem;
   font-weight: 400;
   line-height: 1.4;
   letter-spacing: -0.01em;
+}
+
+@keyframes walletAuthIconIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes walletAuthTitleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-auth-card .wallet-auth-icon,
+  .wallet-auth-card h1 {
+    animation: none;
+  }
 }
 
 .wallet-auth-card .wallet-auth-hint {
