@@ -190,9 +190,9 @@ export default function TripDetails() {
         {/* Soft elegant gradient instead of photo */}
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-surface to-surface pointer-events-none"></div>
         
-        <div className="relative z-20 px-margin-desktop max-w-container-max mx-auto">
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative z-20 px-4 sm:px-6 md:px-margin-desktop max-w-container-max mx-auto w-full min-w-0">
+          <div className="flex flex-col gap-2 min-w-0 max-w-full">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 min-w-0">
               {isInternationalTrip(trip) ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs uppercase tracking-widest font-bold w-max">
                   <span className="material-symbols-outlined text-[14px]">public</span>
@@ -207,15 +207,24 @@ export default function TripDetails() {
               <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-xs uppercase tracking-widest font-bold w-max">
                 {trip.badge || trip.durationLabel || 'Premium Εμπειρία'}
               </span>
-              <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1 rounded-full border border-black/[0.05] shadow-sm flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px] text-primary">calendar_month</span>
-                Ετοιμαστείτε για μια αξέχαστη απόδραση στις {new Date(trip.departureTime).toLocaleDateString('el-GR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1.5 rounded-2xl border border-black/[0.05] shadow-sm flex items-start gap-2 max-w-full min-w-0 text-[13px] sm:text-sm leading-snug">
+                <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">calendar_month</span>
+                <span className="min-w-0 break-words">
+                  Ετοιμαστείτε για μια αξέχαστη απόδραση στις{' '}
+                  {new Date(trip.departureTime).toLocaleDateString('el-GR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </span>
               </span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-headline-lg font-bold text-on-surface tracking-tight">
+            <h1
+              className="text-[1.65rem] leading-tight sm:text-3xl md:text-5xl lg:text-6xl font-headline-lg font-bold text-on-surface tracking-tight max-w-full min-w-0 break-words [overflow-wrap:anywhere] hyphens-auto"
+            >
               {trip.title}
             </h1>
-            <p className="text-on-surface-variant font-body-lg max-w-3xl mt-4 leading-relaxed">
+            <p className="text-on-surface-variant font-body-lg max-w-3xl mt-4 leading-relaxed break-words">
               {trip.description}
             </p>
             <div className="mt-8 md:mt-10">
