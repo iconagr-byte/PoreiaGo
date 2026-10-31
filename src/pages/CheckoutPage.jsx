@@ -595,28 +595,37 @@ export default function CheckoutPage() {
               ) : null}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="block sm:col-span-2 text-sm">
+                <label className="block sm:col-span-2">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">
                     Ονοματεπώνυμο αγοραστή
                     {seatCodes[0] ? ` · θέση ${seatCodes[0]}` : ''}
                   </span>
                   <input
                     required
+                    type="text"
+                    name="passenger-name"
+                    autoComplete="name"
+                    inputMode="text"
+                    enterKeyHint="next"
                     value={form.name}
                     onChange={handleChange('name')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                     placeholder="π.χ. Μαρία Παπαδοπούλου"
                   />
                 </label>
-                <label className="block text-sm">
+                <label className="block">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">Email</span>
                   <input
                     required
                     type="email"
+                    name="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    enterKeyHint="next"
                     value={form.email}
                     onChange={handleChange('email')}
                     readOnly={accountReady}
-                    className={`mt-1 w-full rounded-xl border border-surface-container px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none ${
+                    className={`mt-1 w-full rounded-xl border border-surface-container px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none ${
                       accountReady
                         ? 'bg-surface-container/80 text-on-surface cursor-default'
                         : 'bg-surface-container-low'
@@ -624,14 +633,18 @@ export default function CheckoutPage() {
                     title={accountReady ? 'Email λογαριασμού My Wallet' : undefined}
                   />
                 </label>
-                <label className="block text-sm">
+                <label className="block">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">Τηλέφωνο</span>
                   <input
                     required
                     type="tel"
+                    name="phone"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
                     value={form.phone}
                     onChange={handleChange('phone')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                     placeholder="+30 694 …"
                   />
                 </label>
@@ -648,13 +661,20 @@ export default function CheckoutPage() {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {companionSeats.map((seat, index) => (
-                      <label key={seat} className="block text-sm">
+                      <label key={seat} className="block">
                         <span className="font-bold text-on-surface-variant text-xs uppercase">
                           Επιβάτης · θέση {seat}
                         </span>
                         <input
                           required
+                          type="text"
+                          name={`companion-${seat}`}
                           minLength={2}
+                          inputMode="text"
+                          enterKeyHint="next"
+                          autoCapitalize="words"
+                          autoCorrect="off"
+                          spellCheck={false}
                           value={companionNames[index] || ''}
                           onChange={(e) => {
                             const value = e.target.value;
@@ -664,7 +684,7 @@ export default function CheckoutPage() {
                               return next;
                             });
                           }}
-                          className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                          className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                           placeholder="Ονοματεπώνυμο συνεπιβάτη"
                           autoComplete="off"
                         />
@@ -766,33 +786,40 @@ export default function CheckoutPage() {
 
               {paymentMethod === 'card' && (
                 <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
-                  <label className="block text-sm">
+                  <label className="block">
                     <span className="font-bold text-xs text-on-surface-variant uppercase">Αριθμός κάρτας</span>
                     <input
+                      type="text"
                       inputMode="numeric"
+                      autoComplete="cc-number"
                       value={form.cardNumber}
                       onChange={handleChange('cardNumber')}
-                      className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
+                      className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                       placeholder="4242 4242 4242 4242"
                     />
                   </label>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="block text-sm">
+                    <label className="block">
                       <span className="font-bold text-xs text-on-surface-variant uppercase">Λήξη</span>
                       <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-exp"
                         value={form.expiry}
                         onChange={handleChange('expiry')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
+                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                         placeholder="MM/YY"
                       />
                     </label>
-                    <label className="block text-sm">
+                    <label className="block">
                       <span className="font-bold text-xs text-on-surface-variant uppercase">CVV</span>
                       <input
+                        type="text"
                         inputMode="numeric"
+                        autoComplete="cc-csc"
                         value={form.cvv}
                         onChange={handleChange('cvv')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
+                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                         placeholder="123"
                       />
                     </label>
