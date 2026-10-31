@@ -155,6 +155,13 @@ html[data-poreiago-app='wallet'] body {
   overflow-anchor: none;
 }
 
+/* useNativeInputScrollLock — freeze page while typing card/name fields */
+html[data-poreiago-app='app'] body[data-pg-scroll-lock='1'],
+html[data-poreiago-app='wallet'] body[data-pg-scroll-lock='1'] {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 html[data-poreiago-app='app'] .wallet-auth-card .relative > .material-symbols-outlined,
 html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined,
 html[data-poreiago-app='app'] .rent-auth-card .relative > .material-symbols-outlined,

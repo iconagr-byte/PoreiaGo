@@ -2,15 +2,17 @@ import { useEffect } from 'react';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 /**
- * Android WebView + adjustResize: focusing/typing in mid-page inputs can
- * yank window.scrollY to 0. Keep scroll anchored while an input is focused.
+ * Hard-lock document scroll while a form control is focused.
+ * Android WebView otherwise yanks scrollY→0 on each keypress (card digits).
+ * Uses position:fixed body lock (same pattern as iOS soft-keyboard fixes).
  */
 export function useNativeInputScrollLock(enabled = true) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined' || !isNativeApp()) return undefined;
 
-    let anchorY = null;
-    let inputFocused = false;
+    let lockedY = 0;
+    let locked = false;
+    let unlockTimer = null;
 
     const readY = () =>
       window.scrollY ||
@@ -18,62 +20,81 @@ export function useNativeInputScrollLock(enabled = true) {
       document.body.scrollTop ||
       0;
 
-    const writeY = (y) => {
-      window.scrollTo(0, y);
-      document.documentElement.scrollTop = y;
-      document.body.scrollTop = y;
+    const lock = () => {
+      if (unlockTimer) {
+        clearTimeout(unlockTimer);
+        unlockTimer = null;
+      }
+      if (locked) return;
+      lockedY = readY();
+      locked = true;
+      const b = document.body;
+      const root = document.documentElement;
+      b.dataset.pgScrollLock = '1';
+      root.style.overflow = 'hidden';
+      b.style.position = 'fixed';
+      b.style.top = `-${lockedY}px`;
+      b.style.left = '0';
+      b.style.right = '0';
+      b.style.width = '100%';
+      b.style.overflow = 'hidden';
     };
 
-    const restore = () => {
-      if (!inputFocused || anchorY == null) return;
-      const y = anchorY;
-      // Double rAF: after WebView applies soft-input resize/layout.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!inputFocused) return;
-          if (Math.abs(readY() - y) > 2) writeY(y);
-        });
-      });
+    const unlock = () => {
+      if (!locked) return;
+      locked = false;
+      const b = document.body;
+      const root = document.documentElement;
+      delete b.dataset.pgScrollLock;
+      root.style.overflow = '';
+      b.style.position = '';
+      b.style.top = '';
+      b.style.left = '';
+      b.style.right = '';
+      b.style.width = '';
+      b.style.overflow = '';
+      window.scrollTo(0, lockedY);
+      document.documentElement.scrollTop = lockedY;
+      document.body.scrollTop = lockedY;
     };
+
+    const isField = (el) =>
+      el instanceof HTMLElement && el.matches('input, textarea, select');
 
     const onFocusIn = (e) => {
-      const el = e.target;
-      if (!(el instanceof HTMLElement)) return;
-      if (!el.matches('input, textarea, select')) return;
-      inputFocused = true;
-      anchorY = readY();
-      // After focus scroll-into-view, re-read so we keep the post-focus position
-      // (field visible) rather than freezing a pre-focus offset under the keyboard.
-      requestAnimationFrame(() => {
-        if (inputFocused) anchorY = readY();
-      });
+      if (!isField(e.target)) return;
+      lock();
     };
 
     const onFocusOut = () => {
-      inputFocused = false;
-      anchorY = null;
+      // Android WebView often has relatedTarget=null; wait a tick for next field.
+      if (unlockTimer) clearTimeout(unlockTimer);
+      unlockTimer = setTimeout(() => {
+        unlockTimer = null;
+        if (isField(document.activeElement)) return;
+        unlock();
+      }, 80);
     };
 
+    // Belt-and-suspenders: if anything still moves scroll while locked, pin it.
     const onScroll = () => {
-      // If WebView snaps to top while typing, bounce back to the anchored field.
-      if (!inputFocused || anchorY == null) return;
-      if (readY() < 8 && anchorY > 40) {
-        writeY(anchorY);
+      if (!locked) return;
+      if (readY() !== 0) {
+        // With position:fixed, window scroll should stay 0; ignore.
+        return;
       }
     };
 
     window.addEventListener('focusin', onFocusIn, true);
     window.addEventListener('focusout', onFocusOut, true);
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.visualViewport?.addEventListener('resize', restore);
-    window.visualViewport?.addEventListener('scroll', restore);
 
     return () => {
+      if (unlockTimer) clearTimeout(unlockTimer);
+      unlock();
       window.removeEventListener('focusin', onFocusIn, true);
       window.removeEventListener('focusout', onFocusOut, true);
       window.removeEventListener('scroll', onScroll);
-      window.visualViewport?.removeEventListener('resize', restore);
-      window.visualViewport?.removeEventListener('scroll', restore);
     };
   }, [enabled]);
 }
