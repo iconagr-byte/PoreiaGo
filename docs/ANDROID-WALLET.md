@@ -65,6 +65,27 @@ What the script does: reset to **`main`** → wipe stale `dist`/assets → `npm 
 
 **After DONE:** do **not** press Studio **Run** (reinstalls a stale/cached APK). Open Studio only for **Logcat / debug** on the already-running app.
 
+### If build OK but install fails: `Can't find service: package`
+
+APK built, `adb devices` shows `emulator-5554 device`, even `boot_completed=1`, but install dies with:
+
+```text
+adb.exe: failed to install ... cmd: Can't find service: package
+```
+
+The AVD is **half-booted** — PackageManager is not up yet. Fix:
+
+1. Close the emulator window  
+2. Device Manager → **Cold Boot Now** (or **Wipe Data**)  
+3. Wait for the Android **home screen**  
+4. Install without rebuilding:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+```
+
+`wallet-run.ps1` now waits for `cmd package list packages` before install and retries after an adb bounce.
+
 ### If build OK but install hangs
 
 `adb devices` is empty **or** shows `emulator-5554   offline`, **or** Studio toast:

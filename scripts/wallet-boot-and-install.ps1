@@ -192,8 +192,28 @@ while ((Get-Date) -lt $bootDeadline) {
   Start-Sleep -Seconds 3
 }
 
+Write-Host "==> waiting for PackageManager (cmd package) ..." -ForegroundColor Cyan
+$pkgDeadline = (Get-Date).AddMinutes(3)
+$pkgOk = $false
+while ((Get-Date) -lt $pkgDeadline) {
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $pkgOut = (& $adb shell cmd package list packages 2>&1 | Out-String)
+  $pkgCode = $LASTEXITCODE
+  $ErrorActionPreference = $prevEap
+  if ($pkgCode -eq 0 -and $pkgOut -match "(?m)^package:" -and $pkgOut -notmatch "Can't find service:\s*package") {
+    Write-Host "OK: package service ready" -ForegroundColor Green
+    $pkgOk = $true
+    break
+  }
+  Start-Sleep -Seconds 3
+}
+if (-not $pkgOk) {
+  Write-Host "WARN: package service missing - Cold Boot the AVD if install fails" -ForegroundColor Yellow
+}
+
 # Give system UI a moment after boot
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 3
 
 Write-Host "==> install + launch My Wallet" -ForegroundColor Cyan
 $prevEap = $ErrorActionPreference
@@ -202,7 +222,22 @@ $ErrorActionPreference = "Continue"
 & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
 $ErrorActionPreference = $prevEap
 & $adb install -r $apk
-if ($LASTEXITCODE -ne 0) { throw "adb install failed" }
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "install failed - retry after adb restart..." -ForegroundColor Yellow
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb kill-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  & $adb start-server 2>$null | Out-Null
+  Start-Sleep -Seconds 3
+  $ErrorActionPreference = $prevEap
+  & $adb wait-for-device
+  & $adb install -r $apk
+}
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "=== Can't find service: package? Cold Boot the AVD, wait for home, rerun this script. ===" -ForegroundColor Red
+  throw "adb install failed"
+}
 & $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
 if ($LASTEXITCODE -ne 0) { throw "failed to start MainActivity" }
 
