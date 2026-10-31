@@ -56,7 +56,6 @@ import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/ch
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
-import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
 import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
 import {
   CheckoutCardNumberInput,
@@ -337,11 +336,12 @@ export default function CheckoutPage() {
         toast.error('Συμπληρώστε τον αριθμό κάρτας');
         return false;
       }
-      if (!/^\d{2}\/\d{2}$/.test(form.expiry)) {
+      const expDigits = form.expiry.replace(/\D/g, '');
+      if (expDigits.length !== 4) {
         toast.error('Μη έγκυρη λήξη (MM/YY)');
         return false;
       }
-      if (form.cvv.length < 3) {
+      if (form.cvv.replace(/\D/g, '').length < 3) {
         toast.error('Συμπληρώστε CVV');
         return false;
       }
@@ -510,8 +510,6 @@ export default function CheckoutPage() {
   };
 
   const nativeApp = isNativeApp();
-  // Soft-input resize used to yank scroll to top while typing card digits.
-  useNativeInputScrollLock(nativeApp);
 
   return (
     <div
@@ -787,31 +785,49 @@ export default function CheckoutPage() {
 
               {paymentMethod === 'card' && (
                 <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
-                  <label className="block">
-                    <span className="font-bold text-xs text-on-surface-variant uppercase">Αριθμός κάρτας</span>
+                  <div className="block">
+                    <label
+                      htmlFor="checkout-card-number"
+                      className="font-bold text-xs text-on-surface-variant uppercase"
+                    >
+                      Αριθμός κάρτας
+                    </label>
                     <CheckoutCardNumberInput
+                      id="checkout-card-number"
                       value={form.cardNumber}
                       onChange={setCardField('cardNumber')}
                       className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                     />
-                  </label>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="block">
-                      <span className="font-bold text-xs text-on-surface-variant uppercase">Λήξη</span>
+                    <div className="block">
+                      <label
+                        htmlFor="checkout-card-expiry"
+                        className="font-bold text-xs text-on-surface-variant uppercase"
+                      >
+                        Λήξη
+                      </label>
                       <CheckoutExpiryInput
+                        id="checkout-card-expiry"
                         value={form.expiry}
                         onChange={setCardField('expiry')}
                         className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                       />
-                    </label>
-                    <label className="block">
-                      <span className="font-bold text-xs text-on-surface-variant uppercase">CVV</span>
+                    </div>
+                    <div className="block">
+                      <label
+                        htmlFor="checkout-card-cvv"
+                        className="font-bold text-xs text-on-surface-variant uppercase"
+                      >
+                        CVV
+                      </label>
                       <CheckoutCvvInput
+                        id="checkout-card-cvv"
                         value={form.cvv}
                         onChange={setCardField('cvv')}
                         className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                       />
-                    </label>
+                    </div>
                   </div>
                 </div>
               )}
