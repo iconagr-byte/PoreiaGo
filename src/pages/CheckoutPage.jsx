@@ -525,7 +525,10 @@ export default function CheckoutPage() {
   useNativeInputScrollLock(nativeApp);
 
   return (
-    <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10 overflow-anchor-none">
+    <div
+      className="relative min-h-screen bg-surface py-6 px-4 md:py-10"
+      style={{ overflowAnchor: 'none' }}
+    >
       {/* Decorative blur orbs break Android WebView IME — skip on Capacitor. */}
       {nativeApp ? null : <MinimalPageBackground />}
       <div className="relative z-10 max-w-5xl mx-auto">
