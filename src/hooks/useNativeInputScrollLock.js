@@ -2,16 +2,16 @@ import { useEffect } from 'react';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 /**
- * Hard-lock document scroll while a form control is focused.
- * Android WebView otherwise yanks scrollY→0 on each keypress (card digits).
- * Uses position:fixed body lock (same pattern as iOS soft-keyboard fixes).
+ * Pin window.scrollY while a form field is focused.
+ * Do NOT use position:fixed / touch-action:none — those block Android
+ * numeric IME (card number fields become untouchable / untypable).
  */
 export function useNativeInputScrollLock(enabled = true) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined' || !isNativeApp()) return undefined;
 
-    let lockedY = 0;
-    let locked = false;
+    let anchorY = null;
+    let focused = false;
     let unlockTimer = null;
 
     const readY = () =>
@@ -20,81 +20,66 @@ export function useNativeInputScrollLock(enabled = true) {
       document.body.scrollTop ||
       0;
 
-    const lock = () => {
-      if (unlockTimer) {
-        clearTimeout(unlockTimer);
-        unlockTimer = null;
-      }
-      if (locked) return;
-      lockedY = readY();
-      locked = true;
-      const b = document.body;
-      const root = document.documentElement;
-      b.dataset.pgScrollLock = '1';
-      root.style.overflow = 'hidden';
-      b.style.position = 'fixed';
-      b.style.top = `-${lockedY}px`;
-      b.style.left = '0';
-      b.style.right = '0';
-      b.style.width = '100%';
-      b.style.overflow = 'hidden';
-    };
-
-    const unlock = () => {
-      if (!locked) return;
-      locked = false;
-      const b = document.body;
-      const root = document.documentElement;
-      delete b.dataset.pgScrollLock;
-      root.style.overflow = '';
-      b.style.position = '';
-      b.style.top = '';
-      b.style.left = '';
-      b.style.right = '';
-      b.style.width = '';
-      b.style.overflow = '';
-      window.scrollTo(0, lockedY);
-      document.documentElement.scrollTop = lockedY;
-      document.body.scrollTop = lockedY;
+    const writeY = (y) => {
+      window.scrollTo(0, y);
+      document.documentElement.scrollTop = y;
+      document.body.scrollTop = y;
     };
 
     const isField = (el) =>
       el instanceof HTMLElement && el.matches('input, textarea, select');
 
+    const pin = () => {
+      if (!focused || anchorY == null) return;
+      if (Math.abs(readY() - anchorY) > 1) writeY(anchorY);
+    };
+
     const onFocusIn = (e) => {
       if (!isField(e.target)) return;
-      lock();
+      if (unlockTimer) {
+        clearTimeout(unlockTimer);
+        unlockTimer = null;
+      }
+      focused = true;
+      // Capture after the browser’s own scroll-into-view for the field.
+      requestAnimationFrame(() => {
+        if (focused) anchorY = readY();
+      });
     };
 
     const onFocusOut = () => {
-      // Android WebView often has relatedTarget=null; wait a tick for next field.
       if (unlockTimer) clearTimeout(unlockTimer);
       unlockTimer = setTimeout(() => {
         unlockTimer = null;
         if (isField(document.activeElement)) return;
-        unlock();
+        focused = false;
+        anchorY = null;
       }, 80);
     };
 
-    // Belt-and-suspenders: if anything still moves scroll while locked, pin it.
     const onScroll = () => {
-      if (!locked) return;
-      if (readY() !== 0) {
-        // With position:fixed, window scroll should stay 0; ignore.
-        return;
-      }
+      if (!focused || anchorY == null) return;
+      // WebView sometimes snaps to 0 on keypress — bounce back.
+      if (readY() < 12 && anchorY > 24) writeY(anchorY);
+    };
+
+    const onViewport = () => {
+      requestAnimationFrame(pin);
     };
 
     window.addEventListener('focusin', onFocusIn, true);
     window.addEventListener('focusout', onFocusOut, true);
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.visualViewport?.addEventListener('resize', onViewport);
+    window.visualViewport?.addEventListener('scroll', onViewport);
 
     return () => {
       if (unlockTimer) clearTimeout(unlockTimer);
-      unlock();
       window.removeEventListener('focusin', onFocusIn, true);
       window.removeEventListener('focusout', onFocusOut, true);
       window.removeEventListener('scroll', onScroll);
+      window.visualViewport?.removeEventListener('resize', onViewport);
+      window.visualViewport?.removeEventListener('scroll', onViewport);
     };
   }, [enabled]);
 }
