@@ -58,6 +58,11 @@ import { completeAbandonedCart, getStoredResumeToken } from '../services/abandon
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
 import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
 import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
+import {
+  CheckoutCardNumberInput,
+  CheckoutCvvInput,
+  CheckoutExpiryInput,
+} from '../components/checkout/CheckoutCardNumberInput.jsx';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
@@ -289,29 +294,12 @@ export default function CheckoutPage() {
   const total = checkoutTotal;
 
   const handleChange = (field) => (e) => {
-    const input = e.target;
-    let { value } = input;
-    const scrollY =
-      typeof window !== 'undefined'
-        ? window.scrollY || document.documentElement.scrollTop || 0
-        : 0;
-    if (field === 'cardNumber') {
-      value = value.replace(/\D/g, '').slice(0, 16);
-      value = value.replace(/(.{4})/g, '$1 ').trim();
-    }
-    if (field === 'expiry') {
-      value = value.replace(/\D/g, '').slice(0, 4);
-      if (value.length >= 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
-    }
-    if (field === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
+    const { value } = e.target;
     setForm((prev) => ({ ...prev, [field]: value }));
-    // Android WebView: reformatting card digits can reset window scroll to top.
-    if (typeof window !== 'undefined' && (field === 'cardNumber' || field === 'expiry' || field === 'cvv')) {
-      requestAnimationFrame(() => {
-        window.scrollTo(0, scrollY);
-        document.documentElement.scrollTop = scrollY;
-      });
-    }
+  };
+
+  const setCardField = (field) => (value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleAccountLogin = (profile) => {
@@ -801,39 +789,27 @@ export default function CheckoutPage() {
                 <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
                   <label className="block">
                     <span className="font-bold text-xs text-on-surface-variant uppercase">Αριθμός κάρτας</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="cc-number"
+                    <CheckoutCardNumberInput
                       value={form.cardNumber}
-                      onChange={handleChange('cardNumber')}
+                      onChange={setCardField('cardNumber')}
                       className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                      placeholder="4242 4242 4242 4242"
                     />
                   </label>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="block">
                       <span className="font-bold text-xs text-on-surface-variant uppercase">Λήξη</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="cc-exp"
+                      <CheckoutExpiryInput
                         value={form.expiry}
-                        onChange={handleChange('expiry')}
+                        onChange={setCardField('expiry')}
                         className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                        placeholder="MM/YY"
                       />
                     </label>
                     <label className="block">
                       <span className="font-bold text-xs text-on-surface-variant uppercase">CVV</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="cc-csc"
+                      <CheckoutCvvInput
                         value={form.cvv}
-                        onChange={handleChange('cvv')}
+                        onChange={setCardField('cvv')}
                         className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                        placeholder="123"
                       />
                     </label>
                   </div>
