@@ -608,9 +608,13 @@ export default function CheckoutPage() {
                     required
                     type="text"
                     name="passenger-name"
+                    lang="el"
                     autoComplete="name"
                     inputMode="text"
                     enterKeyHint="next"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={form.name}
                     onChange={handleChange('name')}
                     className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
@@ -674,9 +678,11 @@ export default function CheckoutPage() {
                           type="text"
                           name={`companion-${seat}`}
                           minLength={2}
+                          lang="el"
                           inputMode="text"
                           enterKeyHint="next"
-                          autoCapitalize="words"
+                          // "words" breaks Greek IME on Android WebView (Latin-only glyphs).
+                          autoCapitalize="off"
                           autoCorrect="off"
                           spellCheck={false}
                           value={companionNames[index] || ''}
