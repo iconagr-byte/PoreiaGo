@@ -1,9 +1,11 @@
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 
 /**
- * Card fields with LOCAL state only.
- * Parent CheckoutPage must NOT setState on each digit — that re-render
- * makes Android WebView scroll the page to the top and drop keypresses.
+ * Fully uncontrolled card fields for Capacitor Android WebView.
+ *
+ * Any React setState on each keystroke (even local) can remount/reconcile
+ * the focused <input> and make the WebView scroll to the top + drop digits.
+ * Values are read from the DOM via ref.getValues() only on submit.
  */
 
 function digitsOnly(raw, max) {
@@ -27,30 +29,37 @@ function expiryDisplay(raw) {
 const fieldClass =
   'mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none';
 
-function keepFieldInView(el) {
-  if (!el || typeof el.scrollIntoView !== 'function') return;
-  try {
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
-  } catch {
-    el.scrollIntoView(false);
+function clampDigits(el, max) {
+  if (!el) return;
+  const next = digitsOnly(el.value, max);
+  if (el.value !== next) {
+    const start = el.selectionStart;
+    el.value = next;
+    // Keep caret at end after strip — mid-field caret + IME is unreliable on WebView.
+    try {
+      const pos = typeof start === 'number' ? Math.min(start, next.length) : next.length;
+      el.setSelectionRange(pos, pos);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(_props, ref) {
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
+  const numberRef = useRef(null);
+  const expiryRef = useRef(null);
+  const cvvRef = useRef(null);
 
   useImperativeHandle(
     ref,
     () => ({
       getValues: () => ({
-        cardNumber: cardDisplay(cardNumber),
-        expiry: expiryDisplay(expiry),
-        cvv: digitsOnly(cvv, 4),
+        cardNumber: cardDisplay(numberRef.current?.value),
+        expiry: expiryDisplay(expiryRef.current?.value),
+        cvv: digitsOnly(cvvRef.current?.value, 4),
       }),
     }),
-    [cardNumber, expiry, cvv],
+    [],
   );
 
   return (
@@ -63,7 +72,9 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
           Αριθμός κάρτας
         </label>
         <input
+          ref={numberRef}
           id="checkout-card-number"
+          name="checkout-card-number"
           type="tel"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -73,10 +84,11 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
           spellCheck={false}
           enterKeyHint="next"
           placeholder="4242 4242 4242 4242"
-          value={cardNumber}
-          onFocus={(e) => keepFieldInView(e.currentTarget)}
-          onChange={(e) => setCardNumber(digitsOnly(e.target.value, 16))}
-          onBlur={() => setCardNumber((v) => cardDisplay(v))}
+          defaultValue=""
+          onInput={(e) => clampDigits(e.currentTarget, 16)}
+          onBlur={(e) => {
+            e.currentTarget.value = cardDisplay(e.currentTarget.value);
+          }}
           className={fieldClass}
         />
       </div>
@@ -89,7 +101,9 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
             Λήξη
           </label>
           <input
+            ref={expiryRef}
             id="checkout-card-expiry"
+            name="checkout-card-expiry"
             type="tel"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -99,10 +113,11 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
             spellCheck={false}
             enterKeyHint="next"
             placeholder="MM/YY"
-            value={expiry}
-            onFocus={(e) => keepFieldInView(e.currentTarget)}
-            onChange={(e) => setExpiry(digitsOnly(e.target.value, 4))}
-            onBlur={() => setExpiry((v) => expiryDisplay(v))}
+            defaultValue=""
+            onInput={(e) => clampDigits(e.currentTarget, 4)}
+            onBlur={(e) => {
+              e.currentTarget.value = expiryDisplay(e.currentTarget.value);
+            }}
             className={fieldClass}
           />
         </div>
@@ -114,7 +129,9 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
             CVV
           </label>
           <input
+            ref={cvvRef}
             id="checkout-card-cvv"
+            name="checkout-card-cvv"
             type="tel"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -124,9 +141,8 @@ const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(
             spellCheck={false}
             enterKeyHint="done"
             placeholder="123"
-            value={cvv}
-            onFocus={(e) => keepFieldInView(e.currentTarget)}
-            onChange={(e) => setCvv(digitsOnly(e.target.value, 4))}
+            defaultValue=""
+            onInput={(e) => clampDigits(e.currentTarget, 4)}
             className={fieldClass}
           />
         </div>

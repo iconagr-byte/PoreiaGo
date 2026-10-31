@@ -56,6 +56,7 @@ import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/ch
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
+import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
 import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
 import CheckoutCardPaymentFields from '../components/checkout/CheckoutCardPaymentFields.jsx';
 
@@ -63,6 +64,8 @@ export default function CheckoutPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  // Pin scroll while typing — Android WebView otherwise snaps to top on each digit.
+  useNativeInputScrollLock(true);
   const fromWallet = isWalletBookFlow(location.state);
   const bookState = fromWallet ? location.state : undefined;
   const seedTrip = officeTripFromWalletState(location.state, tripId);
