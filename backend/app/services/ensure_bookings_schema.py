@@ -33,10 +33,9 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
         "ADD COLUMN IF NOT EXISTS payment_status VARCHAR(16) NOT NULL DEFAULT 'pending'"
     ),
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS seat_label VARCHAR(128)",
-    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id INTEGER",
-    # Contabo legacy: trip_id was integer; early SaaS DDL used UUID. Cash INSERT
-    # then fails with DatatypeMismatchError (uuid expression vs integer column)
-    # or the reverse. Normalize to INTEGER to match office excursion ids.
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id BIGINT",
+    # Contabo legacy: trip_id was uuid or int4. Office Date.now() trip ids
+    # (e.g. 1792475148749) overflow INTEGER → guest checkout 500. Prefer BIGINT.
     """
     DO $$
     BEGIN
@@ -48,8 +47,18 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
           AND udt_name = 'uuid'
       ) THEN
         ALTER TABLE bookings
-          ALTER COLUMN trip_id TYPE INTEGER
+          ALTER COLUMN trip_id TYPE BIGINT
           USING NULL;
+      ELSIF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'trip_id'
+          AND udt_name = 'int4'
+      ) THEN
+        ALTER TABLE bookings
+          ALTER COLUMN trip_id TYPE BIGINT
+          USING trip_id::bigint;
       END IF;
     END $$
     """,
@@ -224,6 +233,9 @@ def is_bookings_schema_drift_error(exc: BaseException) -> bool:
             return True
         if "trip_id" in msg and ("uuid" in msg or "integer" in msg):
             return True
+    # Date.now() office trip ids overflow int4 until heal widens to BIGINT.
+    if "out of int32 range" in msg or "int32 range" in msg:
+        return True
     return False
 
 
