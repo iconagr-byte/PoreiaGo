@@ -33,6 +33,7 @@ import {
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
 import {
@@ -232,7 +233,7 @@ export default function CheckoutPage() {
       <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
         <MinimalPageBackground />
         <div className="relative z-10 max-w-lg mx-auto">
-          <div className="bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-6 md:p-8 shadow-sm text-center">
+          <div className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-6 md:p-8 shadow-sm text-center">
             <span className="material-symbols-outlined text-4xl text-emerald-600 mb-3">check_circle</span>
             <p className="text-sm font-semibold text-emerald-700 mb-1">Demo πληρωμή προσομοιώθηκε</p>
             <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-2">
@@ -549,7 +550,7 @@ export default function CheckoutPage() {
 
         <form onSubmit={handlePay} className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-5">
-            <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+            <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
               <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">person</span>
                 Στοιχεία επιβάτη
@@ -696,7 +697,7 @@ export default function CheckoutPage() {
             </section>
 
             {depositEnabled && (
-              <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+              <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
                 <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
                   Επιλογή πληρωμής
@@ -761,7 +762,7 @@ export default function CheckoutPage() {
               </section>
             )}
 
-            <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+            <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
               <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">payments</span>
                 {isDepositPlan ? 'Πληρωμή προκαταβολής online' : 'Τρόπος πληρωμής'}
@@ -936,7 +937,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm lg:sticky lg:top-6">
+            <div className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm lg:sticky lg:top-6">
               <h2 className="font-bold text-on-surface mb-4">Σύνοψη παραγγελίας</h2>
 
               {trip.image && (

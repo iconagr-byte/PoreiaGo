@@ -21,30 +21,18 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Emulator + hardware keyboard: WebView must be focusable or keys never reach <input>.
-        ensureWebViewKeyboardFocus();
+        ensureWebViewKeyboardFocus(true);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        ensureWebViewKeyboardFocus();
+        // Focusability only — do NOT requestFocus here/onResume/windowFocus.
+        // Re-requesting steals IME focus from an already-focused <input> (caret shows, keys die).
+        ensureWebViewKeyboardFocus(false);
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        ensureWebViewKeyboardFocus();
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            ensureWebViewKeyboardFocus();
-        }
-    }
-
-    private void ensureWebViewKeyboardFocus() {
+    private void ensureWebViewKeyboardFocus(boolean requestRootFocus) {
         try {
             if (getBridge() == null) return;
             WebView webView = getBridge().getWebView();
@@ -53,7 +41,7 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             webView.setFocusableInTouchMode(true);
             // Keep descendant focus so tapping an <input> still routes hardware keys.
             webView.setDescendantFocusability(android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS);
-            if (!webView.hasFocus()) {
+            if (requestRootFocus && !webView.hasFocus()) {
                 webView.requestFocus();
             }
         } catch (Exception e) {
