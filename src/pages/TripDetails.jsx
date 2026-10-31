@@ -6,6 +6,7 @@ import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { fleetCategoryLabel } from '../lib/fleet/fleetVehicleCategories.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
 import TripPhotoBento from '../components/storefront/TripPhotoBento.jsx';
+import TripItineraryNarrative from '../components/storefront/TripItineraryNarrative.jsx';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -224,9 +225,9 @@ export default function TripDetails() {
             >
               {trip.title}
             </h1>
-            <p className="text-on-surface-variant font-body-lg max-w-3xl mt-4 leading-relaxed break-words">
-              {trip.description}
-            </p>
+            {trip.description ? (
+              <TripItineraryNarrative description={trip.description} title={trip.title} />
+            ) : null}
             <div className="mt-8 md:mt-10">
               <TripPhotoBento trip={trip} />
             </div>
