@@ -235,84 +235,153 @@ export default function TripDetails() {
       </div>
 
       {/* Main Content: Split Layout */}
-      <div className="flex-1 max-w-container-max mx-auto w-full px-margin-desktop py-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <div className="flex-1 max-w-container-max mx-auto w-full px-4 sm:px-6 md:px-margin-desktop py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 min-w-0">
         
         {/* Left Column: Details & Timeline */}
-        <div className="flex flex-col">
-          <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8">
-            <h3 className="font-headline-md text-on-surface mb-6 font-semibold">Πληροφορίες</h3>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">schedule</span>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Αναχώρηση</div>
-                  <div className="font-label-lg text-on-surface">{new Date(trip.departureTime).toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'})}</div>
-                </div>
-              </div>
+        <div className="flex flex-col min-w-0">
+          <div className="bg-surface-container-lowest rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 shadow-level-2 mb-6 sm:mb-8 overflow-hidden relative">
+            <div
+              className="pointer-events-none absolute -top-16 -right-10 h-40 w-40 rounded-full bg-[#0071e3]/[0.07]"
+              aria-hidden
+            />
+            <h3 className="relative font-headline-md text-on-surface mb-5 sm:mb-6 font-semibold tracking-tight">
+              Πληροφορίες
+            </h3>
 
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">directions_bus</span>
+            <ul className="relative flex flex-col gap-3 sm:gap-3.5" aria-label="Στοιχεία εκδρομής">
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5ac8fa] to-[#0071e3] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">schedule</span>
                 </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Οχημα</div>
-                  <div className="font-label-lg text-on-surface">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Αναχώρηση
+                  </div>
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                    {new Date(trip.departureTime).toLocaleTimeString('el-GR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              </li>
+
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#bf5af2] to-[#5856d6] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">directions_bus</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Όχημα
+                  </div>
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight break-words">
                     {fleetCategoryLabel(trip.vehicleType)}
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">euro</span>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Τιμή</div>
-                  <TripPriceDisplay trip={trip} showOccupancy size="sm" />
-                </div>
-              </div>
+              </li>
 
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">event_seat</span>
+              <li className="flex items-start gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#30d158] to-[#34c759] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">euro</span>
                 </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Διαθεσιμότητα</div>
-                  <div className="font-label-lg text-on-surface">{trip.availableSeats} Θέσεις</div>
-                </div>
-              </div>
-            </div>
-
-            {(trip.meetingPoint || trip.durationLabel || (Array.isArray(trip.highlights) && trip.highlights.length > 0)) && (
-              <div className="mt-8 pt-6 border-t border-black/[0.05] space-y-4">
-                {trip.durationLabel ? (
-                  <p className="text-sm text-on-surface-variant">
-                    <span className="font-bold text-on-surface">Διάρκεια:</span> {trip.durationLabel}
-                  </p>
-                ) : null}
-                {trip.meetingPoint ? (
-                  <p className="text-sm text-on-surface-variant">
-                    <span className="font-bold text-on-surface">Σημείο συνάντησης:</span> {trip.meetingPoint}
-                  </p>
-                ) : null}
-                {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {trip.highlights.map((h) => (
-                      <span
-                        key={h}
-                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
-                      >
-                        <span className="material-symbols-outlined text-[14px] text-emerald-600">check</span>
-                        {h}
-                      </span>
-                    ))}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Τιμή
                   </div>
-                ) : null}
+                  <div className="mt-0.5">
+                    <TripPriceDisplay trip={trip} showOccupancy size="sm" />
+                  </div>
+                </div>
+              </li>
+
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#64d2ff] to-[#32ade6] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">event_seat</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Διαθεσιμότητα
+                  </div>
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                    {trip.availableSeats} Θέσεις
+                  </div>
+                </div>
+              </li>
+
+              {trip.durationLabel ? (
+                <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff9f0a] to-[#ff6b00] text-white shadow-sm"
+                    aria-hidden
+                  >
+                    <span className="material-symbols-outlined text-[26px]">hourglass_empty</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                      Διάρκεια
+                    </div>
+                    <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                      {trip.durationLabel}
+                    </div>
+                  </div>
+                </li>
+              ) : null}
+
+              {trip.meetingPoint ? (
+                <li className="flex items-start gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff375f] to-[#ff2d55] text-white shadow-sm"
+                    aria-hidden
+                  >
+                    <span className="material-symbols-outlined text-[26px]">location_on</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                      Σημείο συνάντησης
+                    </div>
+                    <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight break-words leading-snug">
+                      {trip.meetingPoint}
+                    </div>
+                  </div>
+                </li>
+              ) : null}
+            </ul>
+
+            {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
+              <div className="relative mt-5 pt-5 border-t border-black/[0.06]">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold mb-2.5">
+                  Περιλαμβάνει
+                </p>
+                <div className="flex flex-col gap-2">
+                  {trip.highlights.map((h) => (
+                    <span
+                      key={h}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#f5f5f7] px-3.5 py-2.5 text-sm font-semibold text-[#1d1d1f]"
+                    >
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#30d158]/15 text-[#248a3d]"
+                        aria-hidden
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check</span>
+                      </span>
+                      <span className="min-w-0 break-words">{h}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8 flex-1">
