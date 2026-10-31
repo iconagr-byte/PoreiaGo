@@ -147,6 +147,14 @@ html[data-poreiago-app='wallet'] * {
   -webkit-backdrop-filter: none !important;
 }
 
+/* Soft-input: stop scroll anchoring from yanking the page to the top. */
+html[data-poreiago-app='app'],
+html[data-poreiago-app='wallet'],
+html[data-poreiago-app='app'] body,
+html[data-poreiago-app='wallet'] body {
+  overflow-anchor: none;
+}
+
 html[data-poreiago-app='app'] .wallet-auth-card .relative > .material-symbols-outlined,
 html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined,
 html[data-poreiago-app='app'] .rent-auth-card .relative > .material-symbols-outlined,
