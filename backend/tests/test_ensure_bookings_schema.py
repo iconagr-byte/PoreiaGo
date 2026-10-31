@@ -73,13 +73,21 @@ class EnsureBookingsSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("updated_at", blob)
         self.assertIn("created_at", blob)
 
-    def test_heal_sql_normalizes_trip_id_to_integer(self):
+    def test_heal_sql_normalizes_trip_id_to_bigint(self):
         from app.services.ensure_bookings_schema import _HEAL_STATEMENTS
 
         blob = "\n".join(_HEAL_STATEMENTS)
-        self.assertIn("trip_id INTEGER", blob)
+        self.assertIn("trip_id BIGINT", blob)
         self.assertIn("udt_name = 'uuid'", blob)
-        self.assertIn("ALTER COLUMN trip_id TYPE INTEGER", blob)
+        self.assertIn("udt_name = 'int4'", blob)
+        self.assertIn("ALTER COLUMN trip_id TYPE BIGINT", blob)
+
+    def test_detects_int32_overflow_as_drift(self):
+        exc = Exception(
+            "DBAPIError: invalid input for query argument $3: 1792475148749 "
+            "(value out of int32 range) [SQL: INSERT INTO bookings"
+        )
+        self.assertTrue(is_bookings_schema_drift_error(exc))
 
     def test_heal_sql_softens_legacy_not_null(self):
         from app.services.ensure_bookings_schema import _HEAL_STATEMENTS

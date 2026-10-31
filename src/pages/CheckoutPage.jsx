@@ -494,8 +494,13 @@ export default function CheckoutPage() {
         replace: true,
         state: walletClaimNavState(claim),
       });
-    } catch {
-      toast.error('Αποτυχία πληρωμής. Δοκιμάστε ξανά.');
+    } catch (err) {
+      const msg = String(err?.message || err?.detail || '').trim();
+      toast.error(
+        msg && msg.length < 180
+          ? msg
+          : 'Αποτυχία πληρωμής. Δοκιμάστε ξανά.',
+      );
     } finally {
       setProcessing(false);
     }
