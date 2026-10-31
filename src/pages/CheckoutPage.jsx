@@ -57,6 +57,7 @@ import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
 import { useNativeInputScrollLock } from '../hooks/useNativeInputScrollLock.js';
+import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
@@ -622,19 +623,12 @@ export default function CheckoutPage() {
                     Ονοματεπώνυμο αγοραστή
                     {seatCodes[0] ? ` · θέση ${seatCodes[0]}` : ''}
                   </span>
-                  <input
+                  <GreekFriendlyNameInput
                     required
-                    type="text"
                     name="passenger-name"
-                    lang="el"
-                    autoComplete="name"
-                    inputMode="text"
                     enterKeyHint="next"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
                     value={form.name}
-                    onChange={handleChange('name')}
+                    onChange={(value) => setForm((prev) => ({ ...prev, name: value }))}
                     className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                     placeholder="π.χ. Μαρία Παπαδοπούλου"
                   />
@@ -691,21 +685,13 @@ export default function CheckoutPage() {
                         <span className="font-bold text-on-surface-variant text-xs uppercase">
                           Επιβάτης · θέση {seat}
                         </span>
-                        <input
+                        <GreekFriendlyNameInput
                           required
-                          type="text"
                           name={`companion-${seat}`}
                           minLength={2}
-                          lang="el"
-                          inputMode="text"
                           enterKeyHint="next"
-                          // "words" breaks Greek IME on Android WebView (Latin-only glyphs).
-                          autoCapitalize="off"
-                          autoCorrect="off"
-                          spellCheck={false}
                           value={companionNames[index] || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
+                          onChange={(value) => {
                             setCompanionNames((prev) => {
                               const next = [...prev];
                               next[index] = value;
@@ -714,7 +700,6 @@ export default function CheckoutPage() {
                           }}
                           className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                           placeholder="Ονοματεπώνυμο συνεπιβάτη"
-                          autoComplete="off"
                         />
                       </label>
                     ))}
