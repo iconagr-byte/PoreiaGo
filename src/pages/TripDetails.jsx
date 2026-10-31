@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
@@ -13,6 +13,13 @@ import L from 'leaflet';
 import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 import { LEAFLET_BASEMAP } from '../lib/maps/appleMapTheme.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+  walletBookNavState,
+  walletSelectSeatPath,
+} from '../lib/wallet/walletBookTrip.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -48,7 +55,9 @@ const liveBusIcon = L.divIcon({
 export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [trip, setTrip] = useState(null);
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
+  const [trip, setTrip] = useState(() => officeTripFromWalletState(location.state, id));
   
   // Live Tracking State
   const [isLiveTracking, setIsLiveTracking] = useState(false);
@@ -57,8 +66,18 @@ export default function TripDetails() {
   const [progress, setProgress] = useState(0);
   const [nextStopName, setNextStopName] = useState("");
 
+  const goBack = () => {
+    if (fromWallet) navigate('/wallet');
+    else navigate('/#search-results');
+  };
+
   useEffect(() => {
     const tripId = parseInt(id, 10);
+    const seeded = officeTripFromWalletState(location.state, id);
+    if (seeded) {
+      setTrip(seeded);
+      return undefined;
+    }
     let found = loadTrips().find((t) => Number(t.id) === tripId);
     if (!found && isPlatformSeatBookingDemo()) {
       found = loadPlatformDemoTrips().find((t) => Number(t.id) === tripId);
@@ -68,7 +87,8 @@ export default function TripDetails() {
       return undefined;
     }
     let cancelled = false;
-    fetchPublicOfficeTrips()
+    const tenantId = getWalletTenantId() || undefined;
+    fetchPublicOfficeTrips(tenantId ? { tenantId } : undefined)
       .then((list) => {
         if (cancelled) return;
         const hit = (list || []).find((t) => Number(t.id) === tripId) || null;
@@ -80,7 +100,7 @@ export default function TripDetails() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, location.state]);
 
   // Generate coordinates for polyline
   const positions = trip?.stops?.map(stop => [stop.lat, stop.lng]) || [];
@@ -139,13 +159,13 @@ export default function TripDetails() {
         <p className="font-headline-md text-on-surface">Το δρομολόγιο δεν βρέθηκε.</p>
         <button
           type="button"
-          onClick={() => navigate('/#search-results')}
+          onClick={goBack}
           className="inline-flex items-center gap-2 rounded-full bg-primary text-on-primary px-5 py-2.5 text-sm font-bold"
         >
           <span className="material-symbols-outlined text-[18px]" aria-hidden>
             arrow_back
           </span>
-          Πίσω στις εκδρομές
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
         </button>
       </div>
     );
@@ -157,10 +177,11 @@ export default function TripDetails() {
       <header className="absolute top-0 w-full z-50 px-margin-desktop py-6">
         <button
           type="button"
-          onClick={() => navigate('/#search-results')}
+          onClick={goBack}
           className="flex items-center gap-2 text-on-surface-variant bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-full transition-colors font-label-md shadow-sm border border-black/[0.05]"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span> Πίσω στις εκδρομές
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>{' '}
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
         </button>
       </header>
 
@@ -316,7 +337,10 @@ export default function TripDetails() {
                   }
                   if (check.warning) toast(check.warning, { icon: '⚠️' });
                 }
-                navigate(`/select-seat/${trip.id}`);
+                navigate(
+                  walletSelectSeatPath(trip.id),
+                  { state: fromWallet ? walletBookNavState(trip) : undefined },
+                );
               }}
               className="w-full py-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-[24px] font-headline-sm font-bold shadow-xl hover:scale-[1.02] hover:shadow-gray-900/30 transition-all flex items-center justify-center gap-3"
             >
