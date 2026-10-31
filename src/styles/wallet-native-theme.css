@@ -96,19 +96,29 @@ html[data-poreiago-app='wallet'] .wallet-auth-card h1 {
   letter-spacing: -0.045em;
 }
 
-/* Unified shell uses data-poreiago-app=app — same auth typing guarantees. */
-html[data-poreiago-app='app'] .wallet-auth-card input,
-html[data-poreiago-app='wallet'] .wallet-auth-card input,
-html[data-poreiago-app='app'] .rent-auth-card input,
-html[data-poreiago-app='wallet'] .rent-auth-card input {
+/*
+ * Android WebView typing: caret can appear while keys are ignored when
+ * font-size < 16px (inherited text-sm on labels) or user-select/pointer-events
+ * are blocked. Apply to ALL native form fields — not only auth cards.
+ */
+html[data-poreiago-app='app'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']),
+html[data-poreiago-app='wallet'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']),
+html[data-poreiago-app='app'] textarea,
+html[data-poreiago-app='wallet'] textarea,
+html[data-poreiago-app='app'] select,
+html[data-poreiago-app='wallet'] select {
   -webkit-user-select: text !important;
   user-select: text !important;
   pointer-events: auto !important;
+  -webkit-touch-callout: default !important;
   font-size: max(1rem, 16px) !important;
+  touch-action: manipulation;
 }
 
 html[data-poreiago-app='app'] .wallet-auth-card .relative > .material-symbols-outlined,
-html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined {
+html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='app'] .rent-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='wallet'] .rent-auth-card .relative > .material-symbols-outlined {
   pointer-events: none !important;
 }
 

@@ -30,6 +30,20 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
         ensureWebViewKeyboardFocus();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        ensureWebViewKeyboardFocus();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ensureWebViewKeyboardFocus();
+        }
+    }
+
     private void ensureWebViewKeyboardFocus() {
         try {
             if (getBridge() == null) return;
@@ -37,7 +51,11 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             if (webView == null) return;
             webView.setFocusable(true);
             webView.setFocusableInTouchMode(true);
-            webView.requestFocus();
+            // Keep descendant focus so tapping an <input> still routes hardware keys.
+            webView.setDescendantFocusability(android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS);
+            if (!webView.hasFocus()) {
+                webView.requestFocus();
+            }
         } catch (Exception e) {
             Log.w("MainActivity", "WebView focus setup skipped", e);
         }
