@@ -507,9 +507,12 @@ export default function CheckoutPage() {
     }
   };
 
+  const nativeApp = isNativeApp();
+
   return (
     <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
-      <MinimalPageBackground />
+      {/* Decorative blur orbs break Android WebView IME — skip on Capacitor. */}
+      {nativeApp ? null : <MinimalPageBackground />}
       <div className="relative z-10 max-w-5xl mx-auto">
         <button
           type="button"
