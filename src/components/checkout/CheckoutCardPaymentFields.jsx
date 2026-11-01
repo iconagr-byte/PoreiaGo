@@ -3,12 +3,12 @@ import { forwardRef, memo, useImperativeHandle, useRef } from 'react';
 /**
  * Bare uncontrolled card fields for Capacitor Android WebView.
  *
- * Hard rules (learned the hard way):
- * - NO React state / controlled `value` while typing
- * - NEVER write `el.value = …` on input/keypress (kills Gboard after 1 digit)
- * - NEVER scrollTo / scrollIntoView while focused
- * - type="text" + inputMode="numeric" (type="tel" + pattern is flaky on WebView)
- * - Spaces/slashes only when READING values for submit — not in the live field
+ * - No React state / controlled value while typing (keeps multi-digit IME alive)
+ * - Never write el.value during input (kills Gboard after 1 digit)
+ * - autoComplete off — Google Autofill overlay steals focus / scrolls away
+ * - Soft-input: Activity uses adjustPan so the window pans to the field
+ *   instead of resizing the WebView (adjustResize was yanking to page top)
+ * - Digits/spaces sanitized only when reading values for submit
  */
 
 function digitsOnly(raw, max) {
@@ -62,16 +62,16 @@ const CheckoutCardPaymentFields = memo(
           <input
             ref={numberRef}
             id="checkout-card-number"
-            name="cc-number"
+            name="checkout-card-number"
             type="text"
             inputMode="numeric"
-            autoComplete="cc-number"
+            autoComplete="off"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="next"
             maxLength={19}
-            placeholder="4242424242424242"
+            placeholder="4242 4242 4242 4242"
             defaultValue=""
             className={fieldClass}
           />
@@ -87,16 +87,16 @@ const CheckoutCardPaymentFields = memo(
             <input
               ref={expiryRef}
               id="checkout-card-expiry"
-              name="cc-exp"
+              name="checkout-card-expiry"
               type="text"
               inputMode="numeric"
-              autoComplete="cc-exp"
+              autoComplete="off"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="next"
               maxLength={5}
-              placeholder="MMYY"
+              placeholder="MM/YY"
               defaultValue=""
               className={fieldClass}
             />
@@ -111,10 +111,10 @@ const CheckoutCardPaymentFields = memo(
             <input
               ref={cvvRef}
               id="checkout-card-cvv"
-              name="cc-csc"
+              name="checkout-card-cvv"
               type="text"
               inputMode="numeric"
-              autoComplete="cc-csc"
+              autoComplete="off"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
