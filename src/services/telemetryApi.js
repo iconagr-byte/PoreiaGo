@@ -253,9 +253,15 @@ export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = ad
     const res = await fetch(`${API_BASE}/api/admin/telemetry/alerts?limit=${limit}`, {
       headers: authHeaders,
     });
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+    // Authenticated office must never see demo ROUTE_DEVIATION mocks —
+    // a 500 (e.g. NEW_BOOKING without vehicle_id) previously hid real bookings.
+    if (authHeaders?.Authorization) return [];
   } catch {
-    /* offline */
+    if (authHeaders?.Authorization) return [];
   }
   return getMockAlerts();
 }

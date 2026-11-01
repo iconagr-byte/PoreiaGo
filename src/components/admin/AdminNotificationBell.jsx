@@ -24,10 +24,12 @@ function formatWhen(iso, dateLocale) {
 function iconFor(type) {
   const t = String(type || '').toLowerCase();
   if (t.includes('sos')) return 'emergency';
+  if (t.includes('booking') || t.includes('paid')) return 'confirmation_number';
   if (t.includes('chat') || t.includes('message')) return 'chat';
   if (t.includes('lost')) return 'support_agent';
   if (t.includes('online') || t.includes('shift')) return 'play_circle';
   if (t.includes('offline')) return 'stop_circle';
+  if (t.includes('route') || t.includes('deviation')) return 'alt_route';
   return 'notifications';
 }
 

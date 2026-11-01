@@ -137,11 +137,13 @@ class TelemetryAlertResponse(BaseModel):
     id: str
     alert_type: str
     tenant_id: str
-    vehicle_id: str
-    trip_id: int | None
+    # Optional — NEW_BOOKING / office events have no vehicle.
+    vehicle_id: str | None = None
+    trip_id: int | None = None
     message: str
     metadata: dict | None = None
     created_at: str
+    severity: str | None = None
 
 
 class TripRoutePointResponse(BaseModel):
