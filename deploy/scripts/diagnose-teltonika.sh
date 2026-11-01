@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Diagnose Teltonika Codec 8 TCP ingest + Achillio Travel device bindings.
 # Safe to run via Actions from /tmp — pass REPO_ROOT=/opt/poreiago.
-# Bump: 2026-11-01 empty-map dual-gps recovery + redis open-imei.
+# Bump: 2026-11-01 21:21 EET check IMEI 861076085468260 live pin.
 set -euo pipefail
 
 ROOT="${REPO_ROOT:-}"
