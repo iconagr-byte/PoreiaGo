@@ -11,6 +11,7 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'domain', label: 'Domain', icon: 'language', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
   { id: 'telematics', label: 'Teltonika GPS', icon: 'sensors', section: 'office' },
+  { id: 'trip_reminder', label: 'Υπενθύμιση εκδρομής', icon: 'event_upcoming', section: 'office' },
 ];
 
 /** Settings relevant for a Rent-only office (no bus driver portal settings). */

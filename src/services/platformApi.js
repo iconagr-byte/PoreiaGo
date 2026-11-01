@@ -1177,3 +1177,35 @@ function getMockUsers() {
     },
   ];
 }
+
+export const DEFAULT_TRIP_REMINDER = {
+  enabled: true,
+  days_before: 3,
+  send_hour: 9,
+  subject: 'Η εκδρομή σου πλησιάζει · {trip}',
+  headline: 'Σε {days} μέρες φεύγεις',
+  body:
+    'Υπενθύμιση για την επερχόμενη εκδρομή σου. Έλεγξε ώρα και θέσεις — το εισιτήριό σου είναι στο My Wallet.',
+};
+
+export async function fetchTripReminderSettings() {
+  const res = await adminFetch('/api/admin/platform/trip-reminder');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία φόρτωσης υπενθύμισης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}
+
+export async function updateTripReminderSettings(patch) {
+  const res = await adminFetch('/api/admin/platform/trip-reminder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία αποθήκευσης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}

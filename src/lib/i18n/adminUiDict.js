@@ -97,6 +97,7 @@ export const ADMIN_UI_DICT = {
     settings_domain: 'Domain',
     settings_users: 'Χρήστες',
     settings_telematics: 'Teltonika GPS',
+    settings_trip_reminder: 'Υπενθύμιση εκδρομής',
     settings_tenants: 'Γραφεία',
     settings_password_reset: 'Κωδικοί',
     settings_saas_infra: 'SaaS Infra',
@@ -118,6 +119,7 @@ export const ADMIN_UI_DICT = {
     hint_growth: 'Partner webhooks και growth εργαλεία',
     hint_password_reset: 'Επαναφορά κωδικών διαχειριστών',
     hint_telematics: 'Συσκευές Teltonika και GPS στόλου',
+    hint_trip_reminder: 'Αυτόματο email πριν την αναχώρηση εκδρομής',
   },
   en: {
     lang_el: 'Greek',
@@ -213,6 +215,7 @@ export const ADMIN_UI_DICT = {
     settings_domain: 'Domain',
     settings_users: 'Users',
     settings_telematics: 'Teltonika GPS',
+    settings_trip_reminder: 'Trip reminder',
     settings_tenants: 'Offices',
     settings_password_reset: 'Passwords',
     settings_saas_infra: 'SaaS Infra',
@@ -234,6 +237,7 @@ export const ADMIN_UI_DICT = {
     hint_growth: 'Partner webhooks and growth tools',
     hint_password_reset: 'Admin password reset',
     hint_telematics: 'Teltonika devices and fleet GPS',
+    hint_trip_reminder: 'Automatic email before trip departure',
   },
 };
 
