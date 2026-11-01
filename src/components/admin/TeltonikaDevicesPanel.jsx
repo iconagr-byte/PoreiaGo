@@ -394,51 +394,50 @@ export default function TeltonikaDevicesPanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white shadow-sm">
-        <div className="relative p-6 sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
-            <span className="material-symbols-outlined text-[16px]">sensors</span>
-            Teltonika FTC961
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-900 text-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-4">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
+            <span className="material-symbols-outlined text-[14px]">sensors</span>
+            FTC961
           </div>
-          <h2 className="mt-3 text-2xl font-bold tracking-tight">GPS Tracker (Codec 8)</h2>
-          <p className="mt-2 text-sm text-white/70 max-w-2xl leading-relaxed">
-            Δέσε το IMEI της συσκευής με πινακίδα/όχημα. Στο Configurator βάλε Server IP = VPS και
-            Port = {status?.port || 5027} (TCP Codec 8 / 8E).
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <h2 className="text-sm font-bold tracking-tight sm:text-base">GPS Tracker · Codec 8</h2>
+          <span className="hidden text-[11px] text-white/55 lg:inline">
+            IMEI → πινακίδα · Configurator IP = VPS · Port {status?.port || 5027}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5 text-[10px] font-semibold sm:text-[11px]">
             <span
-              className={`rounded-full px-3 py-1.5 ${
-                status?.listening ? 'bg-emerald-500/20 text-emerald-100' : 'bg-rose-500/20 text-rose-100'
+              className={`rounded-md px-2 py-0.5 ${
+                status?.listening ? 'bg-emerald-500/25 text-emerald-100' : 'bg-rose-500/25 text-rose-100'
               }`}
             >
-              {status?.listening ? 'TCP listening' : 'TCP offline'}
+              {status?.listening ? 'TCP on' : 'TCP off'}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Endpoint: {status?.public_endpoint || '—'}
+            <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono">
+              {status?.public_endpoint || '—'}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Συνδέσεις: {status?.active_connections ?? 0}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              Conn {status?.active_connections ?? 0}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Packets OK: {status?.packets_ok ?? 0}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              OK {status?.packets_ok ?? 0}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Test pins: {mapPins.length}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              Pins {mapPins.length}
             </span>
           </div>
           {status?.last_error ? (
-            <p className="mt-3 text-xs text-amber-200/90">Σφάλμα: {status.last_error}</p>
+            <p className="w-full text-[11px] text-amber-200/90">Σφάλμα: {status.last_error}</p>
           ) : null}
         </div>
       </div>
 
       <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ζωντανή τελευταία θέση από το Teltonika · «Η θέση μου» / δοκιμαστικό pin από πάνω.
+            <h3 className="font-bold text-base text-slate-900">Χάρτης συσκευών GPS</h3>
+            <p className="text-[11px] text-slate-500">
+              Ζωντανή θέση Teltonika · «Η θέση μου» / δοκιμαστικό pin από πάνω.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -462,7 +461,7 @@ export default function TeltonikaDevicesPanel() {
             </button>
           </div>
         </div>
-        <div className="relative h-[18rem] sm:h-[22rem] bg-slate-100">
+        <div className="relative h-[min(70vh,42rem)] min-h-[28rem] bg-slate-100">
           <MapContainer
             key={`teltonika-map-${mapPins.map((p) => p.id).join('-') || 'empty'}`}
             center={DEFAULT_CENTER}
