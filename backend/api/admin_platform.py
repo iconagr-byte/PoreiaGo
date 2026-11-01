@@ -1029,6 +1029,30 @@ async def patch_settings(request: Request, body: PlatformSettingsUpdate):
     return _settings_response_from_dict(s.__dict__)
 
 
+@router.get("/trip-reminder")
+async def get_trip_reminder_settings(request: Request):
+    """Office settings for automatic pre-departure reminder emails."""
+    from travel_platform.settings.trip_reminder_store import read_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    return read_trip_reminder_settings(tid)
+
+
+@router.put("/trip-reminder")
+async def put_trip_reminder_settings(request: Request):
+    """Save days-before / hour / copy for trip reminder emails."""
+    from travel_platform.settings.trip_reminder_store import write_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    return write_trip_reminder_settings(body, tid)
+
+
 @router.get("/login-audits")
 async def get_login_audits(
     limit: int = Query(100, ge=1, le=500),
