@@ -10,14 +10,21 @@ const ACHILLIO_DOC_TITLE = 'Achillio Travel — Εκδρομές με λεωφο
 const POREIAGO_DOC_TITLE = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
 
 /**
- * Googlebot reads static <title>. Contabo often ignores Host-based shells, so:
- * - index.poreiago.html keeps PoreiaGo marketing title
- * - index.html + index.achillio.html get Achillio Travel (safe default SERP)
+ * Googlebot reads static <title>. Contabo often drops Host and serves index.html
+ * for every Proxy Host, so the platform default MUST stay PoreiaGo:
+ * - index.html + index.poreiago.html = PoreiaGo marketing (default SERP-safe)
+ * - index.achillio.html = Achillio Travel (only via Host/XFH or seo-shell)
+ *
+ * Never write Achillio into dist/index.html — that made Google index
+ * "Achillio Travel" under poreiago.com/grafeia as the parent URL.
  */
 function writeAchillioSpaShell() {
   const indexPath = path.resolve('dist/index.html')
   if (!fs.existsSync(indexPath)) return
   const poreiagoHtml = fs.readFileSync(indexPath, 'utf8')
+  if (!poreiagoHtml.includes(`<title>${POREIAGO_DOC_TITLE}</title>`)) {
+    throw new Error('achillio-spa-shell: dist/index.html must keep PoreiaGo document title')
+  }
   fs.writeFileSync(path.resolve('dist/index.poreiago.html'), poreiagoHtml)
 
   const ACHILLIO_DESC =
@@ -58,8 +65,7 @@ function writeAchillioSpaShell() {
     throw new Error('achillio-spa-shell: failed to rewrite document title')
   }
   fs.writeFileSync(path.resolve('dist/index.achillio.html'), achillioHtml)
-  // Default index.html → Achillio so SERP is correct even when Host routing fails.
-  fs.writeFileSync(indexPath, achillioHtml)
+  // Keep PoreiaGo as the shared default shell (do not overwrite index.html).
 }
 
 // https://vite.dev/config/

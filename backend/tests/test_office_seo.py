@@ -8,6 +8,7 @@ from app.services.office_seo import (
     PLATFORM_TITLE,
     inject_office_seo_into_html,
     resolve_seo_payload,
+    spa_shell_internal_url,
 )
 
 
@@ -50,6 +51,13 @@ class OfficeSeoTests(unittest.TestCase):
         self.assertIn('name="description"', out)
         self.assertIn("application/ld+json", out)
         self.assertNotIn("PoreiaGo —", out)
+
+    def test_spa_shell_urls_isolate_achillio_from_default_index(self):
+        # Platform / Contabo default must never load Achillio static shell.
+        self.assertTrue(spa_shell_internal_url(is_platform=True).endswith("/index.html"))
+        self.assertTrue(
+            spa_shell_internal_url(is_platform=False).endswith("/index.achillio.html")
+        )
 
 
 if __name__ == "__main__":
