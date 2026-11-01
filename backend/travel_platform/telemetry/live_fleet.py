@@ -1087,12 +1087,18 @@ class LiveFleetService:
         obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
         end-shift must wipe every mirror or the admin map keeps showing the pin.
 
-        Always deletes App + hardware pins for the driver. Live Teltonika may
-        return only after a real Codec AVL / IMEI accept (not hydrate ghosts).
+        Clears the driver App channel. Online Teltonika hardware stays on the
+        map (GPS οχήματος). Offline / unbound plates are fully removed.
         """
         from travel_platform.telemetry.live_fleet_redis import (
             delete_live_vehicle,
             load_live_vehicles,
+            save_live_vehicle,
+        )
+        from travel_platform.telemetry.tracker_priority import (
+            is_tracker_binding_alive,
+            normalize_vehicle_plate,
+            resolve_tracker_alive_seconds,
         )
 
         did = str(driver_id or "").strip()
@@ -1109,6 +1115,7 @@ class LiveFleetService:
 
         removed: list[str] = []
         seen: set[tuple[str, str]] = set()
+        repaint: list[tuple[str, dict[str, Any]]] = []
 
         def _row_belongs_to_driver(meta: dict[str, Any] | None) -> bool:
             row = meta or {}
@@ -1116,33 +1123,83 @@ class LiveFleetService:
                 row.get("app_driver_id") or ""
             ) == did
 
-        async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
-            from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+        def _alive_teltonika_device(tid: str, code: str | None) -> dict[str, Any] | None:
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
 
+                device = get_enabled_device_by_vehicle_code(tid, code)
+            except Exception:
+                return None
+            if not device:
+                return None
+            alive = resolve_tracker_alive_seconds(tid)
+            if is_tracker_binding_alive(device, max_age_sec=alive):
+                return device
+            return None
+
+        async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
             key = (tid, vid)
             if not vid or key in seen:
                 return
             row = dict(meta or self._vehicles.get(vid) or {})
-            # «Τέλος βάρδιας» always clears the map pin (App + hardware).
-            # Keeping Teltonika ghosts / handoff left buses on the map after
-            # logout. Live GPS reappears only after a real Codec AVL / IMEI
-            # accept (hydrate/keepalive respect shift suppress).
             seen.add(key)
             code = (
                 row.get("vehicle_code")
                 or row.get("bus_plate")
                 or self._vehicles.get(vid, {}).get("vehicle_code")
             )
-            self._vehicles.pop(vid, None)
             plate = normalize_vehicle_plate(code)
+            device = _alive_teltonika_device(tid, code or plate)
+
+            # Online hardware GPS stays — strip only the App channel.
+            if device and plate:
+                kept = {
+                    **row,
+                    "driver_id": None,
+                    "app_driver_id": None,
+                    "app_seen_at": None,
+                    "source": "teltonika",
+                    "gps_sources": ["teltonika"],
+                    "imei": device.get("imei") or row.get("imei"),
+                    "bus_plate": row.get("bus_plate") or code,
+                    "vehicle_code": row.get("vehicle_code") or code,
+                    "driver_name": device.get("label")
+                    or row.get("driver_name")
+                    or f"GPS {plate}",
+                }
+                self._vehicles[vid] = kept
+                self._code_index[f"{tid}:{plate}"] = vid
+                try:
+                    from travel_platform.telemetry.teltonika.shift_suppress import (
+                        clear_shift_suppress,
+                    )
+
+                    clear_shift_suppress(tid, plate)
+                except Exception:
+                    pass
+                try:
+                    await save_live_vehicle(tid, vid, kept)
+                except Exception:
+                    logger.debug(
+                        "shift-end keep teltonika redis save failed plate=%s",
+                        plate,
+                        exc_info=True,
+                    )
+                repaint.append((tid, device))
+                return
+
+            self._vehicles.pop(vid, None)
             if plate:
                 self._code_index.pop(f"{tid}:{plate}", None)
+                # Short suppress only when hardware is offline — blocks ghost hydrate.
                 try:
                     from travel_platform.telemetry.teltonika.shift_suppress import (
                         suppress_plate_after_shift,
                     )
 
-                    suppress_plate_after_shift(tid, plate)
+                    suppress_plate_after_shift(tid, plate, seconds=120.0)
                 except Exception:
                     pass
             await delete_live_vehicle(tid, vid)
@@ -1165,6 +1222,26 @@ class LiveFleetService:
                     continue
                 vid = str(meta.get("vehicle_id") or "")
                 await _drop(tid, vid, meta)
+
+        # Ensure empty Redis still gets a hardware pin after App strip races.
+        for tid, device in repaint:
+            try:
+                from travel_platform.telemetry.teltonika.paint_live import (
+                    paint_live_pin_from_device,
+                )
+
+                await paint_live_pin_from_device(
+                    device,
+                    open_channel=True,
+                    reason="shift_end_keep_hw",
+                    move_coords=False,
+                )
+            except Exception:
+                logger.debug(
+                    "shift-end teltonika repaint failed tenant=%s",
+                    tid,
+                    exc_info=True,
+                )
 
         return removed
 
