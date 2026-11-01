@@ -1081,14 +1081,12 @@ class LiveFleetService:
         extra_tenant_ids: list[str] | None = None,
     ) -> list[str]:
         """
-        Drop live vehicles for a driver (end shift).
+        End-shift for a driver across office + any seed/demo tenant mirrors.
 
-        Clears memory + Redis for the primary tenant and any extras (demo /
-        obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
-        end-shift must wipe every mirror or the admin map keeps showing the pin.
-
-        Clears the driver App channel. Online Teltonika hardware stays on the
-        map (GPS οχήματος). Offline / unbound plates are fully removed.
+        «Έναρξη/Τέλος βάρδιας» only clears the driver App channel on the pin.
+        Teltonika (GPS οχήματος) is never suppressed or wiped by shift — office
+        keeps hardware GPS, and dual badges return when App soft-acks again.
+        Pure phone pins (no IMEI binding) are removed.
         """
         from travel_platform.telemetry.live_fleet_redis import (
             delete_live_vehicle,
@@ -1123,21 +1121,69 @@ class LiveFleetService:
                 row.get("app_driver_id") or ""
             ) == did
 
-        def _alive_teltonika_device(tid: str, code: str | None) -> dict[str, Any] | None:
+        def _bound_teltonika_device(tid: str, code: str | None) -> dict[str, Any] | None:
             try:
                 from travel_platform.telemetry.teltonika.device_store import (
                     get_enabled_device_by_vehicle_code,
                 )
 
-                device = get_enabled_device_by_vehicle_code(tid, code)
+                return get_enabled_device_by_vehicle_code(tid, code)
             except Exception:
                 return None
-            if not device:
-                return None
+
+        async def _strip_app_keep_hw(
+            tid: str,
+            vid: str,
+            row: dict[str, Any],
+            *,
+            plate: str,
+            device: dict[str, Any],
+        ) -> None:
             alive = resolve_tracker_alive_seconds(tid)
-            if is_tracker_binding_alive(device, max_age_sec=alive):
-                return device
-            return None
+            device_alive = is_tracker_binding_alive(device, max_age_sec=alive)
+            kept = {
+                **row,
+                "vehicle_id": vid,
+                "tenant_id": tid,
+                "driver_id": None,
+                "app_driver_id": None,
+                "app_seen_at": None,
+                "source": "teltonika",
+                "gps_sources": ["teltonika"],
+                "imei": device.get("imei") or row.get("imei"),
+                "bus_plate": row.get("bus_plate") or plate,
+                "vehicle_code": row.get("vehicle_code") or plate,
+                "driver_name": device.get("label")
+                or row.get("driver_name")
+                or f"GPS {plate}",
+            }
+            # Parked last-fix until Codec/hydrate reopens the channel.
+            if not device_alive:
+                kept["hydrated_from_store"] = True
+            else:
+                kept.pop("hydrated_from_store", None)
+                if device.get("last_seen_at"):
+                    kept["tracker_signal_at"] = str(device.get("last_seen_at"))
+            self._vehicles[vid] = kept
+            self._code_index[f"{tid}:{plate}"] = vid
+            try:
+                from travel_platform.telemetry.teltonika.shift_suppress import (
+                    clear_shift_suppress,
+                )
+
+                clear_shift_suppress(tid, plate)
+            except Exception:
+                pass
+            try:
+                await save_live_vehicle(kept)
+            except Exception:
+                logger.debug(
+                    "shift-end keep teltonika redis save failed plate=%s",
+                    plate,
+                    exc_info=True,
+                )
+            if device_alive:
+                repaint.append((tid, device))
 
         async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
             key = (tid, vid)
@@ -1151,55 +1197,23 @@ class LiveFleetService:
                 or self._vehicles.get(vid, {}).get("vehicle_code")
             )
             plate = normalize_vehicle_plate(code)
-            device = _alive_teltonika_device(tid, code or plate)
+            device = _bound_teltonika_device(tid, code or plate)
 
-            # Online hardware GPS stays — strip only the App channel.
+            # Bound plate → shift never deletes / suppresses GPS οχήματος.
             if device and plate:
-                kept = {
-                    **row,
-                    "driver_id": None,
-                    "app_driver_id": None,
-                    "app_seen_at": None,
-                    "source": "teltonika",
-                    "gps_sources": ["teltonika"],
-                    "imei": device.get("imei") or row.get("imei"),
-                    "bus_plate": row.get("bus_plate") or code,
-                    "vehicle_code": row.get("vehicle_code") or code,
-                    "driver_name": device.get("label")
-                    or row.get("driver_name")
-                    or f"GPS {plate}",
-                }
-                self._vehicles[vid] = kept
-                self._code_index[f"{tid}:{plate}"] = vid
+                await _strip_app_keep_hw(tid, vid, row, plate=plate, device=device)
+                return
+
+            # Pure App / unbound phone pin — remove from the map.
+            self._vehicles.pop(vid, None)
+            if plate:
+                self._code_index.pop(f"{tid}:{plate}", None)
                 try:
                     from travel_platform.telemetry.teltonika.shift_suppress import (
                         clear_shift_suppress,
                     )
 
                     clear_shift_suppress(tid, plate)
-                except Exception:
-                    pass
-                try:
-                    await save_live_vehicle(tid, vid, kept)
-                except Exception:
-                    logger.debug(
-                        "shift-end keep teltonika redis save failed plate=%s",
-                        plate,
-                        exc_info=True,
-                    )
-                repaint.append((tid, device))
-                return
-
-            self._vehicles.pop(vid, None)
-            if plate:
-                self._code_index.pop(f"{tid}:{plate}", None)
-                # Short suppress only when hardware is offline — blocks ghost hydrate.
-                try:
-                    from travel_platform.telemetry.teltonika.shift_suppress import (
-                        suppress_plate_after_shift,
-                    )
-
-                    suppress_plate_after_shift(tid, plate, seconds=120.0)
                 except Exception:
                     pass
             await delete_live_vehicle(tid, vid)

@@ -279,7 +279,7 @@ export async function startDriverShift() {
   return data;
 }
 
-/** Explicit end-of-shift — notifies admin platform + clears live map pin. */
+/** Explicit end-of-shift — stops App GPS / duty clock; Teltonika pin stays on the office map. */
 export async function endDriverShift() {
   const res = await fetch(`${getApiBase()}/api/driver/telemetry/shift/end`, {
     method: 'POST',
