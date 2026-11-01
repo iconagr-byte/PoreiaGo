@@ -11,6 +11,8 @@ import {
   jitterLatLng,
   placesFromBookings,
   resolvePlaceSync,
+  RENT_MAP_GREECE_CENTER,
+  RENT_MAP_GREECE_ZOOM,
 } from '../../lib/rental/geocodePlace.js';
 import toast from 'react-hot-toast';
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
