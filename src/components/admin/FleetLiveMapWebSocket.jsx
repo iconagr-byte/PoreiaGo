@@ -20,10 +20,12 @@ import {
   formatFleetGpsSourceChipLabel,
   resolveFleetGpsSources,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
+import { formatTeltonikaEmptyMapHint } from '../../lib/admin/teltonikaMapPresence.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
 import { collapseVehicleListByPlate } from '../../lib/admin/fleetPinDedupe.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
+import { fetchTeltonikaDevices } from '../../services/telemetryApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
@@ -42,6 +44,7 @@ export default function FleetLiveMapWebSocket() {
   const [showPlaces, setShowPlaces] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [rentalOverlays, setRentalOverlays] = useState([]);
+  const [teltonikaDevices, setTeltonikaDevices] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +58,25 @@ export default function FleetLiveMapWebSocket() {
     };
     load();
     const timer = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [tenantId]);
+
+  // When the live fleet is empty, explain Teltonika online/offline (not a map bug).
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rows = await fetchTeltonikaDevices();
+        if (!cancelled) setTeltonikaDevices(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setTeltonikaDevices([]);
+      }
+    };
+    load();
+    const timer = setInterval(load, 15_000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -152,9 +174,9 @@ export default function FleetLiveMapWebSocket() {
 
       {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          Κανένα ζωντανό σήμα GPS οχήματος. Το Teltonika τροφοδοτεί τον χάρτη ανεξάρτητα από
-          «Έναρξη βάρδιας». Όταν ο οδηγός στέλνει και App GPS, στο εικονίδιο εμφανίζονται και τα
-          δύο: «GPS οχήματος» + «App».
+          {formatTeltonikaEmptyMapHint(teltonikaDevices)} Η «Έναρξη βάρδιας» αφορά μόνο το App
+          οδηγού — όταν και τα δύο κανάλια είναι ζωντανά, στο εικονίδιο φαίνονται «GPS οχήματος» +
+          «App».
         </p>
       ) : null}
 
