@@ -79,7 +79,11 @@ function pinIcon(selected) {
 function FitPins({ pins, focusId }) {
   const map = useMap();
   useEffect(() => {
-    if (!pins.length) return;
+    map.invalidateSize();
+    if (!pins.length) {
+      map.setView(RENT_MAP_GREECE_CENTER, RENT_MAP_GREECE_ZOOM, { animate: false });
+      return;
+    }
     const focus = focusId ? pins.find((p) => p.id === focusId) : null;
     if (focus) {
       map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 12), { duration: 0.5 });
@@ -349,7 +353,13 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
             Ο χάρτης εμφανίζει τις τοποθεσίες παραλαβής των κρατήσεών σας.
           </div>
         ) : (
-          <MapContainer center={[38.5, 23.5]} zoom={6} scrollWheelZoom={false}>
+          <MapContainer
+            center={RENT_MAP_GREECE_CENTER}
+            zoom={RENT_MAP_GREECE_ZOOM}
+            minZoom={5}
+            maxZoom={18}
+            scrollWheelZoom={false}
+          >
             <TileLayer
               attribution={LEAFLET_BASEMAP.attribution}
               url={LEAFLET_BASEMAP.url}
