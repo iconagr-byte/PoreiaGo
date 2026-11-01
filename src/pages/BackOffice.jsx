@@ -99,6 +99,7 @@ import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
 import { avatarColorClass } from '../lib/admin/avatarColors.js';
 import { computeDashboardKpis } from '../lib/admin/dashboardKpis.js';
+import '../styles/dashboard-apple.css';
 import {
   defaultAdminTabForOfficeMode,
   isAdminTabAllowedForOfficeMode,
@@ -783,18 +784,15 @@ export default function BackOffice() {
   const renderDashboard = () => {
     if (rentOnly) {
       return (
-        <div className="space-y-stack-lg pb-stack-lg">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700 mb-2">Rent</p>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              Dashboard ενοικιάσεων
-            </h2>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Στόλος, κρατήσεις και check-in — χωρίς εκδρομές λεωφορείου.
+        <div className="dash-apple-shell pb-2">
+          <header className="dash-apple-hero">
+            <h2 className="dash-apple-title">Ενοικιάσεις</h2>
+            <p className="dash-apple-subtitle">
+              Στόλος, κρατήσεις και check-in — με μια ματιά
             </p>
-          </div>
+          </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+          <div className="dash-apple-kpi-grid">
             <DashboardKpiCard
               label="Οχήματα"
               value={rentSummary?.vehicles_total ?? '—'}
@@ -817,85 +815,88 @@ export default function BackOffice() {
               label="Ενεργές κρατήσεις"
               value={rentSummary?.active_bookings ?? '—'}
               icon="event"
-              tone="violet"
+              tone="amber"
             />
           </div>
 
-          <div className="bg-white rounded-[24px] border border-teal-100/80 shadow-level-2 p-6 md:p-8">
-            <h3 className="font-headline-md text-lg font-bold text-on-surface mb-2">Γρήγορες ενέργειες</h3>
-            <p className="text-sm text-on-surface-variant mb-5">
-              Άνοιξε το desk Ενοικιάσεις για στόλο, ημερολόγιο και check-in/out.
-            </p>
-            <div className="flex flex-wrap gap-3">
+          <section className="dash-apple-panel">
+            <div className="dash-apple-panel__head">
+              <div>
+                <h3 className="dash-apple-panel__title">Γρήγορες ενέργειες</h3>
+                <p className="dash-apple-panel__meta">
+                  Desk, χάρτης και πελάτες — χωρίς εκδρομές λεωφορείου
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2.5 p-5 sm:p-6">
               <button
                 type="button"
                 onClick={() => {
                   setFleetRentalTab('clients');
                   setActiveTab('fleet_rental');
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+                className="dash-apple-btn dash-apple-btn--primary"
               >
-                <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                <span className="material-symbols-outlined">car_rental</span>
                 Desk ενοικιάσεων
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('fleet_live_map')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+                className="dash-apple-btn dash-apple-btn--ghost"
               >
-                <span className="material-symbols-outlined text-[18px]">map</span>
+                <span className="material-symbols-outlined">map</span>
                 Ζωντανός χάρτης
               </button>
               <button
                 type="button"
                 onClick={goToCustomersHome}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+                className="dash-apple-btn dash-apple-btn--ghost"
               >
-                <span className="material-symbols-outlined text-[18px]">group</span>
+                <span className="material-symbols-outlined">group</span>
                 Πελάτες
               </button>
             </div>
-          </div>
+          </section>
         </div>
       );
     }
 
     return (
-    <div className="space-y-stack-lg pb-stack-lg">
-      <div>
-        <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-          Dashboard Overview
-        </h2>
-      </div>
+    <div className="dash-apple-shell pb-2">
+      <header className="dash-apple-hero">
+        <h2 className="dash-apple-title">Επισκόπηση</h2>
+        <p className="dash-apple-subtitle">Έσοδα, στόλος και κρατήσεις — με μια ματιά</p>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+      <div className="dash-apple-kpi-grid">
         <DashboardKpiCard
-          label="Συνολικά Έσοδα"
+          label="Συνολικά έσοδα"
           value={dashboardKpis.totalRevenue}
           icon="payments"
           tone="emerald"
         />
         <DashboardKpiCard
-          label="Ενεργές Κρατήσεις"
+          label="Ενεργές κρατήσεις"
           value={dashboardKpis.activeBookings}
           icon="confirmation_number"
           tone="sky"
         />
         <DashboardKpiCard
-          label="Στόλος Ενεργός"
+          label="Στόλος ενεργός"
           value={dashboardKpis.fleetStatus}
           icon="directions_bus"
-          tone="violet"
+          tone="slate"
         />
         <DashboardKpiCard
-          label="Αναχωρήσεις Σήμερα"
+          label="Αναχωρήσεις σήμερα"
           value={dashboardKpis.todayDepartures}
           icon="schedule"
           tone="amber"
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
+      <div className="dash-apple-split">
         <OfficeWalletShareCard />
         <DriverChatDashboardWidget
           onOpenInbox={() => setActiveTab('driver_chat')}
@@ -903,33 +904,27 @@ export default function BackOffice() {
         />
       </div>
 
-      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-violet-100/60 flex flex-col min-w-0 overflow-hidden">
-        <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+      <section className="dash-apple-panel mb-4">
+        <div className="dash-apple-panel__head">
           <div>
-            <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
-              Στόλος γραφείου
-            </h3>
-            <p className="text-sm text-on-surface-variant mt-0.5">
+            <h3 className="dash-apple-panel__title">Στόλος γραφείου</h3>
+            <p className="dash-apple-panel__meta">
               {fleetVehicles.length
                 ? `${fleetVehicles.length} οχήματα από τις ρυθμίσεις στόλου`
-                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση Στόλου'}
+                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση στόλου'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveTab('fleet')}
-            className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-          >
+          <button type="button" onClick={() => setActiveTab('fleet')} className="dash-apple-link">
             Διαχείριση
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
         {fleetVehicles.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
-            <p className="font-bold text-gray-900 mt-2">Δεν υπάρχουν οχήματα στον στόλο</p>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Δεν εμφανίζονται demo οχήματα. Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
+          <div className="dash-apple-empty">
+            <span className="material-symbols-outlined">directions_bus</span>
+            <p className="dash-apple-empty__title">Δεν υπάρχουν οχήματα στον στόλο</p>
+            <p className="dash-apple-empty__meta">
+              Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
             </p>
             <button
               type="button"
@@ -937,112 +932,93 @@ export default function BackOffice() {
                 setActiveTab('fleet');
                 setAddVehicleOpen(true);
               }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+              className="dash-apple-btn dash-apple-btn--primary mt-4"
             >
-              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span className="material-symbols-outlined">add</span>
               Νέο όχημα
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="dash-apple-table">
               <thead>
-                <tr className="bg-surface-container-low/60">
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Όχημα
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Πινακίδα
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Κατάσταση
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Χλμ.
-                  </th>
+                <tr>
+                  <th>Όχημα</th>
+                  <th>Πινακίδα</th>
+                  <th>Κατάσταση</th>
+                  <th>Χλμ.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.04]">
-                {fleetVehicles.slice(0, 8).map((v) => (
-                  <tr
-                    key={v.id}
-                    className="hover:bg-primary/[0.03] cursor-pointer"
-                    onClick={() => setActiveTab('fleet')}
-                  >
-                    <td className="px-4 py-3 font-semibold text-sm text-on-surface">
-                      {v.make} {v.model}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{v.plate_number || '—'}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {v.service_status === 'Urgent'
-                        ? 'Σε Service'
-                        : v.service_status === 'Warning'
-                          ? 'Προειδοποίηση'
-                          : 'Ενεργό'}
-                    </td>
-                    <td className="px-4 py-3 text-sm tabular-nums">
-                      {Number(v.current_odometer || 0).toLocaleString('el-GR')}
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {fleetVehicles.slice(0, 8).map((v) => {
+                  const status =
+                    v.service_status === 'Urgent'
+                      ? { label: 'Σε service', tone: 'urgent' }
+                      : v.service_status === 'Warning'
+                        ? { label: 'Προειδοποίηση', tone: 'warn' }
+                        : { label: 'Ενεργό', tone: 'ok' };
+                  return (
+                    <tr key={v.id} onClick={() => setActiveTab('fleet')}>
+                      <td className="font-semibold tracking-tight">
+                        {v.make} {v.model}
+                      </td>
+                      <td className="font-mono text-[0.84rem] text-[#6e6e73]">
+                        {v.plate_number || '—'}
+                      </td>
+                      <td>
+                        <span className={`dash-apple-status dash-apple-status--${status.tone}`}>
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="tabular-nums tracking-tight">
+                        {Number(v.current_odometer || 0).toLocaleString('el-GR')}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 flex flex-col min-w-0 overflow-hidden">
-          <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
-                Πρόσφατες Κρατήσεις
-              </h3>
-              <p className="text-sm text-on-surface-variant mt-0.5">
-                {bookings.length} {bookings.length === 1 ? 'κράτηση' : 'κρατήσεις'}
-                <span className="hidden sm:inline text-on-surface-variant/70"> · διπλό κλικ για λεπτομέρειες</span>
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={goToBookingsHome}
-              className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-            >
-              Όλες
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </button>
+      <section className="dash-apple-panel">
+        <div className="dash-apple-panel__head">
+          <div>
+            <h3 className="dash-apple-panel__title">Πρόσφατες κρατήσεις</h3>
+            <p className="dash-apple-panel__meta">
+              {bookings.length} {bookings.length === 1 ? 'κράτηση' : 'κρατήσεις'}
+              <span className="hidden sm:inline"> · διπλό κλικ για λεπτομέρειες</span>
+            </p>
           </div>
+          <button type="button" onClick={goToBookingsHome} className="dash-apple-link">
+            Όλες
+            <span className="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+        {bookings.length === 0 ? (
+          <div className="dash-apple-empty">
+            <span className="material-symbols-outlined">confirmation_number</span>
+            <p className="dash-apple-empty__title">Δεν υπάρχουν κρατήσεις ακόμα</p>
+            <p className="dash-apple-empty__meta">Οι νέες κρατήσεις θα εμφανιστούν εδώ.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed min-w-[880px]">
+            <table className="dash-apple-table" style={{ minWidth: 880 }}>
               <thead>
-                <tr className="bg-surface-container-low/60">
-                  <th className="w-[92px] pl-4 sm:pl-5 pr-2 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="w-[22%] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Πελάτης
-                  </th>
-                  <th className="w-[34%] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Δρομολόγιο
-                  </th>
-                  <th className="w-[118px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ημερομηνία
-                  </th>
-                  <th className="w-[132px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Κατάσταση
-                  </th>
-                  <th className="w-[120px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    MARK
-                  </th>
-                  <th className="w-[96px] pr-2 pl-2 py-3.5 text-right text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ποσό
-                  </th>
-                  <th className="w-[108px] pr-4 sm:pr-5 pl-2 py-3.5 text-right text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ενέργειες
-                  </th>
+                <tr>
+                  <th>ID</th>
+                  <th>Πελάτης</th>
+                  <th>Δρομολόγιο</th>
+                  <th>Ημερομηνία</th>
+                  <th>Κατάσταση</th>
+                  <th>MARK</th>
+                  <th style={{ textAlign: 'right' }}>Ποσό</th>
+                  <th style={{ textAlign: 'right' }}>Ενέργειες</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.04]">
-                {bookings.map((booking) => {
+              <tbody>
+                {bookings.slice(0, 8).map((booking) => {
                   const crm = getCustomerByEmail(booking.email, CUSTOMER_SERVICE_BUSES);
                   const customer =
                     preferDisplayName(crm?.name, booking.customerName || booking.user) || '—';
@@ -1056,48 +1032,48 @@ export default function BackOffice() {
                     <tr
                       key={booking.id}
                       onDoubleClick={() => openBookingTicket(booking)}
-                      className="hover:bg-primary/[0.03] transition-colors group cursor-pointer"
                       title="Διπλό κλικ για λεπτομέρειες κράτησης"
                     >
-                      <td className="pl-4 sm:pl-5 pr-2 py-4 whitespace-nowrap">
-                        <span className="font-mono text-sm font-semibold text-primary">{booking.id}</span>
+                      <td>
+                        <span className="font-mono text-[0.84rem] font-semibold text-[#0071e3] tracking-tight">
+                          {booking.id}
+                        </span>
                       </td>
-                      <td className="px-3 py-4 min-w-0">
+                      <td>
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ring-1 ${avatarColorClass(customer)}`}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ring-1 ${avatarColorClass(customer)}`}
                           >
                             {customer.substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-[15px] font-medium text-on-surface truncate">{customer}</span>
+                          <span className="font-medium text-[#1d1d1f] truncate tracking-tight">
+                            {customer}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-3 py-4 min-w-0">
-                        <span
-                          className="text-[15px] text-on-surface block truncate"
-                          title={route}
-                        >
+                      <td>
+                        <span className="block truncate text-[#1d1d1f] tracking-tight" title={route}>
                           {route}
                         </span>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-[15px] text-on-surface-variant">
+                      <td className="whitespace-nowrap text-[#6e6e73] tracking-tight">
                         {booking.date}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full ${bookingStatusBadgeClass(booking.status)}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full tracking-tight ${bookingStatusBadgeClass(booking.status)}`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
                           {booking.status}
                         </span>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <FiscalMarkCell booking={booking} compact />
                       </td>
-                      <td className="pr-2 pl-2 py-4 whitespace-nowrap text-right text-[15px] font-bold text-on-surface tabular-nums">
+                      <td className="whitespace-nowrap text-right font-semibold tabular-nums tracking-tight text-[#1d1d1f]">
                         €{Number(amount).toFixed(2)}
                       </td>
-                      <td className="pr-4 sm:pr-5 pl-2 py-4 whitespace-nowrap text-right">
+                      <td className="whitespace-nowrap text-right">
                         {showCash ? (
                           <button
                             type="button"
@@ -1105,14 +1081,14 @@ export default function BackOffice() {
                               e.stopPropagation();
                               setCashPaymentBooking(booking);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition-colors shadow-sm"
+                            className="dash-apple-btn dash-apple-btn--ghost !py-1.5 !px-2.5 !text-[11px]"
                             title={`Καταχώρηση μετρητών · υπόλοιπο €${balanceDue.toFixed(2)}`}
                           >
-                            <span className="material-symbols-outlined text-[14px]">payments</span>
+                            <span className="material-symbols-outlined">payments</span>
                             Μετρητά
                           </button>
                         ) : (
-                          <span className="text-xs text-on-surface-variant/50">—</span>
+                          <span className="text-xs text-[#c7c7cc]">—</span>
                         )}
                       </td>
                     </tr>
@@ -1121,7 +1097,8 @@ export default function BackOffice() {
               </tbody>
             </table>
           </div>
-        </div>
+        )}
+      </section>
     </div>
   );
   };
