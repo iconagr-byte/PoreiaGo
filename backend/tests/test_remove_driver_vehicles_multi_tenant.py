@@ -144,8 +144,8 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
         delete_mock.assert_awaited()
         self.assertFalse(ss.is_shift_suppressed(OFFICE, "EEX5670"))
 
-    async def test_shift_end_keeps_bound_teltonika_even_if_stale(self):
-        """Bound IMEI stays after τέλος βάρδιας — shift does not wipe GPS οχήματος."""
+    async def test_shift_end_removes_stale_bound_without_suppress(self):
+        """Offline bound IMEI pin is removed; hydrate can restore when online again."""
         live = LiveFleetService()
         old = datetime(2020, 1, 1, tzinfo=timezone.utc).isoformat()
         vid = str(live.upsert_vehicle_registry(UUID(OFFICE), "EEX5670", 1))
@@ -176,6 +176,7 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
             "last_lat": 38.3,
             "last_lng": 20.7,
         }
+        ss.suppress_plate_after_shift(OFFICE, "EEX5670", seconds=3600)
 
         with patch(
             "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
@@ -184,27 +185,14 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
             "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
             new=AsyncMock(return_value=[]),
         ), patch(
-            "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
-            new=AsyncMock(return_value=True),
-        ) as save_mock, patch(
             "travel_platform.telemetry.teltonika.device_store.get_enabled_device_by_vehicle_code",
             return_value=tracker,
         ):
             removed = await live.remove_driver_vehicles(OFFICE, DRIVER)
 
-        self.assertEqual(removed, [])
-        self.assertIn(vid, live._vehicles)
-        kept = live._vehicles[vid]
-        self.assertIsNone(kept.get("driver_id"))
-        self.assertIsNone(kept.get("app_seen_at"))
-        self.assertEqual(kept.get("source"), "teltonika")
-        self.assertEqual(kept.get("gps_sources"), ["teltonika"])
-        self.assertTrue(kept.get("hydrated_from_store"))
-        delete_mock.assert_not_awaited()
-        save_mock.assert_awaited()
-        saved = save_mock.await_args.args[0]
-        self.assertEqual(saved.get("vehicle_id"), vid)
-        self.assertEqual(saved.get("tenant_id"), OFFICE)
+        self.assertEqual(removed, [vid])
+        self.assertNotIn(vid, live._vehicles)
+        delete_mock.assert_awaited()
         self.assertFalse(ss.is_shift_suppressed(OFFICE, "EEX5670"))
 
     async def test_shift_end_keeps_alive_teltonika_strips_app(self):

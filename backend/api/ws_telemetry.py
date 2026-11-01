@@ -361,10 +361,18 @@ async def admin_fleet_egress_ws(
     active_rows = await live.list_active_for_admin_async(tenant_uuid)
     if not active_rows:
         try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
             from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
                 hydrate_tenant_live_from_devices,
             )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
 
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
             await hydrate_tenant_live_from_devices(tid, force=True)
             active_rows = await live.list_active_for_admin_async(tenant_uuid)
         except Exception:

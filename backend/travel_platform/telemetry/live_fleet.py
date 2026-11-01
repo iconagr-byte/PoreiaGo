@@ -1139,8 +1139,7 @@ class LiveFleetService:
             plate: str,
             device: dict[str, Any],
         ) -> None:
-            alive = resolve_tracker_alive_seconds(tid)
-            device_alive = is_tracker_binding_alive(device, max_age_sec=alive)
+            now_iso = datetime.now(timezone.utc).isoformat()
             kept = {
                 **row,
                 "vehicle_id": vid,
@@ -1156,14 +1155,13 @@ class LiveFleetService:
                 "driver_name": device.get("label")
                 or row.get("driver_name")
                 or f"GPS {plate}",
+                # Fresh stamp so list_active (90s stale) keeps the online pin.
+                "updated_at": now_iso,
+                "tracker_signal_at": str(
+                    device.get("last_seen_at") or row.get("tracker_signal_at") or now_iso
+                ),
             }
-            # Parked last-fix until Codec/hydrate reopens the channel.
-            if not device_alive:
-                kept["hydrated_from_store"] = True
-            else:
-                kept.pop("hydrated_from_store", None)
-                if device.get("last_seen_at"):
-                    kept["tracker_signal_at"] = str(device.get("last_seen_at"))
+            kept.pop("hydrated_from_store", None)
             self._vehicles[vid] = kept
             self._code_index[f"{tid}:{plate}"] = vid
             try:
@@ -1182,8 +1180,7 @@ class LiveFleetService:
                     plate,
                     exc_info=True,
                 )
-            if device_alive:
-                repaint.append((tid, device))
+            repaint.append((tid, device))
 
         async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
             key = (tid, vid)
@@ -1198,13 +1195,18 @@ class LiveFleetService:
             )
             plate = normalize_vehicle_plate(code)
             device = _bound_teltonika_device(tid, code or plate)
+            alive = resolve_tracker_alive_seconds(tid)
 
-            # Bound plate → shift never deletes / suppresses GPS οχήματος.
-            if device and plate:
+            # Online bound hardware → strip App only (shift never hides GPS οχήματος).
+            if (
+                device
+                and plate
+                and is_tracker_binding_alive(device, max_age_sec=alive)
+            ):
                 await _strip_app_keep_hw(tid, vid, row, plate=plate, device=device)
                 return
 
-            # Pure App / unbound phone pin — remove from the map.
+            # Offline / unbound — remove pin; never shift-suppress (hydrate restores).
             self._vehicles.pop(vid, None)
             if plate:
                 self._code_index.pop(f"{tid}:{plate}", None)

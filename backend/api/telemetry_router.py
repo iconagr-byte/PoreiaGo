@@ -149,11 +149,20 @@ async def fleet_live(
     # Empty map but online IMEI in device store — force paint once (Achillio).
     if not vehicles:
         try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
             from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
                 hydrate_tenant_live_from_devices,
             )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
 
-            n = await hydrate_tenant_live_from_devices(str(tenant_id), force=True)
+            tid = str(tenant_id)
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
+            n = await hydrate_tenant_live_from_devices(tid, force=True)
             if n:
                 vehicles = await live.list_active_for_admin_async(tenant_id)
                 log.info(

@@ -52,10 +52,87 @@ _status: dict[str, Any] = {
 }
 
 
+_REDIS_OPEN_TTL_SEC = 120
+_REDIS_OPEN_PREFIX = "teltonika:tcp:open:"
+
+
+def _redis_open_key(imei_key: str) -> str:
+    return f"{_REDIS_OPEN_PREFIX}{imei_key}"
+
+
+def _mark_open_imei_redis(imei_key: str) -> None:
+    """Share open Codec sessions across processes (blue/green, restarts)."""
+    if not imei_key:
+        return
+    try:
+        import redis
+
+        url = (
+            os.getenv("REDIS_URL")
+            or os.getenv("CELERY_BROKER_URL")
+            or "redis://localhost:6379/0"
+        )
+        client = redis.from_url(url, decode_responses=True, socket_connect_timeout=0.4)
+        client.setex(_redis_open_key(imei_key), _REDIS_OPEN_TTL_SEC, "1")
+        try:
+            client.close()
+        except Exception:
+            pass
+    except Exception:
+        logger.debug("teltonika redis open-imei mark skipped", exc_info=True)
+
+
+def _clear_open_imei_redis(imei_key: str) -> None:
+    if not imei_key:
+        return
+    try:
+        import redis
+
+        url = (
+            os.getenv("REDIS_URL")
+            or os.getenv("CELERY_BROKER_URL")
+            or "redis://localhost:6379/0"
+        )
+        client = redis.from_url(url, decode_responses=True, socket_connect_timeout=0.4)
+        client.delete(_redis_open_key(imei_key))
+        try:
+            client.close()
+        except Exception:
+            pass
+    except Exception:
+        logger.debug("teltonika redis open-imei clear skipped", exc_info=True)
+
+
+def _redis_imei_tcp_connected(imei_key: str) -> bool:
+    if not imei_key:
+        return False
+    try:
+        import redis
+
+        url = (
+            os.getenv("REDIS_URL")
+            or os.getenv("CELERY_BROKER_URL")
+            or "redis://localhost:6379/0"
+        )
+        client = redis.from_url(url, decode_responses=True, socket_connect_timeout=0.4)
+        ok = bool(client.exists(_redis_open_key(imei_key)))
+        try:
+            client.close()
+        except Exception:
+            pass
+        return ok
+    except Exception:
+        return False
+
+
 def is_imei_tcp_connected(imei: str | None) -> bool:
-    """True when this worker holds an open Codec session for the IMEI."""
+    """True when this process or Redis says Codec TCP is open for the IMEI."""
     key = normalize_imei(imei or "")
-    return bool(key) and key in _open_imeis
+    if not key:
+        return False
+    if key in _open_imeis:
+        return True
+    return _redis_imei_tcp_connected(key)
 
 
 def _retain_open_imei(imei: str | None) -> str:
@@ -64,6 +141,7 @@ def _retain_open_imei(imei: str | None) -> str:
         return ""
     _open_imei_refs[key] = int(_open_imei_refs.get(key) or 0) + 1
     _open_imeis.add(key)
+    _mark_open_imei_redis(key)
     return key
 
 
@@ -76,8 +154,10 @@ def _release_open_imei(imei: str | None) -> bool:
     if left <= 0:
         _open_imei_refs.pop(key, None)
         _open_imeis.discard(key)
+        _clear_open_imei_redis(key)
         return True
     _open_imei_refs[key] = left
+    _mark_open_imei_redis(key)
     return False
 
 
@@ -110,6 +190,7 @@ async def _tcp_session_keepalive(imei: str) -> None:
             # open badge without moving lat/lng (moving yanked the pin vs App/AVL).
             try:
                 touch_device(imei)
+                _mark_open_imei_redis(key)
                 from travel_platform.telemetry.teltonika.paint_live import (
                     paint_live_pin_from_device,
                 )
