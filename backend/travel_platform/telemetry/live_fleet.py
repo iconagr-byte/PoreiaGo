@@ -1081,11 +1081,7 @@ class LiveFleetService:
         extra_tenant_ids: list[str] | None = None,
     ) -> list[str]:
         """
-        Drop live vehicles for a driver (end shift).
-
-        Clears memory + Redis for the primary tenant and any extras (demo /
-        obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
-        end-shift must wipe every mirror or the admin map keeps showing the pin.
+        End-shift for a driver across office + any seed/demo tenant mirrors.
 
         «Έναρξη/Τέλος βάρδιας» only clears the driver App channel on the pin.
         Teltonika (GPS οχήματος) is never suppressed or wiped by shift — office
