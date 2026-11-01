@@ -40,16 +40,26 @@ async def paint_live_pin_from_device(
     if not tid or not plate:
         return False
 
-    # After «Τέλος βάρδιας», hydrate/keepalive must not resurrect the pin.
-    # Real IMEI accept / AVL clears suppress first.
+    # After «Τέλος βάρδιας», hydrate/keepalive must not resurrect offline ghosts.
+    # Online hardware (fresh last_seen or open Codec TCP) clears suppress and paints —
+    # otherwise a 1h suppress hid EEX5670 while the tracker was still online.
     if reason in {"hydrate", "hydrate_force", "tcp_keepalive", "ingress_device_online"}:
         try:
             from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
                 is_shift_suppressed,
+            )
+            from travel_platform.telemetry.tracker_priority import (
+                is_tracker_binding_alive,
+                resolve_tracker_alive_seconds,
             )
 
             if is_shift_suppressed(tid, plate):
-                return False
+                alive = resolve_tracker_alive_seconds(tid)
+                if is_tracker_binding_alive(device, max_age_sec=alive):
+                    clear_shift_suppress(tid, plate)
+                else:
+                    return False
         except Exception:
             pass
 
