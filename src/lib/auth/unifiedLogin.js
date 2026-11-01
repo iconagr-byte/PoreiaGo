@@ -28,6 +28,13 @@ export function isNetworkAuthError(err) {
 
 /**
  * Pick My Wallet vs Rent Wallet for a customer who just authenticated.
+ *
+ * Priority:
+ * 1. Explicit path hints ( /rent/login → rent, /wallet claim → wallet )
+ * 2. Live bookings (rent-only → rent; any bus → wallet; dual → wallet)
+ * 3. Session prefer-rent / remembered native role
+ * 4. Default My Wallet
+ *
  * @param {{ preferRent?: boolean, preferWallet?: boolean }} hints
  */
 export async function resolveCustomerSurface(hints = {}) {
@@ -39,19 +46,6 @@ export async function resolveCustomerSurface(hints = {}) {
   }
   if (preferWallet) {
     return { role: NATIVE_ROLE_WALLET, path: pathForNativeRole(NATIVE_ROLE_WALLET) };
-  }
-
-  const remembered = getRememberedNativeRoleHome();
-  if (remembered === NATIVE_ROLE_RENT || remembered === NATIVE_ROLE_WALLET) {
-    return { role: remembered, path: pathForNativeRole(remembered) };
-  }
-
-  try {
-    if (hasPreferRentLookup()) {
-      return { role: NATIVE_ROLE_RENT, path: pathForNativeRole(NATIVE_ROLE_RENT) };
-    }
-  } catch {
-    /* ignore */
   }
 
   let busCount = 0;
@@ -68,11 +62,28 @@ export async function resolveCustomerSurface(hints = {}) {
     busCount = bus;
     rentCount = rent;
   } catch {
-    /* default wallet */
+    /* default below */
   }
 
+  // Rent-only account → Rent Wallet. Dual or bus → bus My Wallet (rent lives inside it).
   if (rentCount > 0 && busCount === 0) {
     return { role: NATIVE_ROLE_RENT, path: pathForNativeRole(NATIVE_ROLE_RENT) };
+  }
+  if (busCount > 0) {
+    return { role: NATIVE_ROLE_WALLET, path: pathForNativeRole(NATIVE_ROLE_WALLET) };
+  }
+
+  try {
+    if (hasPreferRentLookup()) {
+      return { role: NATIVE_ROLE_RENT, path: pathForNativeRole(NATIVE_ROLE_RENT) };
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const remembered = getRememberedNativeRoleHome();
+  if (remembered === NATIVE_ROLE_RENT || remembered === NATIVE_ROLE_WALLET) {
+    return { role: remembered, path: pathForNativeRole(remembered) };
   }
 
   return { role: NATIVE_ROLE_WALLET, path: pathForNativeRole(NATIVE_ROLE_WALLET) };

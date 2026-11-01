@@ -13,6 +13,7 @@ import {
   logoutCustomer,
 } from '../lib/auth.js';
 import { clearNativeRoleHome } from '../lib/capacitor/nativeRoleHome.js';
+import { clearPreferRentLookup } from '../lib/rental/preferRentLookup.js';
 import {
   clearWalletFocusBooking,
   getWalletClaim,
@@ -42,6 +43,7 @@ import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletAccountMenu from '../components/wallet/WalletAccountMenu.jsx';
+import WalletRentSection from '../components/wallet/WalletRentSection.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletMorePanel from '../components/wallet/WalletMorePanel.jsx';
@@ -394,7 +396,16 @@ function WalletAuthenticatedApp() {
   const handleLogout = () => {
     logoutCustomer();
     clearNativeRoleHome();
+    try {
+      clearPreferRentLookup();
+    } catch {
+      /* ignore */
+    }
     navigate('/login', { replace: true, state: { from: '/wallet' } });
+  };
+
+  const openRentWallet = () => {
+    navigate('/rent/wallet');
   };
 
   const tripCatalog = useMemo(() => {
@@ -806,9 +817,11 @@ function WalletAuthenticatedApp() {
               officeBrand.displayName ||
               (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
             }
+            rentAvailable={rentAvailable}
             onOpenAccount={() => switchTab('account')}
             onOpenSecurity={() => openAccountSecurity()}
             onOpenLostFound={() => switchTab('lost_found')}
+            onOpenRent={openRentWallet}
             onLogout={handleLogout}
           />
           <div className="wallet-topbar-brand">
@@ -854,11 +867,25 @@ function WalletAuthenticatedApp() {
         {activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
-              <div className="wallet-desktop-pass-col">{homeFeed}</div>
+              <div className="wallet-desktop-pass-col">
+                {homeFeed}
+                {rentAvailable ? (
+                  <div className="wallet-stack" style={{ marginTop: '1rem' }}>
+                    <WalletRentSection compact />
+                  </div>
+                ) : null}
+              </div>
               {upcomingRail}
             </div>
           ) : (
-            homeFeed
+            <>
+              {homeFeed}
+              {rentAvailable ? (
+                <div className="wallet-stack" style={{ marginTop: '0.85rem' }}>
+                  <WalletRentSection compact />
+                </div>
+              ) : null}
+            </>
           )
         ) : null}
 
@@ -875,12 +902,13 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'bookings' && (
           <div className="wallet-stack">
+            {rentAvailable ? <WalletRentSection /> : null}
             <div className="wallet-panel">
-              <h2>Οι κρατήσεις μου</h2>
+              <h2>Κρατήσεις λεωφορείου</h2>
               <p className="wallet-panel-lead">
                 {bookings.length
-                  ? `${bookings.length} κρατήσεις στο λογαριασμό σας`
-                  : 'Δεν υπάρχουν κρατήσεις ακόμα'}
+                  ? `${bookings.length} εισιτήρια στο λογαριασμό σας`
+                  : 'Δεν υπάρχουν εισιτήρια ακόμα'}
               </p>
 
               {bookings.length === 0 ? (
@@ -967,24 +995,19 @@ function WalletAuthenticatedApp() {
               </span>
               Λογαριασμός
             </button>
+            <WalletRentSection />
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
-                  <span className="material-symbols-outlined">directions_car</span>
+                  <span className="material-symbols-outlined">garage</span>
                 </span>
                 <div>
-                  <h2>Εφαρμογή ενοικίασης</h2>
-                  <p>
-                    Η κράτηση οχήματος γίνεται πλέον στη dedicated εφαρμογή — εγκαταστήσιμη στην
-                    αρχική οθόνη του κινητού.
-                  </p>
+                  <h2>Κατάλογος οχημάτων</h2>
+                  <p>Διαθεσιμότητα και νέα κράτηση από το γραφείο σας.</p>
                 </div>
               </div>
-              <Link to="/rent" className="wallet-btn wallet-btn-primary wallet-btn-block">
-                Άνοιγμα /rent
-              </Link>
             </section>
-            <RentalCatalogPanel />
+            <RentalCatalogPanel mode="full" />
           </div>
         ) : null}
 
@@ -1067,17 +1090,26 @@ function WalletAuthenticatedApp() {
                     <span className="material-symbols-outlined">directions_car</span>
                   </span>
                   <div>
-                    <h2>Rent</h2>
-                    <p>Ενοικίαση οχήματος από το γραφείο σας.</p>
+                    <h2>Ενοικιάσεις</h2>
+                    <p>Rent Wallet και κατάλογος οχημάτων του γραφείου.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="wallet-btn wallet-btn-ghost wallet-btn-block"
-                  onClick={() => switchTab('rentals')}
-                >
-                  Άνοιγμα ενοικιάσεων
-                </button>
+                <div className="wallet-rent-actions">
+                  <button
+                    type="button"
+                    className="wallet-btn wallet-btn-primary wallet-btn-block"
+                    onClick={openRentWallet}
+                  >
+                    Άνοιγμα Rent Wallet
+                  </button>
+                  <button
+                    type="button"
+                    className="wallet-btn wallet-btn-ghost wallet-btn-block"
+                    onClick={() => switchTab('rentals')}
+                  >
+                    Κατάλογος οχημάτων
+                  </button>
+                </div>
               </section>
             ) : null}
             <PushNotificationsPanel email={profile.email} />

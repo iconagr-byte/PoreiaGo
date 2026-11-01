@@ -31,6 +31,10 @@ import { attemptUnifiedLogin, resolveCustomerSurface } from '../lib/auth/unified
 import { clearDriverSession, getDriverSession } from '../lib/driver/driverSession.js';
 import { clearDriverShiftLaunchState } from '../lib/driver/useDriverShiftSession.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
+import {
+  clearPreferRentLookup,
+  markPreferRentLookup,
+} from '../lib/rental/preferRentLookup.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -154,13 +158,19 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           ? location.state.from
           : '/wallet');
     rememberNativeRoleHome(role);
+    const goingRent = role === NATIVE_ROLE_RENT || String(dest).startsWith('/rent');
+    try {
+      if (goingRent) markPreferRentLookup();
+      else clearPreferRentLookup();
+    } catch {
+      /* ignore */
+    }
     const hadClaim = Boolean(claim);
     clearWalletClaim();
     const homeState = walletHomeNavState({
       highlightBooking,
       fromClaim: hadClaim,
     });
-    const goingRent = role === NATIVE_ROLE_RENT || String(dest).startsWith('/rent');
     const rentLookupState = goingRent
       ? {
           rentAuthedAt: Date.now(),
