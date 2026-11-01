@@ -1,14 +1,11 @@
 import { forwardRef, memo, useImperativeHandle, useRef } from 'react';
 
 /**
- * Bare uncontrolled card fields for Capacitor Android WebView.
+ * Bare DOM card fields for Capacitor Android WebView.
  *
- * - No React state / controlled value while typing (keeps multi-digit IME alive)
- * - Never write el.value during input (kills Gboard after 1 digit)
- * - autoComplete off — Google Autofill overlay steals focus / scrolls away
- * - Soft-input: Activity uses adjustPan so the window pans to the field
- *   instead of resizing the WebView (adjustResize was yanking to page top)
- * - Digits/spaces sanitized only when reading values for submit
+ * Critical: do not nest overflow-y scroll parents around these, do not
+ * rewrite el.value while focused, do not use React controlled value.
+ * Digits are read only at submit via getValues().
  */
 
 function digitsOnly(raw, max) {
@@ -30,7 +27,7 @@ function expiryDisplay(raw) {
 }
 
 const fieldClass =
-  'mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none';
+  'checkout-card-field mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-3 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none';
 
 const CheckoutCardPaymentFields = memo(
   forwardRef(function CheckoutCardPaymentFields(_props, ref) {
@@ -51,7 +48,11 @@ const CheckoutCardPaymentFields = memo(
     );
 
     return (
-      <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
+      <div
+        className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container"
+        // Isolate from parent pan/scroll gesture steal on Android.
+        style={{ touchAction: 'manipulation' }}
+      >
         <div className="block">
           <label
             htmlFor="checkout-card-number"
@@ -70,8 +71,8 @@ const CheckoutCardPaymentFields = memo(
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="next"
-            maxLength={19}
-            placeholder="4242 4242 4242 4242"
+            maxLength={16}
+            placeholder="4242424242424242"
             defaultValue=""
             className={fieldClass}
           />
@@ -95,8 +96,8 @@ const CheckoutCardPaymentFields = memo(
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="next"
-              maxLength={5}
-              placeholder="MM/YY"
+              maxLength={4}
+              placeholder="MMYY"
               defaultValue=""
               className={fieldClass}
             />
