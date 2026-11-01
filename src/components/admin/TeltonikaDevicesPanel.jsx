@@ -11,6 +11,7 @@ import {
 } from '../../lib/admin/fleetVehicleDetails.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchFleetVehicles } from '../../services/platformApi.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 import {
   createTeltonikaDevice,
   deleteTeltonikaDevice,
@@ -139,12 +140,16 @@ function FitPins({ pins }) {
       map.setView(DEFAULT_CENTER, 6);
       return;
     }
-    if (pins.length === 1) {
-      map.setView([pins[0].lat, pins[0].lng], 13);
+    const count = pins.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    // 1 στίγμα → κοντινό street zoom · περισσότερα → χαμηλότερο maxZoom.
+    if (count === 1) {
+      map.setView([pins[0].lat, pins[0].lng], maxZoom, { animate: true });
       return;
     }
     const bounds = L.latLngBounds(pins.map((p) => [p.lat, p.lng]));
-    map.fitBounds(bounds.pad(0.35), { maxZoom: 14, animate: true });
+    map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
   }, [pins, map]);
   return null;
 }
