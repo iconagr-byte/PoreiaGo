@@ -30,10 +30,14 @@ class TelemetryAlertBus:
             "id": str(uuid4()),
             "alert_type": str(alert_type or "INFO"),
             "tenant_id": str(tenant_id),
-            "vehicle_id": meta.get("bus_plate") or meta.get("vehicle_id"),
+            # Keep empty string (not None) so older API clients / strict schemas accept it.
+            "vehicle_id": meta.get("bus_plate") or meta.get("vehicle_id") or None,
             "trip_id": meta.get("trip_id"),
             "message": message,
             "metadata": meta,
+            "severity": meta.get("severity") or (
+                "info" if str(alert_type or "").upper() in {"NEW_BOOKING", "BOOKING_PAID"} else "warning"
+            ),
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         cls._recent.appendleft(row)

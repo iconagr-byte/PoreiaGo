@@ -265,24 +265,32 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
     // immediately recreate «Νέο μήνυμα οδηγού» on the next poll.
   }, []);
 
-  // Seed from recent telemetry alerts (silent).
+  // Seed + poll telemetry alerts (silent). Poll catches NEW_BOOKING that
+  // arrived on another worker via Redis while the WS was briefly down.
   useEffect(() => {
     if (!enabled) return undefined;
     let cancelled = false;
-    (async () => {
+    const ingest = async ({ playSound = false } = {}) => {
       try {
-        const rows = await fetchTelemetryAlerts({ limit: 15 });
+        const rows = await fetchTelemetryAlerts({ limit: 20 });
         if (cancelled || !Array.isArray(rows)) return;
         rows
           .slice()
           .reverse()
-          .forEach((row) => pushItem(alertToItem(row), { silent: true }));
+          .forEach((row) =>
+            pushItem(alertToItem(row), {
+              silent: !playSound || String(row.alert_type || '').toUpperCase() !== 'NEW_BOOKING',
+            }),
+          );
       } catch {
         /* ignore */
       }
-    })();
+    };
+    void ingest({ playSound: false });
+    const id = window.setInterval(() => void ingest({ playSound: true }), LIVE_REFRESH_MS);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
     };
   }, [enabled, pushItem]);
 
