@@ -19,8 +19,18 @@ export function isTeltonikaDeviceOnline(device, nowMs = Date.now()) {
   return age <= ONLINE_WINDOW_MS;
 }
 
-/** Best-effort Greek empty-map line from Teltonika device rows. */
-export function formatTeltonikaEmptyMapHint(devices) {
+/**
+ * Best-effort Greek empty-map line from Teltonika device rows.
+ * Pass ``status``: 'loading' | 'ready' | 'error' so we never claim «no IMEI»
+ * before the devices fetch settles (Bugbot / production lock).
+ */
+export function formatTeltonikaEmptyMapHint(devices, status = 'ready') {
+  if (status === 'loading') {
+    return 'Έλεγχος GPS οχήματος (Teltonika)…';
+  }
+  if (status === 'error') {
+    return 'Δεν φορτώθηκε η λίστα Teltonika — το στίγμα εμφανίζεται μόνο με ζωντανό Codec. Δοκίμασε hard-refresh.';
+  }
   const list = Array.isArray(devices) ? devices.filter((d) => d && d.enabled !== false) : [];
   if (!list.length) {
     return 'Κανένα δεμένο GPS οχήματος (Teltonika). Πρόσθεσε IMEI στις ρυθμίσεις τηλεματικής.';

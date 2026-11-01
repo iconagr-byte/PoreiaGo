@@ -45,6 +45,8 @@ export default function FleetLiveMapWebSocket() {
   const [showTrails, setShowTrails] = useState(true);
   const [rentalOverlays, setRentalOverlays] = useState([]);
   const [teltonikaDevices, setTeltonikaDevices] = useState([]);
+  /** 'loading' | 'ready' | 'error' — never claim unbound before fetch settles. */
+  const [teltonikaDevicesStatus, setTeltonikaDevicesStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -67,12 +69,25 @@ export default function FleetLiveMapWebSocket() {
   // When the live fleet is empty, explain Teltonika online/offline (not a map bug).
   useEffect(() => {
     let cancelled = false;
+    let hadReady = false;
+    setTeltonikaDevicesStatus((prev) => {
+      if (prev === 'ready') {
+        hadReady = true;
+        return prev;
+      }
+      return 'loading';
+    });
     const load = async () => {
       try {
         const rows = await fetchTeltonikaDevices();
-        if (!cancelled) setTeltonikaDevices(Array.isArray(rows) ? rows : []);
+        if (cancelled) return;
+        setTeltonikaDevices(Array.isArray(rows) ? rows : []);
+        setTeltonikaDevicesStatus('ready');
+        hadReady = true;
       } catch {
-        if (!cancelled) setTeltonikaDevices([]);
+        if (cancelled) return;
+        // Keep last good list on 502 blips — never flash «no IMEI bound».
+        setTeltonikaDevicesStatus(hadReady ? 'ready' : 'error');
       }
     };
     load();
@@ -174,9 +189,9 @@ export default function FleetLiveMapWebSocket() {
 
       {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          {formatTeltonikaEmptyMapHint(teltonikaDevices)} Η «Έναρξη βάρδιας» αφορά μόνο το App
-          οδηγού — όταν και τα δύο κανάλια είναι ζωντανά, στο εικονίδιο φαίνονται «GPS οχήματος» +
-          «App».
+          {formatTeltonikaEmptyMapHint(teltonikaDevices, teltonikaDevicesStatus)} Η «Έναρξη
+          βάρδιας» αφορά μόνο το App οδηγού — όταν και τα δύο κανάλια είναι ζωντανά, στο εικονίδιο
+          φαίνονται «GPS οχήματος» + «App».
         </p>
       ) : null}
 
