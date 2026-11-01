@@ -194,24 +194,190 @@ async def resolve_office_recipient(
     return _admin_recipient(None)
 
 
+_FONT = (
+    "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Helvetica,Arial,sans-serif"
+)
+
+
+def _esc(value: Any) -> str:
+    return (
+        str(value or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _is_blank(value: Any) -> bool:
+    s = str(value or "").strip()
+    return (not s) or s in {"—", "-", "None", "null"}
+
+
+def _looks_like_uuid(value: Any) -> bool:
+    s = str(value or "").strip()
+    if len(s) != 36 or s.count("-") != 4:
+        return False
+    hexish = s.replace("-", "")
+    return len(hexish) == 32 and all(c in "0123456789abcdefABCDEF" for c in hexish)
+
+
+def _payment_method_label(raw: Any) -> str:
+    s = str(raw or "").strip()
+    if _is_blank(s):
+        return ""
+    key = s.lower()
+    if key in {"card", "credit_card", "creditcard"} or "κάρτ" in key:
+        return "Κάρτα"
+    if "paypal" in key:
+        return "PayPal"
+    if "apple" in key:
+        return "Apple Pay"
+    if "bank" in key or "τραπεζ" in key or "iban" in key:
+        return "Τραπεζική μεταφορά"
+    if "cash" in key or "μετρητ" in key:
+        return "Μετρητά"
+    return s
+
+
+def _payment_status_label(raw: Any) -> str:
+    s = str(raw or "").strip()
+    if _is_blank(s):
+        return ""
+    low = s.lower()
+    if low.startswith("paid") or "πληρωμ" in low:
+        return "Πληρωμένη"
+    if "partial" in low or "deposit" in low or "προκαταβ" in low:
+        return "Μερική / προκαταβολή"
+    if "pending" in low or "εκκρεμ" in low:
+        return "Εκκρεμής"
+    return s
+
+
+def _plan_label(plan: Any, deposit_pct: Any = None) -> str:
+    s = str(plan or "").strip().lower()
+    if not s:
+        return ""
+    if s in {"full", "full_payment"}:
+        label = "Πλήρης πληρωμή"
+    elif s in {"deposit", "down_payment"}:
+        label = "Προκαταβολή"
+    else:
+        label = str(plan)
+    if deposit_pct not in (None, ""):
+        label = f"{label} ({deposit_pct}%)"
+    return label
+
+
+def _trip_when(booking: dict[str, Any]) -> str:
+    date = str(booking.get("date") or "").strip()
+    time = str(booking.get("time") or "").strip()
+    if date or time:
+        return " ".join(p for p in (date, time) if p).strip()
+    for key in ("departureTime", "departure_time", "tripDate", "trip_date"):
+        raw = booking.get(key)
+        if not raw:
+            continue
+        text = str(raw).strip()
+        if "T" in text:
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                return dt.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                return text.replace("T", " ")[:16]
+        return text
+    return ""
+
+
+def _kv_row(label: str, value: Any, *, mono: bool = False, emphasize: bool = False) -> str:
+    if _is_blank(value):
+        return ""
+    val = _esc(value)
+    value_style = "padding:11px 0;text-align:right;color:#1d1d1f;font-size:14px;line-height:1.35;"
+    if mono:
+        value_style += "font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.02em;"
+    if emphasize:
+        value_style += "font-weight:600;"
+    return (
+        f'<tr>'
+        f'<td style="padding:11px 0;color:#86868b;font-size:13px;line-height:1.35;width:42%;vertical-align:top;">{_esc(label)}</td>'
+        f'<td style="{value_style}">{val}</td>'
+        f"</tr>"
+    )
+
+
+def _section(title: str, rows_html: str, *, tone: str = "neutral") -> str:
+    if not rows_html.strip():
+        return ""
+    bg = "#f5f5f7" if tone == "neutral" else "#f0f7ff"
+    return f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+      style="margin:18px 0 0;background:{bg};border-radius:16px;">
+      <tr><td style="padding:18px 18px 6px;">
+        <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#86868b;">
+          {_esc(title)}
+        </p>
+      </td></tr>
+      <tr><td style="padding:0 18px 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+          style="border-collapse:collapse;">
+          {rows_html}
+        </table>
+      </td></tr>
+    </table>
+    """
+
+
+def _hero_amount(label: str, amount: str) -> str:
+    return f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+      style="margin:8px 0 4px;background:#f5f5f7;border-radius:16px;">
+      <tr><td style="padding:22px 20px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:13px;color:#86868b;">{_esc(label)}</p>
+        <p style="margin:0;font-size:32px;line-height:1.1;font-weight:600;letter-spacing:-.03em;color:#1d1d1f;">
+          {_esc(amount)}
+        </p>
+      </td></tr>
+    </table>
+    """
+
+
 def _wrap_html(title: str, body: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="el">
-<head><meta charset="utf-8"><title>{title}</title></head>
-<body style="margin:0;padding:0;background:#f4f6fb;font-family:Inter,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 16px;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{_esc(title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f7;font-family:{_FONT};-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 16px;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.08);">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+        style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;
+               box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 40px rgba(0,0,0,.06);">
         <tr>
-          <td style="background:linear-gradient(135deg,#0040df,#001d66);padding:24px 28px;color:#fff;">
-            <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;opacity:.85;">PoreiaGo Travel</div>
-            <h1 style="margin:10px 0 0;font-size:20px;">{title}</h1>
+          <td style="padding:28px 28px 8px;">
+            <p style="margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em;color:#1d1d1f;">
+              PoreiaGo
+            </p>
+            <h1 style="margin:10px 0 0;font-size:24px;line-height:1.2;font-weight:600;letter-spacing:-.03em;color:#1d1d1f;">
+              {_esc(title)}
+            </h1>
           </td>
         </tr>
-        <tr><td style="padding:28px;color:#334155;font-size:14px;line-height:1.65;">{body}</td></tr>
         <tr>
-          <td style="padding:16px 28px;background:#f8fafc;text-align:center;font-size:12px;color:#94a3b8;">
-            PoreiaGo Travel · Μην απαντάτε αυτό το email
+          <td style="padding:8px 28px 28px;color:#1d1d1f;font-size:15px;line-height:1.55;">
+            {body}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 24px;">
+            <p style="margin:0;padding-top:18px;border-top:1px solid #e8e8ed;font-size:12px;line-height:1.45;color:#86868b;text-align:center;">
+              PoreiaGo · Μην απαντάτε σε αυτό το email
+            </p>
           </td>
         </tr>
       </table>
@@ -224,37 +390,38 @@ def _wrap_html(title: str, body: str) -> str:
 def _seats_display(booking: dict[str, Any]) -> str:
     seats = booking.get("seat") or booking.get("seats")
     if isinstance(seats, (list, tuple)):
-        return ", ".join(str(s) for s in seats if s) or "—"
-    return str(seats or "—")
+        return ", ".join(str(s) for s in seats if s) or ""
+    return str(seats or "").strip()
 
 
-def _booking_summary_rows(booking: dict[str, Any]) -> str:
-    pnr = booking.get("pnr") or booking.get("id") or "—"
+def _booking_summary_rows(booking: dict[str, Any], *, admin: bool = False) -> str:
+    pnr = booking.get("pnr") or booking.get("id") or ""
     saas_id = booking.get("saasBookingId") or booking.get("saas_booking_id") or ""
     source = booking.get("bookingSource") or booking.get("source") or ""
     agent = booking.get("agentName") or booking.get("agent_name") or ""
     trip_id = booking.get("tripId") or booking.get("trip_id") or booking.get("external_trip_id") or ""
-    extra_rows = ""
-    if saas_id:
-        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Booking ID:</strong> {saas_id}</td></tr>'
-    if trip_id:
-        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Trip ID:</strong> {trip_id}</td></tr>'
-    if source:
-        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Πηγή:</strong> {source}</td></tr>'
+    rows = [
+        _kv_row("Κωδικός", pnr, mono=True, emphasize=True),
+    ]
+    if admin and saas_id:
+        rows.append(_kv_row("Booking ID", saas_id, mono=True))
+    if admin and trip_id:
+        rows.append(_kv_row("Trip ID", trip_id, mono=True))
+    if admin and source:
+        rows.append(_kv_row("Πηγή", source))
     if agent:
-        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Πράκτορας:</strong> {agent}</td></tr>'
-    return f"""
-    <table width="100%" style="background:#f8fafc;border-radius:12px;padding:16px;font-size:13px;color:#475569;margin-top:16px;">
-      <tr><td style="padding:4px 0;"><strong>PNR:</strong> {pnr}</td></tr>
-      {extra_rows}
-      <tr><td style="padding:4px 0;"><strong>Εκδρομή:</strong> {booking.get("tripTitle") or booking.get("trip_title") or "—"}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Θέσεις:</strong> {_seats_display(booking)}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Ημερομηνία:</strong> {booking.get("date") or "—"} {booking.get("time") or ""}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Πελάτης:</strong> {booking.get("customerName") or booking.get("customer_name") or "—"}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Email:</strong> {booking.get("email") or "—"}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Τηλέφωνο:</strong> {booking.get("phone") or "—"}</td></tr>
-    </table>
-    """
+        rows.append(_kv_row("Πράκτορας", agent))
+    rows.extend(
+        [
+            _kv_row("Εκδρομή", booking.get("tripTitle") or booking.get("trip_title"), emphasize=True),
+            _kv_row("Θέσεις", _seats_display(booking), mono=True),
+            _kv_row("Ημερομηνία", _trip_when(booking)),
+            _kv_row("Πελάτης", booking.get("customerName") or booking.get("customer_name")),
+            _kv_row("Email", booking.get("email")),
+            _kv_row("Τηλέφωνο", booking.get("phone"), mono=True),
+        ]
+    )
+    return _section("Κράτηση", "".join(rows))
 
 
 def _payment_detail_rows(booking: dict[str, Any]) -> str:
@@ -265,37 +432,51 @@ def _payment_detail_rows(booking: dict[str, Any]) -> str:
     pay_date = booking.get("paymentDate") or booking.get("payment_date") or ""
     balance_method = booking.get("balanceDueMethod") or booking.get("balance_due_method") or ""
     tenant = booking.get("tenant_id") or booking.get("tenantId") or ""
-    rows = [
-        f'<tr><td style="padding:4px 0;"><strong>Τρόπος πληρωμής:</strong> {booking.get("paymentMethod") or booking.get("payment_method") or "—"}</td></tr>',
-        f'<tr><td style="padding:4px 0;"><strong>Κατάσταση κράτησης:</strong> {booking.get("status") or "—"}</td></tr>',
-        f'<tr><td style="padding:4px 0;"><strong>Κατάσταση πληρωμής:</strong> {booking.get("paymentStatus") or booking.get("payment_status") or "—"}</td></tr>',
-        f'<tr><td style="padding:4px 0;"><strong>Πληρώθηκε τώρα / σύνολο πληρωμών:</strong> {_money(booking.get("amountPaid") or booking.get("amount_paid") or booking.get("price"))}</td></tr>',
-        f'<tr><td style="padding:4px 0;"><strong>Υπόλοιπο:</strong> {_money(booking.get("balanceDue") or booking.get("balance_due") or 0)}</td></tr>',
-        f'<tr><td style="padding:4px 0;"><strong>Σύνολο κράτησης:</strong> {_money(booking.get("price") or booking.get("amount") or booking.get("total_eur"))}</td></tr>',
-    ]
-    if plan:
-        plan_label = plan
-        if deposit_pct:
-            plan_label = f"{plan} ({deposit_pct}%)"
-        rows.append(f'<tr><td style="padding:4px 0;"><strong>Πλάνο:</strong> {plan_label}</td></tr>')
-    if balance_method:
-        rows.append(
-            f'<tr><td style="padding:4px 0;"><strong>Υπόλοιπο — τρόπος:</strong> {balance_method}</td></tr>'
-        )
-    if txn:
-        rows.append(f'<tr><td style="padding:4px 0;"><strong>Transaction:</strong> {txn}</td></tr>')
-    if invoice:
-        rows.append(f'<tr><td style="padding:4px 0;"><strong>Τιμολόγιο:</strong> {invoice}</td></tr>')
-    if pay_date:
-        rows.append(f'<tr><td style="padding:4px 0;"><strong>Ημ/νία πληρωμής:</strong> {pay_date}</td></tr>')
-    if tenant:
-        rows.append(f'<tr><td style="padding:4px 0;"><strong>Tenant / γραφείο:</strong> {tenant}</td></tr>')
-    return (
-        '<table width="100%" style="background:#eff6ff;border-radius:12px;padding:16px;'
-        'font-size:13px;color:#1e3a8a;margin-top:12px;border:1px solid #bfdbfe;">'
-        + "".join(rows)
-        + "</table>"
+    method = _payment_method_label(booking.get("paymentMethod") or booking.get("payment_method"))
+    pay_status = _payment_status_label(
+        booking.get("paymentStatus") or booking.get("payment_status")
     )
+    rows = [
+        _kv_row("Τρόπος πληρωμής", method),
+        _kv_row("Κατάσταση κράτησης", booking.get("status")),
+        _kv_row("Κατάσταση πληρωμής", pay_status, emphasize=True),
+        _kv_row(
+            "Πληρώθηκε",
+            _money(
+                booking.get("amountPaid")
+                if booking.get("amountPaid") is not None
+                else booking.get("amount_paid")
+                if booking.get("amount_paid") is not None
+                else booking.get("price")
+            ),
+            emphasize=True,
+        ),
+        _kv_row(
+            "Υπόλοιπο",
+            _money(booking.get("balanceDue") if booking.get("balanceDue") is not None else booking.get("balance_due") or 0),
+        ),
+        _kv_row(
+            "Σύνολο",
+            _money(booking.get("price") or booking.get("amount") or booking.get("total_eur")),
+            emphasize=True,
+        ),
+    ]
+    plan_txt = _plan_label(plan, deposit_pct)
+    if plan_txt:
+        rows.append(_kv_row("Πλάνο", plan_txt))
+    if balance_method:
+        rows.append(_kv_row("Υπόλοιπο — τρόπος", balance_method))
+    if txn:
+        rows.append(_kv_row("Συναλλαγή", txn, mono=True))
+    if invoice:
+        rows.append(_kv_row("Τιμολόγιο", invoice, mono=True))
+    if pay_date:
+        rows.append(_kv_row("Ημ/νία πληρωμής", pay_date))
+    # Keep tenant id for office ops/tests, but de-emphasize raw UUIDs.
+    if tenant:
+        label = "Γραφείο (ID)" if _looks_like_uuid(tenant) else "Γραφείο"
+        rows.append(_kv_row(label, tenant, mono=True))
+    return _section("Πληρωμή", "".join(rows), tone="info")
 
 
 def _fiscal_mark_block(booking: dict[str, Any]) -> str:
@@ -305,25 +486,13 @@ def _fiscal_mark_block(booking: dict[str, Any]) -> str:
     kind = booking.get("fiscalKindLabel") or booking.get("fiscal_kind_label") or "Απόδειξη"
     amount = _money(booking.get("fiscalReceiptAmount") or booking.get("lastReceiptAmount"))
     provider = booking.get("fiscalProvider") or booking.get("fiscal_provider") or ""
-    provider_row = (
-        f'<tr><td style="padding:4px 0;"><strong>Πάροχος:</strong> {provider}</td></tr>'
-        if provider
-        else ""
-    )
-    return f"""
-    <div style="margin:20px 0;padding:18px 20px;background:#ecfdf5;border:2px solid #6ee7b7;border-radius:14px;">
-      <p style="margin:0 0 10px;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#047857;">
-        Φορολογική απόδειξη (myDATA)
-      </p>
-      <table width="100%" style="font-size:14px;color:#064e3b;">
-        <tr><td style="padding:4px 0;"><strong>MARK:</strong></td>
-            <td style="padding:4px 0;font-family:monospace;font-weight:bold;text-align:right;">{mark}</td></tr>
-        <tr><td style="padding:4px 0;"><strong>Τύπος:</strong> {kind}</td></tr>
-        <tr><td style="padding:4px 0;"><strong>Ποσό απόδειξης:</strong> {amount}</td></tr>
-        {provider_row}
-      </table>
-    </div>
-    """
+    rows = [
+        _kv_row("MARK", mark, mono=True, emphasize=True),
+        _kv_row("Τύπος", kind),
+        _kv_row("Ποσό απόδειξης", amount, emphasize=True),
+        _kv_row("Πάροχος", provider),
+    ]
+    return _section("Φορολογική απόδειξη · myDATA", "".join(rows))
 
 
 def _passenger_track_block(booking: dict[str, Any]) -> str:
@@ -335,118 +504,93 @@ def _bank_transfer_email_block(booking: dict[str, Any]) -> str:
     bank = resolve_bank_transfer_details(booking)
     if not bank.get("iban"):
         return ""
-    bic_row = (
-        f'<tr><td style="padding:6px 0;color:#64748b;">BIC / SWIFT</td>'
-        f'<td style="padding:6px 0;font-family:monospace;font-weight:bold;text-align:right;">{bank["bic"]}</td></tr>'
-        if bank.get("bic")
-        else ""
-    )
+    rows = [
+        _kv_row("Τράπεζα", bank.get("bank_name"), emphasize=True),
+        _kv_row("Δικαιούχος", bank.get("beneficiary")),
+        _kv_row("IBAN", bank.get("iban_display"), mono=True, emphasize=True),
+        _kv_row("BIC / SWIFT", bank.get("bic"), mono=True),
+        _kv_row("Αιτιολογία", bank.get("reference"), mono=True, emphasize=True),
+    ]
+    note = """
+    <p style="margin:10px 18px 16px;font-size:12px;line-height:1.45;color:#86868b;">
+      Χρησιμοποιήστε <strong style="color:#1d1d1f;">ακριβώς</strong> την αιτιολογία για να ταυτοποιηθεί η πληρωμή.
+    </p>
+    """
     instructions = ""
     if bank.get("instructions"):
         instructions = f"""
-        <p style="margin:12px 0 0;font-size:13px;color:#475569;line-height:1.5;">
-          {bank["instructions"]}
+        <p style="margin:0 18px 16px;font-size:13px;line-height:1.5;color:#424245;">
+          {_esc(bank["instructions"])}
         </p>
         """
-    return f"""
-    <div style="margin:20px 0;padding:18px 20px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:14px;">
-      <p style="margin:0 0 12px;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#1d4ed8;">
-        Στοιχεία τραπεζικής κατάθεσης
-      </p>
-      <table width="100%" style="font-size:14px;color:#0f172a;">
-        <tr>
-          <td style="padding:6px 0;color:#64748b;width:42%;">Τράπεζα</td>
-          <td style="padding:6px 0;font-weight:bold;text-align:right;">{bank.get("bank_name") or "—"}</td>
-        </tr>
-        <tr>
-          <td style="padding:6px 0;color:#64748b;">Δικαιούχος</td>
-          <td style="padding:6px 0;font-weight:bold;text-align:right;">{bank.get("beneficiary") or "—"}</td>
-        </tr>
-        <tr>
-          <td style="padding:6px 0;color:#64748b;vertical-align:top;">IBAN</td>
-          <td style="padding:6px 0;font-family:monospace;font-weight:bold;font-size:15px;text-align:right;word-break:break-all;">
-            {bank.get("iban_display") or "—"}
-          </td>
-        </tr>
-        {bic_row}
-        <tr>
-          <td style="padding:6px 0;color:#64748b;vertical-align:top;">Αιτιολογία</td>
-          <td style="padding:6px 0;font-family:monospace;font-weight:bold;text-align:right;word-break:break-all;">
-            {bank.get("reference") or "—"}
-          </td>
-        </tr>
-      </table>
-      <p style="margin:12px 0 0;font-size:12px;color:#64748b;">
-        Χρησιμοποιήστε <strong>ακριβώς</strong> την παραπάνω αιτιολογία ώστε να ταυτοποιηθεί η πληρωμή σας.
-      </p>
-      {instructions}
-    </div>
-    """
+    return _section("Τραπεζική κατάθεση", "".join(rows)) + note + instructions
 
 
 def build_customer_payment_email(booking: dict[str, Any], event: str) -> tuple[str, str]:
-    name = booking.get("customerName") or "επιβάτη"
+    name = _esc(booking.get("customerName") or "επιβάτη")
     total = _money(booking.get("price") or booking.get("amount"))
     paid = _money(booking.get("amountPaid") or booking.get("price"))
     balance = _money(booking.get("balanceDue") or 0)
     pnr = booking.get("pnr") or booking.get("id") or "—"
+    greeting = f'<p style="margin:0 0 12px;color:#424245;">Γεια σας, {name}.</p>'
 
     if event == EVENT_BANK_PENDING:
         subject = f"PoreiaGo — Οδηγίες κατάθεσης · {pnr}"
         body = f"""
-        <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-        <p>Η κράτησή σας καταχωρήθηκε και <strong>αναμένει τραπεζική κατάθεση</strong>.</p>
-        <p style="margin:16px 0;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;">
-          Ποσό προς κατάθεση: <strong style="color:#c2410c;">{paid}</strong><br/>
-          Σύνολο κράτησης: {total}
-        </p>
+        {greeting}
+        <p style="margin:0 0 8px;color:#424245;">Η κράτηση καταχωρήθηκε και αναμένει τραπεζική κατάθεση.</p>
+        {_hero_amount("Ποσό προς κατάθεση", paid)}
+        <p style="margin:10px 0 0;font-size:13px;color:#86868b;text-align:center;">Σύνολο κράτησης {total}</p>
         {_bank_transfer_email_block(booking)}
-        <p>Μόλις επιβεβαιωθεί η κατάθεση, θα λάβετε νέο email με το εισιτήριό σας.</p>
+        <p style="margin:16px 0 0;color:#424245;">Μόλις επιβεβαιωθεί η κατάθεση, θα λάβετε το εισιτήριό σας.</p>
         {_booking_summary_rows(booking)}
         """
-        return subject, _wrap_html("Οδηγίες τραπεζικής κατάθεσης", body)
+        return subject, _wrap_html("Οδηγίες κατάθεσης", body)
 
     if event == EVENT_ONLINE_DEPOSIT:
         subject = f"PoreiaGo — Επιβεβαίωση προκαταβολής · {pnr}"
         body = f"""
-        <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-        <p>Λάβαμε την <strong>προκαταβολή</strong> σας και η κράτηση επιβεβαιώθηκε.</p>
-        <p style="margin:16px 0;padding:14px 16px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">
-          Πληρώθηκε τώρα: <strong style="color:#047857;">{paid}</strong><br/>
-          Υπόλοιπο (μετρητά στο λεωφορείο): <strong>{balance}</strong><br/>
-          Σύνολο: {total}
+        {greeting}
+        <p style="margin:0 0 8px;color:#424245;">Η προκαταβολή σας καταχωρήθηκε και η κράτηση επιβεβαιώθηκε.</p>
+        {_hero_amount("Πληρώθηκε τώρα", paid)}
+        <p style="margin:10px 0 0;font-size:13px;color:#86868b;text-align:center;">
+          Υπόλοιπο στο λεωφορείο {balance} · Σύνολο {total}
         </p>
         {_passenger_track_block(booking)}
         {_booking_summary_rows(booking)}
-        {_passenger_track_block(booking)}
         """
-        return subject, _wrap_html("Επιβεβαίωση προκαταβολής", body)
+        return subject, _wrap_html("Προκαταβολή επιβεβαιώθηκε", body)
 
     if event == EVENT_BANK_CONFIRMED:
         subject = f"PoreiaGo — Κατάθεση επιβεβαιώθηκε · {pnr}"
+        bal_note = (
+            f'<p style="margin:10px 0 0;font-size:13px;color:#86868b;text-align:center;">Υπόλοιπο {balance}</p>'
+            if float(booking.get("balanceDue") or 0) > 0
+            else ""
+        )
         body = f"""
-        <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-        <p>Η τραπεζική σας κατάθεση <strong>επιβεβαιώθηκε</strong>. Η κράτηση είναι πλέον ενεργή.</p>
-        <p style="margin:16px 0;padding:14px 16px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">
-          Εξοφλήθηκε: <strong style="color:#047857;">{paid}</strong>
-          {"<br/>Υπόλοιπο: <strong>" + balance + "</strong>" if float(booking.get("balanceDue") or 0) > 0 else ""}
-        </p>
+        {greeting}
+        <p style="margin:0 0 8px;color:#424245;">Η κατάθεση επιβεβαιώθηκε. Η κράτησή σας είναι ενεργή.</p>
+        {_hero_amount("Εξοφλήθηκε", paid)}
+        {bal_note}
         {_passenger_track_block(booking)}
         {_booking_summary_rows(booking)}
         """
-        return subject, _wrap_html("Επιβεβαίωση κατάθεσης", body)
+        return subject, _wrap_html("Κατάθεση επιβεβαιώθηκε", body)
 
     if event == EVENT_CASH_PAYMENT:
-        method = booking.get("paymentMethod") or "Μετρητά"
+        method = _payment_method_label(booking.get("paymentMethod")) or "Μετρητά"
         subject = f"PoreiaGo — Επιβεβαίωση πληρωμής μετρητών · {pnr}"
+        cash_amt = _money(booking.get("lastCashAmount") or paid)
+        bal_note = (
+            f" · Υπόλοιπο {balance}" if float(booking.get("balanceDue") or 0) > 0 else ""
+        )
         body = f"""
-        <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-        <p>Καταχωρήθηκε πληρωμή μετρητών (<strong>{method}</strong>).</p>
-        <p style="margin:16px 0;padding:14px 16px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">
-          Ποσό αυτής της είσπραξης: <strong style="color:#047857;">{_money(booking.get("lastCashAmount") or paid)}</strong><br/>
-          Συνολικά πληρωμένα: <strong>{paid}</strong><br/>
-          {"Υπόλοιπο: <strong>" + balance + "</strong><br/>" if float(booking.get("balanceDue") or 0) > 0 else ""}
-          Σύνολο κράτησης: {total}
+        {greeting}
+        <p style="margin:0 0 8px;color:#424245;">Καταχωρήθηκε πληρωμή μετρητών ({_esc(method)}).</p>
+        {_hero_amount("Είσπραξη", cash_amt)}
+        <p style="margin:10px 0 0;font-size:13px;color:#86868b;text-align:center;">
+          Συνολικά πληρωμένα {paid}{bal_note} · Σύνολο {total}
         </p>
         {_passenger_track_block(booking)}
         {_booking_summary_rows(booking)}
@@ -457,23 +601,22 @@ def build_customer_payment_email(booking: dict[str, Any], event: str) -> tuple[s
         mark = booking.get("fiscalMark") or booking.get("fiscal_mark") or "—"
         subject = f"PoreiaGo — Φορολογική απόδειξη · MARK {mark} · {pnr}"
         body = f"""
-        <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-        <p>Εκδόθηκε η φορολογική απόδειξη για την πληρωμή σας.</p>
+        {greeting}
+        <p style="margin:0 0 8px;color:#424245;">Εκδόθηκε η φορολογική απόδειξη για την πληρωμή σας.</p>
         {_fiscal_mark_block(booking)}
         {_booking_summary_rows(booking)}
-        <p style="font-size:12px;color:#64748b;margin-top:16px;">
-          Το MARK αποτελεί τον μοναδικό αριθμό καταχώρησης στην ΑΑΔΕ (myDATA).
+        <p style="margin:16px 0 0;font-size:12px;color:#86868b;">
+          Το MARK είναι ο μοναδικός αριθμός καταχώρησης στην ΑΑΔΕ (myDATA).
         </p>
         """
         return subject, _wrap_html(f"Απόδειξη · MARK {mark}", body)
 
     subject = f"PoreiaGo — Επιβεβαίωση πληρωμής · {pnr}"
     body = f"""
-    <p>Αγαπητέ/ή <strong>{name}</strong>,</p>
-    <p>Η πληρωμή σας ολοκληρώθηκε και η κράτηση <strong>επιβεβαιώθηκε</strong>.</p>
-    <p style="margin:16px 0;padding:14px 16px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">
-      Ποσό: <strong style="color:#047857;">{paid}</strong> · Σύνολο: {total}
-    </p>
+    {greeting}
+    <p style="margin:0 0 8px;color:#424245;">Η πληρωμή ολοκληρώθηκε και η κράτηση επιβεβαιώθηκε.</p>
+    {_hero_amount("Πληρώθηκε", paid)}
+    <p style="margin:10px 0 0;font-size:13px;color:#86868b;text-align:center;">Σύνολο κράτησης {total}</p>
     {_passenger_track_block(booking)}
     {_booking_summary_rows(booking)}
     """
@@ -484,7 +627,7 @@ def build_admin_payment_email(booking: dict[str, Any], event: str) -> tuple[str,
     pnr = booking.get("pnr") or booking.get("id") or "—"
     labels = {
         EVENT_NEW_BOOKING: "Νέα κράτηση εκδρομής",
-        EVENT_BANK_PENDING: "Νέα κράτηση — εκκρεμής τραπεζική κατάθεση",
+        EVENT_BANK_PENDING: "Νέα κράτηση — εκκρεμής κατάθεση",
         EVENT_ONLINE_DEPOSIT: "Νέα κράτηση — προκαταβολή online",
         EVENT_BANK_CONFIRMED: "Κατάθεση επιβεβαιώθηκε",
         EVENT_CASH_PAYMENT: "Είσπραξη μετρητών",
@@ -493,13 +636,25 @@ def build_admin_payment_email(booking: dict[str, Any], event: str) -> tuple[str,
     }
     label = labels.get(event, "Ενημέρωση πληρωμής")
     subject = f"[Γραφείο] {label} · {pnr}"
+    paid = _money(
+        booking.get("amountPaid")
+        if booking.get("amountPaid") is not None
+        else booking.get("amount_paid")
+        if booking.get("amount_paid") is not None
+        else booking.get("price")
+    )
+    customer = _esc(booking.get("customerName") or booking.get("customer_name") or "—")
+    trip = _esc(booking.get("tripTitle") or booking.get("trip_title") or "—")
     body = f"""
-    <p><strong>{label}</strong></p>
-    <p>Νέα / ενημερωμένη κράτηση εκδρομής — στοιχεία πληρωμής παρακάτω.</p>
+    <p style="margin:0 0 6px;font-size:13px;color:#86868b;">Ενημέρωση γραφείου</p>
+    <p style="margin:0 0 14px;color:#424245;">
+      {customer} · {trip}
+    </p>
+    {_hero_amount("Πληρωμή", paid)}
     {_payment_detail_rows(booking)}
     {_fiscal_mark_block(booking) if event == EVENT_FISCAL_RECEIPT else ""}
     {_bank_transfer_email_block(booking) if event == EVENT_BANK_PENDING else ""}
-    {_booking_summary_rows(booking)}
+    {_booking_summary_rows(booking, admin=True)}
     """
     return subject, _wrap_html(label, body)
 
