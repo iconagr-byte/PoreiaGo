@@ -41,9 +41,12 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             webView.setFocusableInTouchMode(true);
             // Keep descendant focus so tapping an <input> still routes hardware keys.
             webView.setDescendantFocusability(android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS);
+            // Do not let WebView steal click focus from <input> on the next key.
+            webView.getSettings().setNeedInitialFocus(false);
             try {
                 // UTF-8 + no forced Latin path for Greek IME composition.
                 webView.getSettings().setDefaultTextEncodingName("UTF-8");
+                webView.getSettings().setJavaScriptEnabled(true);
             } catch (Exception ignored) {
                 /* older WebView */
             }
