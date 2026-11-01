@@ -4071,3 +4071,43 @@ button.wallet-account-row--action.is-open {
   /* Keep bottom floating dock on phones */
   border-radius: 22px;
 }
+
+/* Rent bridge inside bus My Wallet */
+.wallet-rent-section .wallet-rent-featured {
+  margin: 0 0 0.85rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.wallet-rent-featured-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--wallet-ink, #1d1d1f);
+}
+
+.wallet-rent-featured-plate {
+  font-weight: 500;
+  color: var(--wallet-muted, #6e6e73);
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-rent-featured-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+  color: var(--wallet-muted, #6e6e73);
+}
+
+.wallet-rent-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wallet-rent-section--compact .wallet-panel-head h2 {
+  font-size: 1rem;
+}

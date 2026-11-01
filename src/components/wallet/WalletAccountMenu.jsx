@@ -64,15 +64,17 @@ function WalletAvatarFace({
 
 /**
  * Wallet top-left account control — Apple-like sheet with identity + security.
- * Rent lives on /rent (not in this menu).
+ * When the office has rent_enabled, Rent Wallet is linked from this menu.
  */
 export default function WalletAccountMenu({
   profile,
   officeLogoUrl = '',
   officeName = '',
+  rentAvailable = false,
   onOpenAccount,
   onOpenSecurity,
   onOpenLostFound,
+  onOpenRent,
   onLogout,
 }) {
   const menuId = useId();
@@ -221,6 +223,29 @@ export default function WalletAccountMenu({
               </span>
             </button>
           </div>
+
+          {rentAvailable && typeof onOpenRent === 'function' ? (
+            <div className="wallet-account-sheet-section" role="group" aria-label="Ενοικιάσεις">
+              <p className="wallet-account-sheet-section-label">Ενοικιάσεις</p>
+              <button
+                type="button"
+                role="menuitem"
+                className="wallet-account-sheet-item"
+                onClick={() => go(onOpenRent)}
+              >
+                <span className="wallet-account-sheet-item-icon is-mint" aria-hidden>
+                  <span className="material-symbols-outlined">directions_car</span>
+                </span>
+                <span className="wallet-account-sheet-item-body">
+                  <span className="wallet-account-sheet-item-label">Rent Wallet</span>
+                  <span className="wallet-account-sheet-item-hint">Κρατήσεις οχήματος</span>
+                </span>
+                <span className="material-symbols-outlined wallet-account-sheet-chevron" aria-hidden>
+                  chevron_right
+                </span>
+              </button>
+            </div>
+          ) : null}
 
           <div className="wallet-account-sheet-section" role="group" aria-label="Υποστήριξη">
             <p className="wallet-account-sheet-section-label">Υποστήριξη</p>

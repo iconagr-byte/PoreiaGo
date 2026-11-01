@@ -131,7 +131,23 @@ describe('unifiedLogin', () => {
     expect(surface.path).toBe('/rent/wallet');
   });
 
-  it('honors rememberNativeRoleHome for rent', async () => {
+  it('routes dual-product customers to bus My Wallet', async () => {
+    fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
+    fetchMyBookingsFromServer.mockResolvedValue([{ id: 'bus-1' }]);
+    rememberNativeRoleHome('rent');
+    const surface = await resolveCustomerSurface();
+    expect(surface.path).toBe('/wallet');
+  });
+
+  it('bus bookings beat remembered rent role', async () => {
+    rememberNativeRoleHome('rent');
+    fetchMyBookingsFromServer.mockResolvedValue([{ id: 'bus-1' }]);
+    fetchMyRentalBookings.mockResolvedValue([]);
+    const surface = await resolveCustomerSurface();
+    expect(surface.path).toBe('/wallet');
+  });
+
+  it('honors rememberNativeRoleHome for rent when bookings are empty', async () => {
     rememberNativeRoleHome('rent');
     const surface = await resolveCustomerSurface();
     expect(surface.role).toBe('rent');
@@ -141,5 +157,10 @@ describe('unifiedLogin', () => {
     fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
     const surface = await resolveCustomerSurface({ preferWallet: true });
     expect(surface.path).toBe('/wallet');
+  });
+
+  it('preferRent hint opens Rent Wallet', async () => {
+    const surface = await resolveCustomerSurface({ preferRent: true });
+    expect(surface.path).toBe('/rent/wallet');
   });
 });
