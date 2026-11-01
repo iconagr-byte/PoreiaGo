@@ -152,9 +152,9 @@ export default function FleetLiveMapWebSocket() {
 
       {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          Κανένα ζωντανό σήμα. Το GPS οχήματος (Teltonika) εμφανίζεται όταν το IMEI είναι online —
-          χωρίς «Έναρξη βάρδιας». Για θέση από κινητό: στην PWA πατήστε «Έναρξη βάρδιας», επιτρέψτε
-          τοποθεσία, περιμένετε επιβεβαίωση — μετά hard-refresh αυτόν τον χάρτη.
+          Κανένα ζωντανό σήμα GPS οχήματος. Το Teltonika τροφοδοτεί τον χάρτη ανεξάρτητα από
+          «Έναρξη βάρδιας». Όταν ο οδηγός στέλνει και App GPS, στο εικονίδιο εμφανίζονται και τα
+          δύο: «GPS οχήματος» + «App».
         </p>
       ) : null}
 

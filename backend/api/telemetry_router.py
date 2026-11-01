@@ -250,6 +250,16 @@ async def fleet_live(
                     hydrated_from_store = False
                     if not meta.get("imei") and device.get("imei"):
                         meta["imei"] = device.get("imei")
+                # Dual chip: fresh App soft-ack + live IMEI → both on the pin.
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
             except Exception:
                 pass
             rows.append(
