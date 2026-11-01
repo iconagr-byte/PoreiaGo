@@ -29,11 +29,16 @@ _SEED_SCHEDULE = (
 
 def _utc_at(day_offset: int, hhmm: str) -> datetime:
     hour, minute = (int(x) for x in hhmm.split(":", 1))
-    base = datetime.now(timezone.utc).replace(
-        hour=hour, minute=minute, second=0, microsecond=0
-    )
-    # Always start from tomorrow so «today 08:00» never goes stale mid-morning.
-    return base + timedelta(days=1 + int(day_offset))
+    now = datetime.now(timezone.utc)
+    base = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # Prefer tomorrow so «today 08:00» never goes stale mid-morning. When CI
+    # runs late UTC evening, tomorrow 08:00 is <12h away and My Wallet would
+    # already treat the ticket as near-expired — bump one more day.
+    candidate = base + timedelta(days=1 + int(day_offset))
+    min_ahead = now + timedelta(hours=13)
+    if candidate <= min_ahead:
+        candidate += timedelta(days=1)
+    return candidate
 
 
 def _iso_z(dt: datetime) -> str:
