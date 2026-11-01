@@ -1,11 +1,14 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, memo, useImperativeHandle, useRef } from 'react';
 
 /**
- * Fully uncontrolled card fields for Capacitor Android WebView.
+ * Bare uncontrolled card fields for Capacitor Android WebView.
  *
- * Any React setState on each keystroke (even local) can remount/reconcile
- * the focused <input> and make the WebView scroll to the top + drop digits.
- * Values are read from the DOM via ref.getValues() only on submit.
+ * Hard rules (learned the hard way):
+ * - NO React state / controlled `value` while typing
+ * - NEVER write `el.value = …` on input/keypress (kills Gboard after 1 digit)
+ * - NEVER scrollTo / scrollIntoView while focused
+ * - type="text" + inputMode="numeric" (type="tel" + pattern is flaky on WebView)
+ * - Spaces/slashes only when READING values for submit — not in the live field
  */
 
 function digitsOnly(raw, max) {
@@ -29,126 +32,103 @@ function expiryDisplay(raw) {
 const fieldClass =
   'mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 text-base font-mono focus:ring-2 focus:ring-primary focus:outline-none';
 
-function clampDigits(el, max) {
-  if (!el) return;
-  const next = digitsOnly(el.value, max);
-  if (el.value !== next) {
-    const start = el.selectionStart;
-    el.value = next;
-    // Keep caret at end after strip — mid-field caret + IME is unreliable on WebView.
-    try {
-      const pos = typeof start === 'number' ? Math.min(start, next.length) : next.length;
-      el.setSelectionRange(pos, pos);
-    } catch {
-      /* ignore */
-    }
-  }
-}
+const CheckoutCardPaymentFields = memo(
+  forwardRef(function CheckoutCardPaymentFields(_props, ref) {
+    const numberRef = useRef(null);
+    const expiryRef = useRef(null);
+    const cvvRef = useRef(null);
 
-const CheckoutCardPaymentFields = forwardRef(function CheckoutCardPaymentFields(_props, ref) {
-  const numberRef = useRef(null);
-  const expiryRef = useRef(null);
-  const cvvRef = useRef(null);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      getValues: () => ({
-        cardNumber: cardDisplay(numberRef.current?.value),
-        expiry: expiryDisplay(expiryRef.current?.value),
-        cvv: digitsOnly(cvvRef.current?.value, 4),
+    useImperativeHandle(
+      ref,
+      () => ({
+        getValues: () => ({
+          cardNumber: cardDisplay(numberRef.current?.value),
+          expiry: expiryDisplay(expiryRef.current?.value),
+          cvv: digitsOnly(cvvRef.current?.value, 4),
+        }),
       }),
-    }),
-    [],
-  );
+      [],
+    );
 
-  return (
-    <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
-      <div className="block">
-        <label
-          htmlFor="checkout-card-number"
-          className="font-bold text-xs text-on-surface-variant uppercase"
-        >
-          Αριθμός κάρτας
-        </label>
-        <input
-          ref={numberRef}
-          id="checkout-card-number"
-          name="checkout-card-number"
-          type="tel"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="next"
-          placeholder="4242 4242 4242 4242"
-          defaultValue=""
-          onInput={(e) => clampDigits(e.currentTarget, 16)}
-          onBlur={(e) => {
-            e.currentTarget.value = cardDisplay(e.currentTarget.value);
-          }}
-          className={fieldClass}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+    return (
+      <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
         <div className="block">
           <label
-            htmlFor="checkout-card-expiry"
+            htmlFor="checkout-card-number"
             className="font-bold text-xs text-on-surface-variant uppercase"
           >
-            Λήξη
+            Αριθμός κάρτας
           </label>
           <input
-            ref={expiryRef}
-            id="checkout-card-expiry"
-            name="checkout-card-expiry"
-            type="tel"
+            ref={numberRef}
+            id="checkout-card-number"
+            name="cc-number"
+            type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
+            autoComplete="cc-number"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="next"
-            placeholder="MM/YY"
+            maxLength={19}
+            placeholder="4242424242424242"
             defaultValue=""
-            onInput={(e) => clampDigits(e.currentTarget, 4)}
-            onBlur={(e) => {
-              e.currentTarget.value = expiryDisplay(e.currentTarget.value);
-            }}
             className={fieldClass}
           />
         </div>
-        <div className="block">
-          <label
-            htmlFor="checkout-card-cvv"
-            className="font-bold text-xs text-on-surface-variant uppercase"
-          >
-            CVV
-          </label>
-          <input
-            ref={cvvRef}
-            id="checkout-card-cvv"
-            name="checkout-card-cvv"
-            type="tel"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="done"
-            placeholder="123"
-            defaultValue=""
-            onInput={(e) => clampDigits(e.currentTarget, 4)}
-            className={fieldClass}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="block">
+            <label
+              htmlFor="checkout-card-expiry"
+              className="font-bold text-xs text-on-surface-variant uppercase"
+            >
+              Λήξη
+            </label>
+            <input
+              ref={expiryRef}
+              id="checkout-card-expiry"
+              name="cc-exp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-exp"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
+              maxLength={5}
+              placeholder="MMYY"
+              defaultValue=""
+              className={fieldClass}
+            />
+          </div>
+          <div className="block">
+            <label
+              htmlFor="checkout-card-cvv"
+              className="font-bold text-xs text-on-surface-variant uppercase"
+            >
+              CVV
+            </label>
+            <input
+              ref={cvvRef}
+              id="checkout-card-cvv"
+              name="cc-csc"
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-csc"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
+              maxLength={4}
+              placeholder="123"
+              defaultValue=""
+              className={fieldClass}
+            />
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  }),
+);
 
 export default CheckoutCardPaymentFields;
