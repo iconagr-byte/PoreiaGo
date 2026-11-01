@@ -149,13 +149,21 @@ html[data-poreiago-app='wallet'] * {
 
 /* Soft-input: stop scroll anchoring from yanking the page to the top.
  * Pair with Activity windowSoftInputMode=adjustPan (not adjustResize) —
- * resize reflows min-h-screen checkout and jumps the viewport upward. */
+ * resize reflows min-h-screen checkout and jumps the viewport upward.
+ * Keep overflow-y scrollable — overscroll-behavior-y:none on both html+body
+ * was blocking seat-map / checkout vertical scroll on Android WebView. */
 html[data-poreiago-app='app'],
 html[data-poreiago-app='wallet'],
 html[data-poreiago-app='app'] body,
-html[data-poreiago-app='wallet'] body {
+html[data-poreiago-app='wallet'] body,
+html[data-poreiago-app='app'] #root,
+html[data-poreiago-app='wallet'] #root {
   overflow-anchor: none;
-  overscroll-behavior-y: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: auto;
+  min-height: 100%;
+  overscroll-behavior-y: auto;
 }
 
 
