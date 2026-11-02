@@ -63,7 +63,7 @@ export default function PageDesignLivePreview({
     (designPage === 'rent'
       ? '/rent?preview=1'
       : designPage === 'wallet'
-        ? '/wallet'
+        ? '/wallet?preview=1'
         : '/storefront?preview=1');
 
   const onIframeLoad = () => {
