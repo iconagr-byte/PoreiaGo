@@ -5464,8 +5464,8 @@
 /* iPad / tablet portrait: full-bleed, left copy + form */
 @media (min-width: 701px) and (max-width: 1100px) {
   .rent-auth-stage--desktop .rent-auth-scroll {
-    grid-template-columns: minmax(220px, 1fr) minmax(320px, 440px);
-    max-width: 920px;
+    grid-template-columns: minmax(220px, 1fr) minmax(380px, 520px);
+    max-width: 980px;
     gap: 1.5rem 1.75rem;
     padding: 1.5rem 1.25rem;
   }
@@ -5486,8 +5486,8 @@
 /* Landscape tablets: keep three columns when wide enough */
 @media (min-width: 901px) and (max-width: 1100px) and (orientation: landscape) {
   .rent-auth-stage--desktop .rent-auth-scroll {
-    grid-template-columns: minmax(180px, 1fr) minmax(300px, 400px) minmax(180px, 1fr);
-    max-width: 1100px;
+    grid-template-columns: minmax(180px, 1fr) minmax(400px, 520px) minmax(180px, 1fr);
+    max-width: 1180px;
   }
 
   .rent-auth-stage--desktop .rent-auth-aside--right {
