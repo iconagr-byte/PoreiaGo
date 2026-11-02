@@ -318,6 +318,8 @@ class PlatformTenantCreateRequest(BaseModel):
     legal_name: str = Field(min_length=2, max_length=255)
     subdomain: str = Field(min_length=2, max_length=64)
     plan: str = "starter"
+    # buses = trips only · rent = rent-only plan · both = bus plan + rent add-on
+    service_mode: str = "buses"
     vat_number: str | None = None
     admin_email: EmailStr
     admin_password: str = Field(min_length=8, max_length=128)
