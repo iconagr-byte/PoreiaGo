@@ -1,5 +1,6 @@
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import PlatformBusesSession from '../components/marketing/PlatformBusesSession.jsx';
+import PlatformWalletSession from '../components/marketing/PlatformWalletSession.jsx';
 import PlatformMarketingHeader from '../components/marketing/PlatformMarketingHeader.jsx';
 import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
@@ -26,6 +27,7 @@ export default function FrontPage() {
       <main>
         <PlatformServiceHub />
         <PlatformBusesSession />
+        <PlatformWalletSession />
         <PainPointsSection />
         <FeaturesSection />
         <HowItWorksSection />
@@ -54,6 +56,9 @@ export default function FrontPage() {
               </a>
               <a href="#our-fleet" className="hover:text-white">
                 Στόλος
+              </a>
+              <a href="#session-wallet" className="hover:text-white">
+                My Wallet
               </a>
               <a href="#features" className="hover:text-white">
                 Λειτουργίες
