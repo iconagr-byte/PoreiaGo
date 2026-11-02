@@ -209,9 +209,13 @@ async def create_tenant(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Slug, subdomain ή email υπάρχει ήδη",
             ) from exc
+        # Keep a short actionable hint for Contabo schema quirks (name/plan).
+        hint = str(exc).replace("\n", " ").strip()
+        if len(hint) > 180:
+            hint = hint[:177] + "…"
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Αποτυχία δημιουργίας γραφείου — δοκίμασε ξανά",
+            detail=f"Αποτυχία δημιουργίας γραφείου ({type(exc).__name__}): {hint}",
         ) from exc
 
     # Prefer in-memory summary so a follow-up read cannot poison the txn.

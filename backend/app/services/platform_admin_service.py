@@ -579,10 +579,10 @@ class PlatformAdminService:
         if not _SLUG_RE.match(subdomain):
             raise ValueError("Invalid subdomain")
 
-        from app.services.tenant_modules import _heal_legacy_tenant_name_column
+        from app.services.tenant_modules import prepare_contabo_tenant_write
 
-        # Contabo legacy: tenants.name NOT NULL breaks ORM inserts (legal_name only).
-        await _heal_legacy_tenant_name_column(self._session)
+        # Contabo: same-txn softeners (name NOT NULL, plan CHECKs without rent).
+        schema_flags = await prepare_contabo_tenant_write(self._session)
 
         dup = await self._session.execute(
             select(Tenant.id).where(
@@ -599,41 +599,62 @@ class PlatformAdminService:
         )
         legal = legal_name.strip()
         vat = normalize_vat_number(vat_number) if vat_number else None
-
-        tenant = Tenant(
-            id=uuid4(),
-            slug=slug,
-            legal_name=legal,
-            vat_number=vat,
-            subdomain=subdomain,
-            plan=resolved_plan,
-            is_active=True,
-            settings_json=json.dumps(seed_settings, ensure_ascii=False),
-            isolation_strategy=(
-                IsolationStrategy.DATABASE.value
-                if resolved_plan == TenantPlan.ENTERPRISE
-                else IsolationStrategy.SCHEMA.value
-                if resolved_plan == TenantPlan.PROFESSIONAL
-                else IsolationStrategy.SHARED_RLS.value
-            ),
+        tenant_id = uuid4()
+        isolation = (
+            IsolationStrategy.DATABASE.value
+            if resolved_plan == TenantPlan.ENTERPRISE
+            else IsolationStrategy.SCHEMA.value
+            if resolved_plan == TenantPlan.PROFESSIONAL
+            else IsolationStrategy.SHARED_RLS.value
         )
-        self._session.add(tenant)
-        await self._session.flush()
+        settings_raw = json.dumps(seed_settings, ensure_ascii=False)
+        plan_value = (
+            resolved_plan.value if hasattr(resolved_plan, "value") else str(resolved_plan)
+        )
 
-        # Keep legacy tenants.name populated when the column still exists.
-        try:
+        # Raw INSERT so Contabo legacy ``name`` is populated in the same statement.
+        if schema_flags.get("has_name_col"):
             await self._session.execute(
                 text(
-                    "UPDATE tenants SET name = COALESCE(NULLIF(BTRIM(name), ''), :n) "
-                    "WHERE id = :id AND EXISTS ("
-                    "  SELECT 1 FROM information_schema.columns"
-                    "  WHERE table_schema = 'public' AND table_name = 'tenants'"
-                    "    AND column_name = 'name')"
+                    """
+                    INSERT INTO tenants (
+                      id, slug, legal_name, name, vat_number, subdomain, plan,
+                      is_active, settings_json, isolation_strategy
+                    ) VALUES (
+                      :id, :slug, :legal_name, :name, :vat_number, :subdomain, :plan,
+                      true, :settings_json, :isolation_strategy
+                    )
+                    """
                 ),
-                {"n": legal, "id": tenant.id},
+                {
+                    "id": tenant_id,
+                    "slug": slug,
+                    "legal_name": legal,
+                    "name": legal,
+                    "vat_number": vat,
+                    "subdomain": subdomain,
+                    "plan": plan_value,
+                    "settings_json": settings_raw,
+                    "isolation_strategy": isolation,
+                },
             )
-        except Exception:
-            logger.debug("tenants.name sync skipped for %s", slug, exc_info=True)
+            tenant = await self._session.get(Tenant, tenant_id)
+            if tenant is None:
+                raise RuntimeError("Tenant insert succeeded but ORM reload missed the row")
+        else:
+            tenant = Tenant(
+                id=tenant_id,
+                slug=slug,
+                legal_name=legal,
+                vat_number=vat,
+                subdomain=subdomain,
+                plan=resolved_plan,
+                is_active=True,
+                settings_json=settings_raw,
+                isolation_strategy=isolation,
+            )
+            self._session.add(tenant)
+            await self._session.flush()
 
         self._session.add(
             Subscription(
@@ -661,7 +682,13 @@ class PlatformAdminService:
             await provision_tenant_schema(self._session, tenant)
         elif tenant.isolation_strategy == IsolationStrategy.DATABASE.value:
             await provision_dedicated_database(self._session, tenant)
-        logger.info("Provisioned tenant %s (%s)", tenant.slug, tenant.id)
+        logger.info(
+            "Provisioned tenant %s (%s) plan=%s name_col=%s",
+            tenant.slug,
+            tenant.id,
+            plan_value,
+            schema_flags.get("has_name_col"),
+        )
         return tenant, admin
 
     async def update_tenant(

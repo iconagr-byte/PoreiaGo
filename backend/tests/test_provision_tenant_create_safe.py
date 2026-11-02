@@ -31,10 +31,12 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
         self.assertIn("Prefer in-memory summary", src)
         self.assertIn("svc._tenant_detail(tenant", src)
 
-    def test_provision_heals_legacy_name(self):
+    def test_provision_prepares_contabo_schema_and_inserts_name(self):
         src = (ROOT / "app/services/platform_admin_service.py").read_text(encoding="utf-8")
-        self.assertIn("_heal_legacy_tenant_name_column", src)
-        self.assertIn("UPDATE tenants SET name", src)
+        self.assertIn("prepare_contabo_tenant_write", src)
+        self.assertIn("INSERT INTO tenants", src)
+        mods = (ROOT / "app/services/tenant_modules.py").read_text(encoding="utf-8")
+        self.assertIn("async def prepare_contabo_tenant_write", mods)
 
 
 if __name__ == "__main__":
