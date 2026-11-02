@@ -59,7 +59,7 @@ const BUSES_SESSION_GROUPS = [
       {
         icon: 'account_balance_wallet',
         label: 'My Wallet',
-        detail: 'Το εισιτήριο στο κινητό — χωρίς ψάξιμο στο email',
+        detail: 'Εισιτήρια και κάρτες ενοικίασης στο ίδιο κινητό',
       },
       {
         icon: 'badge',
