@@ -8,19 +8,20 @@ const QUICK_NAV = [
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
   { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
   { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
+  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
 ];
 
 const NAV_ITEMS = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
-  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works', icon: 'route' },
-  { id: 'rent-guest-services', el: 'Υπηρεσίες', en: 'Services', icon: 'verified_user' },
   {
     id: 'session-rent-contracts',
     el: 'Συμβόλαιο',
     en: 'Contract',
     icon: 'contract',
   },
+  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works', icon: 'route' },
+  { id: 'rent-guest-services', el: 'Υπηρεσίες', en: 'Services', icon: 'verified_user' },
 ];
 
 function phoneHref(phone) {
@@ -30,7 +31,20 @@ function phoneHref(phone) {
 
 function scrollToSection(id) {
   const el = document.getElementById(id);
-  el?.scrollIntoView({ behavior: 'smooth', block: id === 'rent-guest-search' ? 'center' : 'start' });
+  if (!el) return;
+  const block = id === 'rent-guest-search' ? 'center' : 'start';
+  // Prefer scrolling the guest home scroller (phone chrome); fall back to window.
+  const scroller = el.closest?.('.rent-home') || el.closest?.('.rent-main');
+  if (scroller && scroller !== document.documentElement) {
+    const topBar = document.querySelector('.rent-app--guest .rent-topbar');
+    const offset = (topBar?.offsetHeight || 0) + 12;
+    const elTop = el.getBoundingClientRect().top;
+    const scrollerTop = scroller.getBoundingClientRect().top;
+    const nextTop = scroller.scrollTop + (elTop - scrollerTop) - offset;
+    scroller.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+    return;
+  }
+  el.scrollIntoView({ behavior: 'smooth', block });
 }
 
 /**
