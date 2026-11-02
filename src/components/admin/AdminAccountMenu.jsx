@@ -13,6 +13,7 @@ import {
 } from '../../services/saasApi.js';
 import toast from 'react-hot-toast';
 import { useUiLang } from '../../hooks/useUiLang.js';
+import '../../styles/admin-header-icons.css';
 
 function initialsFromEmail(email) {
   const local = String(email || '')
@@ -103,42 +104,21 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className={`flex items-center gap-2 sm:gap-2.5 pl-1 pr-2 sm:pr-2.5 py-1 rounded-full border transition-colors ${
-          open
-            ? 'bg-sky-50 border-sky-200 shadow-sm'
-            : 'bg-white border-black/[0.08] hover:border-black/[0.14] hover:bg-black/[0.02]'
-        }`}
-        aria-label={t('account')}
+        className={`admin-hdr-avatar-btn${open ? ' is-open' : ''}`}
+        aria-label={`${t('account')} · ${name} · ${role}`}
         aria-expanded={open}
         aria-haspopup="menu"
+        title={`${name} · ${role}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <span
-          className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold tracking-wide shrink-0 ${
-            impersonating
-              ? 'bg-amber-500 text-white'
-              : 'bg-[#0b4f6c] text-white'
-          }`}
-          aria-hidden
-        >
-          {initials}
-        </span>
-        <span className="hidden sm:flex flex-col items-start min-w-0 text-left leading-tight pr-0.5">
-          <span className="text-[13px] font-semibold text-on-surface truncate max-w-[9.5rem]">
-            {name}
-          </span>
-          <span className="text-[11px] text-on-surface-variant truncate max-w-[9.5rem]">
-            {role}
+        <span className="admin-hdr-avatar-ring" aria-hidden>
+          <span
+            className={`admin-hdr-avatar-core${impersonating ? ' is-impersonating' : ''}`}
+          >
+            {initials}
           </span>
         </span>
-        <span
-          className={`material-symbols-outlined text-[18px] text-on-surface-variant transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
-          aria-hidden
-        >
-          expand_more
-        </span>
+        {!impersonating ? <span className="admin-hdr-online" aria-hidden /> : null}
       </button>
 
       {open ? (
