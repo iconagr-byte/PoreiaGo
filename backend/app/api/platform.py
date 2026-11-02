@@ -178,12 +178,20 @@ async def create_tenant(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
+    svc = PlatformAdminService(db)
     try:
-        tenant, admin = await PlatformAdminService(db).provision_tenant(
+        plan = TenantPlan(str(body.plan or "starter").strip().lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Μη έγκυρο πλάνο — starter / professional / enterprise / rent",
+        ) from exc
+    try:
+        tenant, admin = await svc.provision_tenant(
             slug=body.slug,
             legal_name=body.legal_name,
             subdomain=body.subdomain,
-            plan=TenantPlan(body.plan),
+            plan=plan,
             admin_email=body.admin_email,
             admin_password=body.admin_password,
             admin_full_name=body.admin_full_name,
@@ -192,12 +200,44 @@ async def create_tenant(
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("provision_tenant failed slug=%s", body.slug)
+        # Surface unique / constraint failures as 400 instead of opaque 500.
+        msg = str(exc).lower()
+        if "unique" in msg or "duplicate" in msg or "already exists" in msg:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Slug, subdomain ή email υπάρχει ήδη",
+            ) from exc
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Αποτυχία δημιουργίας γραφείου — δοκίμασε ξανά",
+        ) from exc
 
-    detail = await PlatformAdminService(db).get_tenant(tenant.id)
-    return PlatformTenantCreateResponse(
-        tenant=_tenant_model(detail or {}),
-        admin_user_id=admin.id,
-    )
+    # Prefer in-memory summary so a follow-up read cannot poison the txn.
+    try:
+        detail = svc._tenant_detail(tenant, include_counts=True, subscription=None)
+        detail["user_count"] = 1
+        detail["booking_count"] = 0
+        detail.setdefault("domain_in_registry", False)
+    except Exception:
+        logger.exception("create_tenant summary fallback for %s", tenant.id)
+        detail = {
+            "id": tenant.id,
+            "slug": tenant.slug,
+            "legal_name": tenant.legal_name,
+            "subdomain": tenant.subdomain,
+            "plan": tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan),
+            "is_active": True,
+            "user_count": 1,
+            "booking_count": 0,
+            "domain_in_registry": False,
+        }
+    try:
+        summary = _tenant_model(detail)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    return PlatformTenantCreateResponse(tenant=summary, admin_user_id=admin.id)
 
 
 @router.patch("/tenants/{tenant_id}", response_model=PlatformTenantSummary)

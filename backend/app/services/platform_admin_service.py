@@ -473,26 +473,25 @@ class PlatformAdminService:
         )
         from app.core.auth_deps import apply_tenant_rls
 
+        # Use a savepoint — never roll back the outer txn. Contabo booking
+        # schema quirks used to abort create-office after a successful flush.
         try:
-            await apply_tenant_rls(self._session, tenant.id)
-            detail["user_count"] = int(
-                await self._session.scalar(
-                    select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+            async with self._session.begin_nested():
+                await apply_tenant_rls(self._session, tenant.id)
+                detail["user_count"] = int(
+                    await self._session.scalar(
+                        select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+                    )
+                    or 0,
                 )
-                or 0,
-            )
-            detail["booking_count"] = int(
-                await self._session.scalar(
-                    select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+                detail["booking_count"] = int(
+                    await self._session.scalar(
+                        select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+                    )
+                    or 0,
                 )
-                or 0,
-            )
         except Exception:
             logger.exception("tenant detail counts failed for %s", tenant.id)
-            try:
-                await self._session.rollback()
-            except Exception:
-                pass
             detail["user_count"] = detail.get("user_count") or 0
             detail["booking_count"] = detail.get("booking_count") or 0
         return detail
@@ -580,6 +579,11 @@ class PlatformAdminService:
         if not _SLUG_RE.match(subdomain):
             raise ValueError("Invalid subdomain")
 
+        from app.services.tenant_modules import _heal_legacy_tenant_name_column
+
+        # Contabo legacy: tenants.name NOT NULL breaks ORM inserts (legal_name only).
+        await _heal_legacy_tenant_name_column(self._session)
+
         dup = await self._session.execute(
             select(Tenant.id).where(
                 or_(Tenant.slug == slug, Tenant.subdomain == subdomain),
@@ -593,12 +597,14 @@ class PlatformAdminService:
             service_mode=service_mode,
             office_name=legal_name.strip(),
         )
+        legal = legal_name.strip()
+        vat = normalize_vat_number(vat_number) if vat_number else None
 
         tenant = Tenant(
             id=uuid4(),
             slug=slug,
-            legal_name=legal_name.strip(),
-            vat_number=vat_number,
+            legal_name=legal,
+            vat_number=vat,
             subdomain=subdomain,
             plan=resolved_plan,
             is_active=True,
@@ -614,13 +620,28 @@ class PlatformAdminService:
         self._session.add(tenant)
         await self._session.flush()
 
+        # Keep legacy tenants.name populated when the column still exists.
+        try:
+            await self._session.execute(
+                text(
+                    "UPDATE tenants SET name = COALESCE(NULLIF(BTRIM(name), ''), :n) "
+                    "WHERE id = :id AND EXISTS ("
+                    "  SELECT 1 FROM information_schema.columns"
+                    "  WHERE table_schema = 'public' AND table_name = 'tenants'"
+                    "    AND column_name = 'name')"
+                ),
+                {"n": legal, "id": tenant.id},
+            )
+        except Exception:
+            logger.debug("tenants.name sync skipped for %s", slug, exc_info=True)
+
         self._session.add(
             Subscription(
                 id=uuid4(),
                 tenant_id=tenant.id,
                 plan=resolved_plan,
                 status=SubscriptionStatus.TRIALING,
-                base_amount_cents=_PLAN_BASE_CENTS[resolved_plan],
+                base_amount_cents=_PLAN_BASE_CENTS.get(resolved_plan, 0),
                 trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
             ),
         )
