@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import {
   HERO_BACKGROUND_IMAGE,
   PLATFORM_NAME,
@@ -16,7 +17,7 @@ function scrollToSession(event, sessionId) {
 }
 
 /**
- * Marketing homepage hub — brand-first chooser: buses session vs rent session.
+ * Marketing homepage hub — brand-first chooser: buses (on-page) vs rent (/rent page).
  */
 export default function PlatformServiceHub() {
   return (
@@ -53,11 +54,7 @@ export default function PlatformServiceHub() {
               </span>
             </a>
 
-            <a
-              href="#session-rent"
-              className="pg-hub-door pg-hub-door--rent"
-              onClick={(e) => scrollToSession(e, 'session-rent')}
-            >
+            <Link to="/rent" className="pg-hub-door pg-hub-door--rent">
               <span className="pg-hub-door-icon material-symbols-outlined" aria-hidden>
                 car_rental
               </span>
@@ -66,9 +63,9 @@ export default function PlatformServiceHub() {
                 <span>{SERVICE_HUB.rentHint}</span>
               </span>
               <span className="pg-hub-door-arrow material-symbols-outlined" aria-hidden>
-                arrow_downward
+                arrow_forward
               </span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>

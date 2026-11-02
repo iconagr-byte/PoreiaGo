@@ -247,7 +247,7 @@ export const FEATURE_LANES = {
   rent: {
     kicker: 'Ενοικιάσεις',
     title: 'Αυτοκίνητα με βοήθεια και συμβόλαιο',
-    href: '#session-rent',
+    href: '/rent',
   },
   shared: {
     kicker: 'Κοινά',
@@ -294,7 +294,7 @@ export const AUDIENCE = {
   rent: {
     kicker: 'Ενοικιάσεις',
     title: 'Θέλετε αυτοκίνητα δίπλα στα λεωφορεία — καθαρά',
-    href: '#session-rent',
+    href: '/rent',
     points: [
       { icon: 'car_rental', text: 'Ενοικιάσεις χωρίς να μπερδεύονται με τις εκδρομές' },
       { icon: 'shield', text: 'Ασφάλειες και υπογραφή πριν φύγει το όχημα' },
