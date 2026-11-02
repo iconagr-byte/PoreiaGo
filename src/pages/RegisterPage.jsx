@@ -280,21 +280,15 @@ export default function RegisterPage() {
     <>
       <div className={`text-center ${heroClass}`}>
         <span className={iconClass} aria-hidden>
-          {rentIntent
-            ? 'directions_car'
-            : walletClaimFlow
-              ? 'account_balance_wallet'
-              : 'account_circle'}
+          {rentIntent || walletClaimFlow ? 'account_balance_wallet' : 'account_circle'}
         </span>
         <h1>
-          {rentIntent
-            ? 'Rent Wallet'
-            : walletClaimFlow
-              ? 'My Wallet'
-              : 'Δημιουργία λογαριασμού'}
+          {rentIntent || walletClaimFlow ? 'My Wallet' : 'Δημιουργία λογαριασμού'}
         </h1>
         {rentIntent ? (
-          <p className={leadClass}>Δημιουργήστε λογαριασμό για ενοικίαση οχήματος</p>
+          <p className={leadClass}>
+            Ένας λογαριασμός — εισιτήρια και ενοικιάσεις μαζί
+          </p>
         ) : walletClaimFlow ? null : (
           <p className={leadClass}>
             Όνομα, email και κωδικός — για κρατήσεις στο όνομά σας.
@@ -464,16 +458,16 @@ export default function RegisterPage() {
         <div className="rent-auth-shell">
           <div className="rent-auth-scroll">
             {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το Rent Wallet">
-                <p className="rent-auth-aside-kicker">Rent Wallet · Ενοικιάσεις</p>
+              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το My Wallet">
+                <p className="rent-auth-aside-kicker">My Wallet · Ενοικιάσεις</p>
                 <h2 className="rent-auth-aside-title">
                   Δημιουργήστε
                   <br />
-                  λογαριασμό ενοικίασης
+                  έναν λογαριασμό
                 </h2>
                 <p className="rent-auth-aside-lead">
-                  Ένας λογαριασμός μόνο για οχήματα — κρατήσεις, πληρωμές και QR παραλαβής,
-                  χωριστά από τα λεωφορεία.
+                  Ένα My Wallet για εισιτήρια και ενοικιάσεις. Από το /rent μπαίνετε κατευθείαν
+                  στην καρτέλα Ενοικιάσεις — ίδια σύνδεση με τα λεωφορεία.
                 </p>
                 <ul className="rent-auth-aside-list">
                   <li>
@@ -481,8 +475,8 @@ export default function RegisterPage() {
                       directions_car
                     </span>
                     <div>
-                      <strong>Κρατήσεις οχημάτων</strong>
-                      <span>Επιβατικά, van και υπηρεσίες σε μία λίστα.</span>
+                      <strong>Κάρτες οχημάτων</strong>
+                      <span>Ενοικιάσεις δίπλα στα εισιτήρια — ίδιο Wallet.</span>
                     </div>
                   </li>
                   <li>

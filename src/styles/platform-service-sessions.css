@@ -662,6 +662,20 @@
   animation: pgWalletPassFloat 5.5s ease-in-out infinite;
 }
 
+.pg-wallet-pass--rent {
+  background: linear-gradient(160deg, rgba(15, 118, 110, 0.92), rgba(4, 47, 46, 0.95));
+  border-color: rgba(94, 234, 212, 0.35);
+  opacity: 0.88;
+}
+
+.pg-wallet-pass--rent .pg-wallet-pass-route {
+  color: #ecfdf5;
+}
+
+.pg-wallet-pass--rent .pg-wallet-pass-meta {
+  color: rgba(167, 243, 208, 0.9);
+}
+
 .pg-wallet-pass--mid {
   top: 2.35rem;
   transform: scale(0.97);
