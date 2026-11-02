@@ -11,7 +11,7 @@ const PREVIEW_CARS = DEMO_RENT_FLEET.slice(0, 3);
 
 export default function PlatformRentSession({ placement = 'page' } = {}) {
   const onRentPage = placement === 'page';
-  const ctaLabel = onRentPage ? 'Δες διαθέσιμα οχήματα' : RENT_SESSION.ctaLabel;
+  const ctaLabel = onRentPage ? 'Πάνω στον στόλο' : RENT_SESSION.ctaLabel;
 
   const scrollToFleet = (e) => {
     if (!onRentPage) return;
@@ -52,7 +52,7 @@ export default function PlatformRentSession({ placement = 'page' } = {}) {
           <a href="#rent-guest-fleet" className="pg-session-cta pg-session-cta--rent" onClick={scrollToFleet}>
             {ctaLabel}
             <span className="material-symbols-outlined" aria-hidden>
-              arrow_downward
+              arrow_upward
             </span>
           </a>
         ) : (
