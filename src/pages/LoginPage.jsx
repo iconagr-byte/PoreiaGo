@@ -349,16 +349,16 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     <>
       <div className={`text-center ${rentIntent ? 'mb-6' : 'wallet-auth-hero'}`}>
         <span className={iconClass} aria-hidden>
-          {rentIntent ? 'directions_car' : 'account_balance_wallet'}
+          account_balance_wallet
         </span>
         <h1>
-          {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : rentIntent ? 'Rent Wallet' : 'My Wallet'}
+          {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : 'My Wallet'}
         </h1>
         {bookingPayContinue || rentIntent ? (
           <p className={leadClass}>
             {bookingPayContinue
               ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.'
-              : 'Σύνδεση για ενοικίαση οχήματος'}
+              : 'Ένας λογαριασμός — εισιτήρια και ενοικιάσεις μαζί'}
           </p>
         ) : null}
       </div>
@@ -519,16 +519,16 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         <div className="rent-auth-shell">
           <div className="rent-auth-scroll">
             {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το Rent Wallet">
-                <p className="rent-auth-aside-kicker">Rent Wallet · Ενοικιάσεις</p>
+              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το My Wallet">
+                <p className="rent-auth-aside-kicker">My Wallet · Ενοικιάσεις</p>
                 <h2 className="rent-auth-aside-title">
                   Η κράτησή σας,
                   <br />
                   πάντα στο κινητό
                 </h2>
                 <p className="rent-auth-aside-lead">
-                  Ένας λογαριασμός μόνο για ενοικίαση οχήματος — κρατήσεις, πληρωμές και QR
-                  παραλαβής, χωριστά από τα λεωφορεία.
+                  Ένα My Wallet για όλα — εισιτήρια λεωφορείου και κάρτες ενοικίασης στο ίδιο
+                  λογαριασμό. Από το /rent ανοίγει η καρτέλα Ενοικιάσεις.
                 </p>
                 <ul className="rent-auth-aside-list">
                   <li>
@@ -536,8 +536,8 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                       directions_car
                     </span>
                     <div>
-                      <strong>Κρατήσεις οχημάτων</strong>
-                      <span>Επιβατικά, van και υπηρεσίες σε μία λίστα.</span>
+                      <strong>Κάρτες οχημάτων</strong>
+                      <span>Ενοικιάσεις δίπλα στα εισιτήρια — ίδιο Wallet.</span>
                     </div>
                   </li>
                   <li>
@@ -597,7 +597,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                     <span className="rent-auth-aside-step">3</span>
                     <div>
                       <strong>Παραλάβετε με QR</strong>
-                      <span>Όλα στο Wallet — χωρίς χαρτιά.</span>
+                      <span>Όλα στο My Wallet — χωρίς χαρτιά.</span>
                     </div>
                   </li>
                 </ol>

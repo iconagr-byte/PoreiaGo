@@ -108,7 +108,7 @@ export default function RentAppShareBanner() {
               ) : null}
             </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
-              Πράσινο My Wallet ενοικίασης — χωριστά από το μπλε /wallet λεωφορείων. Σκανάρετε για
+              My Wallet με καρτέλα Ενοικιάσεις — ίδιο πορτοφόλι με τα εισιτήρια. Σκανάρετε για
               σύνδεση, κρατήσεις και εγκατάσταση.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">

@@ -27,7 +27,7 @@ export default function RentGuestLandingExtras({
               Ό,τι χρειάζεσαι για μια ήρεμη ενοικίαση.
               <span className="rent-land-muted"> Built-in.</span>
             </h2>
-            <p className="rent-land-sub">Ασφάλεια, υποστήριξη και εργαλεία μέσα στο Rent Wallet.</p>
+            <p className="rent-land-sub">Ασφάλεια, υποστήριξη και εργαλεία μέσα στο My Wallet.</p>
           </header>
           <div className="rent-land-cards">
             {RENT_HOME_TRUST.map((item) => (
@@ -153,9 +153,9 @@ export default function RentGuestLandingExtras({
             </div>
           </div>
           <aside className="rent-land-aside">
-            <p className="rent-land-aside-kicker">Rent Wallet</p>
+            <p className="rent-land-aside-kicker">My Wallet</p>
             <h3>Η κράτησή σου σε μία κάρτα</h3>
-            <p>Ημερομηνίες, παραλαβή, SOS και οδική βοήθεια — όλα στο Wallet μετά τη σύνδεση.</p>
+            <p>Ημερομηνίες, παραλαβή, SOS και οδική βοήθεια — όλα στο My Wallet μετά τη σύνδεση.</p>
           </aside>
         </div>
       </section>
