@@ -433,8 +433,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           </RentGuestHero>
 
           <div className="rent-home-stack rent-home-stack--landing">
-            {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
-
             {/* Filters sit in a left page column — outside the car-results frame. */}
             <div id="rent-guest-fleet" className="rent-fleet-shell">
               <RentFleetFilterSidebar
@@ -583,6 +581,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             />
+
+            {/* Marketing rent session sits below «Γιατί εμάς», not above the fleet. */}
+            {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
           </div>
         </main>
       </div>
