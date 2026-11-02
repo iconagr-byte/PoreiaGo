@@ -91,7 +91,8 @@ export default function BookingLookupPage() {
               searchParams.get('reference') ||
               searchParams.get('code'),
           );
-          const target = hasLookup || qRef.startsWith('RB-') ? '/rent/my-booking' : '/rent/wallet';
+          const target =
+            hasLookup || qRef.startsWith('RB-') ? '/rent/my-booking' : '/wallet?tab=rentals';
           navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
           return;
         }
@@ -250,7 +251,7 @@ export default function BookingLookupPage() {
                   </span>
                   Εισιτήριο λεωφορείου
                 </button>
-                <a href="/rent/wallet" className="booking-lookup-product-gate-rent">
+                <a href="/wallet?tab=rentals" className="booking-lookup-product-gate-rent">
                   <span className="material-symbols-outlined" aria-hidden>
                     car_rental
                   </span>
@@ -266,7 +267,7 @@ export default function BookingLookupPage() {
               {rentAvailable ? (
                 <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
                   Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-                  <Link to="/rent/wallet">Rent Wallet</Link>
+                  <Link to="/wallet?tab=rentals">My Wallet</Link>
                   {' · '}
                   <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
                 </p>

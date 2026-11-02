@@ -29,7 +29,7 @@ function scrollToSection(id) {
 /**
  * Guest header — Menu (left, beside brand) + quick links / lang / Sign in / My Wallet.
  * Pass `brand` to place the logo immediately before the menu control.
- * My Wallet always opens /rent/wallet — never bus /my-booking.
+ * My Wallet opens unified /wallet?tab=rentals — same shell as bus tickets.
  */
 export default function RentGuestTopActions({
   brand = null,
@@ -192,7 +192,7 @@ export default function RentGuestTopActions({
             to="/rent/register"
             role="menuitem"
             className="rent-top-menu-item"
-            state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
+            state={{ from: '/wallet?tab=rentals', rentEntrance: true }}
             onClick={close}
           >
             <span className="material-symbols-outlined" aria-hidden>
@@ -201,7 +201,7 @@ export default function RentGuestTopActions({
             {registerLabel}
           </Link>
 
-          <a href="/rent/wallet" role="menuitem" className="rent-top-menu-cta" onClick={close}>
+          <a href="/wallet?tab=rentals" role="menuitem" className="rent-top-menu-cta" onClick={close}>
             <span className="material-symbols-outlined" aria-hidden>
               account_balance_wallet
             </span>
@@ -278,7 +278,7 @@ export default function RentGuestTopActions({
         </button>
 
         <a
-          href="/rent/wallet"
+          href="/wallet?tab=rentals"
           className="rent-top-chip rent-top-chip--wallet"
           title={walletTitle}
           aria-label={walletTitle}

@@ -22,7 +22,10 @@ import '../styles/rental-pwa.css';
 import '../styles/customer-auth.css';
 
 function isRentReturn(path) {
-  return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
+  if (typeof path !== 'string') return false;
+  if (path === '/rent' || path.startsWith('/rent/')) return true;
+  if (path === '/wallet?tab=rentals' || path.startsWith('/wallet?tab=rentals')) return true;
+  return false;
 }
 
 function isRentAuthPath(pathname) {
@@ -70,7 +73,7 @@ export default function RegisterPage() {
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
-      : '/rent/wallet'
+      : '/wallet?tab=rentals'
     : cleanRegister
       ? location.state?.from || '/'
       : location.state?.from || '/wallet';

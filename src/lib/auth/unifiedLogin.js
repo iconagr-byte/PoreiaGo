@@ -27,13 +27,13 @@ export function isNetworkAuthError(err) {
 }
 
 /**
- * Pick My Wallet vs Rent Wallet for a customer who just authenticated.
+ * Pick unified My Wallet landing (home vs rentals tab) after auth.
  *
  * Priority:
- * 1. Explicit path hints ( /rent/login → rent, /wallet claim → wallet )
- * 2. Live bookings (rent-only → rent; any bus → wallet; dual → wallet)
+ * 1. Explicit path hints ( /rent/login → rentals tab, /wallet claim → home )
+ * 2. Live bookings (rent-only → rentals tab; any bus → home; dual → home )
  * 3. Session prefer-rent / remembered native role
- * 4. Default My Wallet
+ * 4. Default My Wallet home
  *
  * @param {{ preferRent?: boolean, preferWallet?: boolean }} hints
  */
@@ -65,7 +65,7 @@ export async function resolveCustomerSurface(hints = {}) {
     /* default below */
   }
 
-  // Rent-only account → Rent Wallet. Dual or bus → bus My Wallet (rent lives inside it).
+  // One My Wallet shell: rent-only opens the rentals tab; bus/dual open home.
   if (rentCount > 0 && busCount === 0) {
     return { role: NATIVE_ROLE_RENT, path: pathForNativeRole(NATIVE_ROLE_RENT) };
   }

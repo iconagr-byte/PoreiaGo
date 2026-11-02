@@ -1,6 +1,6 @@
 /**
- * Rent Wallet — featured rental pass + stack of other vehicle bookings.
- * Separate from bus My Wallet (/wallet).
+ * Rent passes — featured rental pass + stack of other vehicle bookings.
+ * Lives inside unified My Wallet (/wallet?tab=rentals).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';

@@ -3,14 +3,18 @@
  *
  * Canonical Android package: com.poreiago.wallet (one install).
  * Role homes:
- *   driver  → /driver          (DriverCommandCenter)
- *   wallet  → /wallet          (SimpleWalletPage / bus My Wallet)
- *   rent    → /rent/wallet     (RentalCustomerApp)
- *   none    → /login           (unified login: auto-detects customer / driver / rent)
+ *   driver  → /driver                 (DriverCommandCenter)
+ *   wallet  → /wallet                 (unified My Wallet)
+ *   rent    → /wallet?tab=rentals     (same shell, rentals tab)
+ *   none    → /login                  (unified login: auto-detects customer / driver / rent)
  */
 
 import { getCustomerToken, isCustomer } from '../auth.js';
 import { hasPreferRentLookup } from '../rental/preferRentLookup.js';
+import {
+  UNIFIED_WALLET_PATH,
+  UNIFIED_WALLET_RENTALS_PATH,
+} from '../wallet/unifiedWalletPaths.js';
 
 export const NATIVE_ROLE_DRIVER = 'driver';
 export const NATIVE_ROLE_WALLET = 'wallet';
@@ -22,8 +26,8 @@ const DRIVER_SESSION_KEY = 'driver_command_session';
 
 const ROLE_PATH = {
   [NATIVE_ROLE_DRIVER]: '/driver',
-  [NATIVE_ROLE_WALLET]: '/wallet',
-  [NATIVE_ROLE_RENT]: '/rent/wallet',
+  [NATIVE_ROLE_WALLET]: UNIFIED_WALLET_PATH,
+  [NATIVE_ROLE_RENT]: UNIFIED_WALLET_RENTALS_PATH,
 };
 
 function readRememberedRole() {

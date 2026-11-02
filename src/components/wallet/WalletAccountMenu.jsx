@@ -237,8 +237,8 @@ export default function WalletAccountMenu({
                   <span className="material-symbols-outlined">directions_car</span>
                 </span>
                 <span className="wallet-account-sheet-item-body">
-                  <span className="wallet-account-sheet-item-label">Rent Wallet</span>
-                  <span className="wallet-account-sheet-item-hint">Κρατήσεις οχήματος</span>
+                  <span className="wallet-account-sheet-item-label">Ενοικιάσεις</span>
+                  <span className="wallet-account-sheet-item-hint">Κάρτες οχήματος στο My Wallet</span>
                 </span>
                 <span className="material-symbols-outlined wallet-account-sheet-chevron" aria-hidden>
                   chevron_right

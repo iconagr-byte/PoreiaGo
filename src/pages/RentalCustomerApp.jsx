@@ -650,7 +650,7 @@ function RentalAuthGate() {
           replace
           state={{
             ...(location.state || {}),
-            from: '/rent/wallet',
+            from: '/wallet?tab=rentals',
             rentEntrance: true,
           }}
         />
@@ -667,7 +667,9 @@ function RentalAuthGate() {
   return (
     <RentalGuestPreviewApp
       onRequireLogin={() =>
-        navigate('/rent/login', { state: { from: '/rent/wallet', rentEntrance: true } })
+        navigate('/rent/login', {
+          state: { from: '/wallet?tab=rentals', rentEntrance: true },
+        })
       }
       onPickVehicle={() => {
         /* handled in guest */
@@ -788,17 +790,13 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
   };
 
   const openWallet = () => {
-    if (location.pathname !== '/rent/wallet') {
-      navigate('/rent/wallet', {
-        state: {
-          ...(location.state || {}),
-          openRentWallet: true,
-        },
-      });
-      return;
-    }
-    setWalletKey((k) => k + 1);
-    requestAnimationFrame(() => scrollToSection('rent-wallet'));
+    navigate('/wallet?tab=rentals', {
+      state: {
+        ...(location.state || {}),
+        walletTab: 'rentals',
+        openRentWallet: true,
+      },
+    });
   };
 
   const pickVehicle = (v) => {
@@ -947,15 +945,27 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
               <div className="rent-panel rent-panel--wallet">
                 <h2>My Wallet</h2>
                 <p className="rent-panel-lead">
-                  Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
+                  Εισιτήρια και ενοικιάσεις στο ίδιο My Wallet — άνοιξε την καρτέλα Ενοικιάσεις.
                 </p>
-                <RentalWalletPanel
-                  brandLabel={branding.brandLabel}
-                  passengerName={profile.name}
-                  refreshKey={walletKey}
-                  highlightBookingId={highlightBookingId}
-                  onBookVehicle={() => scrollToSection('rent-book')}
-                />
+                <button
+                  type="button"
+                  className="rent-btn rent-btn-wallet"
+                  onClick={openWallet}
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    account_balance_wallet
+                  </span>
+                  Άνοιγμα My Wallet
+                </button>
+                {highlightBookingId ? (
+                  <RentalWalletPanel
+                    brandLabel={branding.brandLabel}
+                    passengerName={profile.name}
+                    refreshKey={walletKey}
+                    highlightBookingId={highlightBookingId}
+                    onBookVehicle={() => scrollToSection('rent-book')}
+                  />
+                ) : null}
               </div>
             </RentWalletCheckInBand>
           </section>
@@ -1005,8 +1015,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
             <div className="rent-panel">
               <h2>Λογαριασμός</h2>
               <p className="rent-panel-lead">
-                Στοιχεία σύνδεσης για την εφαρμογή ενοικίασης. Τα εισιτήρια λεωφορείου είναι στο My
-                Wallet λεωφορείων.
+                Στοιχεία σύνδεσης. Εισιτήρια και ενοικιάσεις ανοίγουν στο ίδιο My Wallet.
               </p>
               <dl style={{ margin: 0 }}>
                 <div className="rent-account-row">
