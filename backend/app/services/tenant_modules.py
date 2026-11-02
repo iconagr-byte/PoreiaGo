@@ -353,7 +353,7 @@ async def _heal_subscription_plan_column(session: Any) -> None:
         logger.exception("Could not heal subscriptions.plan column")
 
 
-async def _heal_legacy_tenant_name_column(session: Any) -> None:
+async def _heal_legacy_tenant_name_column(session: Any, *, commit: bool = True) -> None:
     """
     Contabo legacy schema still has tenants.name NOT NULL.
 
@@ -374,23 +374,99 @@ async def _heal_legacy_tenant_name_column(session: Any) -> None:
                       AND table_name = 'tenants'
                       AND column_name = 'name'
                   ) THEN
+                    ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL;
                     BEGIN
-                      ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL;
+                      ALTER TABLE tenants ALTER COLUMN name SET DEFAULT '';
                     EXCEPTION WHEN OTHERS THEN
                       NULL;
                     END;
                     UPDATE tenants
-                       SET name = COALESCE(NULLIF(BTRIM(name), ''), legal_name, slug)
+                       SET name = COALESCE(NULLIF(BTRIM(name), ''), legal_name, slug, '')
                      WHERE name IS NULL OR BTRIM(COALESCE(name, '')) = '';
                   END IF;
                 END $$;
                 """
             )
         )
-        await session.commit()
+        if commit:
+            await session.commit()
     except Exception:
-        await session.rollback()
+        if commit:
+            await session.rollback()
         logger.exception("Could not heal legacy tenants.name column")
+        if not commit:
+            raise
+
+
+async def prepare_contabo_tenant_write(session: Any) -> dict[str, bool]:
+    """
+    Same-transaction schema softeners for Contabo create-office inserts.
+
+    - tenants.name NOT NULL → nullable (+ empty default)
+    - plan check constraints that omit ``rent`` → dropped
+    - PG enum tenant_plan missing rent → ADD VALUE
+    Does NOT commit — stays inside the request transaction.
+    """
+    from sqlalchemy import text
+
+    flags = {"has_name_col": False, "plan_softened": False}
+    flags["has_name_col"] = bool(
+        await session.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public'
+                    AND table_name = 'tenants'
+                    AND column_name = 'name'
+                )
+                """
+            )
+        )
+    )
+    async def _safe(label: str, sql: str) -> bool:
+        try:
+            async with session.begin_nested():
+                await session.execute(text(sql))
+            return True
+        except Exception:
+            logger.debug("prepare_contabo_tenant_write %s skipped", label, exc_info=True)
+            return False
+
+    if flags["has_name_col"]:
+        # asyncpg rejects multi-statement prepared SQL — one ALTER per execute.
+        await _safe("drop_name_not_null", "ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL")
+        await _safe("name_default", "ALTER TABLE tenants ALTER COLUMN name SET DEFAULT ''")
+
+    # PG enum type (if any). Contabo usually uses VARCHAR (native_enum=False).
+    if await _safe("enum_rent", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'rent'"):
+        flags["plan_softened"] = True
+
+    # Drop CHECK constraints that lock plan to starter/professional/enterprise.
+    if await _safe(
+        "plan_checks",
+        """
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT c.conname, t.relname AS tbl
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE n.nspname = 'public'
+              AND t.relname IN ('tenants', 'subscriptions')
+              AND c.contype = 'c'
+              AND pg_get_constraintdef(c.oid) ILIKE '%plan%'
+              AND pg_get_constraintdef(c.oid) NOT ILIKE '%rent%'
+          LOOP
+            EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', r.tbl, r.conname);
+          END LOOP;
+        END $$;
+        """,
+    ):
+        flags["plan_softened"] = True
+    return flags
 
 
 def _tenant_noload_options():
