@@ -579,10 +579,14 @@ class PlatformAdminService:
         if not _SLUG_RE.match(subdomain):
             raise ValueError("Invalid subdomain")
 
-        from app.services.tenant_modules import prepare_contabo_tenant_write
+        from app.services.tenant_modules import (
+            prepare_contabo_tenant_write,
+            tenant_plan_db_token,
+        )
 
         # Contabo: same-txn softeners (name NOT NULL, plan CHECKs without rent).
         schema_flags = await prepare_contabo_tenant_write(self._session)
+        plan_style = str(schema_flags.get("plan_style") or "value")
 
         dup = await self._session.execute(
             select(Tenant.id).where(
@@ -608,20 +612,25 @@ class PlatformAdminService:
             else IsolationStrategy.SHARED_RLS.value
         )
         settings_raw = json.dumps(seed_settings, ensure_ascii=False)
-        plan_value = (
-            resolved_plan.value if hasattr(resolved_plan, "value") else str(resolved_plan)
-        )
+        # Contabo PG enum labels are STARTER/…; alembic/dev often uses starter/….
+        plan_db = tenant_plan_db_token(resolved_plan, plan_style)
+        # Prefer CAST when a real PG enum exists; plain bind for VARCHAR.
+        plan_sql = "CAST(:plan AS tenant_plan)" if plan_style == "name" else ":plan"
 
-        # Raw INSERT so Contabo legacy ``name`` is populated in the same statement.
-        if schema_flags.get("has_name_col"):
+        # Always Core-insert tenants when Contabo has legacy name col OR name-style plan,
+        # then attach an in-memory ORM instance (no reload → no LookupError on 'starter').
+        use_core_tenant = bool(schema_flags.get("has_name_col") or plan_style == "name")
+        if use_core_tenant:
+            name_cols = ", name" if schema_flags.get("has_name_col") else ""
+            name_vals = ", :name" if schema_flags.get("has_name_col") else ""
             await self._session.execute(
                 text(
-                    """
+                    f"""
                     INSERT INTO tenants (
-                      id, slug, legal_name, name, vat_number, subdomain, plan,
+                      id, slug, legal_name{name_cols}, vat_number, subdomain, plan,
                       is_active, settings_json, isolation_strategy
                     ) VALUES (
-                      :id, :slug, :legal_name, :name, :vat_number, :subdomain, :plan,
+                      :id, :slug, :legal_name{name_vals}, :vat_number, :subdomain, {plan_sql},
                       true, :settings_json, :isolation_strategy
                     )
                     """
@@ -633,14 +642,24 @@ class PlatformAdminService:
                     "name": legal,
                     "vat_number": vat,
                     "subdomain": subdomain,
-                    "plan": plan_value,
+                    "plan": plan_db,
                     "settings_json": settings_raw,
                     "isolation_strategy": isolation,
                 },
             )
-            tenant = await self._session.get(Tenant, tenant_id)
-            if tenant is None:
-                raise RuntimeError("Tenant insert succeeded but ORM reload missed the row")
+            tenant = Tenant(
+                id=tenant_id,
+                slug=slug,
+                legal_name=legal,
+                vat_number=vat,
+                subdomain=subdomain,
+                plan=resolved_plan,
+                is_active=True,
+                settings_json=settings_raw,
+                isolation_strategy=isolation,
+            )
+            # load=False: register PK in identity map without SELECT (avoids enum LookupError).
+            tenant = await self._session.merge(tenant, load=False)
         else:
             tenant = Tenant(
                 id=tenant_id,
@@ -656,16 +675,42 @@ class PlatformAdminService:
             self._session.add(tenant)
             await self._session.flush()
 
-        self._session.add(
-            Subscription(
-                id=uuid4(),
-                tenant_id=tenant.id,
-                plan=resolved_plan,
-                status=SubscriptionStatus.TRIALING,
-                base_amount_cents=_PLAN_BASE_CENTS.get(resolved_plan, 0),
-                trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
-            ),
-        )
+        sub_id = uuid4()
+        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+        base_cents = int(_PLAN_BASE_CENTS.get(resolved_plan, 0))
+        if plan_style == "name":
+            await self._session.execute(
+                text(
+                    f"""
+                    INSERT INTO subscriptions (
+                      id, tenant_id, plan, status, base_amount_cents, trial_ends_at,
+                      cancel_at_period_end, metered_buses, metered_trips
+                    ) VALUES (
+                      :id, :tenant_id, {plan_sql}, :status, :base_amount_cents,
+                      :trial_ends_at, false, true, true
+                    )
+                    """
+                ),
+                {
+                    "id": sub_id,
+                    "tenant_id": tenant.id,
+                    "plan": plan_db,
+                    "status": SubscriptionStatus.TRIALING.value,
+                    "base_amount_cents": base_cents,
+                    "trial_ends_at": trial_end,
+                },
+            )
+        else:
+            self._session.add(
+                Subscription(
+                    id=sub_id,
+                    tenant_id=tenant.id,
+                    plan=resolved_plan,
+                    status=SubscriptionStatus.TRIALING,
+                    base_amount_cents=base_cents,
+                    trial_ends_at=trial_end,
+                ),
+            )
 
         admin = User(
             id=uuid4(),
@@ -683,10 +728,11 @@ class PlatformAdminService:
         elif tenant.isolation_strategy == IsolationStrategy.DATABASE.value:
             await provision_dedicated_database(self._session, tenant)
         logger.info(
-            "Provisioned tenant %s (%s) plan=%s name_col=%s",
+            "Provisioned tenant %s (%s) plan_db=%s style=%s name_col=%s",
             tenant.slug,
             tenant.id,
-            plan_value,
+            plan_db,
+            plan_style,
             schema_flags.get("has_name_col"),
         )
         return tenant, admin
