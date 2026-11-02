@@ -63,7 +63,7 @@ import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
-import { RentProductSection } from '../components/marketing/PlatformLandingSections.jsx';
+import PlatformRentSession from '../components/marketing/PlatformRentSession.jsx';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import LoginPage from './LoginPage.jsx';
@@ -433,6 +433,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           </RentGuestHero>
 
           <div className="rent-home-stack rent-home-stack--landing">
+            {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
+
             {/* Filters sit in a left page column — outside the car-results frame. */}
             <div id="rent-guest-fleet" className="rent-fleet-shell">
               <RentFleetFilterSidebar
@@ -581,8 +583,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             />
-
-            {isPlatformMarketingHost() ? <RentProductSection /> : null}
           </div>
         </main>
       </div>

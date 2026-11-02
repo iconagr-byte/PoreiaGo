@@ -148,12 +148,21 @@ export function PainPointsSection() {
                   </li>
                 ))}
               </ul>
-              <a href={lane.href} className="pg-audience-lane-link">
-                {mod === 'buses' ? 'Πίσω στις εκδρομές' : 'Πίσω στις ενοικιάσεις'}
-                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
-                  arrow_upward
-                </span>
-              </a>
+              {mod === 'buses' ? (
+                <a href={lane.href} className="pg-audience-lane-link">
+                  Πίσω στις εκδρομές
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+                    arrow_upward
+                  </span>
+                </a>
+              ) : (
+                <Link to={lane.href} className="pg-audience-lane-link">
+                  Σελίδα ενοικιάσεων
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+                    arrow_forward
+                  </span>
+                </Link>
+              )}
             </article>
           ))}
         </div>
@@ -214,16 +223,21 @@ export function FeaturesSection() {
                   </li>
                 ))}
               </ul>
-              <a href={lane.meta.href} className="pg-features-lane-link">
-                {lane.id === 'shared'
-                  ? 'Δείτε τιμές'
-                  : lane.id === 'buses'
-                    ? 'Πίσω στις εκδρομές'
-                    : 'Πίσω στις ενοικιάσεις'}
-                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
-                  {lane.id === 'shared' ? 'arrow_downward' : 'arrow_upward'}
-                </span>
-              </a>
+              {lane.id === 'rent' ? (
+                <Link to={lane.meta.href} className="pg-features-lane-link">
+                  Σελίδα ενοικιάσεων
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
+                    arrow_forward
+                  </span>
+                </Link>
+              ) : (
+                <a href={lane.meta.href} className="pg-features-lane-link">
+                  {lane.id === 'shared' ? 'Δείτε τιμές' : 'Πίσω στις εκδρομές'}
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
+                    {lane.id === 'shared' ? 'arrow_downward' : 'arrow_upward'}
+                  </span>
+                </a>
+              )}
             </article>
           ))}
         </div>
@@ -389,9 +403,9 @@ export function FinalCtaSection() {
           <a href="#session-buses" className="pg-final-cta-btn pg-final-cta-btn--buses">
             Λεωφορεία
           </a>
-          <a href="#session-rent" className="pg-final-cta-btn pg-final-cta-btn--rent">
+          <Link to="/rent" className="pg-final-cta-btn pg-final-cta-btn--rent">
             Ενοικιάσεις
-          </a>
+          </Link>
         </div>
       </div>
     </section>

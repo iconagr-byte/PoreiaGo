@@ -126,12 +126,12 @@ export default function PlatformMarketingHeader() {
           <span className="pm-nav-rule" aria-hidden />
 
           <div className="pm-nav-cluster pm-nav-cluster--rent">
-            <a href="#session-rent" className="pm-nav-rent" onClick={closeAll}>
+            <Link to="/rent" className="pm-nav-rent" onClick={closeAll}>
               <span className="material-symbols-outlined" aria-hidden>
                 car_rental
               </span>
               Ενοικιάσεις
-            </a>
+            </Link>
           </div>
         </nav>
 
@@ -190,7 +190,7 @@ export default function PlatformMarketingHeader() {
                 </span>
                 Ενοικιάσεις
               </p>
-              <a href="#session-rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
+              <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
                 <span className="material-symbols-outlined" aria-hidden>
                   car_rental
                 </span>
@@ -198,7 +198,7 @@ export default function PlatformMarketingHeader() {
                   <strong>Ενοικιάσεις οχημάτων</strong>
                   <em>Ασφάλεια · οδική βοήθεια · συμβόλαιο</em>
                 </span>
-              </a>
+              </Link>
               <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
                 <span className="material-symbols-outlined" aria-hidden>
                   open_in_new
