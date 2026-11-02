@@ -19,7 +19,6 @@ import {
   updatePlatformUser,
 } from '../../services/platformApi.js';
 import { useUiLang } from '../../hooks/useUiLang.js';
-import '../../styles/office-logo-modal.css';
 import '../../styles/admin-header-icons.css';
 
 function roleLabel(t) {
@@ -57,9 +56,15 @@ function sessionExpiryLabel() {
 }
 
 /**
- * User-only account sheet: edit display name + change password (direct or email link).
+ * Inline account / security form for the header dropdown (no separate modal window).
+ * focus: 'account' shows name + optional password; 'security' focuses password change.
  */
-export default function AdminAccountSecurityModal({ open, onClose, onProfileSaved }) {
+export default function AdminAccountInlinePanel({
+  open,
+  focus = 'account',
+  onBack,
+  onProfileSaved,
+}) {
   const { t } = useUiLang();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -77,6 +82,7 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
   const expires = sessionExpiryLabel();
   const role = roleLabel(t);
   const isSuper = canAccessPlatformOperatorUi();
+  const securityFocus = focus === 'security';
 
   useEffect(() => {
     if (!open) return undefined;
@@ -84,6 +90,7 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
     setLoading(true);
     setPassword('');
     setPassword2('');
+    setShowPassword(false);
     (async () => {
       try {
         const list = await fetchPlatformUsers({ allOffices: isSuper });
@@ -111,7 +118,7 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
     return () => {
       cancelled = true;
     };
-  }, [open, email, jwtSub, isSuper]);
+  }, [open, email, jwtSub, isSuper, focus]);
 
   if (!open) return null;
 
@@ -123,7 +130,7 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
       toast.error(t('security_reset_unavailable'));
       return;
     }
-    if (nextName.length < 2) {
+    if (!securityFocus && nextName.length < 2) {
       toast.error(t('account_name_short'));
       return;
     }
@@ -137,7 +144,7 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
         return;
       }
     }
-    const nameDirty = nextName !== savedName.trim();
+    const nameDirty = !securityFocus && nextName !== savedName.trim();
     if (!nameDirty && !pwd) {
       toast.success(t('account_nothing_to_save'));
       return;
@@ -148,11 +155,12 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
       if (nameDirty) patch.name = nextName;
       if (pwd) patch.password = pwd;
       await updatePlatformUser(uid, patch);
-      setSavedName(nextName);
+      if (nameDirty) {
+        setSavedName(nextName);
+        onProfileSaved?.(nextName);
+      }
       setPassword('');
       setPassword2('');
-      onProfileSaved?.(nextName);
-      // Keep local email session; name is derived for UI via callback.
       setSaasSession({
         accessToken: getSaasToken(),
         tenantId: getSaasTenantId(),
@@ -190,42 +198,43 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
   };
 
   return (
-    <div className="olm-root" role="dialog" aria-modal="true" aria-label={t('my_account')}>
-      <button type="button" className="olm-backdrop" aria-label={t('close')} onClick={onClose} />
-      <div className="olm-panel admin-sec-panel">
-        <header className="olm-header">
-          <div>
-            <p className="olm-kicker">{t('account')}</p>
-            <h2 className="olm-title">{t('my_account')}</h2>
-            <p className="olm-subtitle">{t('my_account_subtitle')}</p>
-          </div>
-          <button type="button" className="olm-close" onClick={onClose} aria-label={t('close')}>
-            <span className="material-symbols-outlined" aria-hidden>
-              close
-            </span>
-          </button>
-        </header>
+    <div className="admin-acct-panel" role="group" aria-label={securityFocus ? t('security') : t('my_account')}>
+      <div className="admin-acct-panel-head">
+        <button
+          type="button"
+          className="admin-acct-panel-back"
+          onClick={onBack}
+          aria-label={t('close')}
+        >
+          <span className="material-symbols-outlined" aria-hidden>
+            chevron_left
+          </span>
+          <span>{t('account')}</span>
+        </button>
+        <p className="admin-acct-panel-title">{securityFocus ? t('security') : t('my_account')}</p>
+      </div>
 
-        <div className="olm-body admin-sec-body">
-          {loading ? (
-            <p className="olm-loading">{t('loading')}</p>
-          ) : (
-            <>
-              <div className="admin-sec-card">
-                <p className="admin-sec-card-label">{t('security_signed_in')}</p>
-                <p className="admin-sec-card-value">{email || t('signed_in_admin')}</p>
-                <p className="admin-sec-card-meta">{role}</p>
-                {expires ? (
-                  <p className="admin-sec-card-meta">
-                    {t('security_session_until')}: {expires}
-                  </p>
-                ) : null}
-              </div>
+      <div className="admin-acct-panel-body">
+        {loading ? (
+          <p className="admin-acct-panel-loading">{t('loading')}</p>
+        ) : (
+          <>
+            <div className="admin-acct-panel-card">
+              <p className="admin-acct-panel-card-label">{t('security_signed_in')}</p>
+              <p className="admin-acct-panel-card-value">{email || t('signed_in_admin')}</p>
+              <p className="admin-acct-panel-card-meta">{role}</p>
+              {expires ? (
+                <p className="admin-acct-panel-card-meta">
+                  {t('security_session_until')}: {expires}
+                </p>
+              ) : null}
+            </div>
 
-              <label className="olm-field">
-                <span className="olm-label">{t('account_display_name')}</span>
+            {!securityFocus ? (
+              <label className="admin-acct-field">
+                <span className="admin-acct-field-label">{t('account_display_name')}</span>
                 <input
-                  className="olm-input"
+                  className="admin-acct-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t('account_display_name_ph')}
@@ -233,76 +242,79 @@ export default function AdminAccountSecurityModal({ open, onClose, onProfileSave
                   autoComplete="name"
                 />
               </label>
+            ) : null}
 
-              <div className="admin-sec-password-block">
-                <p className="olm-label">{t('security_change_password')}</p>
-                <label className="olm-field">
-                  <span className="olm-label is-soft">{t('account_new_password')}</span>
-                  <div className="admin-sec-password-row">
-                    <input
-                      className="olm-input"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      disabled={busy}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="admin-sec-eye"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? t('hide_password') : t('show_password')}
-                    >
-                      <span className="material-symbols-outlined" aria-hidden>
-                        {showPassword ? 'visibility_off' : 'visibility'}
-                      </span>
-                    </button>
-                  </div>
-                </label>
-                <label className="olm-field">
-                  <span className="olm-label is-soft">{t('account_confirm_password')}</span>
+            <div className="admin-acct-password-block">
+              <p className="admin-acct-field-label">{t('security_change_password')}</p>
+              <label className="admin-acct-field">
+                <span className="admin-acct-field-label is-soft">{t('account_new_password')}</span>
+                <div className="admin-acct-password-row">
                   <input
-                    className="olm-input"
+                    className="admin-acct-input"
                     type={showPassword ? 'text' : 'password'}
-                    value={password2}
-                    onChange={(e) => setPassword2(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     disabled={busy}
                     autoComplete="new-password"
+                    autoFocus={securityFocus}
                   />
-                </label>
-                <p className="olm-field-hint">{t('account_password_hint')}</p>
-              </div>
+                  <button
+                    type="button"
+                    className="admin-acct-eye"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t('hide_password') : t('show_password')}
+                    aria-pressed={showPassword}
+                    tabIndex={-1}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+              </label>
+              <label className="admin-acct-field">
+                <span className="admin-acct-field-label is-soft">{t('account_confirm_password')}</span>
+                <input
+                  className="admin-acct-input"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={busy}
+                  autoComplete="new-password"
+                />
+              </label>
+              <p className="admin-acct-field-hint">{t('account_password_hint')}</p>
+            </div>
 
-              <div className="admin-sec-actions">
-                <button
-                  type="button"
-                  className="olm-btn olm-btn--primary"
-                  disabled={busy}
-                  onClick={saveProfile}
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    save
-                  </span>
-                  {busy ? t('saving') : t('save_account')}
-                </button>
-                <button
-                  type="button"
-                  className="olm-btn olm-btn--ghost"
-                  disabled={busy}
-                  onClick={requestPasswordReset}
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    mail
-                  </span>
-                  {t('security_email_reset')}
-                </button>
-                <p className="olm-field-hint">{t('security_change_password_hint')}</p>
-              </div>
-            </>
-          )}
-        </div>
+            <div className="admin-acct-panel-actions">
+              <button
+                type="button"
+                className="admin-acct-btn is-primary"
+                disabled={busy}
+                onClick={saveProfile}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  save
+                </span>
+                {busy ? t('saving') : t('save_account')}
+              </button>
+              <button
+                type="button"
+                className="admin-acct-btn is-ghost"
+                disabled={busy}
+                onClick={requestPasswordReset}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  mail
+                </span>
+                {t('security_email_reset')}
+              </button>
+              <p className="admin-acct-field-hint">{t('security_change_password_hint')}</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
