@@ -23,6 +23,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
+import AdminMailHeaderButton from '../components/admin/AdminMailHeaderButton.jsx';
 import AdminLanguageSwitcher from '../components/admin/AdminLanguageSwitcher.jsx';
 import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
 import { useUiLang } from '../hooks/useUiLang.js';
@@ -2482,8 +2483,12 @@ export default function BackOffice() {
               <TemplateSearch onUseTemplate={useEmailTemplate} />
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="admin-hdr-cluster shrink-0">
             <AdminLanguageSwitcher />
+            <AdminMailHeaderButton
+              active={activeTab === 'email'}
+              onOpenMailbox={goToEmailMailbox}
+            />
             <AdminNotificationBell
               onNavigate={(tab, extra = {}) => {
                 if (extra.driverId) setChatFocusDriverId(extra.driverId);
@@ -2496,22 +2501,20 @@ export default function BackOffice() {
                 setActiveTab(tab);
               }}
             />
-            <div className="pl-2 sm:pl-3 border-l border-black/[0.06]">
-              <AdminAccountMenu
-                onOpenSettings={() => {
-                  setActiveTab('settings');
-                  setSettingsSubTab(
-                    sanitizeSettingsSubTab(
-                      isSaasSuperAdmin()
-                        ? DEFAULT_PLATFORM_TAB
-                        : DEFAULT_TENANT_SETTINGS_TAB,
-                      isSaasSuperAdmin(),
-                    ),
-                  );
-                  focusSettingsHub();
-                }}
-              />
-            </div>
+            <AdminAccountMenu
+              onOpenSettings={() => {
+                setActiveTab('settings');
+                setSettingsSubTab(
+                  sanitizeSettingsSubTab(
+                    isSaasSuperAdmin()
+                      ? DEFAULT_PLATFORM_TAB
+                      : DEFAULT_TENANT_SETTINGS_TAB,
+                    isSaasSuperAdmin(),
+                  ),
+                );
+                focusSettingsHub();
+              }}
+            />
           </div>
         </header>
 
