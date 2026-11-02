@@ -44,9 +44,6 @@ export default function AdminLanguageSwitcher() {
         aria-haspopup="listbox"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="material-symbols-outlined admin-lang-icon" aria-hidden>
-          translate
-        </span>
         <span className="admin-lang-code">{current.flag}</span>
         <span className="material-symbols-outlined admin-lang-chevron" aria-hidden>
           expand_more
