@@ -892,7 +892,16 @@ export default function SuperAdminPanel() {
                         <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{mode.hint}</p>
                       </div>
                       {selected ? (
-                        <span className="material-symbols-outlined ml-auto text-sky-600 text-[18px]" aria-hidden>
+                        <span
+                          className={`material-symbols-outlined ml-auto text-[18px] ${
+                            mode.tone === 'teal'
+                              ? 'text-teal-600'
+                              : mode.tone === 'indigo'
+                                ? 'text-indigo-600'
+                                : 'text-sky-600'
+                          }`}
+                          aria-hidden
+                        >
                           check_circle
                         </span>
                       ) : null}
