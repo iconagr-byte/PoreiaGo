@@ -421,6 +421,383 @@
   color: rgba(236, 254, 255, 0.55);
 }
 
+/* ——— My Wallet session (buses homepage) ——— */
+
+.pg-session--wallet {
+  --pg-wallet-ink: #0b1220;
+  --pg-wallet-sky: #0ea5e9;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 85% 20%, rgba(14, 165, 233, 0.16), transparent 58%),
+    radial-gradient(ellipse 50% 45% at 8% 80%, rgba(2, 132, 199, 0.1), transparent 55%),
+    linear-gradient(165deg, #07111f 0%, #0c1a2e 42%, #10243a 100%);
+  color: #f8fafc;
+}
+
+.pg-wallet-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-wallet-atmosphere-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+}
+
+.pg-wallet-atmosphere-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(40px);
+  opacity: 0.55;
+  animation: pgWalletOrb 12s ease-in-out infinite alternate;
+}
+
+.pg-wallet-atmosphere-orb--a {
+  width: 18rem;
+  height: 18rem;
+  top: -4rem;
+  right: 8%;
+  background: rgba(14, 165, 233, 0.35);
+}
+
+.pg-wallet-atmosphere-orb--b {
+  width: 14rem;
+  height: 14rem;
+  bottom: 6%;
+  left: 4%;
+  background: rgba(56, 189, 248, 0.22);
+  animation-delay: -4s;
+}
+
+@keyframes pgWalletOrb {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(12px, 18px, 0) scale(1.08);
+  }
+}
+
+.pg-wallet-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+  display: grid;
+  gap: 2.75rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .pg-wallet-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 3rem;
+    padding: 5rem 2rem 5.25rem;
+  }
+}
+
+.pg-session-intro--wallet {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.pg-session--wallet .pg-session-kicker {
+  color: #7dd3fc;
+}
+
+.pg-session--wallet .pg-session-hook {
+  color: #fff;
+  font-size: clamp(1.85rem, 4.2vw, 2.85rem);
+  max-width: 18ch;
+}
+
+.pg-wallet-hook-accent {
+  font-style: normal;
+  background: linear-gradient(105deg, #7dd3fc 0%, #38bdf8 50%, #e0f2fe 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pg-session--wallet .pg-session-support {
+  margin: 0 0 1.6rem;
+  max-width: 34rem;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.pg-wallet-points {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.pg-wallet-points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.pg-wallet-point-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.9rem;
+  font-size: 1.2rem !important;
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+}
+
+.pg-wallet-points strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.pg-wallet-points li > div > span {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(203, 213, 225, 0.78);
+}
+
+.pg-session-cta--wallet {
+  background: #fff;
+  color: #0b1220;
+}
+
+.pg-session-cta--wallet:hover {
+  background: #e0f2fe;
+}
+
+.pg-wallet-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.pg-wallet-phone {
+  width: min(100%, 280px);
+  filter: drop-shadow(0 28px 48px rgba(2, 8, 23, 0.55));
+}
+
+.pg-wallet-phone-bezel {
+  position: relative;
+  border-radius: 2rem;
+  padding: 0.55rem;
+  background: linear-gradient(160deg, #334155 0%, #0f172a 55%, #020617 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pg-wallet-phone-notch {
+  position: absolute;
+  top: 0.85rem;
+  left: 50%;
+  width: 5.5rem;
+  height: 0.55rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #020617;
+  z-index: 2;
+}
+
+.pg-wallet-phone-screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.55rem;
+  min-height: 28rem;
+  padding: 1.65rem 1rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(14, 165, 233, 0.28), transparent 60%),
+    linear-gradient(180deg, #0b1729 0%, #102a44 100%);
+}
+
+.pg-wallet-phone-kicker {
+  margin: 0 0 1.15rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+.pg-wallet-pass-stack {
+  position: relative;
+  height: 22.5rem;
+}
+
+.pg-wallet-pass {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.95rem 1rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.pg-wallet-pass--back {
+  top: 0.2rem;
+  transform: scale(0.94) translateY(0);
+  opacity: 0.55;
+  background: rgba(15, 23, 42, 0.75);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+}
+
+.pg-wallet-pass--mid {
+  top: 2.35rem;
+  transform: scale(0.97);
+  opacity: 0.78;
+  background: rgba(15, 23, 42, 0.88);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+  animation-delay: 0.35s;
+}
+
+.pg-wallet-pass--front {
+  top: 4.6rem;
+  background: linear-gradient(165deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.35);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+  animation-delay: 0.7s;
+}
+
+@keyframes pgWalletPassFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.pg-wallet-pass--back {
+  animation-name: pgWalletPassFloatBack;
+}
+
+.pg-wallet-pass--mid {
+  animation-name: pgWalletPassFloatMid;
+}
+
+@keyframes pgWalletPassFloatBack {
+  0%,
+  100% {
+    transform: scale(0.94) translateY(0);
+  }
+  50% {
+    transform: scale(0.94) translateY(-5px);
+  }
+}
+
+@keyframes pgWalletPassFloatMid {
+  0%,
+  100% {
+    transform: scale(0.97) translateY(0);
+  }
+  50% {
+    transform: scale(0.97) translateY(-5px);
+  }
+}
+
+.pg-wallet-pass-route,
+.pg-wallet-pass-meta {
+  display: block;
+}
+
+.pg-wallet-pass-route {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.pg-wallet-pass-meta {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.pg-wallet-pass-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.pg-wallet-pass-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0369a1;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+.pg-wallet-pass-top .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: #0284c7;
+}
+
+.pg-wallet-pass-route-lg {
+  margin: 0 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #0f172a;
+}
+
+.pg-wallet-pass-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.pg-wallet-pass-qr {
+  width: 5.25rem;
+  height: 5.25rem;
+  margin: 0 auto;
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(90deg, #0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
+    linear-gradient(#0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
+    #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.pg-wallet-rise {
+  animation: pgBusesRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pg-session-cta:hover,
   .pg-session-rent-card:hover {
@@ -428,7 +805,12 @@
   }
 
   .pg-buses-rise,
-  .pg-buses-journey-col {
+  .pg-buses-journey-col,
+  .pg-wallet-rise,
+  .pg-wallet-atmosphere-orb,
+  .pg-wallet-pass--back,
+  .pg-wallet-pass--mid,
+  .pg-wallet-pass--front {
     animation: none !important;
   }
 }

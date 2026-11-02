@@ -126,6 +126,41 @@ export const RENT_SESSION = {
   ctaTo: '/rent',
 };
 
+/** My Wallet — customer pass hub on the buses homepage. */
+export const WALLET_SESSION = {
+  id: 'session-wallet',
+  kicker: 'My Wallet',
+  hook: 'Το εισιτήριο μένει στο κινητό — έτοιμο στην πόρτα',
+  hookAccent: 'στο κινητό',
+  support:
+    'Μετά την κράτηση, ο πελάτης ανοίγει το My Wallet: QR εισιτήριο, θέση, ώρα αναχώρησης και ειδοποιήσεις. Αν το γραφείο έχει ενοικιάσεις, οι κάρτες οχήματος ζουν στο ίδιο πορτοφόλι.',
+  points: [
+    {
+      icon: 'qr_code_2',
+      label: 'QR στην είσοδο',
+      detail: 'Ο οδηγός σκανάρει — χωρίς χαρτί και χωρίς λίστα στο χέρι',
+    },
+    {
+      icon: 'confirmation_number',
+      label: 'Όλες οι εκδρομές μαζί',
+      detail: 'Επόμενη αναχώρηση μπροστά · παλιότερα εισιτήρια στο ιστορικό',
+    },
+    {
+      icon: 'directions_car',
+      label: 'Και ενοικιάσεις',
+      detail: 'Ίδιος λογαριασμός · κάρτες οχήματος δίπλα στα εισιτήρια',
+    },
+  ],
+  ctaLabel: 'Άνοιγμα My Wallet',
+  ctaTo: '/wallet',
+  visual: {
+    route: 'Αθήνα → Μύκονος',
+    seat: 'Θέση 12A',
+    when: 'Σάβ 08:30',
+    status: 'Έτοιμο για επιβίβαση',
+  },
+};
+
 /** Hero background — πλήρες cover, χωρίς demo εκδρομή */
 export const HERO_BACKGROUND_IMAGE =
   'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=2000&q=85';

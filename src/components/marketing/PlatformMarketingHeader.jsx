@@ -23,6 +23,12 @@ const BUS_LINKS = [
     icon: 'directions_bus',
   },
   {
+    href: '#session-wallet',
+    label: 'My Wallet',
+    hint: 'QR εισιτήριο στο κινητό',
+    icon: 'account_balance_wallet',
+  },
+  {
     href: '#features',
     label: 'Λειτουργίες',
     hint: 'GPS, QR, πίνακας, email',
