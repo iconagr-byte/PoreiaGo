@@ -80,7 +80,40 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
             "show_fleet_section": False,
             "show_why_us_section": False,
         }
+    else:
+        settings["modules"] = {"trips_enabled": True, "rent_enabled": False}
     return settings
+
+
+def resolve_provision_plan_and_settings(
+    *,
+    plan: TenantPlan | str,
+    service_mode: str | None = None,
+    office_name: str | None = None,
+) -> tuple[TenantPlan, dict[str, Any]]:
+    """Map UI service mode → TenantPlan + settings_json seed."""
+    mode = str(service_mode or "buses").strip().lower()
+    if mode not in {"buses", "rent", "both"}:
+        mode = "buses"
+
+    raw_plan = plan if isinstance(plan, TenantPlan) else TenantPlan(str(plan or "starter"))
+    if mode == "rent":
+        resolved = TenantPlan.RENT
+        return resolved, initial_settings_for_plan(resolved, office_name=office_name)
+
+    # Bus bill plans never use the standalone rent enum.
+    if raw_plan == TenantPlan.RENT:
+        raw_plan = TenantPlan.STARTER
+
+    settings = initial_settings_for_plan(raw_plan, office_name=office_name)
+    if mode == "both":
+        settings = enable_rent_addon_in_settings(settings)
+    else:
+        settings["modules"] = {"trips_enabled": True, "rent_enabled": False}
+        addons = dict(settings.get("addons") or {})
+        addons["rent"] = False
+        settings["addons"] = addons
+    return raw_plan, settings
 
 
 def modules_for_settings(

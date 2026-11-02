@@ -26,6 +26,7 @@ from app.services.billing_service import BillingService
 from app.services.tenant_modules import (
     _heal_subscription_plan_column,
     _tenant_noload_options,
+    resolve_provision_plan_and_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -570,6 +571,7 @@ class PlatformAdminService:
         admin_password: str,
         admin_full_name: str,
         vat_number: str | None = None,
+        service_mode: str | None = "buses",
     ) -> tuple[Tenant, User]:
         slug = slug.strip().lower()
         subdomain = subdomain.strip().lower()
@@ -586,19 +588,26 @@ class PlatformAdminService:
         if dup.scalar_one_or_none():
             raise ValueError("Slug or subdomain already exists")
 
+        resolved_plan, seed_settings = resolve_provision_plan_and_settings(
+            plan=plan,
+            service_mode=service_mode,
+            office_name=legal_name.strip(),
+        )
+
         tenant = Tenant(
             id=uuid4(),
             slug=slug,
             legal_name=legal_name.strip(),
             vat_number=vat_number,
             subdomain=subdomain,
-            plan=plan,
+            plan=resolved_plan,
             is_active=True,
+            settings_json=json.dumps(seed_settings, ensure_ascii=False),
             isolation_strategy=(
                 IsolationStrategy.DATABASE.value
-                if plan == TenantPlan.ENTERPRISE
+                if resolved_plan == TenantPlan.ENTERPRISE
                 else IsolationStrategy.SCHEMA.value
-                if plan == TenantPlan.PROFESSIONAL
+                if resolved_plan == TenantPlan.PROFESSIONAL
                 else IsolationStrategy.SHARED_RLS.value
             ),
         )
@@ -609,9 +618,9 @@ class PlatformAdminService:
             Subscription(
                 id=uuid4(),
                 tenant_id=tenant.id,
-                plan=plan,
+                plan=resolved_plan,
                 status=SubscriptionStatus.TRIALING,
-                base_amount_cents=_PLAN_BASE_CENTS[plan],
+                base_amount_cents=_PLAN_BASE_CENTS[resolved_plan],
                 trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
             ),
         )

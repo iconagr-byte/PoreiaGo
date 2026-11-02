@@ -12,6 +12,7 @@ from app.services.tenant_modules import (
     is_poreiago_platform_office,
     modules_for_settings,
     modules_for_tenant,
+    resolve_provision_plan_and_settings,
 )
 
 
@@ -54,6 +55,30 @@ def test_initial_settings_for_rent_plan():
     assert seed["site_appearance"]["rent_office_name"] == "Achillio Travel"
     assert seed["site_appearance"]["footer_brand_name"] == "Achillio Travel"
     assert "Το όχημά σας" in seed["site_appearance"]["rent_hero_title"]
+
+
+def test_resolve_provision_service_modes():
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.STARTER, service_mode="buses"
+    )
+    assert plan is TenantPlan.STARTER
+    assert settings["modules"]["trips_enabled"] is True
+    assert settings["modules"]["rent_enabled"] is False
+
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.STARTER, service_mode="rent", office_name="Demo Rent"
+    )
+    assert plan is TenantPlan.RENT
+    assert settings["modules"]["rent_enabled"] is True
+    assert settings["modules"]["trips_enabled"] is False
+
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.PROFESSIONAL, service_mode="both"
+    )
+    assert plan is TenantPlan.PROFESSIONAL
+    assert settings["modules"]["trips_enabled"] is True
+    assert settings["modules"]["rent_enabled"] is True
+    assert settings["addons"]["rent"] is True
 
 
 def test_enable_rent_addon_merge():

@@ -188,6 +188,7 @@ async def create_tenant(
             admin_password=body.admin_password,
             admin_full_name=body.admin_full_name,
             vat_number=body.vat_number,
+            service_mode=body.service_mode,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
