@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 function customerInitials(name, email) {
@@ -80,7 +80,10 @@ export default function WalletAccountMenu({
   const menuId = useId();
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
+  const sheetRef = useRef(null);
   const [open, setOpen] = useState(false);
+  /** Dropdown anchor under the person icon (fixed — parent .wallet-app overflows). */
+  const [sheetPos, setSheetPos] = useState(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -109,6 +112,36 @@ export default function WalletAccountMenu({
     if (open) app.classList.add('wallet-app--account-open');
     else app.classList.remove('wallet-app--account-open');
     return () => app.classList.remove('wallet-app--account-open');
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setSheetPos(null);
+      return undefined;
+    }
+    const place = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const r = trigger.getBoundingClientRect();
+      const gap = 8;
+      const margin = 10;
+      const width = Math.min(312, Math.max(240, window.innerWidth - margin * 2));
+      let left = r.left;
+      left = Math.min(left, window.innerWidth - width - margin);
+      left = Math.max(margin, left);
+      const top = Math.min(
+        r.bottom + gap,
+        Math.max(margin, window.innerHeight - margin - 120),
+      );
+      setSheetPos({ top, left, width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
   }, [open]);
 
   const go = (fn) => {
@@ -163,10 +196,20 @@ export default function WalletAccountMenu({
 
       {open ? (
         <div
+          ref={sheetRef}
           id={menuId}
           role="menu"
           aria-label="Λογαριασμός"
-          className="wallet-account-sheet wallet-topbar-popover--start"
+          className="wallet-account-sheet wallet-account-sheet--anchored"
+          style={
+            sheetPos
+              ? {
+                  top: `${sheetPos.top}px`,
+                  left: `${sheetPos.left}px`,
+                  width: `${sheetPos.width}px`,
+                }
+              : { visibility: 'hidden' }
+          }
         >
           <div className="wallet-account-sheet-identity">
             <WalletAvatarFace

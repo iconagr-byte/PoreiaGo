@@ -283,7 +283,7 @@
   right: 0;
 }
 
-/* Apple-like account sheet — fixed so ticket stack cannot cover it */
+/* Apple-like account sheet — fixed + anchored under the person icon (JS sets top/left). */
 .wallet-account-sheet {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 3.85rem);
@@ -304,6 +304,14 @@
     0 4px 14px rgba(15, 23, 42, 0.06),
     0 22px 48px rgba(10, 37, 64, 0.16);
   animation: wallet-account-sheet-in 0.18s ease-out;
+  transform-origin: top left;
+}
+
+/* Desktop / phone: drop down from the account button, not the viewport edge. */
+.wallet-account-sheet--anchored {
+  /* top/left/width come from inline style via getBoundingClientRect */
+  right: auto;
+  max-height: min(32rem, calc(100dvh - 4.5rem));
 }
 
 @keyframes wallet-account-sheet-in {

@@ -812,6 +812,310 @@
   animation-delay: var(--pg-rise-delay, 0ms);
 }
 
+/* ——— Rent digital contracts session (/rent) ——— */
+
+.pg-session--rent-contracts {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 65% 50% at 90% 15%, rgba(45, 212, 191, 0.18), transparent 58%),
+    radial-gradient(ellipse 45% 40% at 5% 85%, rgba(13, 148, 136, 0.14), transparent 55%),
+    linear-gradient(165deg, #042f2e 0%, #0b3d4a 45%, #062a30 100%);
+  color: #f8fafc;
+}
+
+.pg-rent-contracts-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-rent-contracts-atmosphere-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 42%);
+}
+
+.pg-rent-contracts-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(42px);
+  opacity: 0.5;
+  animation: pgWalletOrb 11s ease-in-out infinite alternate;
+}
+
+.pg-rent-contracts-orb--a {
+  width: 16rem;
+  height: 16rem;
+  top: -3rem;
+  right: 10%;
+  background: rgba(45, 212, 191, 0.4);
+}
+
+.pg-rent-contracts-orb--b {
+  width: 13rem;
+  height: 13rem;
+  bottom: 8%;
+  left: 6%;
+  background: rgba(20, 184, 166, 0.28);
+  animation-delay: -3.5s;
+}
+
+.pg-rent-contracts-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+  display: grid;
+  gap: 2.75rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .pg-rent-contracts-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 3rem;
+    padding: 5rem 2rem 5.25rem;
+  }
+}
+
+.pg-session-intro--rent-contracts {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.pg-session--rent-contracts .pg-session-kicker {
+  color: #5eead4;
+}
+
+.pg-session--rent-contracts .pg-session-hook {
+  color: #fff;
+  font-size: clamp(1.85rem, 4.2vw, 2.85rem);
+  max-width: 16ch;
+}
+
+.pg-rent-contracts-hook-accent {
+  font-style: normal;
+  background: linear-gradient(105deg, #99f6e4 0%, #5eead4 45%, #ccfbf1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pg-session--rent-contracts .pg-session-support {
+  margin: 0 0 1.6rem;
+  max-width: 34rem;
+  color: rgba(204, 251, 241, 0.78);
+}
+
+.pg-rent-contracts-points {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.pg-rent-contracts-points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.pg-rent-contracts-point-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.9rem;
+  font-size: 1.2rem !important;
+  color: #5eead4;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+}
+
+.pg-rent-contracts-points strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.pg-rent-contracts-points li > div > span {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(167, 243, 208, 0.78);
+}
+
+.pg-session-cta--rent-contracts {
+  background: #fff;
+  color: #042f2e;
+}
+
+.pg-session-cta--rent-contracts:hover {
+  background: #ccfbf1;
+}
+
+.pg-rent-contracts-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.pg-rent-contracts-doc {
+  position: relative;
+  width: min(100%, 320px);
+  border-radius: 1.5rem;
+  padding: 1.35rem 1.25rem 1.3rem;
+  background: linear-gradient(165deg, #ffffff 0%, #f0fdfa 55%, #e6fffa 100%);
+  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 28px 50px rgba(2, 44, 34, 0.38);
+  animation: pgRentContractsDocFloat 6s ease-in-out infinite;
+}
+
+@keyframes pgRentContractsDocFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.4deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+.pg-rent-contracts-doc-seal {
+  position: absolute;
+  top: -0.85rem;
+  right: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #14b8a6, #0f766e);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.35);
+}
+
+.pg-rent-contracts-doc-seal .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+.pg-rent-contracts-doc-head {
+  margin-bottom: 1.1rem;
+  padding-right: 2rem;
+}
+
+.pg-rent-contracts-doc-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.pg-rent-contracts-doc-plate {
+  margin: 0.35rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #042f2e;
+}
+
+.pg-rent-contracts-doc-terms {
+  list-style: none;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.pg-rent-contracts-doc-terms li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #134e4a;
+}
+
+.pg-rent-contracts-doc-terms .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #0d9488;
+}
+
+.pg-rent-contracts-doc-sign {
+  border-top: 1px dashed rgba(15, 118, 110, 0.28);
+  padding-top: 0.9rem;
+}
+
+.pg-rent-contracts-doc-sign-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pg-rent-contracts-doc-ink {
+  color: #0f766e;
+  min-height: 2.75rem;
+}
+
+.pg-rent-contracts-ink-path {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: pgRentContractsInk 2.8s ease-in-out 0.4s infinite alternate;
+}
+
+@keyframes pgRentContractsInk {
+  from {
+    stroke-dashoffset: 220;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pg-rent-contracts-doc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f766e;
+  background: rgba(13, 148, 136, 0.12);
+}
+
+.pg-rent-contracts-doc-status .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.pg-rent-contracts-rise {
+  animation: pgBusesRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pg-session-cta:hover,
   .pg-session-rent-card:hover {
@@ -824,7 +1128,15 @@
   .pg-wallet-atmosphere-orb,
   .pg-wallet-pass--back,
   .pg-wallet-pass--mid,
-  .pg-wallet-pass--front {
+  .pg-wallet-pass--front,
+  .pg-rent-contracts-rise,
+  .pg-rent-contracts-orb,
+  .pg-rent-contracts-doc,
+  .pg-rent-contracts-ink-path {
     animation: none !important;
+  }
+
+  .pg-rent-contracts-ink-path {
+    stroke-dashoffset: 0;
   }
 }

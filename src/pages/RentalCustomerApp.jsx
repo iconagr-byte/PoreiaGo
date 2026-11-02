@@ -64,6 +64,7 @@ import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
 import PlatformRentSession from '../components/marketing/PlatformRentSession.jsx';
+import PlatformRentContractsSession from '../components/marketing/PlatformRentContractsSession.jsx';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import LoginPage from './LoginPage.jsx';
@@ -582,7 +583,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               }}
             />
 
-            {/* Marketing rent session sits below «Γιατί εμάς», not above the fleet. */}
+            {/* Digital contracts + marketing rent session below «Γιατί εμάς». */}
+            <PlatformRentContractsSession />
             {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
           </div>
         </main>
