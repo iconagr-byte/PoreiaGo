@@ -47,12 +47,13 @@ function roleLabel(t) {
 }
 
 /**
- * Header account chip + menu — name, role, logout (and exit impersonation).
+ * Header account chip + menu — Apple-minimal identity, settings, logout.
  */
 export default function AdminAccountMenu({ onOpenSettings } = {}) {
   const { t } = useUiLang();
   const navigate = useNavigate();
   const rootRef = useRef(null);
+  const firstItemRef = useRef(null);
   const [open, setOpen] = useState(false);
   const email = useMemo(() => getSaasUserEmail(), [open]);
   const name = displayNameFromEmail(email, t('role_admin'));
@@ -70,9 +71,13 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
     };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
+    const focusTimer = window.setTimeout(() => {
+      firstItemRef.current?.focus?.();
+    }, 30);
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+      window.clearTimeout(focusTimer);
     };
   }, [open]);
 
@@ -100,11 +105,22 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
     navigate('/admin?tab=settings');
   };
 
+  const copyEmail = async () => {
+    const value = String(email || '').trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t('email_copied'));
+    } catch {
+      toast.error(value);
+    }
+  };
+
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="admin-acct relative" ref={rootRef}>
       <button
         type="button"
-        className={`admin-hdr-avatar-btn${open ? ' is-open' : ''}`}
+        className={`admin-hdr-avatar-btn${open ? ' is-open' : ''}${impersonating ? ' is-impersonating' : ''}`}
         aria-label={`${t('account')} · ${name} · ${role}`}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -122,66 +138,91 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
       </button>
 
       {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 mt-2 w-[17.5rem] rounded-2xl border border-black/[0.08] bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)] overflow-hidden z-50"
-        >
-          <div className="px-3.5 py-3 border-b border-black/[0.06] bg-slate-50/80">
-            <p className="text-sm font-bold text-on-surface truncate">{name}</p>
-            <p className="text-xs text-on-surface-variant truncate mt-0.5">
-              {email || t('signed_in_admin')}
-            </p>
+        <div role="menu" className="admin-acct-menu" aria-label={t('account')}>
+          <div className="admin-acct-identity">
             <span
-              className={`inline-flex items-center gap-1 mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                impersonating
-                  ? 'bg-amber-100 text-amber-900'
-                  : 'bg-sky-100 text-sky-900'
-              }`}
+              className={`admin-acct-avatar${impersonating ? ' is-impersonating' : ''}`}
+              aria-hidden
             >
-              <span className="material-symbols-outlined text-[14px]" aria-hidden>
-                {impersonating ? 'visibility' : 'verified_user'}
-              </span>
-              {role}
+              {initials}
             </span>
+            <div className="admin-acct-identity-text">
+              <p className="admin-acct-name">{name}</p>
+              {email ? (
+                <button
+                  type="button"
+                  className="admin-acct-email"
+                  title={t('copy_email')}
+                  onClick={copyEmail}
+                >
+                  {email}
+                </button>
+              ) : (
+                <p className="admin-acct-email is-static">{t('signed_in_admin')}</p>
+              )}
+              <span
+                className={`admin-acct-role${impersonating ? ' is-impersonating' : ''}`}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  {impersonating ? 'visibility' : 'verified_user'}
+                </span>
+                {role}
+              </span>
+            </div>
           </div>
 
-          <div className="p-1.5">
+          <div className="admin-acct-section">
             <button
+              ref={firstItemRef}
               type="button"
               role="menuitem"
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-black/[0.04] text-left"
+              className="admin-acct-item"
               onClick={goSettings}
             >
-              <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden>
-                settings
+              <span className="admin-acct-item-icon" aria-hidden>
+                <span className="material-symbols-outlined">settings</span>
               </span>
-              {t('settings')}
+              <span className="admin-acct-item-body">
+                <span className="admin-acct-item-label">{t('settings')}</span>
+                <span className="admin-acct-item-hint">{t('settings_hint')}</span>
+              </span>
+              <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
+                chevron_right
+              </span>
             </button>
 
             {impersonating ? (
               <button
                 type="button"
                 role="menuitem"
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-amber-900 hover:bg-amber-50 text-left"
+                className="admin-acct-item is-warn"
                 onClick={exitImpersonation}
               >
-                <span className="material-symbols-outlined text-[20px]" aria-hidden>
-                  logout
+                <span className="admin-acct-item-icon is-warn" aria-hidden>
+                  <span className="material-symbols-outlined">switch_account</span>
                 </span>
-                {t('exit_impersonation')}
+                <span className="admin-acct-item-body">
+                  <span className="admin-acct-item-label">{t('exit_impersonation')}</span>
+                  <span className="admin-acct-item-hint">{t('back_super')}</span>
+                </span>
               </button>
             ) : null}
+          </div>
 
+          <div className="admin-acct-footer">
             <button
               type="button"
               role="menuitem"
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-rose-700 hover:bg-rose-50 text-left"
+              className="admin-acct-item is-danger"
               onClick={logout}
             >
-              <span className="material-symbols-outlined text-[20px]" aria-hidden>
-                logout
+              <span className="admin-acct-item-icon is-danger" aria-hidden>
+                <span className="material-symbols-outlined">logout</span>
               </span>
-              {t('logout')}
+              <span className="admin-acct-item-body">
+                <span className="admin-acct-item-label">{t('logout')}</span>
+                <span className="admin-acct-item-hint">{t('logout_hint')}</span>
+              </span>
             </button>
           </div>
         </div>
