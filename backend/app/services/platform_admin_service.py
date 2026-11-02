@@ -582,11 +582,13 @@ class PlatformAdminService:
         from app.services.tenant_modules import (
             prepare_contabo_tenant_write,
             tenant_plan_db_token,
+            tenant_plan_sql_expr,
         )
 
         # Contabo: same-txn softeners (name NOT NULL, plan CHECKs without rent).
         schema_flags = await prepare_contabo_tenant_write(self._session)
         plan_style = str(schema_flags.get("plan_style") or "value")
+        has_plan_enum = bool(schema_flags.get("has_plan_enum"))
 
         dup = await self._session.execute(
             select(Tenant.id).where(
@@ -612,14 +614,15 @@ class PlatformAdminService:
             else IsolationStrategy.SHARED_RLS.value
         )
         settings_raw = json.dumps(seed_settings, ensure_ascii=False)
-        # Contabo PG enum labels are STARTER/…; alembic/dev often uses starter/….
+        # Contabo may store STARTER/RENT in VARCHAR (no PG type) or as native enum.
         plan_db = tenant_plan_db_token(resolved_plan, plan_style)
-        # Prefer CAST when a real PG enum exists; plain bind for VARCHAR.
-        plan_sql = "CAST(:plan AS tenant_plan)" if plan_style == "name" else ":plan"
+        plan_sql = tenant_plan_sql_expr(has_plan_enum=has_plan_enum)
 
-        # Always Core-insert tenants when Contabo has legacy name col OR name-style plan,
+        # Core-insert when Contabo has legacy name col OR name-style tokens OR real PG enum,
         # then attach an in-memory ORM instance (no reload → no LookupError on 'starter').
-        use_core_tenant = bool(schema_flags.get("has_name_col") or plan_style == "name")
+        use_core_tenant = bool(
+            schema_flags.get("has_name_col") or plan_style == "name" or has_plan_enum
+        )
         if use_core_tenant:
             name_cols = ", name" if schema_flags.get("has_name_col") else ""
             name_vals = ", :name" if schema_flags.get("has_name_col") else ""
@@ -678,7 +681,8 @@ class PlatformAdminService:
         sub_id = uuid4()
         trial_end = datetime.now(timezone.utc) + timedelta(days=14)
         base_cents = int(_PLAN_BASE_CENTS.get(resolved_plan, 0))
-        if plan_style == "name":
+        # Match tenants.plan token style via Core when Contabo uses name tokens or PG enum.
+        if plan_style == "name" or has_plan_enum:
             await self._session.execute(
                 text(
                     f"""
@@ -728,11 +732,12 @@ class PlatformAdminService:
         elif tenant.isolation_strategy == IsolationStrategy.DATABASE.value:
             await provision_dedicated_database(self._session, tenant)
         logger.info(
-            "Provisioned tenant %s (%s) plan_db=%s style=%s name_col=%s",
+            "Provisioned tenant %s (%s) plan_db=%s style=%s enum=%s name_col=%s",
             tenant.slug,
             tenant.id,
             plan_db,
             plan_style,
+            has_plan_enum,
             schema_flags.get("has_name_col"),
         )
         return tenant, admin

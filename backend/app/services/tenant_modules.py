@@ -398,10 +398,31 @@ async def _heal_legacy_tenant_name_column(session: Any, *, commit: bool = True) 
             raise
 
 
+async def pg_tenant_plan_type_exists(session: Any) -> bool:
+    """True only when PostgreSQL has a real enum/domain type named tenant_plan."""
+    from sqlalchemy import text
+
+    return bool(
+        await session.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM pg_type t
+                  JOIN pg_namespace n ON n.oid = t.typnamespace
+                  WHERE n.nspname = 'public'
+                    AND t.typname = 'tenant_plan'
+                )
+                """
+            )
+        )
+    )
+
+
 async def detect_tenant_plan_persist_style(session: Any) -> str:
     """
-    Contabo stores tenant_plan as uppercase enum **names** (STARTER), while
-    alembic/dev often stores lowercase **values** (starter).
+    Contabo often stores plan as uppercase tokens (STARTER) in VARCHAR,
+    while alembic/dev uses lowercase values (starter). Detect which.
     """
     from sqlalchemy import text
 
@@ -423,22 +444,24 @@ async def detect_tenant_plan_persist_style(session: Any) -> str:
         if token.lower() in values:
             return "value"
 
-    label = await session.scalar(
-        text(
-            """
-            SELECT e.enumlabel
-            FROM pg_enum e
-            JOIN pg_type t ON t.oid = e.enumtypid
-            WHERE t.typname = 'tenant_plan'
-            ORDER BY e.enumsortorder
-            LIMIT 1
-            """
+    # Prefer enum labels only when the PG type actually exists.
+    if await pg_tenant_plan_type_exists(session):
+        label = await session.scalar(
+            text(
+                """
+                SELECT e.enumlabel
+                FROM pg_enum e
+                JOIN pg_type t ON t.oid = e.enumtypid
+                WHERE t.typname = 'tenant_plan'
+                ORDER BY e.enumsortorder
+                LIMIT 1
+                """
+            )
         )
-    )
-    if label is not None:
-        token = str(label).strip()
-        if token in {m.name for m in TenantPlan} or token.isupper():
-            return "name"
+        if label is not None:
+            token = str(label).strip()
+            if token in {m.name for m in TenantPlan} or token.isupper():
+                return "name"
     return "value"
 
 
@@ -452,13 +475,23 @@ def tenant_plan_db_token(plan: Any, style: str) -> str:
     return raw.lower()
 
 
+def tenant_plan_sql_expr(*, has_plan_enum: bool) -> str:
+    """
+    Bind expression for plan inserts.
+    CAST only when PG type tenant_plan exists — Contabo VARCHAR must stay plain.
+    """
+    if has_plan_enum:
+        return "CAST(:plan AS tenant_plan)"
+    return ":plan"
+
+
 async def prepare_contabo_tenant_write(session: Any) -> dict[str, Any]:
     """
     Same-transaction schema softeners for Contabo create-office inserts.
 
     - tenants.name NOT NULL → nullable (+ empty default)
     - plan check constraints that omit ``rent`` → dropped
-    - PG enum tenant_plan missing rent → ADD VALUE
+    - PG enum tenant_plan missing rent → ADD VALUE (only if type exists)
     Does NOT commit — stays inside the request transaction.
     """
     from sqlalchemy import text
@@ -467,7 +500,13 @@ async def prepare_contabo_tenant_write(session: Any) -> dict[str, Any]:
         "has_name_col": False,
         "plan_softened": False,
         "plan_style": "value",
+        "has_plan_enum": False,
     }
+    try:
+        flags["has_plan_enum"] = await pg_tenant_plan_type_exists(session)
+    except Exception:
+        logger.debug("tenant_plan type detect failed", exc_info=True)
+        flags["has_plan_enum"] = False
     try:
         flags["plan_style"] = await detect_tenant_plan_persist_style(session)
     except Exception:
@@ -503,8 +542,12 @@ async def prepare_contabo_tenant_write(session: Any) -> dict[str, Any]:
         await _safe("name_default", "ALTER TABLE tenants ALTER COLUMN name SET DEFAULT ''")
 
     # PG enum type (if any). Contabo usually uses VARCHAR (native_enum=False).
-    if await _safe("enum_rent", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'rent'"):
-        flags["plan_softened"] = True
+    if flags["has_plan_enum"]:
+        # Contabo labels are uppercase; also try lowercase for drifted schemas.
+        if await _safe("enum_rent_upper", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'RENT'"):
+            flags["plan_softened"] = True
+        if await _safe("enum_rent_lower", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'rent'"):
+            flags["plan_softened"] = True
 
     # Drop CHECK constraints that lock plan to starter/professional/enterprise.
     if await _safe(

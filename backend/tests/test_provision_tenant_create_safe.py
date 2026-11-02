@@ -43,12 +43,26 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
 
     def test_tenant_plan_db_token_name_vs_value(self):
         from app.models.tenant import TenantPlan
-        from app.services.tenant_modules import tenant_plan_db_token
+        from app.services.tenant_modules import tenant_plan_db_token, tenant_plan_sql_expr
 
         self.assertEqual(tenant_plan_db_token(TenantPlan.STARTER, "name"), "STARTER")
         self.assertEqual(tenant_plan_db_token(TenantPlan.RENT, "name"), "RENT")
         self.assertEqual(tenant_plan_db_token(TenantPlan.STARTER, "value"), "starter")
         self.assertEqual(tenant_plan_db_token(TenantPlan.RENT, "value"), "rent")
+        # Contabo VARCHAR: never CAST when the PG type is missing.
+        self.assertEqual(tenant_plan_sql_expr(has_plan_enum=False), ":plan")
+        self.assertEqual(
+            tenant_plan_sql_expr(has_plan_enum=True),
+            "CAST(:plan AS tenant_plan)",
+        )
+
+    def test_prepare_flags_include_has_plan_enum(self):
+        mods = (ROOT / "app/services/tenant_modules.py").read_text(encoding="utf-8")
+        self.assertIn("pg_tenant_plan_type_exists", mods)
+        self.assertIn('"has_plan_enum"', mods)
+        src = (ROOT / "app/services/platform_admin_service.py").read_text(encoding="utf-8")
+        self.assertIn("tenant_plan_sql_expr", src)
+        self.assertIn("has_plan_enum", src)
 
 
 if __name__ == "__main__":
