@@ -7,6 +7,7 @@ const QUICK_NAV = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
   { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
+  { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
 ];
 
 const NAV_ITEMS = [
@@ -14,6 +15,12 @@ const NAV_ITEMS = [
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
   { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works', icon: 'route' },
   { id: 'rent-guest-services', el: 'Υπηρεσίες', en: 'Services', icon: 'verified_user' },
+  {
+    id: 'session-rent-contracts',
+    el: 'Συμβόλαιο',
+    en: 'Contract',
+    icon: 'contract',
+  },
 ];
 
 function phoneHref(phone) {

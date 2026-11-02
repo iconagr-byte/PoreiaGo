@@ -126,6 +126,41 @@ export const RENT_SESSION = {
   ctaTo: '/rent',
 };
 
+/** Digital rental contracts — session on /rent. */
+export const RENT_CONTRACTS_SESSION = {
+  id: 'session-rent-contracts',
+  kicker: 'Ψηφιακό συμβόλαιο',
+  hook: 'Υπογράφεις μία φορά — και φεύγεις χωρίς χαρτί',
+  hookAccent: 'χωρίς χαρτί',
+  support:
+    'Πριν την παραλαβή βλέπεις όρους, ασφάλεια και checklist στο tablet του γραφείου ή στο κινητό σου. Η υπογραφή μένει στο φάκελο της κράτησης — καθαρά για σένα και για το γραφείο.',
+  points: [
+    {
+      icon: 'shield',
+      label: 'Ασφάλεια πριν την υπογραφή',
+      detail: 'CDW / SCDW και υποχρεωτικοί όροι — διαβάζεις πριν αγγίξεις το στυλό',
+    },
+    {
+      icon: 'stylus_note',
+      label: 'Sign-on-Glass ή σύνδεσμος',
+      detail: 'Υπογραφή στο desk ή ασφαλές σύνδεσμος στο κινητό — ίδια ισχύς',
+    },
+    {
+      icon: 'fact_check',
+      label: 'Checklist παραλαβής',
+      detail: 'Καύσιμο, χλμ. και φωτογραφίες μαζί με το συμβόλαιο στο My Wallet',
+    },
+  ],
+  ctaLabel: 'Δες στόλο & κράτησε',
+  ctaHref: '#rent-guest-fleet',
+  visual: {
+    title: 'Σύμβαση ενοικίασης',
+    plate: 'DEMO-SIGN',
+    terms: ['CDW / SCDW', 'Οδική βοήθεια', 'Κατάσταση οχήματος'],
+    status: 'Έτοιμο για υπογραφή',
+  },
+};
+
 /** My Wallet — customer pass hub on the buses homepage. */
 export const WALLET_SESSION = {
   id: 'session-wallet',
