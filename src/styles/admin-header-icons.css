@@ -377,12 +377,56 @@
 .admin-sec-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
-.admin-sec-links {
-  padding: 0;
-  margin: 0 -0.15rem;
+.admin-sec-password-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: #fbfbfd;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.admin-sec-password-row {
+  position: relative;
+}
+
+.admin-sec-password-row .olm-input {
+  padding-right: 2.75rem;
+}
+
+.admin-sec-eye {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #86868b;
+  cursor: pointer;
+}
+
+.admin-sec-eye:hover {
+  background: #f5f5f7;
+  color: #1d1d1f;
+}
+
+.admin-sec-eye .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.olm-label.is-soft {
+  font-weight: 400;
+  color: #86868b;
 }
 
 .admin-acct-item {

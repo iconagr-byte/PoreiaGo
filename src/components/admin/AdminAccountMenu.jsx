@@ -48,18 +48,19 @@ function roleLabel(t) {
 }
 
 /**
- * Header account chip + menu — settings, account/security, logout.
- * onOpenSettings(subTab?) opens the settings hub (default: office «platform»).
+ * Header account menu — user-only: account/security + logout (no office settings).
  */
-export default function AdminAccountMenu({ onOpenSettings } = {}) {
+export default function AdminAccountMenu() {
   const { t } = useUiLang();
   const navigate = useNavigate();
   const rootRef = useRef(null);
   const firstItemRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const [securityOpen, setSecurityOpen] = useState(false);
-  const email = useMemo(() => getSaasUserEmail(), [open]);
-  const name = displayNameFromEmail(email, t('role_admin'));
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const email = useMemo(() => getSaasUserEmail(), [open, accountOpen]);
+  const fallbackName = displayNameFromEmail(email, t('role_admin'));
+  const name = displayName.trim() || fallbackName;
   const initials = initialsFromEmail(email);
   const role = roleLabel(t);
   const impersonating = isImpersonating() && hasImpersonationBackup();
@@ -99,18 +100,9 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
     }
   };
 
-  const goSettings = (subTab = 'platform') => {
+  const openAccount = () => {
     setOpen(false);
-    if (typeof onOpenSettings === 'function') {
-      onOpenSettings(subTab);
-      return;
-    }
-    navigate(`/admin?tab=settings&sub=${encodeURIComponent(subTab)}`);
-  };
-
-  const openSecurity = () => {
-    setOpen(false);
-    setSecurityOpen(true);
+    setAccountOpen(true);
   };
 
   const copyEmail = async () => {
@@ -180,59 +172,37 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
               </div>
             </div>
 
-            <div className="admin-acct-section" role="group" aria-label={t('account_section')}>
-              <p className="admin-acct-section-label">{t('account_section')}</p>
+            <div className="admin-acct-section" role="group" aria-label={t('account')}>
               <button
                 ref={firstItemRef}
                 type="button"
                 role="menuitem"
                 className="admin-acct-item"
-                onClick={() => goSettings('platform')}
+                onClick={openAccount}
               >
-                <span className="admin-acct-item-icon" aria-hidden>
-                  <span className="material-symbols-outlined">settings</span>
+                <span className="admin-acct-item-icon is-mint" aria-hidden>
+                  <span className="material-symbols-outlined">manage_accounts</span>
                 </span>
                 <span className="admin-acct-item-body">
-                  <span className="admin-acct-item-label">{t('settings')}</span>
-                  <span className="admin-acct-item-hint">{t('settings_hint')}</span>
+                  <span className="admin-acct-item-label">{t('my_account')}</span>
+                  <span className="admin-acct-item-hint">{t('my_account_hint')}</span>
                 </span>
                 <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
                   chevron_right
                 </span>
               </button>
-            </div>
-
-            <div className="admin-acct-section" role="group" aria-label={t('security_section')}>
-              <p className="admin-acct-section-label">{t('security_section')}</p>
               <button
                 type="button"
                 role="menuitem"
                 className="admin-acct-item"
-                onClick={openSecurity}
+                onClick={openAccount}
               >
-                <span className="admin-acct-item-icon is-mint" aria-hidden>
-                  <span className="material-symbols-outlined">shield</span>
+                <span className="admin-acct-item-icon" aria-hidden>
+                  <span className="material-symbols-outlined">lock</span>
                 </span>
                 <span className="admin-acct-item-body">
                   <span className="admin-acct-item-label">{t('security')}</span>
                   <span className="admin-acct-item-hint">{t('security_hint')}</span>
-                </span>
-                <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
-                  chevron_right
-                </span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="admin-acct-item"
-                onClick={() => goSettings('logins')}
-              >
-                <span className="admin-acct-item-icon" aria-hidden>
-                  <span className="material-symbols-outlined">login</span>
-                </span>
-                <span className="admin-acct-item-body">
-                  <span className="admin-acct-item-label">{t('security_logins')}</span>
-                  <span className="admin-acct-item-hint">{t('security_logins_hint')}</span>
                 </span>
                 <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
                   chevron_right
@@ -280,9 +250,11 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
       </div>
 
       <AdminAccountSecurityModal
-        open={securityOpen}
-        onClose={() => setSecurityOpen(false)}
-        onNavigateSettings={goSettings}
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        onProfileSaved={(nextName) => {
+          if (nextName) setDisplayName(nextName);
+        }}
       />
     </>
   );
