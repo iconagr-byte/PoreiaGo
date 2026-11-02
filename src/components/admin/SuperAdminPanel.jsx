@@ -225,6 +225,7 @@ export default function SuperAdminPanel() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showCreatePasswordConfirm, setShowCreatePasswordConfirm] = useState(false);
+  const [createAttempted, setCreateAttempted] = useState(false);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({
     legal_name: '',
@@ -398,11 +399,47 @@ export default function SuperAdminPanel() {
   const createEmailOk = isValidEmail(createForm.admin_email);
   const createSlugOk = isValidOfficeSlug(createForm.slug);
   const createSubdomainOk = isValidOfficeSlug(createForm.subdomain || createForm.slug);
+  const createLegalNameOk = String(createForm.legal_name || '').trim().length >= 2;
+  const createAdminNameOk = String(createForm.admin_full_name || '').trim().length >= 2;
+  const createAfmOk = isValidAfm(createForm.vat_number);
+  const createBlockers = useMemo(() => {
+    const missing = [];
+    if (!createLegalNameOk) missing.push('Επωνυμία γραφείου');
+    if (!createSlugOk) missing.push('Slug (URL id)');
+    if (!createSubdomainOk) missing.push('Subdomain');
+    if (!createAfmOk) missing.push('ΑΦΜ (9 ψηφία ή κενό)');
+    if (!createAdminNameOk) missing.push('Ονοματεπώνυμο admin');
+    if (!createEmailOk) missing.push('Email / username');
+    if (!createPasswordReady) missing.push('Κωδικός + επιβεβαίωση');
+    return missing;
+  }, [
+    createLegalNameOk,
+    createSlugOk,
+    createSubdomainOk,
+    createAfmOk,
+    createAdminNameOk,
+    createEmailOk,
+    createPasswordReady,
+  ]);
+  const createFormReady = createBlockers.length === 0;
 
   const submitCreate = async (e) => {
     e.preventDefault();
+    setCreateAttempted(true);
+    if (!createLegalNameOk) {
+      toast.error('Βάλε επωνυμία γραφείου (τουλάχιστον 2 χαρακτήρες)');
+      return;
+    }
     if (!createSlugOk || !createSubdomainOk) {
       toast.error('Slug / subdomain: μόνο πεζά λατινικά, αριθμοί και παύλα (τουλάχιστον 2 χαρακτήρες)');
+      return;
+    }
+    if (!createAfmOk) {
+      toast.error('ΑΦΜ: ακριβώς 9 ψηφία ή άφησέ το κενό');
+      return;
+    }
+    if (!createAdminNameOk) {
+      toast.error('Βάλε ονοματεπώνυμο για τον admin');
       return;
     }
     if (!createEmailOk) {
@@ -436,6 +473,7 @@ export default function SuperAdminPanel() {
       setSlugTouched(false);
       setShowCreatePassword(false);
       setShowCreatePasswordConfirm(false);
+      setCreateAttempted(false);
       load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία δημιουργίας γραφείου');
@@ -611,6 +649,7 @@ export default function SuperAdminPanel() {
                 setSlugTouched(false);
                 setShowCreatePassword(false);
                 setShowCreatePasswordConfirm(false);
+                setCreateAttempted(false);
                 setShowCreate(true);
               }}
               className="px-4 py-2.5 rounded-full bg-white text-slate-900 text-sm font-bold inline-flex items-center gap-1.5 shadow-sm"
@@ -800,6 +839,7 @@ export default function SuperAdminPanel() {
                 setSlugTouched(false);
                 setShowCreatePassword(false);
                 setShowCreatePasswordConfirm(false);
+                setCreateAttempted(false);
                 setShowCreate(true);
               }}
               className="mt-4 px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-bold"
@@ -942,7 +982,7 @@ export default function SuperAdminPanel() {
           size="xl"
           noScroll
         >
-          <form onSubmit={submitCreate} className="flex flex-col gap-4">
+          <form onSubmit={submitCreate} noValidate className="flex flex-col gap-4">
             <div
               className="grid grid-cols-3 gap-2.5"
               role="radiogroup"
@@ -1031,45 +1071,60 @@ export default function SuperAdminPanel() {
                   </div>
                 </div>
                 <Field
-                  label="Επωνυμία"
+                  label="Επωνυμία *"
                   value={createForm.legal_name}
                   onChange={onCreateNameChange}
                   required
-                  placeholder="π.χ. Aegean Travel"
+                  placeholder="π.χ. Icona Rent"
+                  hint={
+                    createAttempted && !createLegalNameOk
+                      ? 'Υποχρεωτικό — πληκτρολόγησε την επωνυμία (όχι μόνο placeholder)'
+                      : null
+                  }
+                  error={createAttempted && !createLegalNameOk}
                   snug
                 />
                 <div className="grid grid-cols-2 gap-2.5">
                   <Field
-                    label="Slug (URL id)"
+                    label="Slug (URL id) *"
                     value={createForm.slug}
                     onChange={(v) => {
                       setSlugTouched(true);
                       setCreateForm((f) => ({ ...f, slug: slugify(v), subdomain: slugify(v) }));
                     }}
                     required
-                    placeholder="aegean-travel"
+                    placeholder="π.χ. iconarent"
                     hint={
                       createForm.slug
                         ? createSlugOk
                           ? 'Έγκυρο · πεζά, αριθμοί, παύλα'
                           : 'Μόνο a-z, 0-9, παύλα · ≥ 2'
-                        : 'Μοναδικό id γραφείου'
+                        : createAttempted
+                          ? 'Υποχρεωτικό — συμπληρώνεται αυτόματα από την επωνυμία'
+                          : 'Συμπληρώνεται αυτόματα από την επωνυμία'
                     }
-                    error={Boolean(createForm.slug) && !createSlugOk}
+                    error={(createAttempted && !createSlugOk) || (Boolean(createForm.slug) && !createSlugOk)}
                     snug
                   />
                   <Field
-                    label="Subdomain"
+                    label="Subdomain *"
                     value={createForm.subdomain}
                     onChange={(v) => setCreateForm((f) => ({ ...f, subdomain: slugify(v) }))}
                     required
-                    placeholder="aegean"
+                    placeholder="π.χ. iconarent"
                     hint={
-                      createForm.subdomain && !createSubdomainOk
-                        ? 'Μόνο a-z, 0-9, παύλα · ≥ 2'
-                        : `${createForm.subdomain || 'office'}.${getPlatformBaseDomain()}`
+                      !createForm.subdomain
+                        ? createAttempted
+                          ? 'Υποχρεωτικό — βάλε επωνυμία ή πληκτρολόγησε subdomain'
+                          : `Θα γίνει: {slug}.${getPlatformBaseDomain()}`
+                        : !createSubdomainOk
+                          ? 'Μόνο a-z, 0-9, παύλα · ≥ 2'
+                          : `${createForm.subdomain}.${getPlatformBaseDomain()}`
                     }
-                    error={Boolean(createForm.subdomain) && !createSubdomainOk}
+                    error={
+                      (createAttempted && !createSubdomainOk) ||
+                      (Boolean(createForm.subdomain) && !createSubdomainOk)
+                    }
                     snug
                   />
                 </div>
@@ -1293,40 +1348,46 @@ export default function SuperAdminPanel() {
               </section>
             </div>
 
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-              <p className="text-xs text-slate-500 leading-snug">
-                {createForm.service_mode === 'rent'
-                  ? 'Θα ανοίξει μόνο το Rent storefront (/rent).'
-                  : createForm.service_mode === 'both'
-                    ? 'Λεωφορεία + μενού ενοικιάσεων ενεργό από την αρχή.'
-                    : 'Μόνο εκδρομές / λεωφορεία — χωρίς Rent.'}
-              </p>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  type="button"
-                  disabled={working}
-                  onClick={() => setShowCreate(false)}
-                  className="px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-white"
-                >
-                  Άκυρο
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    working ||
-                    !isValidAfm(createForm.vat_number) ||
-                    !createSlugOk ||
-                    !createSubdomainOk ||
-                    !createEmailOk ||
-                    !createPasswordReady ||
-                    !String(createForm.admin_full_name || '').trim() ||
-                    !String(createForm.legal_name || '').trim()
-                  }
-                  className="px-5 py-2.5 rounded-full bg-sky-600 text-white text-sm font-bold disabled:opacity-50 shadow-[0_8px_20px_rgba(2,132,199,0.28)] hover:bg-sky-500"
-                >
-                  {working ? 'Δημιουργία…' : 'Δημιουργία γραφείου'}
-                </button>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 leading-snug">
+                  {createForm.service_mode === 'rent'
+                    ? 'Θα ανοίξει μόνο το Rent storefront (/rent).'
+                    : createForm.service_mode === 'both'
+                      ? 'Λεωφορεία + μενού ενοικιάσεων ενεργό από την αρχή.'
+                      : 'Μόνο εκδρομές / λεωφορεία — χωρίς Rent.'}
+                </p>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={() => setShowCreate(false)}
+                    className="px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-white"
+                  >
+                    Άκυρο
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={working}
+                    className={`px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-[0_8px_20px_rgba(2,132,199,0.28)] disabled:opacity-50 ${
+                      createFormReady
+                        ? 'bg-sky-600 hover:bg-sky-500'
+                        : 'bg-sky-600/70 hover:bg-sky-600'
+                    }`}
+                  >
+                    {working ? 'Δημιουργία…' : 'Δημιουργία γραφείου'}
+                  </button>
+                </div>
               </div>
+              {!createFormReady ? (
+                <p className="text-[11px] font-medium text-amber-700 leading-snug">
+                  Συμπλήρωσε: {createBlockers.join(' · ')}
+                </p>
+              ) : (
+                <p className="text-[11px] font-medium text-emerald-700 leading-snug">
+                  Έτοιμο για δημιουργία
+                </p>
+              )}
             </div>
           </form>
         </Modal>
