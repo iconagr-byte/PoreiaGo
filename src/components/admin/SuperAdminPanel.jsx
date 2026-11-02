@@ -81,6 +81,7 @@ const EMPTY_CREATE = {
   admin_full_name: '',
   admin_email: '',
   admin_password: '',
+  admin_password_confirm: '',
 };
 
 function slugify(value) {
@@ -146,6 +147,61 @@ function isValidDomain(value) {
   return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(raw);
 }
 
+function isValidEmail(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw);
+}
+
+function isValidOfficeSlug(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(raw) && raw.length >= 2;
+}
+
+function passwordChecks(password, email = '') {
+  const pwd = String(password || '');
+  const mail = String(email || '').trim().toLowerCase();
+  const local = mail.includes('@') ? mail.split('@')[0] : '';
+  return {
+    length: pwd.length >= 8,
+    letter: /[A-Za-zΑ-Ωα-ω]/.test(pwd),
+    number: /\d/.test(pwd),
+    special: /[^A-Za-zΑ-Ωα-ω0-9\s]/.test(pwd),
+    notEmail: !mail || pwd.toLowerCase() !== mail,
+    notLocal: !local || local.length < 3 || !pwd.toLowerCase().includes(local),
+  };
+}
+
+function passwordStrength(checks) {
+  const score = [
+    checks.length,
+    checks.letter,
+    checks.number,
+    checks.special,
+    checks.notEmail && checks.notLocal,
+  ].filter(Boolean).length;
+  if (score <= 2) return { score, label: 'Αδύναμος', tone: 'rose' };
+  if (score === 3) return { score, label: 'Μέτριος', tone: 'amber' };
+  if (score === 4) return { score, label: 'Καλός', tone: 'sky' };
+  return { score, label: 'Ισχυρός', tone: 'emerald' };
+}
+
+function generateAdminPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%&*';
+  const all = upper + lower + digits + special;
+  const pick = (set) => set[Math.floor(Math.random() * set.length)];
+  const chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (chars.length < 12) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
 function copyText(text) {
   if (!text) return;
   navigator.clipboard?.writeText(text).then(
@@ -167,6 +223,8 @@ export default function SuperAdminPanel() {
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_CREATE);
   const [slugTouched, setSlugTouched] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showCreatePasswordConfirm, setShowCreatePasswordConfirm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({
     legal_name: '',
@@ -323,8 +381,40 @@ export default function SuperAdminPanel() {
     setCreateForm(next);
   };
 
+  const createPwdChecks = useMemo(
+    () => passwordChecks(createForm.admin_password, createForm.admin_email),
+    [createForm.admin_password, createForm.admin_email],
+  );
+  const createPwdStrength = useMemo(() => passwordStrength(createPwdChecks), [createPwdChecks]);
+  const createPasswordReady =
+    createPwdChecks.length &&
+    createPwdChecks.letter &&
+    createPwdChecks.number &&
+    createPwdChecks.special &&
+    createPwdChecks.notEmail &&
+    createPwdChecks.notLocal &&
+    Boolean(createForm.admin_password_confirm) &&
+    createForm.admin_password === createForm.admin_password_confirm;
+  const createEmailOk = isValidEmail(createForm.admin_email);
+  const createSlugOk = isValidOfficeSlug(createForm.slug);
+  const createSubdomainOk = isValidOfficeSlug(createForm.subdomain || createForm.slug);
+
   const submitCreate = async (e) => {
     e.preventDefault();
+    if (!createSlugOk || !createSubdomainOk) {
+      toast.error('Slug / subdomain: μόνο πεζά λατινικά, αριθμοί και παύλα (τουλάχιστον 2 χαρακτήρες)');
+      return;
+    }
+    if (!createEmailOk) {
+      toast.error('Βάλε έγκυρο email σύνδεσης για τον admin');
+      return;
+    }
+    if (!createPasswordReady) {
+      toast.error(
+        'Κωδικός: ≥8, γράμμα, αριθμός, σύμβολο · όχι το email · και να ταιριάζει η επιβεβαίωση',
+      );
+      return;
+    }
     setWorking(true);
     try {
       const mode = createForm.service_mode || 'buses';
@@ -344,6 +434,8 @@ export default function SuperAdminPanel() {
       setShowCreate(false);
       setCreateForm(EMPTY_CREATE);
       setSlugTouched(false);
+      setShowCreatePassword(false);
+      setShowCreatePasswordConfirm(false);
       load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία δημιουργίας γραφείου');
@@ -514,7 +606,13 @@ export default function SuperAdminPanel() {
             </button>
             <button
               type="button"
-              onClick={() => setShowCreate(true)}
+              onClick={() => {
+                setCreateForm(EMPTY_CREATE);
+                setSlugTouched(false);
+                setShowCreatePassword(false);
+                setShowCreatePasswordConfirm(false);
+                setShowCreate(true);
+              }}
               className="px-4 py-2.5 rounded-full bg-white text-slate-900 text-sm font-bold inline-flex items-center gap-1.5 shadow-sm"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -697,7 +795,13 @@ export default function SuperAdminPanel() {
             </p>
             <button
               type="button"
-              onClick={() => setShowCreate(true)}
+              onClick={() => {
+                setCreateForm(EMPTY_CREATE);
+                setSlugTouched(false);
+                setShowCreatePassword(false);
+                setShowCreatePasswordConfirm(false);
+                setShowCreate(true);
+              }}
               className="mt-4 px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-bold"
             >
               + Νέο γραφείο
@@ -936,13 +1040,22 @@ export default function SuperAdminPanel() {
                 />
                 <div className="grid grid-cols-2 gap-2.5">
                   <Field
-                    label="Slug"
+                    label="Slug (URL id)"
                     value={createForm.slug}
                     onChange={(v) => {
                       setSlugTouched(true);
                       setCreateForm((f) => ({ ...f, slug: slugify(v), subdomain: slugify(v) }));
                     }}
                     required
+                    placeholder="aegean-travel"
+                    hint={
+                      createForm.slug
+                        ? createSlugOk
+                          ? 'Έγκυρο · πεζά, αριθμοί, παύλα'
+                          : 'Μόνο a-z, 0-9, παύλα · ≥ 2'
+                        : 'Μοναδικό id γραφείου'
+                    }
+                    error={Boolean(createForm.slug) && !createSlugOk}
                     snug
                   />
                   <Field
@@ -950,7 +1063,13 @@ export default function SuperAdminPanel() {
                     value={createForm.subdomain}
                     onChange={(v) => setCreateForm((f) => ({ ...f, subdomain: slugify(v) }))}
                     required
-                    hint={`${createForm.subdomain || 'office'}.${getPlatformBaseDomain()}`}
+                    placeholder="aegean"
+                    hint={
+                      createForm.subdomain && !createSubdomainOk
+                        ? 'Μόνο a-z, 0-9, παύλα · ≥ 2'
+                        : `${createForm.subdomain || 'office'}.${getPlatformBaseDomain()}`
+                    }
+                    error={Boolean(createForm.subdomain) && !createSubdomainOk}
                     snug
                   />
                 </div>
@@ -993,44 +1112,182 @@ export default function SuperAdminPanel() {
                 </div>
               </section>
 
-              <section className="rounded-[22px] border border-slate-100 bg-white p-4 space-y-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
-                    <span className="material-symbols-outlined text-[16px]" aria-hidden>
-                      admin_panel_settings
+              <section className="rounded-[22px] border border-slate-100 bg-white p-4 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white shrink-0">
+                      <span className="material-symbols-outlined text-[16px]" aria-hidden>
+                        admin_panel_settings
+                      </span>
                     </span>
-                  </span>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
-                      Admin γραφείου
-                    </p>
-                    <p className="text-xs text-slate-500">Πρώτος χρήστης στο back office</p>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                        Admin γραφείου
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        Username = email · ισχυρός κωδικός
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={() => {
+                      const pwd = generateAdminPassword();
+                      setCreateForm((f) => ({
+                        ...f,
+                        admin_password: pwd,
+                        admin_password_confirm: pwd,
+                      }));
+                      setShowCreatePassword(true);
+                      setShowCreatePasswordConfirm(true);
+                      toast.success('Δημιουργήθηκε ισχυρός κωδικός');
+                    }}
+                    className="inline-flex items-center gap-1 shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white hover:border-sky-200"
+                  >
+                    <span className="material-symbols-outlined text-[14px]" aria-hidden>
+                      autorenew
+                    </span>
+                    Γεννήτρια
+                  </button>
                 </div>
                 <Field
                   label="Ονοματεπώνυμο"
                   value={createForm.admin_full_name}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_full_name: v }))}
                   required
+                  placeholder="π.χ. Μαρία Παπαδοπούλου"
                   snug
                 />
                 <Field
-                  label="Email"
+                  label="Username (email σύνδεσης)"
                   type="email"
                   value={createForm.admin_email}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_email: v }))}
                   required
+                  placeholder="admin@office.gr"
+                  autoComplete="username"
+                  hint={
+                    createForm.admin_email
+                      ? createEmailOk
+                        ? 'Έγκυρο username για σύνδεση στο back office'
+                        : 'Χρειάζεται έγκυρο email (π.χ. name@domain.gr)'
+                      : 'Το email είναι το username σύνδεσης — όχι κοινόχρηστο'
+                  }
+                  error={Boolean(createForm.admin_email) && !createEmailOk}
                   snug
                 />
-                <Field
+                <PasswordField
                   label="Κωδικός (≥ 8)"
-                  type="password"
                   value={createForm.admin_password}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_password: v }))}
+                  visible={showCreatePassword}
+                  onToggleVisible={() => setShowCreatePassword((v) => !v)}
                   required
                   minLength={8}
+                  autoComplete="new-password"
                   snug
                 />
+                <PasswordField
+                  label="Επιβεβαίωση κωδικού"
+                  value={createForm.admin_password_confirm}
+                  onChange={(v) => setCreateForm((f) => ({ ...f, admin_password_confirm: v }))}
+                  visible={showCreatePasswordConfirm}
+                  onToggleVisible={() => setShowCreatePasswordConfirm((v) => !v)}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  error={
+                    Boolean(createForm.admin_password_confirm) &&
+                    createForm.admin_password !== createForm.admin_password_confirm
+                  }
+                  hint={
+                    createForm.admin_password_confirm &&
+                    createForm.admin_password !== createForm.admin_password_confirm
+                      ? 'Οι κωδικοί δεν ταιριάζουν'
+                      : createForm.admin_password_confirm &&
+                          createForm.admin_password === createForm.admin_password_confirm
+                        ? 'Οι κωδικοί ταιριάζουν'
+                        : null
+                  }
+                  snug
+                />
+                {createForm.admin_password ? (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold text-slate-500">Ισχύς κωδικού</p>
+                      <span
+                        className={`text-[11px] font-bold ${
+                          createPwdStrength.tone === 'rose'
+                            ? 'text-rose-600'
+                            : createPwdStrength.tone === 'amber'
+                              ? 'text-amber-600'
+                              : createPwdStrength.tone === 'sky'
+                                ? 'text-sky-600'
+                                : 'text-emerald-600'
+                        }`}
+                      >
+                        {createPwdStrength.label}
+                      </span>
+                    </div>
+                    <div className="flex gap-1" aria-hidden>
+                      {[1, 2, 3, 4, 5].map((step) => (
+                        <span
+                          key={step}
+                          className={`h-1.5 flex-1 rounded-full ${
+                            createPwdStrength.score >= step
+                              ? createPwdStrength.tone === 'rose'
+                                ? 'bg-rose-400'
+                                : createPwdStrength.tone === 'amber'
+                                  ? 'bg-amber-400'
+                                  : createPwdStrength.tone === 'sky'
+                                    ? 'bg-sky-400'
+                                    : 'bg-emerald-400'
+                              : 'bg-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      {[
+                        { ok: createPwdChecks.length, label: '≥ 8 χαρακτήρες' },
+                        { ok: createPwdChecks.letter, label: 'Γράμμα' },
+                        { ok: createPwdChecks.number, label: 'Αριθμός' },
+                        { ok: createPwdChecks.special, label: 'Σύμβολο (!@#…)' },
+                        { ok: createPwdChecks.notEmail, label: '≠ email' },
+                        { ok: createPwdChecks.notLocal, label: '≠ μέρος username' },
+                      ].map((item) => (
+                        <li
+                          key={item.label}
+                          className={`flex items-center gap-1 text-[11px] font-medium ${
+                            item.ok ? 'text-emerald-700' : 'text-slate-400'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]" aria-hidden>
+                            {item.ok ? 'check_circle' : 'radio_button_unchecked'}
+                          </span>
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                    {createForm.admin_password && createPasswordReady ? (
+                      <button
+                        type="button"
+                        onClick={() => copyText(createForm.admin_password)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:text-sky-800"
+                      >
+                        <span className="material-symbols-outlined text-[14px]" aria-hidden>
+                          content_copy
+                        </span>
+                        Αντιγραφή κωδικού
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 leading-snug px-0.5">
+                    Γεννήτρια ή χειροκίνητα: ≥ 8, γράμμα, αριθμός, σύμβολο. Όχι το email ως κωδικός.
+                  </p>
+                )}
               </section>
             </div>
 
@@ -1053,7 +1310,16 @@ export default function SuperAdminPanel() {
                 </button>
                 <button
                   type="submit"
-                  disabled={working || !isValidAfm(createForm.vat_number)}
+                  disabled={
+                    working ||
+                    !isValidAfm(createForm.vat_number) ||
+                    !createSlugOk ||
+                    !createSubdomainOk ||
+                    !createEmailOk ||
+                    !createPasswordReady ||
+                    !String(createForm.admin_full_name || '').trim() ||
+                    !String(createForm.legal_name || '').trim()
+                  }
                   className="px-5 py-2.5 rounded-full bg-sky-600 text-white text-sm font-bold disabled:opacity-50 shadow-[0_8px_20px_rgba(2,132,199,0.28)] hover:bg-sky-500"
                 >
                   {working ? 'Δημιουργία…' : 'Δημιουργία γραφείου'}
@@ -1513,6 +1779,7 @@ function Field({
   hint,
   error,
   snug = false,
+  autoComplete,
 }) {
   return (
     <label className="block text-sm">
@@ -1523,6 +1790,7 @@ function Field({
         required={required}
         minLength={minLength}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         className={`mt-1 w-full px-3 ${snug ? 'py-2 rounded-xl' : 'py-2.5 rounded-2xl'} bg-slate-50 border text-sm outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white ${
           error ? 'border-rose-300' : 'border-slate-100'
@@ -1530,6 +1798,59 @@ function Field({
       />
       {hint ? (
         <p className={`mt-1 text-[11px] ${error ? 'text-rose-600 font-medium' : 'text-slate-500'}`}>
+          {hint}
+        </p>
+      ) : null}
+    </label>
+  );
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+  visible,
+  onToggleVisible,
+  required,
+  minLength,
+  placeholder,
+  hint,
+  error,
+  snug = false,
+  autoComplete = 'new-password',
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="font-bold text-slate-500">{label}</span>
+      <div className="relative mt-1">
+        <input
+          type={visible ? 'text' : 'password'}
+          value={value}
+          required={required}
+          minLength={minLength}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          spellCheck={false}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full pl-3 pr-11 ${snug ? 'py-2 rounded-xl' : 'py-2.5 rounded-2xl'} bg-slate-50 border text-sm outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white ${
+            error ? 'border-rose-300' : 'border-slate-100'
+          }`}
+        />
+        <button
+          type="button"
+          onClick={onToggleVisible}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+          aria-label={visible ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+          aria-pressed={visible}
+          tabIndex={-1}
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            {visible ? 'visibility_off' : 'visibility'}
+          </span>
+        </button>
+      </div>
+      {hint ? (
+        <p className={`mt-1 text-[11px] ${error ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}`}>
           {hint}
         </p>
       ) : null}
