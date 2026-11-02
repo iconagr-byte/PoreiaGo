@@ -92,8 +92,13 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const syncInFlight = useRef(false);
 
   const loadFolders = useCallback(async () => {
+    // No office mailbox → empty counts (never show another tenant's unread).
+    if (!emailSettingsId) {
+      setFolders(Object.keys(FOLDER_META).map((name) => ({ name, unread: 0 })));
+      return;
+    }
     try {
-      const data = await fetchMailboxFolders(emailSettingsId || undefined);
+      const data = await fetchMailboxFolders(emailSettingsId);
       setFolders(data.folders || []);
     } catch (err) {
       mailboxToastError(err.message);
@@ -102,10 +107,18 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
 
   const loadMessages = useCallback(
     async ({ silent = false } = {}) => {
+      // SEAL: without this office's account id, never fetch the shared cache.
+      if (!emailSettingsId) {
+        setMessages([]);
+        setSelectedId(null);
+        setDetail(null);
+        setCustomer(null);
+        return [];
+      }
       if (!silent) setLoading(true);
       try {
         const list = await fetchMailboxMessages(activeFolder, {
-          accountId: emailSettingsId || undefined,
+          accountId: emailSettingsId,
         });
         setMessages((prev) => {
           // Avoid re-render jitter when poll returns the same rows.
@@ -343,7 +356,8 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       {!emailSettingsId && (
         <div className="embox-banner" role="status">
           <AlertCircle size={18} strokeWidth={2} aria-hidden />
-          Προσθέστε λογαριασμό email από την καρτέλα «Ρυθμίσεις Email».
+          Προσθέστε λογαριασμό email από την καρτέλα «Ρυθμίσεις Email». Χωρίς
+          δικό σας λογαριασμό δεν εμφανίζονται μηνύματα άλλων γραφείων.
         </div>
       )}
       {emailSettingsId && lastSyncError && (

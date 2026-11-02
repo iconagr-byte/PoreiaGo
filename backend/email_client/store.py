@@ -274,20 +274,46 @@ async def get_message(message_pk: str) -> dict | None:
     return _row_message(row) if row else None
 
 
+def _account_scope_clause(
+    *,
+    email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
+) -> tuple[str, list]:
+    """SQL fragment + params for tenant/account scope.
+
+    ``email_settings_ids=[]`` (empty list) seals to nothing — never unscoped.
+    ``None`` keeps legacy unscoped reads for internal/background callers only.
+    """
+    if email_settings_ids is not None:
+        ids = [str(i).strip() for i in email_settings_ids if str(i).strip()]
+        if not ids:
+            return " AND 1=0", []
+        placeholders = ",".join("?" * len(ids))
+        return f" AND email_settings_id IN ({placeholders})", ids
+    if email_settings_id:
+        return " AND email_settings_id = ?", [str(email_settings_id)]
+    return "", []
+
+
 async def list_messages(
     *,
     folder: str,
     email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
     limit: int = 50,
     offset: int = 0,
     search: str | None = None,
 ) -> list[dict]:
     db = get_db()
-    q = "SELECT * FROM email_messages WHERE folder = ?"
-    params: list = [folder]
-    if email_settings_id:
-        q += " AND email_settings_id = ?"
-        params.append(email_settings_id)
+    scope_sql, scope_params = _account_scope_clause(
+        email_settings_id=email_settings_id,
+        email_settings_ids=email_settings_ids,
+    )
+    # Empty explicit scope → no cross-tenant leak.
+    if email_settings_ids is not None and not scope_params and scope_sql == " AND 1=0":
+        return []
+    q = f"SELECT * FROM email_messages WHERE folder = ?{scope_sql}"
+    params: list = [folder, *scope_params]
     if search:
         q += " AND (subject LIKE ? OR sender LIKE ? OR recipient LIKE ?)"
         like = f"%{search}%"
@@ -298,17 +324,24 @@ async def list_messages(
     return [_row_message(r) for r in await cur.fetchall()]
 
 
-async def folder_unread_counts(*, email_settings_id: str | None = None) -> dict[str, int]:
+async def folder_unread_counts(
+    *,
+    email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
+) -> dict[str, int]:
+    scope_sql, scope_params = _account_scope_clause(
+        email_settings_id=email_settings_id,
+        email_settings_ids=email_settings_ids,
+    )
+    if email_settings_ids is not None and not scope_params and scope_sql == " AND 1=0":
+        return {}
     db = get_db()
-    q = """
+    q = f"""
         SELECT folder, COUNT(*) AS cnt
         FROM email_messages
-        WHERE is_read = 0 AND folder != ?
+        WHERE is_read = 0 AND folder != ?{scope_sql}
     """
-    params: list = [FOLDER_TRASH]
-    if email_settings_id:
-        q += " AND email_settings_id = ?"
-        params.append(email_settings_id)
+    params: list = [FOLDER_TRASH, *scope_params]
     q += " GROUP BY folder"
     cur = await db.execute(q, params)
     rows = await cur.fetchall()
