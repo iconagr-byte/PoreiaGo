@@ -129,20 +129,32 @@ export default function WalletAccountMenu({
       let left = r.left;
       left = Math.min(left, window.innerWidth - width - margin);
       left = Math.max(margin, left);
-      const top = Math.min(
-        r.bottom + gap,
-        Math.max(margin, window.innerHeight - margin - 120),
-      );
-      setSheetPos({ top, left, width });
+
+      // Prefer opening below the icon; flip up only when that would force a scrollbar.
+      const spaceBelow = Math.max(0, window.innerHeight - r.bottom - gap - margin);
+      const spaceAbove = Math.max(0, r.top - gap - margin);
+      const sheetH = sheetRef.current?.offsetHeight || 0;
+      const openUp =
+        sheetH > 0 && spaceBelow < sheetH && spaceAbove > spaceBelow;
+      const top = openUp
+        ? Math.max(margin, r.top - gap - (sheetH || Math.min(spaceAbove, 420)))
+        : r.bottom + gap;
+      const maxHeight = openUp
+        ? Math.max(160, r.top - gap - margin)
+        : Math.max(160, window.innerHeight - top - margin);
+      setSheetPos({ top, left, width, maxHeight });
     };
     place();
+    // Second pass after paint so flip-up uses real sheet height.
+    const raf = requestAnimationFrame(() => place());
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open]);
+  }, [open, rentAvailable]);
 
   const go = (fn) => {
     setOpen(false);
@@ -207,6 +219,7 @@ export default function WalletAccountMenu({
                   top: `${sheetPos.top}px`,
                   left: `${sheetPos.left}px`,
                   width: `${sheetPos.width}px`,
+                  maxHeight: `${sheetPos.maxHeight}px`,
                 }
               : { visibility: 'hidden' }
           }
