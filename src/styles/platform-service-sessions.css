@@ -817,11 +817,21 @@
 .pg-session--rent-contracts {
   position: relative;
   overflow: hidden;
+  display: block;
+  width: 100%;
+  opacity: 1;
+  scroll-margin-top: 5.75rem;
   background:
     radial-gradient(ellipse 65% 50% at 90% 15%, rgba(45, 212, 191, 0.18), transparent 58%),
     radial-gradient(ellipse 45% 40% at 5% 85%, rgba(13, 148, 136, 0.14), transparent 55%),
     linear-gradient(165deg, #042f2e 0%, #0b3d4a 45%, #062a30 100%);
   color: #f8fafc;
+}
+
+/* Guest /rent: sit between fleet and landing bands, edge-to-edge inside the app. */
+.rent-home > .pg-session--rent-contracts {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .pg-rent-contracts-atmosphere {
@@ -1112,6 +1122,7 @@
 }
 
 .pg-rent-contracts-rise {
+  opacity: 1;
   animation: pgBusesRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--pg-rise-delay, 0ms);
 }

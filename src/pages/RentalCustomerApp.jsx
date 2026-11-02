@@ -572,7 +572,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 </div>
               </section>
             </div>
+          </div>
 
+          {/* Digital contracts — full-bleed session under the fleet (nav «Συμβόλαιο»). */}
+          <PlatformRentContractsSession />
+
+          <div className="rent-home-stack rent-home-stack--landing">
             <RentGuestLandingExtras
               brandLabel={branding.brandLabel}
               onRequireLogin={onRequireLogin}
@@ -583,8 +588,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               }}
             />
 
-            {/* Digital contracts + marketing rent session below «Γιατί εμάς». */}
-            <PlatformRentContractsSession />
             {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
           </div>
         </main>
