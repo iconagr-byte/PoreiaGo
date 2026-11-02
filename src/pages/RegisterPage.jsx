@@ -242,28 +242,6 @@ export default function RegisterPage() {
   const phoneChrome = nativeWallet || isPhone;
   const useCustomerShell = cleanRegister || (!rentIntent && !walletClaimFlow && !nativeWallet);
 
-  const shellClass = rentIntent
-    ? `rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`
-    : useCustomerShell
-      ? `customer-auth-stage${phoneChrome ? '' : ' customer-auth-stage--desktop'}`
-      : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
-          nativeWallet ? ' wallet-auth-stage--native' : ''
-        }`;
-  const cardClass = rentIntent
-    ? 'rent-auth-shell'
-    : useCustomerShell
-      ? 'customer-auth-shell'
-      : 'wallet-auth-shell';
-  const scrollClass = rentIntent
-    ? 'rent-auth-scroll'
-    : useCustomerShell
-      ? 'customer-auth-scroll'
-      : 'wallet-auth-scroll';
-  const panelClass = rentIntent
-    ? 'rent-auth-card'
-    : useCustomerShell
-      ? 'customer-auth-card'
-      : 'wallet-auth-card';
   const iconClass = rentIntent
     ? 'material-symbols-outlined rent-auth-icon'
     : useCustomerShell
@@ -295,189 +273,300 @@ export default function RegisterPage() {
       ? 'customer-auth-hero'
       : 'wallet-auth-hero';
 
+  const formBody = (
+    <>
+      <div className={`text-center ${heroClass}`}>
+        <span className={iconClass} aria-hidden>
+          {rentIntent
+            ? 'directions_car'
+            : walletClaimFlow
+              ? 'account_balance_wallet'
+              : 'account_circle'}
+        </span>
+        <h1>
+          {rentIntent
+            ? 'Rent Wallet'
+            : walletClaimFlow
+              ? 'My Wallet'
+              : 'Δημιουργία λογαριασμού'}
+        </h1>
+        {rentIntent ? (
+          <p className={leadClass}>Δημιουργήστε λογαριασμό για ενοικίαση οχήματος</p>
+        ) : walletClaimFlow ? null : (
+          <p className={leadClass}>
+            Όνομα, email και κωδικός — για κρατήσεις στο όνομά σας.
+          </p>
+        )}
+      </div>
+
+      {walletClaimFlow ? (
+        <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
+          <p className="font-bold text-primary mb-1">Η κράτησή σας είναι έτοιμη</p>
+          <p className="text-on-surface-variant">
+            Email: <span className="font-semibold text-on-surface">{prefillEmail}</span>
+            {claim.reference || highlightBooking ? (
+              <>
+                {' · '}
+                Κωδικός:{' '}
+                <span className="font-semibold text-on-surface">
+                  {claim.reference || highlightBooking}
+                </span>
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {backendOk === false && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            {import.meta.env.PROD
+              ? 'Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.'
+              : (
+                <>
+                  Ο server δεν τρέχει. Ανοίξτε νέο terminal και εκτελέστε:{' '}
+                  <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
+                </>
+              )}
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            {error}{' '}
+            {error.includes('σύνδεση') ? (
+              <Link
+                to={rentIntent ? '/rent/login' : '/login'}
+                state={loginState}
+                className="font-bold underline"
+              >
+                Σύνδεση
+              </Link>
+            ) : null}
+          </p>
+        )}
+
+        <div className="space-y-2">
+          <label className="block text-sm font-bold" htmlFor="name">
+            Ονοματεπώνυμο <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            required
+            minLength={2}
+            autoComplete="name"
+            defaultValue={prefillName}
+            className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
+            placeholder="π.χ. Μαρία Παπαδοπούλου"
+          />
+          {walletClaimFlow ? (
+            <p className="text-xs text-on-surface-variant">
+              Το όνομα του επιβάτη για το εισιτήριο στο My Wallet.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-bold" htmlFor="email">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            defaultValue={prefillEmail}
+            className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
+            placeholder="email@example.com"
+          />
+        </div>
+
+        <PasswordField
+          id="password"
+          name="password"
+          label="Κωδικός"
+          minLength={6}
+          required
+          autoComplete="new-password"
+        />
+
+        <PasswordField
+          id="confirm"
+          name="confirm"
+          label="Επιβεβαίωση κωδικού"
+          minLength={6}
+          required
+          autoComplete="new-password"
+        />
+
+        <button type="submit" disabled={loading || googleLoading} className={submitClass}>
+          {loading
+            ? 'Δημιουργία…'
+            : rentIntent
+              ? 'Δημιουργία & είσοδος στην Ενοικίαση'
+              : walletClaimFlow
+                ? 'Δημιουργία & άνοιγμα Wallet'
+                : 'Δημιουργία λογαριασμού'}
+        </button>
+      </form>
+
+      <div className={`${dividerClass} mt-5`}>ή με Google</div>
+      <div className="space-y-3 mt-2">
+        <GoogleSignInButton
+          text="signup_with"
+          disabled={googleLoading || loading}
+          onSuccess={handleGoogleCredential}
+          onDemoProfile={handleGoogleDemo}
+          onError={setError}
+        />
+        {googleLoading ? (
+          <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+        ) : null}
+      </div>
+
+      <p className="text-sm text-center mt-6 text-[#6e6e73]">
+        Έχετε ήδη λογαριασμό;{' '}
+        <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
+          Σύνδεση
+        </Link>
+      </p>
+      {!isNativeApp() ? (
+        !rentIntent && !cleanRegister ? (
+          <p className="text-xs text-center mt-4">
+            <Link to="/my-booking" className={linkClass}>
+              Εύρεση κράτησης λεωφορείου
+            </Link>
+          </p>
+        ) : rentIntent ? (
+          <p className="text-xs text-center mt-4">
+            <Link to="/rent/my-booking" className={linkClass}>
+              Εύρεση κράτησης ενοικίασης
+            </Link>
+          </p>
+        ) : (
+          <p className="text-xs text-center mt-4">
+            <Link to="/" className={linkClass}>
+              Επιστροφή στην αρχική
+            </Link>
+          </p>
+        )
+      ) : null}
+    </>
+  );
+
+  if (rentIntent) {
+    return (
+      <div className={`rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`}>
+        <div className="rent-auth-shell">
+          <div className="rent-auth-scroll">
+            {!phoneChrome ? (
+              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το Rent Wallet">
+                <p className="rent-auth-aside-kicker">Rent Wallet · Ενοικιάσεις</p>
+                <h2 className="rent-auth-aside-title">
+                  Δημιουργήστε
+                  <br />
+                  λογαριασμό ενοικίασης
+                </h2>
+                <p className="rent-auth-aside-lead">
+                  Ένας λογαριασμός μόνο για οχήματα — κρατήσεις, πληρωμές και QR παραλαβής,
+                  χωριστά από τα λεωφορεία.
+                </p>
+                <ul className="rent-auth-aside-list">
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      directions_car
+                    </span>
+                    <div>
+                      <strong>Κρατήσεις οχημάτων</strong>
+                      <span>Επιβατικά, van και υπηρεσίες σε μία λίστα.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      qr_code_2
+                    </span>
+                    <div>
+                      <strong>QR παραλαβής</strong>
+                      <span>Δείξτε το στο γραφείο χωρίς email ή PDF.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      payments
+                    </span>
+                    <div>
+                      <strong>Πληρωμές & κατάθεση</strong>
+                      <span>Κάρτα, τράπεζα ή μετρητά — ξεκάθαρο υπόλοιπο.</span>
+                    </div>
+                  </li>
+                </ul>
+              </aside>
+            ) : null}
+
+            <div className="rent-auth-panel">
+              <div className="rent-auth-card rent-auth-card--register">{formBody}</div>
+              {!phoneChrome ? (
+                <Link to="/rent" className="rent-auth-back">
+                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                  Επιστροφή στην Αρχική
+                </Link>
+              ) : null}
+            </div>
+
+            {!phoneChrome ? (
+              <aside className="rent-auth-aside rent-auth-aside--right" aria-label="Πώς λειτουργεί">
+                <p className="rent-auth-aside-kicker">Πώς λειτουργεί</p>
+                <h2 className="rent-auth-aside-title rent-auth-aside-title--sm">
+                  Από την εγγραφή
+                  <br />
+                  στην παραλαβή
+                </h2>
+                <ol className="rent-auth-aside-steps">
+                  <li>
+                    <span className="rent-auth-aside-step">1</span>
+                    <div>
+                      <strong>Δημιουργήστε λογαριασμό</strong>
+                      <span>Όνομα, email και κωδικός — ή Google.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="rent-auth-aside-step">2</span>
+                    <div>
+                      <strong>Βρείτε όχημα</strong>
+                      <span>Ημερομηνίες, τοποθεσία και κατηγορία.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="rent-auth-aside-step">3</span>
+                    <div>
+                      <strong>Παραλάβετε με QR</strong>
+                      <span>Όλα στο Wallet — χωρίς χαρτιά.</span>
+                    </div>
+                  </li>
+                </ol>
+              </aside>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const shellClass = useCustomerShell
+    ? `customer-auth-stage${phoneChrome ? '' : ' customer-auth-stage--desktop'}`
+    : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
+        nativeWallet ? ' wallet-auth-stage--native' : ''
+      }`;
+  const cardClass = useCustomerShell ? 'customer-auth-shell' : 'wallet-auth-shell';
+  const scrollClass = useCustomerShell ? 'customer-auth-scroll' : 'wallet-auth-scroll';
+  const panelClass = useCustomerShell ? 'customer-auth-card' : 'wallet-auth-card';
+
   return (
     <div className={shellClass}>
       <div className={cardClass}>
         <div className={scrollClass}>
-          <div className={panelClass}>
-        <div className={`text-center ${heroClass}`}>
-          <span className={iconClass} aria-hidden>
-            {rentIntent
-              ? 'directions_car'
-              : walletClaimFlow
-                ? 'account_balance_wallet'
-                : 'account_circle'}
-          </span>
-          <h1>
-            {rentIntent
-              ? 'Rent Wallet'
-              : walletClaimFlow
-                ? 'My Wallet'
-                : 'Δημιουργία λογαριασμού'}
-          </h1>
-          {rentIntent ? (
-            <p className={leadClass}>Δημιουργήστε λογαριασμό για ενοικίαση οχήματος</p>
-          ) : walletClaimFlow ? null : (
-            <p className={leadClass}>
-              Όνομα, email και κωδικός — για κρατήσεις στο όνομά σας.
-            </p>
-          )}
-        </div>
-
-        {walletClaimFlow ? (
-          <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
-            <p className="font-bold text-primary mb-1">Η κράτησή σας είναι έτοιμη</p>
-            <p className="text-on-surface-variant">
-              Email: <span className="font-semibold text-on-surface">{prefillEmail}</span>
-              {claim.reference || highlightBooking ? (
-                <>
-                  {' · '}
-                  Κωδικός:{' '}
-                  <span className="font-semibold text-on-surface">
-                    {claim.reference || highlightBooking}
-                  </span>
-                </>
-              ) : null}
-            </p>
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {backendOk === false && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              {import.meta.env.PROD
-                ? 'Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.'
-                : (
-                  <>
-                    Ο server δεν τρέχει. Ανοίξτε νέο terminal και εκτελέστε:{' '}
-                    <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
-                  </>
-                )}
-            </p>
-          )}
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-              {error}{' '}
-              {error.includes('σύνδεση') ? (
-                <Link
-                  to={rentIntent ? '/rent/login' : '/login'}
-                  state={loginState}
-                  className="font-bold underline"
-                >
-                  Σύνδεση
-                </Link>
-              ) : null}
-            </p>
-          )}
-
-          <div className="space-y-2">
-            <label className="block text-sm font-bold" htmlFor="name">
-              Ονοματεπώνυμο <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              minLength={2}
-              autoComplete="name"
-              defaultValue={prefillName}
-              className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-              placeholder="π.χ. Μαρία Παπαδοπούλου"
-            />
-            {walletClaimFlow ? (
-              <p className="text-xs text-on-surface-variant">
-                Το όνομα του επιβάτη για το εισιτήριο στο My Wallet.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-bold" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              defaultValue={prefillEmail}
-              className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-              placeholder="email@example.com"
-            />
-          </div>
-
-          <PasswordField
-            id="password"
-            name="password"
-            label="Κωδικός"
-            minLength={6}
-            required
-            autoComplete="new-password"
-          />
-
-          <PasswordField
-            id="confirm"
-            name="confirm"
-            label="Επιβεβαίωση κωδικού"
-            minLength={6}
-            required
-            autoComplete="new-password"
-          />
-
-          <button type="submit" disabled={loading || googleLoading} className={submitClass}>
-            {loading
-              ? 'Δημιουργία…'
-              : rentIntent
-                ? 'Δημιουργία & είσοδος στην Ενοικίαση'
-                : walletClaimFlow
-                  ? 'Δημιουργία & άνοιγμα Wallet'
-                  : 'Δημιουργία λογαριασμού'}
-          </button>
-        </form>
-
-        <div className={`${dividerClass} mt-5`}>ή με Google</div>
-        <div className="space-y-3 mt-2">
-          <GoogleSignInButton
-            text="signup_with"
-            disabled={googleLoading || loading}
-            onSuccess={handleGoogleCredential}
-            onDemoProfile={handleGoogleDemo}
-            onError={setError}
-          />
-          {googleLoading ? (
-            <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-          ) : null}
-        </div>
-
-        <p className="text-sm text-center mt-6 text-[#6e6e73]">
-          Έχετε ήδη λογαριασμό;{' '}
-          <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
-            Σύνδεση
-          </Link>
-        </p>
-        {!isNativeApp() ? (
-          !rentIntent && !cleanRegister ? (
-            <p className="text-xs text-center mt-4">
-              <Link to="/my-booking" className={linkClass}>
-                Εύρεση κράτησης λεωφορείου
-              </Link>
-            </p>
-          ) : rentIntent ? (
-            <p className="text-xs text-center mt-4">
-              <Link to="/rent/my-booking" className={linkClass}>
-                Εύρεση κράτησης ενοικίασης
-              </Link>
-            </p>
-          ) : (
-            <p className="text-xs text-center mt-4">
-              <Link to="/" className={linkClass}>
-                Επιστροφή στην αρχική
-              </Link>
-            </p>
-          )
-        ) : null}
-          </div>
+          <div className={panelClass}>{formBody}</div>
         </div>
       </div>
     </div>
