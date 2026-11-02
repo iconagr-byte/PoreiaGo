@@ -24,10 +24,13 @@ import {
   replyMailboxMessage,
   syncMailbox,
 } from '../../../services/emailClientApi.js';
+import { useResizableRailWidth } from '../../../hooks/useResizableRailWidth.js';
 import '../../../styles/emailMarketingHub.css';
 import '../../../styles/emailMailbox.css';
 import EmailComposeModal from './EmailComposeModal.jsx';
 import RichTextEditor from './RichTextEditor.jsx';
+
+const LIST_WIDTH_KEY = 'poreiago.email.mailbox.listWidth';
 
 function mailboxToastError(message) {
   toast.error(message, { id: 'mailbox-request-error' });
@@ -90,6 +93,12 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [bulkBusy, setBulkBusy] = useState(false);
   const autoSyncedFor = useRef('');
   const syncInFlight = useRef(false);
+  const { width: listWidth, onPointerDown: onListResize } = useResizableRailWidth({
+    storageKey: LIST_WIDTH_KEY,
+    defaultWidth: 300,
+    minWidth: 220,
+    maxWidth: 560,
+  });
 
   const loadFolders = useCallback(async () => {
     // No office mailbox → empty counts (never show another tenant's unread).
@@ -443,7 +452,10 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
           })}
         </aside>
 
-        <section className="embox-list">
+        <section
+          className="embox-list"
+          style={{ ['--embox-list-width']: `${listWidth}px` }}
+        >
           <div className="embox-list-head">
             <label className="embox-check-all">
               <input
@@ -515,6 +527,15 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
               );
             })}
           </ul>
+          <button
+            type="button"
+            className="embox-list-resize"
+            aria-label="Αλλαγή πλάτους λίστας / προεπισκόπησης"
+            title="Σύρετε για περισσότερο χώρο στην προεπισκόπηση"
+            onPointerDown={onListResize}
+          >
+            <span className="embox-list-resize-grip" aria-hidden />
+          </button>
         </section>
 
         <section className="embox-detail">

@@ -218,13 +218,54 @@
 
 .embox-list {
   position: relative;
-  width: 300px;
+  width: var(--embox-list-width, 300px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--embox-surface);
   border-right: 1px solid var(--embox-border);
+}
+
+/* Drag handle: list ↔ preview */
+.embox-list-resize {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .embox-list-resize {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    right: -0.45rem;
+    z-index: 5;
+    width: 0.85rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .embox-list-resize-grip {
+    width: 0.28rem;
+    height: min(4.5rem, 42%);
+    min-height: 2.5rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.2);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+    transition: background 0.15s ease, height 0.15s ease, transform 0.15s ease;
+  }
+
+  .embox-list-resize:hover .embox-list-resize-grip,
+  .embox-list-resize:focus-visible .embox-list-resize-grip {
+    background: #6366f1;
+    height: min(5.5rem, 55%);
+    transform: scaleX(1.15);
+  }
 }
 
 .embox-list-head {
