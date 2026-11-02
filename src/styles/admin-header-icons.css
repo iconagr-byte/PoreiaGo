@@ -311,12 +311,122 @@
 }
 
 .admin-acct-section {
-  padding: 0.4rem;
+  padding: 0.35rem 0.4rem 0.15rem;
+}
+
+.admin-acct-section-label {
+  margin: 0;
+  padding: 0.35rem 0.65rem 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--acct-tertiary, #86868b);
 }
 
 .admin-acct-footer {
   padding: 0.25rem 0.4rem 0.45rem;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.admin-acct-item-icon.is-mint {
+  background: rgba(52, 199, 89, 0.12);
+  color: #248a3d;
+}
+
+.admin-sec-panel {
+  max-width: 24rem;
+}
+
+.admin-sec-body {
+  gap: 1rem;
+}
+
+.admin-sec-card {
+  padding: 1rem 1.05rem;
+  border-radius: 14px;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.admin-sec-card-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #86868b;
+}
+
+.admin-sec-card-value {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  word-break: break-all;
+}
+
+.admin-sec-card-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6e6e73;
+}
+
+.admin-sec-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.admin-sec-password-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: #fbfbfd;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.admin-sec-password-row {
+  position: relative;
+}
+
+.admin-sec-password-row .olm-input {
+  padding-right: 2.75rem;
+}
+
+.admin-sec-eye {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #86868b;
+  cursor: pointer;
+}
+
+.admin-sec-eye:hover {
+  background: #f5f5f7;
+  color: #1d1d1f;
+}
+
+.admin-sec-eye .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.olm-label.is-soft {
+  font-weight: 400;
+  color: #86868b;
 }
 
 .admin-acct-item {
