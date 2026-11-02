@@ -50,6 +50,7 @@ import WalletMorePanel from '../components/wallet/WalletMorePanel.jsx';
 import WalletNotificationBell from '../components/wallet/WalletNotificationBell.jsx';
 import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
+import WalletDesignPreview from '../components/wallet/WalletDesignPreview.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import {
@@ -128,6 +129,17 @@ function WalletAuthGate() {
   const location = useLocation();
   const walletReturn =
     `/wallet${location.search || ''}` || '/wallet';
+
+  // Design studio iframe (/wallet?preview=1) — show Αρχική, not login.
+  let previewMode = false;
+  try {
+    previewMode = new URLSearchParams(location.search || '').get('preview') === '1';
+  } catch {
+    previewMode = false;
+  }
+  if (previewMode) {
+    return <WalletDesignPreview />;
+  }
 
   if (isCustomer() && !getCustomerToken()) {
     logoutCustomer();

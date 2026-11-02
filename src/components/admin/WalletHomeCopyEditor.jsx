@@ -9,6 +9,7 @@ import {
   updateSiteAppearance,
 } from '../../services/siteAppearanceApi.js';
 import { resolveWalletHomeFeed } from '../../lib/wallet/walletHomeFeed.js';
+import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
 
 const DEFAULT_SERVICES = DEFAULT_SITE_APPEARANCE.wallet_home_services || [];
 
@@ -63,6 +64,16 @@ export default function WalletHomeCopyEditor({ embedded = false, onSaved } = {})
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live Split preview iframe (/wallet?preview=1) picks up draft via BroadcastChannel.
+  useEffect(() => {
+    if (loading) return;
+    pushHomepagePreviewDraft({
+      ...form,
+      footer_brand_name: officeName,
+      display_name: officeName,
+    });
+  }, [form, officeName, loading]);
 
   const dirty = JSON.stringify(form) !== saved;
   const preview = useMemo(
