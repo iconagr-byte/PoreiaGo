@@ -35,8 +35,20 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
         src = (ROOT / "app/services/platform_admin_service.py").read_text(encoding="utf-8")
         self.assertIn("prepare_contabo_tenant_write", src)
         self.assertIn("INSERT INTO tenants", src)
+        self.assertIn("tenant_plan_db_token", src)
+        self.assertIn("merge(tenant, load=False)", src)
         mods = (ROOT / "app/services/tenant_modules.py").read_text(encoding="utf-8")
         self.assertIn("async def prepare_contabo_tenant_write", mods)
+        self.assertIn("detect_tenant_plan_persist_style", mods)
+
+    def test_tenant_plan_db_token_name_vs_value(self):
+        from app.models.tenant import TenantPlan
+        from app.services.tenant_modules import tenant_plan_db_token
+
+        self.assertEqual(tenant_plan_db_token(TenantPlan.STARTER, "name"), "STARTER")
+        self.assertEqual(tenant_plan_db_token(TenantPlan.RENT, "name"), "RENT")
+        self.assertEqual(tenant_plan_db_token(TenantPlan.STARTER, "value"), "starter")
+        self.assertEqual(tenant_plan_db_token(TenantPlan.RENT, "value"), "rent")
 
 
 if __name__ == "__main__":

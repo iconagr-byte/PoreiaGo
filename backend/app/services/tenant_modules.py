@@ -398,7 +398,61 @@ async def _heal_legacy_tenant_name_column(session: Any, *, commit: bool = True) 
             raise
 
 
-async def prepare_contabo_tenant_write(session: Any) -> dict[str, bool]:
+async def detect_tenant_plan_persist_style(session: Any) -> str:
+    """
+    Contabo stores tenant_plan as uppercase enum **names** (STARTER), while
+    alembic/dev often stores lowercase **values** (starter).
+    """
+    from sqlalchemy import text
+
+    from app.models.tenant import TenantPlan
+
+    sample = await session.scalar(
+        text("SELECT plan::text FROM tenants WHERE plan IS NOT NULL LIMIT 1")
+    )
+    if sample is not None:
+        token = str(sample).strip()
+        names = {m.name for m in TenantPlan}
+        values = {m.value for m in TenantPlan}
+        if token in names:
+            return "name"
+        if token in values:
+            return "value"
+        if token.upper() in names:
+            return "name"
+        if token.lower() in values:
+            return "value"
+
+    label = await session.scalar(
+        text(
+            """
+            SELECT e.enumlabel
+            FROM pg_enum e
+            JOIN pg_type t ON t.oid = e.enumtypid
+            WHERE t.typname = 'tenant_plan'
+            ORDER BY e.enumsortorder
+            LIMIT 1
+            """
+        )
+    )
+    if label is not None:
+        token = str(label).strip()
+        if token in {m.name for m in TenantPlan} or token.isupper():
+            return "name"
+    return "value"
+
+
+def tenant_plan_db_token(plan: Any, style: str) -> str:
+    """Persist TenantPlan as Contabo expects (name vs value)."""
+    if hasattr(plan, "name") and hasattr(plan, "value"):
+        return plan.name if style == "name" else plan.value
+    raw = str(plan or "starter").strip()
+    if style == "name":
+        return raw.upper()
+    return raw.lower()
+
+
+async def prepare_contabo_tenant_write(session: Any) -> dict[str, Any]:
     """
     Same-transaction schema softeners for Contabo create-office inserts.
 
@@ -409,7 +463,17 @@ async def prepare_contabo_tenant_write(session: Any) -> dict[str, bool]:
     """
     from sqlalchemy import text
 
-    flags = {"has_name_col": False, "plan_softened": False}
+    flags: dict[str, Any] = {
+        "has_name_col": False,
+        "plan_softened": False,
+        "plan_style": "value",
+    }
+    try:
+        flags["plan_style"] = await detect_tenant_plan_persist_style(session)
+    except Exception:
+        logger.debug("plan persist style detect failed", exc_info=True)
+        flags["plan_style"] = "value"
+
     flags["has_name_col"] = bool(
         await session.scalar(
             text(
