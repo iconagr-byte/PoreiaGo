@@ -2502,13 +2502,11 @@ export default function BackOffice() {
               }}
             />
             <AdminAccountMenu
-              onOpenSettings={() => {
+              onOpenSettings={(subTab) => {
                 setActiveTab('settings');
                 setSettingsSubTab(
                   sanitizeSettingsSubTab(
-                    isSaasSuperAdmin()
-                      ? DEFAULT_PLATFORM_TAB
-                      : DEFAULT_TENANT_SETTINGS_TAB,
+                    subTab || DEFAULT_TENANT_SETTINGS_TAB,
                     isSaasSuperAdmin(),
                   ),
                 );
