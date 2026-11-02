@@ -59,8 +59,8 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const isPhone = useRentPhone();
-  // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
-  // Unified native app: allow /rent/login (and rentEntrance) so rent customers open Rent menu.
+  // Path / prop still marks rent entrance for redirects (rentals tab) — same blue My Wallet UI.
+  // Unified native app: allow /rent/login (and rentEntrance) so rent customers open rentals tab.
   const allowNativeRent =
     isNativeApp() && isNativeUnifiedApp() && (rentEntrance || isRentAuthPath(location.pathname));
   const pathRent =
@@ -68,7 +68,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const bookingPayContinue =
     typeof location.state?.from === 'string' &&
     (location.state.from.includes('/rent/book/payment') || location.state?.rentBookingPay);
-  // Deep-link /rent/* still paints green Rent chrome; plain /login auto-detects role.
   const rentChrome =
     (pathRent || isRentReturn(location.state?.from) || bookingPayContinue) &&
     (!isNativeApp() || allowNativeRent);
@@ -77,6 +76,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     Boolean(location.state?.walletClaim) ||
     location.state?.from === '/wallet' ||
     (typeof location.state?.from === 'string' && location.state.from.startsWith('/wallet'));
+  /** Rent deep-link / return — same My Wallet chrome; opens rentals tab after login. */
   const rentIntent = rentChrome;
   const walletIntent = !rentIntent && preferWalletHint;
   const [error, setError] = useState('');
@@ -337,33 +337,31 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         }
       : { from: registerFrom };
 
-  const iconClass = rentIntent
-    ? 'material-symbols-outlined rent-auth-icon'
-    : 'material-symbols-outlined wallet-auth-icon';
-  const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
-  const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
-  const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
-  const dividerClass = rentIntent ? 'rent-auth-divider' : 'wallet-auth-divider';
+  const iconClass = 'material-symbols-outlined wallet-auth-icon';
+  const leadClass = 'wallet-auth-lead';
+  const linkClass = 'wallet-auth-link';
+  const submitClass = 'wallet-auth-submit';
+  const dividerClass = 'wallet-auth-divider';
+  const homeHref = rentIntent ? '/rent' : '/';
+  const registerHref = rentIntent ? '/rent/register' : '/register';
 
   const formBody = (
     <>
-      <div className={`text-center ${rentIntent ? 'mb-6' : 'wallet-auth-hero'}`}>
+      <div className="text-center wallet-auth-hero">
         <span className={iconClass} aria-hidden>
           account_balance_wallet
         </span>
         <h1>
           {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : 'My Wallet'}
         </h1>
-        {bookingPayContinue || rentIntent ? (
+        {bookingPayContinue ? (
           <p className={leadClass}>
-            {bookingPayContinue
-              ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.'
-              : 'Ένας λογαριασμός — εισιτήρια και ενοικιάσεις μαζί'}
+            Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.
           </p>
         ) : null}
       </div>
 
-      {claim && !rentIntent ? (
+      {claim ? (
         <div className="mb-5 rounded-2xl border border-[#0071e3]/20 bg-[#0071e3]/8 px-4 py-3 text-sm">
           <p className="font-bold text-[#0071e3] mb-1">Κράτηση έτοιμη για το Wallet</p>
           <p className="text-[#6e6e73]">
@@ -486,128 +484,28 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}
         <Link
-          to={rentIntent ? '/rent/register' : '/register'}
+          to={registerHref}
           state={rentIntent ? { from: '/wallet?tab=rentals' } : registerState}
           className={linkClass}
         >
-          {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
+          Εγγραφή
         </Link>
       </p>
       {!isNativeApp() ? (
-        !rentIntent ? (
-          <p className="text-xs text-center mt-3">
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-          </p>
-        ) : (
-          <p className="text-xs text-center mt-3">
-            <Link to="/rent/my-booking" className={linkClass}>
-              Εύρεση κράτησης ενοικίασης
-            </Link>
-          </p>
-        )
+        <p className="text-xs text-center mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <Link to="/my-booking" className={linkClass}>
+            Εύρεση κράτησης λεωφορείου
+          </Link>
+          <span className="text-[#d2d2d7]" aria-hidden>
+            ·
+          </span>
+          <Link to="/rent/my-booking" className={linkClass}>
+            Εύρεση κράτησης ενοικίασης
+          </Link>
+        </p>
       ) : null}
     </>
   );
-
-  if (rentIntent) {
-    // Tablets get full-bleed desktop auth (not the phone bezel). Phones keep compact chrome.
-    const phoneChrome = isPhone;
-    return (
-      <div className={`rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`}>
-        <div className="rent-auth-shell">
-          <div className="rent-auth-scroll">
-            {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το My Wallet">
-                <p className="rent-auth-aside-kicker">My Wallet · Ενοικιάσεις</p>
-                <h2 className="rent-auth-aside-title">
-                  Η κράτησή σας,
-                  <br />
-                  πάντα στο κινητό
-                </h2>
-                <p className="rent-auth-aside-lead">
-                  Ένα My Wallet για όλα — εισιτήρια λεωφορείου και κάρτες ενοικίασης στο ίδιο
-                  λογαριασμό. Από το /rent ανοίγει η καρτέλα Ενοικιάσεις.
-                </p>
-                <ul className="rent-auth-aside-list">
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      directions_car
-                    </span>
-                    <div>
-                      <strong>Κάρτες οχημάτων</strong>
-                      <span>Ενοικιάσεις δίπλα στα εισιτήρια — ίδιο Wallet.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      qr_code_2
-                    </span>
-                    <div>
-                      <strong>QR παραλαβής</strong>
-                      <span>Δείξτε το στο γραφείο χωρίς email ή PDF.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      payments
-                    </span>
-                    <div>
-                      <strong>Πληρωμές & κατάθεση</strong>
-                      <span>Κάρτα, τράπεζα ή μετρητά — ξεκάθαρο υπόλοιπο.</span>
-                    </div>
-                  </li>
-                </ul>
-              </aside>
-            ) : null}
-
-            <div className="rent-auth-panel">
-              <div className="rent-auth-card">{formBody}</div>
-              <Link to="/rent" className="rent-auth-back">
-                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                Επιστροφή στην Αρχική
-              </Link>
-            </div>
-
-            {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--right" aria-label="Πώς λειτουργεί">
-                <p className="rent-auth-aside-kicker">Πώς λειτουργεί</p>
-                <h2 className="rent-auth-aside-title rent-auth-aside-title--sm">
-                  Από την αναζήτηση
-                  <br />
-                  στην παραλαβή
-                </h2>
-                <ol className="rent-auth-aside-steps">
-                  <li>
-                    <span className="rent-auth-aside-step">1</span>
-                    <div>
-                      <strong>Βρείτε όχημα</strong>
-                      <span>Ημερομηνίες, τοποθεσία και κατηγορία.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="rent-auth-aside-step">2</span>
-                    <div>
-                      <strong>Ολοκληρώστε πληρωμή</strong>
-                      <span>Επιβεβαίωση κράτησης σε λίγα βήματα.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="rent-auth-aside-step">3</span>
-                    <div>
-                      <strong>Παραλάβετε με QR</strong>
-                      <span>Όλα στο My Wallet — χωρίς χαρτιά.</span>
-                    </div>
-                  </li>
-                </ol>
-              </aside>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const nativeWallet = isNativeApp();
   // Native Capacitor app: always full-bleed phone chrome (never desktop aside).
@@ -628,14 +526,14 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                 Όλα σε ένα μέρος.<br />Πάντα μαζί σας.
               </h2>
               <p className="wallet-auth-aside-lead">
-                Απλή, ασφαλής πρόσβαση στον λογαριασμό σας.
+                Εισιτήρια λεωφορείου και κάρτες ενοικίασης — ένας λογαριασμός.
               </p>
             </aside>
           ) : null}
           <div className="wallet-auth-panel">
             <div className="wallet-auth-card">{formBody}</div>
             {!isNativeApp() ? (
-              <Link to="/" className="wallet-auth-back">
+              <Link to={homeHref} className="wallet-auth-back">
                 <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                 Επιστροφή στην Αρχική
               </Link>

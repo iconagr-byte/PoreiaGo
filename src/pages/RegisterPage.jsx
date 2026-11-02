@@ -245,51 +245,29 @@ export default function RegisterPage() {
   const phoneChrome = nativeWallet || isPhone;
   const useCustomerShell = cleanRegister || (!rentIntent && !walletClaimFlow && !nativeWallet);
 
-  const iconClass = rentIntent
-    ? 'material-symbols-outlined rent-auth-icon'
-    : useCustomerShell
-      ? 'material-symbols-outlined customer-auth-icon'
-      : 'material-symbols-outlined wallet-auth-icon';
-  const leadClass = rentIntent
-    ? 'rent-auth-lead'
-    : useCustomerShell
-      ? 'customer-auth-lead'
-      : 'wallet-auth-lead';
-  const linkClass = rentIntent
-    ? 'rent-auth-link'
-    : useCustomerShell
-      ? 'customer-auth-link'
-      : 'wallet-auth-link';
-  const submitClass = rentIntent
-    ? 'rent-auth-submit'
-    : useCustomerShell
-      ? 'customer-auth-submit'
-      : 'wallet-auth-submit';
-  const dividerClass = rentIntent
-    ? 'rent-auth-divider'
-    : useCustomerShell
-      ? 'customer-auth-divider'
-      : 'wallet-auth-divider';
-  const heroClass = rentIntent
-    ? 'mb-8'
-    : useCustomerShell
-      ? 'customer-auth-hero'
-      : 'wallet-auth-hero';
+  // Rent entrance uses the same blue My Wallet shell as buses (not teal rent-auth).
+  const useWalletShell = rentIntent || walletClaimFlow || nativeWallet;
+  const iconClass = useCustomerShell
+    ? 'material-symbols-outlined customer-auth-icon'
+    : 'material-symbols-outlined wallet-auth-icon';
+  const leadClass = useCustomerShell ? 'customer-auth-lead' : 'wallet-auth-lead';
+  const linkClass = useCustomerShell ? 'customer-auth-link' : 'wallet-auth-link';
+  const submitClass = useCustomerShell ? 'customer-auth-submit' : 'wallet-auth-submit';
+  const dividerClass = useCustomerShell ? 'customer-auth-divider' : 'wallet-auth-divider';
+  const heroClass = useCustomerShell ? 'customer-auth-hero' : 'wallet-auth-hero';
+  const homeHref = rentIntent ? '/rent' : '/';
+  const loginHref = rentIntent ? '/rent/login' : '/login';
 
   const formBody = (
     <>
       <div className={`text-center ${heroClass}`}>
         <span className={iconClass} aria-hidden>
-          {rentIntent || walletClaimFlow ? 'account_balance_wallet' : 'account_circle'}
+          {useWalletShell ? 'account_balance_wallet' : 'account_circle'}
         </span>
         <h1>
-          {rentIntent || walletClaimFlow ? 'My Wallet' : 'Δημιουργία λογαριασμού'}
+          {useWalletShell ? 'My Wallet' : 'Δημιουργία λογαριασμού'}
         </h1>
-        {rentIntent ? (
-          <p className={leadClass}>
-            Ένας λογαριασμός — εισιτήρια και ενοικιάσεις μαζί
-          </p>
-        ) : walletClaimFlow ? null : (
+        {walletClaimFlow || rentIntent ? null : (
           <p className={leadClass}>
             Όνομα, email και κωδικός — για κρατήσεις στο όνομά σας.
           </p>
@@ -400,11 +378,9 @@ export default function RegisterPage() {
         <button type="submit" disabled={loading || googleLoading} className={submitClass}>
           {loading
             ? 'Δημιουργία…'
-            : rentIntent
-              ? 'Δημιουργία & είσοδος στην Ενοικίαση'
-              : walletClaimFlow
-                ? 'Δημιουργία & άνοιγμα Wallet'
-                : 'Δημιουργία λογαριασμού'}
+            : useWalletShell
+              ? 'Δημιουργία & άνοιγμα Wallet'
+              : 'Δημιουργία λογαριασμού'}
         </button>
       </form>
 
@@ -424,131 +400,33 @@ export default function RegisterPage() {
 
       <p className="text-sm text-center mt-6 text-[#6e6e73]">
         Έχετε ήδη λογαριασμό;{' '}
-        <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
+        <Link to={loginHref} state={loginState} className={linkClass}>
           Σύνδεση
         </Link>
       </p>
       {!isNativeApp() ? (
-        !rentIntent && !cleanRegister ? (
-          <p className="text-xs text-center mt-4">
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-          </p>
-        ) : rentIntent ? (
-          <p className="text-xs text-center mt-4">
-            <Link to="/rent/my-booking" className={linkClass}>
-              Εύρεση κράτησης ενοικίασης
-            </Link>
-          </p>
-        ) : (
+        cleanRegister ? (
           <p className="text-xs text-center mt-4">
             <Link to="/" className={linkClass}>
               Επιστροφή στην αρχική
+            </Link>
+          </p>
+        ) : (
+          <p className="text-xs text-center mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <Link to="/my-booking" className={linkClass}>
+              Εύρεση κράτησης λεωφορείου
+            </Link>
+            <span className="text-[#d2d2d7]" aria-hidden>
+              ·
+            </span>
+            <Link to="/rent/my-booking" className={linkClass}>
+              Εύρεση κράτησης ενοικίασης
             </Link>
           </p>
         )
       ) : null}
     </>
   );
-
-  if (rentIntent) {
-    return (
-      <div className={`rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`}>
-        <div className="rent-auth-shell">
-          <div className="rent-auth-scroll">
-            {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το My Wallet">
-                <p className="rent-auth-aside-kicker">My Wallet · Ενοικιάσεις</p>
-                <h2 className="rent-auth-aside-title">
-                  Δημιουργήστε
-                  <br />
-                  έναν λογαριασμό
-                </h2>
-                <p className="rent-auth-aside-lead">
-                  Ένα My Wallet για εισιτήρια και ενοικιάσεις. Από το /rent μπαίνετε κατευθείαν
-                  στην καρτέλα Ενοικιάσεις — ίδια σύνδεση με τα λεωφορεία.
-                </p>
-                <ul className="rent-auth-aside-list">
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      directions_car
-                    </span>
-                    <div>
-                      <strong>Κάρτες οχημάτων</strong>
-                      <span>Ενοικιάσεις δίπλα στα εισιτήρια — ίδιο Wallet.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      qr_code_2
-                    </span>
-                    <div>
-                      <strong>QR παραλαβής</strong>
-                      <span>Δείξτε το στο γραφείο χωρίς email ή PDF.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      payments
-                    </span>
-                    <div>
-                      <strong>Πληρωμές & κατάθεση</strong>
-                      <span>Κάρτα, τράπεζα ή μετρητά — ξεκάθαρο υπόλοιπο.</span>
-                    </div>
-                  </li>
-                </ul>
-              </aside>
-            ) : null}
-
-            <div className="rent-auth-panel">
-              <div className="rent-auth-card rent-auth-card--register">{formBody}</div>
-              {!phoneChrome ? (
-                <Link to="/rent" className="rent-auth-back">
-                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                  Επιστροφή στην Αρχική
-                </Link>
-              ) : null}
-            </div>
-
-            {!phoneChrome ? (
-              <aside className="rent-auth-aside rent-auth-aside--right" aria-label="Πώς λειτουργεί">
-                <p className="rent-auth-aside-kicker">Πώς λειτουργεί</p>
-                <h2 className="rent-auth-aside-title rent-auth-aside-title--sm">
-                  Από την εγγραφή
-                  <br />
-                  στην παραλαβή
-                </h2>
-                <ol className="rent-auth-aside-steps">
-                  <li>
-                    <span className="rent-auth-aside-step">1</span>
-                    <div>
-                      <strong>Δημιουργήστε λογαριασμό</strong>
-                      <span>Όνομα, email και κωδικός — ή Google.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="rent-auth-aside-step">2</span>
-                    <div>
-                      <strong>Βρείτε όχημα</strong>
-                      <span>Ημερομηνίες, τοποθεσία και κατηγορία.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="rent-auth-aside-step">3</span>
-                    <div>
-                      <strong>Παραλάβετε με QR</strong>
-                      <span>Όλα στο Wallet — χωρίς χαρτιά.</span>
-                    </div>
-                  </li>
-                </ol>
-              </aside>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const shellClass = useCustomerShell
     ? `customer-auth-stage${phoneChrome ? '' : ' customer-auth-stage--desktop'}`
@@ -563,7 +441,30 @@ export default function RegisterPage() {
     <div className={shellClass}>
       <div className={cardClass}>
         <div className={scrollClass}>
-          <div className={panelClass}>{formBody}</div>
+          {!phoneChrome && useWalletShell ? (
+            <aside className="wallet-auth-aside" aria-label="My Wallet">
+              <p className="wallet-auth-aside-kicker">My Wallet</p>
+              <h2 className="wallet-auth-aside-title">
+                Όλα σε ένα μέρος.<br />Πάντα μαζί σας.
+              </h2>
+              <p className="wallet-auth-aside-lead">
+                Εισιτήρια λεωφορείου και κάρτες ενοικίασης — ένας λογαριασμός.
+              </p>
+            </aside>
+          ) : null}
+          {useCustomerShell ? (
+            <div className={panelClass}>{formBody}</div>
+          ) : (
+            <div className="wallet-auth-panel">
+              <div className={panelClass}>{formBody}</div>
+              {!isNativeApp() ? (
+                <Link to={homeHref} className="wallet-auth-back">
+                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                  Επιστροφή στην Αρχική
+                </Link>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </div>
