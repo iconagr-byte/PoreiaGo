@@ -50,6 +50,7 @@ import WalletMorePanel from '../components/wallet/WalletMorePanel.jsx';
 import WalletNotificationBell from '../components/wallet/WalletNotificationBell.jsx';
 import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
+import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import {
   DEFAULT_SITE_APPEARANCE,
@@ -77,14 +78,15 @@ import {
 } from '../lib/wallet/walletOfficeTrips.js';
 import '../styles/wallet-pass.css';
 
-/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Περισσότερα.
+/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · [Ενοικιάσεις] · Περισσότερα.
  * Desktop → left sidebar; phone → bottom dock.
- * Never add lookup/Κράτηση/search here — use home CTAs + /my-booking.
+ * Rent passes live in the same shell (tab rentals) — not a second /rent/wallet app.
  * Account / Lost & Found / logout live in the header person menu. */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'pass', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'rentals', label: 'Ενοικιάσεις', icon: 'directions_car' },
   { id: 'more', label: 'Περισσότερα', icon: 'travel_explore' },
 ];
 
@@ -123,6 +125,10 @@ function pickFeaturedBooking(bookings, highlightId, dismissedIds = []) {
 }
 
 function WalletAuthGate() {
+  const location = useLocation();
+  const walletReturn =
+    `/wallet${location.search || ''}` || '/wallet';
+
   if (isCustomer() && !getCustomerToken()) {
     logoutCustomer();
   }
@@ -137,7 +143,9 @@ function WalletAuthGate() {
   }
 
   if (isAdmin()) {
-    return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
+    return (
+      <Navigate to="/login" replace state={{ from: walletReturn, walletClaim: true }} />
+    );
   }
 
   const claim = getWalletClaim();
@@ -151,7 +159,9 @@ function WalletAuthGate() {
     );
   }
 
-  return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
+  return (
+    <Navigate to="/login" replace state={{ from: walletReturn, walletClaim: true }} />
+  );
 }
 
 /**
@@ -240,19 +250,27 @@ function WalletAuthenticatedApp() {
   }, [location.state?.highlightBooking, location.state?.fromClaim]);
 
   useEffect(() => {
-    const tab = location.state?.walletTab;
+    let tab = location.state?.walletTab;
+    if (!tab) {
+      try {
+        tab = new URLSearchParams(location.search || '').get('tab') || '';
+      } catch {
+        tab = '';
+      }
+    }
     if (
       tab === 'account' ||
       tab === 'bookings' ||
       tab === 'home' ||
       tab === 'rentals' ||
+      tab === 'pass' ||
       tab === 'more' ||
       tab === 'lost_found'
     ) {
       setActiveTab(tab);
       setSelectedBookingId(null);
     }
-  }, [location.state?.walletTab]);
+  }, [location.state?.walletTab, location.search]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,13 +401,16 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // Rent opens from the header account menu when the sealed office has Rent.
+  // Rent passes share this shell when the sealed office has Rent.
   const rentAvailable = shouldShowRentStorefront(officeModules);
-  const tabs = ALL_TABS;
+  const tabs = useMemo(
+    () => (rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals')),
+    [rentAvailable],
+  );
 
   useEffect(() => {
     if (!rentAvailable && activeTab === 'rentals') {
-      setActiveTab('account');
+      setActiveTab('home');
     }
   }, [rentAvailable, activeTab]);
 
@@ -405,8 +426,13 @@ function WalletAuthenticatedApp() {
   };
 
   const openRentWallet = () => {
-    navigate('/rent/wallet');
+    setActiveTab('rentals');
+    setSelectedBookingId(null);
   };
+
+  const highlightRentalBookingId = String(
+    location.state?.highlightRentalBooking || '',
+  ).trim();
 
   const tripCatalog = useMemo(() => {
     let local = [];
@@ -871,7 +897,7 @@ function WalletAuthenticatedApp() {
                 {homeFeed}
                 {rentAvailable ? (
                   <div className="wallet-stack" style={{ marginTop: '1rem' }}>
-                    <WalletRentSection compact />
+                    <WalletRentSection compact onOpenRentals={openRentWallet} />
                   </div>
                 ) : null}
               </div>
@@ -882,7 +908,7 @@ function WalletAuthenticatedApp() {
               {homeFeed}
               {rentAvailable ? (
                 <div className="wallet-stack" style={{ marginTop: '0.85rem' }}>
-                  <WalletRentSection compact />
+                  <WalletRentSection compact onOpenRentals={openRentWallet} />
                 </div>
               ) : null}
             </>
@@ -902,7 +928,7 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'bookings' && (
           <div className="wallet-stack">
-            {rentAvailable ? <WalletRentSection /> : null}
+            {rentAvailable ? <WalletRentSection onOpenRentals={openRentWallet} /> : null}
             <div className="wallet-panel">
               <h2>Κρατήσεις λεωφορείου</h2>
               <p className="wallet-panel-lead">
@@ -985,17 +1011,23 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'rentals' && rentAvailable ? (
           <div className="wallet-stack">
-            <button
-              type="button"
-              className="wallet-ticket-back"
-              onClick={() => switchTab('account')}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                arrow_back
-              </span>
-              Λογαριασμός
-            </button>
-            <WalletRentSection />
+            <section className="wallet-panel wallet-panel--rent-passes">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">directions_car</span>
+                </span>
+                <div>
+                  <h2>Ενοικιάσεις</h2>
+                  <p>Οι κάρτες οχήματός σας στο ίδιο My Wallet.</p>
+                </div>
+              </div>
+              <RentalWalletPanel
+                brandLabel={brandLabel}
+                passengerName={profile.name}
+                highlightBookingId={highlightRentalBookingId}
+                onBookVehicle={() => navigate('/rent')}
+              />
+            </section>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
@@ -1091,7 +1123,7 @@ function WalletAuthenticatedApp() {
                   </span>
                   <div>
                     <h2>Ενοικιάσεις</h2>
-                    <p>Rent Wallet και κατάλογος οχημάτων του γραφείου.</p>
+                    <p>Κάρτες οχήματος και κατάλογος στο ίδιο My Wallet.</p>
                   </div>
                 </div>
                 <div className="wallet-rent-actions">
@@ -1100,15 +1132,11 @@ function WalletAuthenticatedApp() {
                     className="wallet-btn wallet-btn-primary wallet-btn-block"
                     onClick={openRentWallet}
                   >
-                    Άνοιγμα Rent Wallet
+                    Οι ενοικιάσεις μου
                   </button>
-                  <button
-                    type="button"
-                    className="wallet-btn wallet-btn-ghost wallet-btn-block"
-                    onClick={() => switchTab('rentals')}
-                  >
-                    Κατάλογος οχημάτων
-                  </button>
+                  <Link to="/rent" className="wallet-btn wallet-btn-ghost wallet-btn-block">
+                    Βρες όχημα
+                  </Link>
                 </div>
               </section>
             ) : null}

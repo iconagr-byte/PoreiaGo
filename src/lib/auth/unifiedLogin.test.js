@@ -124,11 +124,11 @@ describe('unifiedLogin', () => {
     await expect(attemptUnifiedLogin('a@b.com', 'pw')).rejects.toThrow(/σύνδεση/);
   });
 
-  it('routes rent-only customers to Rent Wallet', async () => {
+  it('routes rent-only customers to unified My Wallet rentals tab', async () => {
     fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
     fetchMyBookingsFromServer.mockResolvedValue([]);
     const surface = await resolveCustomerSurface();
-    expect(surface.path).toBe('/rent/wallet');
+    expect(surface.path).toBe('/wallet?tab=rentals');
   });
 
   it('routes dual-product customers to bus My Wallet', async () => {
@@ -159,8 +159,8 @@ describe('unifiedLogin', () => {
     expect(surface.path).toBe('/wallet');
   });
 
-  it('preferRent hint opens Rent Wallet', async () => {
+  it('preferRent hint opens unified My Wallet rentals tab', async () => {
     const surface = await resolveCustomerSurface({ preferRent: true });
-    expect(surface.path).toBe('/rent/wallet');
+    expect(surface.path).toBe('/wallet?tab=rentals');
   });
 });

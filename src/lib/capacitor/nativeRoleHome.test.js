@@ -65,7 +65,7 @@ describe('nativeRoleHome', () => {
   it('maps roles to entrance paths', () => {
     expect(pathForNativeRole('driver')).toBe('/driver');
     expect(pathForNativeRole('wallet')).toBe('/wallet');
-    expect(pathForNativeRole('rent')).toBe('/rent/wallet');
+    expect(pathForNativeRole('rent')).toBe('/wallet?tab=rentals');
     expect(pathForNativeRole(null)).toBe('/login');
   });
 
@@ -103,7 +103,7 @@ describe('nativeRoleHome', () => {
     getCustomerToken.mockReturnValue('cust');
     rememberNativeRoleHome('rent');
     expect(resolveNativeRole()).toBe('rent');
-    expect(resolveNativeRoleHomePath()).toBe('/rent/wallet');
+    expect(resolveNativeRoleHomePath()).toBe('/wallet?tab=rentals');
 
     clearNativeRoleHome();
     hasPreferRentLookup.mockReturnValue(true);

@@ -413,16 +413,17 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
                   type="button"
                   className="rent-wiz-next rent-wiz-next--pay"
                   onClick={() =>
-                    navigate('/rent/wallet', {
+                    navigate('/wallet?tab=rentals', {
                       state: {
                         rentBookedAt: Date.now(),
-                        highlightBooking: bookingDone.bookingId,
+                        walletTab: 'rentals',
+                        highlightRentalBooking: bookingDone.bookingId,
                         openRentWallet: true,
                       },
                     })
                   }
                 >
-                  Άνοιγμα Rent Wallet
+                  Άνοιγμα My Wallet
                 </button>
               ) : null}
             </div>

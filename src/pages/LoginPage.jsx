@@ -39,7 +39,11 @@ import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
 function isRentReturn(path) {
-  return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
+  if (typeof path !== 'string') return false;
+  if (path === '/rent' || path.startsWith('/rent/')) return true;
+  // Unified My Wallet rentals tab (legacy /rent/wallet redirects here).
+  if (path === '/wallet?tab=rentals' || path.startsWith('/wallet?tab=rentals')) return true;
+  return false;
 }
 
 function isRentAuthPath(pathname) {
@@ -153,12 +157,15 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       (rentIntent
         ? isRentReturn(location.state?.from)
           ? location.state.from
-          : '/rent/wallet'
+          : '/wallet?tab=rentals'
         : location.state?.from && !String(location.state.from).startsWith('/rent')
           ? location.state.from
           : '/wallet');
     rememberNativeRoleHome(role);
-    const goingRent = role === NATIVE_ROLE_RENT || String(dest).startsWith('/rent');
+    const goingRent =
+      role === NATIVE_ROLE_RENT ||
+      String(dest).startsWith('/rent') ||
+      String(dest).includes('tab=rentals');
     try {
       if (goingRent) markPreferRentLookup();
       else clearPreferRentLookup();
@@ -313,7 +320,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on return from bridge
   }, []);
 
-  const registerFrom = preferRentHint ? '/rent/wallet' : '/wallet';
+  const registerFrom = preferRentHint ? '/wallet?tab=rentals' : '/wallet';
   const registerState =
     claim && !rentIntent
       ? {
@@ -480,7 +487,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         Δεν έχετε λογαριασμό;{' '}
         <Link
           to={rentIntent ? '/rent/register' : '/register'}
-          state={rentIntent ? { from: '/rent/wallet' } : registerState}
+          state={rentIntent ? { from: '/wallet?tab=rentals' } : registerState}
           className={linkClass}
         >
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}

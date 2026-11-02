@@ -16,6 +16,7 @@ import TripExtrasPage from './pages/TripExtrasPage';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
+import RentWalletRedirect from './pages/RentWalletRedirect.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
 import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
@@ -162,7 +163,7 @@ function App() {
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet/native-google" element={<WalletNativeGoogleBridgePage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
+            {/* Rent: green URLs — /rent/login + browse /rent; wallet is unified at /wallet. */}
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
             <Route path="/rent/my-booking" element={<RentBookingLookupGated />} />
@@ -172,7 +173,8 @@ function App() {
             <Route path="/rent/book/services" element={<RentBookingWizardGated />} />
             <Route path="/rent/book/details" element={<RentBookingWizardGated />} />
             <Route path="/rent/book/payment" element={<RentBookingWizardGated />} />
-            <Route path="/rent/wallet" element={<RentalCustomerAppGated />} />
+            <Route path="/rent/wallet" element={<RentWalletRedirect />} />
+            <Route path="/rent/wallet/*" element={<RentWalletRedirect />} />
             <Route path="/rent" element={<RentalCustomerAppGated />} />
             <Route path="/rent/*" element={<RentalCustomerAppGated />} />
             {/* Contactless rental contract signature (token from SMS/email). */}

@@ -1,6 +1,6 @@
 /**
- * Compact rent summary inside bus My Wallet when the office has rent_enabled.
- * Full Rent Wallet lives at /rent/wallet — this is a bridge, not a second app.
+ * Compact rent summary inside unified My Wallet when the office has rent_enabled.
+ * Opens the rentals tab in the same shell — not a second /rent/wallet app.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -37,7 +37,10 @@ function rankBooking(b) {
   return 4;
 }
 
-export default function WalletRentSection({ compact = false } = {}) {
+export default function WalletRentSection({
+  compact = false,
+  onOpenRentals = null,
+} = {}) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +71,10 @@ export default function WalletRentSection({ compact = false } = {}) {
   const statusLabel = featured
     ? STATUS_LABEL[featured.rental_status] || featured.rental_status
     : '';
+
+  const openRentals = () => {
+    if (typeof onOpenRentals === 'function') onOpenRentals();
+  };
 
   return (
     <section
@@ -107,9 +114,19 @@ export default function WalletRentSection({ compact = false } = {}) {
       ) : null}
 
       <div className="wallet-rent-actions">
-        <Link to="/rent/wallet" className="wallet-btn wallet-btn-primary wallet-btn-block">
-          Άνοιγμα Rent Wallet
-        </Link>
+        {typeof onOpenRentals === 'function' ? (
+          <button
+            type="button"
+            className="wallet-btn wallet-btn-primary wallet-btn-block"
+            onClick={openRentals}
+          >
+            Οι ενοικιάσεις μου
+          </button>
+        ) : (
+          <Link to="/wallet?tab=rentals" className="wallet-btn wallet-btn-primary wallet-btn-block">
+            Οι ενοικιάσεις μου
+          </Link>
+        )}
         {!compact ? (
           <Link to="/rent" className="wallet-btn wallet-btn-ghost wallet-btn-block">
             Βρες όχημα
