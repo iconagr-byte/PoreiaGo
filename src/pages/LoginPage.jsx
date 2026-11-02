@@ -78,7 +78,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     (typeof location.state?.from === 'string' && location.state.from.startsWith('/wallet'));
   /** Rent deep-link / return — same My Wallet chrome; opens rentals tab after login. */
   const rentIntent = rentChrome;
-  const walletIntent = !rentIntent && preferWalletHint;
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
