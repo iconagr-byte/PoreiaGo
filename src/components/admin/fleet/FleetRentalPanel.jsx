@@ -38,6 +38,7 @@ import RentNotificationsEditor from './RentNotificationsEditor.jsx';
 import RentDocumentsPanel from './RentDocumentsPanel.jsx';
 import RentExpensesPanel from './RentExpensesPanel.jsx';
 import RentAvailabilityPanel from './RentAvailabilityPanel.jsx';
+import RentalFocusedInspectionModal from './RentalFocusedInspectionModal.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchAdminSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -174,6 +175,8 @@ export default function FleetRentalPanel({
   const [signaturePadKey, setSignaturePadKey] = useState(0);
   const [officeName, setOfficeName] = useState('Γραφείο ενοικιάσεων');
   const [paperworkFocusId, setPaperworkFocusId] = useState(null);
+  /** Focused check-in/out for one booking — not the bulk inspections desk. */
+  const [focusedInspection, setFocusedInspection] = useState(null); // { bookingId, type }
   const [inspTypeFilter, setInspTypeFilter] = useState(''); // '' | PICKUP_CHECK | RETURN_CHECK
   const [inspQuery, setInspQuery] = useState('');
   const [expandedInspIds, setExpandedInspIds] = useState(() => new Set());
@@ -192,14 +195,23 @@ export default function FleetRentalPanel({
     };
   }, []);
 
-  const openPaperworkCheckIn = (bookingId, inspectionType = 'PICKUP_CHECK') => {
-    setInsp((s) => ({
-      ...s,
-      rental_booking_id: bookingId,
-      inspection_type: inspectionType,
-    }));
-    setTab('inspections');
+  const openFocusedInspection = (bookingId, inspectionType = 'PICKUP_CHECK') => {
+    if (!bookingId) return;
+    setFocusedInspection({
+      bookingId,
+      type: inspectionType === 'RETURN_CHECK' ? 'RETURN_CHECK' : 'PICKUP_CHECK',
+    });
   };
+
+  /** From paperwork / agreement — open the single-customer sheet, not bulk desk. */
+  const openPaperworkCheckIn = (bookingId, inspectionType = 'PICKUP_CHECK') => {
+    openFocusedInspection(bookingId, inspectionType);
+  };
+
+  const focusedBooking = useMemo(() => {
+    if (!focusedInspection?.bookingId) return null;
+    return (bookings || []).find((b) => b.id === focusedInspection.bookingId) || null;
+  }, [bookings, focusedInspection]);
 
   const openPaperwork = (bookingId) => {
     setPaperworkFocusId(bookingId || null);
@@ -240,7 +252,7 @@ export default function FleetRentalPanel({
   // Soft live refresh on paperwork / inspections — signatures from tablet or remote
   // must appear without a full page reload.
   useEffect(() => {
-    if (tab !== 'paperwork' && tab !== 'inspections') return undefined;
+    if (tab !== 'paperwork' && tab !== 'inspections' && !focusedInspection) return undefined;
     let cancelled = false;
     const softReload = async () => {
       try {
@@ -258,7 +270,7 @@ export default function FleetRentalPanel({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [tab]);
+  }, [tab, focusedInspection]);
 
   const activeBookings = useMemo(
     () => bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status)),
@@ -529,6 +541,22 @@ export default function FleetRentalPanel({
 
   return (
     <div className="rental-apple-shell space-y-4 animate-in fade-in duration-300">
+      {focusedInspection && focusedBooking ? (
+        <RentalFocusedInspectionModal
+          booking={focusedBooking}
+          inspectionType={focusedInspection.type}
+          officeName={officeName}
+          onClose={() => setFocusedInspection(null)}
+          onSaved={async () => {
+            setFocusedInspection(null);
+            await reload();
+          }}
+          onToast={(kind, message) => {
+            if (kind === 'error') toast.error(message);
+            else toast.success(message);
+          }}
+        />
+      ) : null}
       <header className="rental-apple-hero">
         <div className="rental-apple-hero-inner">
           <div className="flex items-start gap-3.5 min-w-0">
@@ -1283,14 +1311,7 @@ export default function FleetRentalPanel({
                             <button
                               type="button"
                               className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0a7a6c] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#08665b]"
-                              onClick={() => {
-                                setInsp((s) => ({
-                                  ...s,
-                                  rental_booking_id: b.id,
-                                  inspection_type: 'PICKUP_CHECK',
-                                }));
-                                setTab('inspections');
-                              }}
+                              onClick={() => openFocusedInspection(b.id, 'PICKUP_CHECK')}
                             >
                               <span className="material-symbols-outlined text-[15px]">login</span>
                               Check-in
@@ -1321,14 +1342,7 @@ export default function FleetRentalPanel({
                           <button
                             type="button"
                             className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0071e3] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#0062c4]"
-                            onClick={() => {
-                              setInsp((s) => ({
-                                ...s,
-                                rental_booking_id: b.id,
-                                inspection_type: 'RETURN_CHECK',
-                              }));
-                              setTab('inspections');
-                            }}
+                            onClick={() => openFocusedInspection(b.id, 'RETURN_CHECK')}
                           >
                             <span className="material-symbols-outlined text-[15px]">logout</span>
                             Check-out
