@@ -1178,6 +1178,7 @@ export default function SuperAdminPanel() {
                   snug
                 />
                 <PasswordField
+                  id="new-office-admin-password"
                   label="Κωδικός (≥ 8)"
                   value={createForm.admin_password}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_password: v }))}
@@ -1189,6 +1190,7 @@ export default function SuperAdminPanel() {
                   snug
                 />
                 <PasswordField
+                  id="new-office-admin-password-confirm"
                   label="Επιβεβαίωση κωδικού"
                   value={createForm.admin_password_confirm}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_password_confirm: v }))}
@@ -1805,7 +1807,35 @@ function Field({
   );
 }
 
+function EyeIcon({ off = false }) {
+  if (off) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.5 10.5 0 0 1 12 5c5 0 9.3 3.1 11 7.5a11.8 11.8 0 0 1-4.2 5.1M6.1 6.1A11.8 11.8 0 0 0 1 12.5C2.7 16.9 7 20 12 20c1.4 0 2.7-.2 3.9-.7"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M1 12.5C2.7 8.1 7 5 12 5s9.3 3.1 11 7.5c-1.7 4.4-6 7.5-11 7.5S2.7 16.9 1 12.5Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12.5" r="3" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function PasswordField({
+  id,
   label,
   value,
   onChange,
@@ -1819,11 +1849,15 @@ function PasswordField({
   snug = false,
   autoComplete = 'new-password',
 }) {
+  const inputId = id || `pwd-${label?.replace(/\W+/g, '-').toLowerCase() || 'field'}`;
   return (
-    <label className="block text-sm">
-      <span className="font-bold text-slate-500">{label}</span>
+    <div className="block text-sm">
+      <label htmlFor={inputId} className="font-bold text-slate-500">
+        {label}
+      </label>
       <div className="relative mt-1">
         <input
+          id={inputId}
           type={visible ? 'text' : 'password'}
           value={value}
           required={required}
@@ -1832,21 +1866,23 @@ function PasswordField({
           autoComplete={autoComplete}
           spellCheck={false}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full pl-3 pr-11 ${snug ? 'py-2 rounded-xl' : 'py-2.5 rounded-2xl'} bg-slate-50 border text-sm outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white ${
-            error ? 'border-rose-300' : 'border-slate-100'
+          className={`w-full pl-3 pr-12 ${snug ? 'py-2.5 rounded-xl' : 'py-2.5 rounded-2xl'} bg-white border text-sm outline-none focus:ring-2 focus:ring-sky-200 ${
+            error ? 'border-rose-300' : 'border-sky-200'
           }`}
         />
         <button
           type="button"
-          onClick={onToggleVisible}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleVisible();
+          }}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700"
           aria-label={visible ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
           aria-pressed={visible}
-          tabIndex={-1}
+          title={visible ? 'Απόκρυψη' : 'Εμφάνιση'}
         >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden>
-            {visible ? 'visibility_off' : 'visibility'}
-          </span>
+          <EyeIcon off={visible} />
         </button>
       </div>
       {hint ? (
@@ -1854,6 +1890,6 @@ function PasswordField({
           {hint}
         </p>
       ) : null}
-    </label>
+    </div>
   );
 }
