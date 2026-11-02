@@ -90,15 +90,15 @@ export default function PlatformWalletSession() {
             <div className="pg-wallet-phone-bezel">
               <div className="pg-wallet-phone-notch" />
               <div className="pg-wallet-phone-screen">
-                <p className="pg-wallet-phone-kicker">My Wallet</p>
+                <p className="pg-wallet-phone-kicker">My Wallet · όλα μαζί</p>
                 <div className="pg-wallet-pass-stack">
-                  <article className="pg-wallet-pass pg-wallet-pass--back">
-                    <span className="pg-wallet-pass-route">Θεσ/νίκη → Βόλος</span>
-                    <span className="pg-wallet-pass-meta">Θέση 4C</span>
+                  <article className="pg-wallet-pass pg-wallet-pass--back pg-wallet-pass--rent">
+                    <span className="pg-wallet-pass-route">{v.rentModel || 'Compact · DEMO-RENT'}</span>
+                    <span className="pg-wallet-pass-meta">{v.rentMeta || 'Παραλαβή με QR'}</span>
                   </article>
                   <article className="pg-wallet-pass pg-wallet-pass--mid">
-                    <span className="pg-wallet-pass-route">Ρόδος · ημερήσια</span>
-                    <span className="pg-wallet-pass-meta">Θέση 8B</span>
+                    <span className="pg-wallet-pass-route">Θεσ/νίκη → Βόλος</span>
+                    <span className="pg-wallet-pass-meta">Θέση 4C · εισιτήριο</span>
                   </article>
                   <article className="pg-wallet-pass pg-wallet-pass--front">
                     <div className="pg-wallet-pass-top">

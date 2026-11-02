@@ -126,29 +126,29 @@ export const RENT_SESSION = {
   ctaTo: '/rent',
 };
 
-/** My Wallet — customer pass hub on the buses homepage. */
+/** My Wallet — one shell for bus tickets + rentals (homepage + auth copy). */
 export const WALLET_SESSION = {
   id: 'session-wallet',
   kicker: 'My Wallet',
-  hook: 'Το εισιτήριο μένει στο κινητό — έτοιμο στην πόρτα',
-  hookAccent: 'στο κινητό',
+  hook: 'Η κράτησή σας, πάντα στο κινητό',
+  hookAccent: 'πάντα στο κινητό',
   support:
-    'Μετά την κράτηση, ο πελάτης ανοίγει το My Wallet: QR εισιτήριο, θέση, ώρα αναχώρησης και ειδοποιήσεις. Αν το γραφείο έχει ενοικιάσεις, οι κάρτες οχήματος ζουν στο ίδιο πορτοφόλι.',
+    'Ένας λογαριασμός για όλα — εισιτήρια λεωφορείου και κάρτες ενοικίασης στο ίδιο My Wallet. QR στην πόρτα ή στην παραλαβή, χωρίς χαρτί και χωρίς δεύτερο app.',
   points: [
     {
-      icon: 'qr_code_2',
-      label: 'QR στην είσοδο',
-      detail: 'Ο οδηγός σκανάρει — χωρίς χαρτί και χωρίς λίστα στο χέρι',
-    },
-    {
       icon: 'confirmation_number',
-      label: 'Όλες οι εκδρομές μαζί',
-      detail: 'Επόμενη αναχώρηση μπροστά · παλιότερα εισιτήρια στο ιστορικό',
+      label: 'Εισιτήρια εκδρομών',
+      detail: 'Θέση, ώρα αναχώρησης και QR — έτοιμα στην επιβίβαση',
     },
     {
       icon: 'directions_car',
-      label: 'Και ενοικιάσεις',
-      detail: 'Ίδιος λογαριασμός · κάρτες οχήματος δίπλα στα εισιτήρια',
+      label: 'Κάρτες ενοικίασης',
+      detail: 'Ίδιο Wallet · καρτέλα Ενοικιάσεις δίπλα στα εισιτήρια',
+    },
+    {
+      icon: 'qr_code_2',
+      label: 'QR χωρίς χαρτί',
+      detail: 'Δείξτε το στον οδηγό ή στο γραφείο — χωρίς email ή PDF',
     },
   ],
   ctaLabel: 'Άνοιγμα My Wallet',
@@ -158,6 +158,8 @@ export const WALLET_SESSION = {
     seat: 'Θέση 12A',
     when: 'Σάβ 08:30',
     status: 'Έτοιμο για επιβίβαση',
+    rentModel: 'Compact · DEMO-RENT',
+    rentMeta: 'Παραλαβή με QR',
   },
 };
 
