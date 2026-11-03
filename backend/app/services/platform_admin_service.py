@@ -580,6 +580,7 @@ class PlatformAdminService:
             raise ValueError("Invalid subdomain")
 
         from app.services.tenant_modules import (
+            build_subscription_insert_sql,
             prepare_contabo_tenant_write,
             tenant_plan_db_token,
             tenant_plan_sql_expr,
@@ -589,6 +590,7 @@ class PlatformAdminService:
         schema_flags = await prepare_contabo_tenant_write(self._session)
         plan_style = str(schema_flags.get("plan_style") or "value")
         has_plan_enum = bool(schema_flags.get("has_plan_enum"))
+        subscription_columns = set(schema_flags.get("subscription_columns") or ())
 
         dup = await self._session.execute(
             select(Tenant.id).where(
@@ -681,28 +683,35 @@ class PlatformAdminService:
         sub_id = uuid4()
         trial_end = datetime.now(timezone.utc) + timedelta(days=14)
         base_cents = int(_PLAN_BASE_CENTS.get(resolved_plan, 0))
-        # Match tenants.plan token style via Core when Contabo uses name tokens or PG enum.
-        if plan_style == "name" or has_plan_enum or use_core_tenant:
+        # Contabo: Core INSERT with only columns that exist (after soft-ADD).
+        # Avoid ORM Subscription flush — missing base_amount_cents etc. → 500.
+        if plan_style == "name" or has_plan_enum or use_core_tenant or subscription_columns:
+            cols = subscription_columns or {
+                "id",
+                "tenant_id",
+                "plan",
+                "status",
+                "base_amount_cents",
+                "trial_ends_at",
+                "cancel_at_period_end",
+                "metered_buses",
+                "metered_trips",
+            }
+            sub_sql, bind_keys = build_subscription_insert_sql(
+                columns=cols,
+                plan_sql=plan_sql,
+            )
+            sub_params = {
+                "id": sub_id,
+                "tenant_id": tenant_id,
+                "plan": plan_db,
+                "status": SubscriptionStatus.TRIALING.value,
+                "base_amount_cents": base_cents,
+                "trial_ends_at": trial_end,
+            }
             await self._session.execute(
-                text(
-                    f"""
-                    INSERT INTO subscriptions (
-                      id, tenant_id, plan, status, base_amount_cents, trial_ends_at,
-                      cancel_at_period_end, metered_buses, metered_trips
-                    ) VALUES (
-                      :id, :tenant_id, {plan_sql}, :status, :base_amount_cents,
-                      :trial_ends_at, false, true, true
-                    )
-                    """
-                ),
-                {
-                    "id": sub_id,
-                    "tenant_id": tenant_id,
-                    "plan": plan_db,
-                    "status": SubscriptionStatus.TRIALING.value,
-                    "base_amount_cents": base_cents,
-                    "trial_ends_at": trial_end,
-                },
+                text(sub_sql),
+                {k: sub_params[k] for k in bind_keys if k in sub_params},
             )
         else:
             self._session.add(
