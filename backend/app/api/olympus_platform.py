@@ -51,7 +51,7 @@ async def validate_domain_for_tls(
 async def dns_check_custom_domain(
     domain: str = Query(..., min_length=3, max_length=255),
     session: AsyncSession = Depends(get_db),
-    _: Annotated[None, Depends(require_superadmin)],
+    _: Annotated[None, Depends(require_superadmin)] = None,
 ):
     """
     Registry + live DNS — SuperAdmin only (not a public DNS oracle).
