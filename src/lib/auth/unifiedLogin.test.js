@@ -103,7 +103,23 @@ describe('unifiedLogin', () => {
     expect(out.kind).toBe('driver');
   });
 
-  it('prefers customer when both succeed without driver memory', async () => {
+  it('prefers driver when both succeed without role memory (native ops default)', async () => {
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('driver');
+  });
+
+  it('prefers customer when both succeed and last role was wallet', async () => {
+    rememberNativeRoleHome('wallet');
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('customer');
+  });
+
+  it('prefers customer when both succeed and last role was rent', async () => {
+    rememberNativeRoleHome('rent');
     loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
     loginDriver.mockResolvedValue({ accessToken: 'd' });
     const out = await attemptUnifiedLogin('both@x.com', 'pw');
