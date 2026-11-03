@@ -476,11 +476,6 @@
   }
 }
 
-.pg-hub-flow-intro {
-  max-width: 36rem;
-  margin: 0 0 2.25rem;
-}
-
 .pg-hub-flow-kicker {
   margin: 0 0 0.5rem;
   font-size: 0.72rem;
@@ -490,96 +485,11 @@
   color: #0284c7;
 }
 
-.pg-hub-flow-title {
-  margin: 0 0 0.55rem;
-  font-size: clamp(1.6rem, 3.2vw, 2.2rem);
-  font-weight: 750;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  color: var(--pg-hub-ink);
-}
-
-.pg-hub-flow-support {
-  margin: 0;
-  font-size: 1.02rem;
-  line-height: 1.5;
-  color: var(--pg-hub-muted);
-}
-
-.pg-hub-flow-cards {
-  list-style: none;
-  margin: 0 0 3.25rem;
-  padding: 0;
-  display: grid;
-  gap: 1rem;
-}
-
-@media (min-width: 900px) {
-  .pg-hub-flow-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.15rem;
-  }
-}
-
-.pg-hub-flow-card {
-  display: flex;
-  flex-direction: column;
-  padding: 0.35rem 0 0.15rem;
-  border-radius: 1.15rem;
-  border: 1px solid rgba(10, 37, 64, 0.08);
-  background: #fff;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(10, 37, 64, 0.04);
-  transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease;
-  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.pg-hub-flow-card:nth-child(2) {
-  animation-delay: 0.08s;
-}
-
-.pg-hub-flow-card:nth-child(3) {
-  animation-delay: 0.16s;
-}
-
-.pg-hub-flow-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 16px 36px rgba(10, 37, 64, 0.08);
-}
-
-.pg-hub-flow-num {
-  display: block;
-  padding: 0.85rem 1.15rem 0;
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.12em;
-  color: #0284c7;
-}
-
-.pg-hub-flow-card strong {
-  display: block;
-  padding: 0.35rem 1.15rem 0.4rem;
-  font-size: 1.08rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  color: var(--pg-hub-ink);
-}
-
-.pg-hub-flow-card > p {
-  margin: 0;
-  padding: 0 1.15rem 1.25rem;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  color: var(--pg-hub-muted);
-}
-
 /* —— Choose doors —— */
 
 .pg-hub-choose {
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--pg-hub-line);
+  padding-top: 0;
+  border-top: 0;
   scroll-margin-top: 5.5rem;
 }
 
@@ -747,14 +657,12 @@
   .pg-hub-support,
   .pg-hub-cta,
   .pg-hub-stage,
-  .pg-hub-flow-card,
   .pg-hub-ribbon,
   .pg-hub-phone {
     animation: none !important;
   }
 
   .pg-hub-door:hover,
-  .pg-hub-flow-card:hover,
   .pg-hub-cta-primary:hover {
     transform: none;
   }

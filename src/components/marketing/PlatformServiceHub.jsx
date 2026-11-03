@@ -39,9 +39,9 @@ export default function PlatformServiceHub() {
                 </span>
               </Link>
               <a
-                href="#how-poreiago-works"
+                href="#choose-service"
                 className="pg-hub-cta-secondary"
-                onClick={(e) => scrollToId(e, 'how-poreiago-works')}
+                onClick={(e) => scrollToId(e, 'choose-service')}
               >
                 {SERVICE_HUB.secondaryCta}
               </a>
@@ -64,30 +64,12 @@ export default function PlatformServiceHub() {
       </section>
 
       <section
-        id="how-poreiago-works"
+        id="choose-service"
         className="pg-hub-flow"
-        aria-label="Πώς δουλεύει το PoreiaGo"
+        aria-label="Διαλέξτε πόρτα υπηρεσίας"
       >
         <div className="pg-hub-flow-inner">
-          <header className="pg-hub-flow-intro">
-            <p className="pg-hub-flow-kicker">{SERVICE_HUB.flowKicker}</p>
-            <h2 className="pg-hub-flow-title">{SERVICE_HUB.flowTitle}</h2>
-            <p className="pg-hub-flow-support">{SERVICE_HUB.flowSupport}</p>
-          </header>
-
-          <ol className="pg-hub-flow-cards">
-            {SERVICE_HUB.flow.map((item) => (
-              <li key={item.step} className="pg-hub-flow-card">
-                <span className="pg-hub-flow-num" aria-hidden>
-                  {item.step}
-                </span>
-                <strong>{item.title}</strong>
-                <p>{item.body}</p>
-              </li>
-            ))}
-          </ol>
-
-          <div className="pg-hub-choose" id="choose-service">
+          <div className="pg-hub-choose">
             <p className="pg-hub-flow-kicker">{SERVICE_HUB.chooseKicker}</p>
             <h2 className="pg-hub-choose-title">{SERVICE_HUB.chooseTitle}</h2>
             <p className="pg-hub-choose-support">{SERVICE_HUB.chooseSupport}</p>

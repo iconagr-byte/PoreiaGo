@@ -67,9 +67,6 @@ export default function PlatformMarketingHeader() {
         <PlatformBrand variant="light" />
 
         <nav className="pm-nav pm-nav--slim" aria-label="Κύριο μενού">
-          <a href="#how-poreiago-works" className="pm-nav-quiet" onClick={closeAll}>
-            Πώς δουλεύει
-          </a>
           <a href="#choose-service" className="pm-nav-quiet" onClick={closeAll}>
             Υπηρεσίες
           </a>
@@ -110,15 +107,6 @@ export default function PlatformMarketingHeader() {
                 </span>
                 Ξεκινήστε εδώ
               </p>
-              <a href="#how-poreiago-works" className="pm-mobile-link" onClick={closeAll}>
-                <span className="material-symbols-outlined" aria-hidden>
-                  route
-                </span>
-                <span>
-                  <strong>Πώς δουλεύει</strong>
-                  <em>Τρία βήματα · καθαρή ροή</em>
-                </span>
-              </a>
               <a href="#choose-service" className="pm-mobile-link" onClick={closeAll}>
                 <span className="material-symbols-outlined" aria-hidden>
                   door_open
