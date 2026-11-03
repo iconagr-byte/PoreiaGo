@@ -282,108 +282,139 @@ export default function AgencyPlansPage() {
             })}
           </div>
         </section>
+      </main>
 
-        <section className="pg-contracts-section">
-          <h2>{rentCatalog.sectionTitle || DEFAULT_RENT_SECTION_TITLE}</h2>
-          <div
-            className={`pg-contracts-grid ${
-              visibleCards <= 1 ? 'pg-contracts-grid--rent-1' : 'pg-contracts-grid--rent-2'
-            }`}
-          >
-            {standalone.visible !== false ? (
-              <article className="pg-contracts-card pg-contracts-card--rent">
-                <span className="pg-contracts-card-badge">{standalone.badge}</span>
-                <h3 style={{ marginTop: '0.9rem' }}>{standalone.name}</h3>
-                <p className="pg-contracts-card-tag">{standalone.tagline}</p>
-                <div className="pg-contracts-price">
-                  <strong>
-                    {rentStandalonePrice.label}
-                    <em>{rentStandalonePrice.suffix}</em>
-                  </strong>
-                </div>
-                <ul className="pg-contracts-features">
-                  {standalone.features.map((f) => (
-                    <li key={f}>
-                      <span className="material-symbols-outlined" aria-hidden>
-                        check_circle
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => choosePlan('rent')}
-                  className="pg-contracts-btn pg-contracts-btn--teal"
-                >
-                  {loggedIn ? standalone.ctaLoggedIn : standalone.ctaGuest}
-                </button>
-              </article>
-            ) : null}
+        <section className="pg-contracts-rent-stage" aria-label="Ενοικιάσεις">
+          <div className="pg-contracts-rent-wave" aria-hidden />
+          <div className="pg-contracts-rent-wave pg-contracts-rent-wave--soft" aria-hidden />
+          <div className="pg-contracts-rent-orbit" aria-hidden />
 
-            {addon.visible !== false ? (
-              <article className="pg-contracts-card">
-                <span className="pg-contracts-card-badge pg-contracts-card-badge--dark">
-                  {addon.badge}
+          <div className="pg-contracts-float pg-contracts-float--rent-key" aria-hidden>
+            <span className="material-symbols-outlined">vpn_key</span>
+            Digital check-in
+          </div>
+          <div className="pg-contracts-float pg-contracts-float--rent-map" aria-hidden>
+            <span className="material-symbols-outlined">sos</span>
+            SOS 24/7
+          </div>
+          <div className="pg-contracts-float pg-contracts-float--rent-wallet" aria-hidden>
+            <div className="pg-contracts-rent-wallet">
+              <span>Rent Wallet</span>
+              <strong>Κράτηση ενεργή</strong>
+              <em>QR · συμβόλαιο</em>
+            </div>
+          </div>
+
+          <div className="pg-contracts-rent-inner">
+            <header className="pg-contracts-rent-head">
+              <p className="pg-contracts-rent-kicker">Rent module</p>
+              <h2>{rentCatalog.sectionTitle || DEFAULT_RENT_SECTION_TITLE}</h2>
+              <p>
+                Αυτόνομο συμβόλαιο ή add-on πάνω στα λεωφορεία — ίδιο app, ίδιο brand, δική σας
+                εμπειρία ενοικίασης.
+              </p>
+            </header>
+
+            <div
+              className={`pg-contracts-grid ${
+                visibleCards <= 1 ? 'pg-contracts-grid--rent-1' : 'pg-contracts-grid--rent-2'
+              }`}
+            >
+              {standalone.visible !== false ? (
+                <article className="pg-contracts-card pg-contracts-card--rent pg-contracts-card--on-stage">
+                  <span className="pg-contracts-card-badge">{standalone.badge}</span>
+                  <h3 style={{ marginTop: '0.9rem' }}>{standalone.name}</h3>
+                  <p className="pg-contracts-card-tag">{standalone.tagline}</p>
+                  <div className="pg-contracts-price">
+                    <strong>
+                      {rentStandalonePrice.label}
+                      <em>{rentStandalonePrice.suffix}</em>
+                    </strong>
+                  </div>
+                  <ul className="pg-contracts-features">
+                    {standalone.features.map((f) => (
+                      <li key={f}>
+                        <span className="material-symbols-outlined" aria-hidden>
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => choosePlan('rent')}
+                    className="pg-contracts-btn pg-contracts-btn--teal"
+                  >
+                    {loggedIn ? standalone.ctaLoggedIn : standalone.ctaGuest}
+                  </button>
+                </article>
+              ) : null}
+
+              {addon.visible !== false ? (
+                <article className="pg-contracts-card pg-contracts-card--on-stage">
+                  <span className="pg-contracts-card-badge pg-contracts-card-badge--dark">
+                    {addon.badge}
+                  </span>
+                  <h3 style={{ marginTop: '0.9rem' }}>{addon.name}</h3>
+                  <p className="pg-contracts-card-tag">{addon.tagline}</p>
+                  <div className="pg-contracts-price">
+                    <strong>
+                      {rentAddonPrice.label}
+                      <em>{rentAddonPrice.suffix}</em>
+                    </strong>
+                  </div>
+                  <ul className="pg-contracts-features">
+                    {addon.features.map((f) => (
+                      <li key={f}>
+                        <span className="material-symbols-outlined" aria-hidden>
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" onClick={openRentAddon} className="pg-contracts-btn">
+                    {loggedIn ? addon.ctaLoggedIn : addon.ctaGuest}
+                  </button>
+                  {addon.servicesLinkLabel ? (
+                    <Link to="/rent" className="pg-contracts-extra-link">
+                      {addon.servicesLinkLabel}
+                    </Link>
+                  ) : null}
+                </article>
+              ) : null}
+            </div>
+
+            <div className="pg-contracts-info pg-contracts-info--glass">
+              <h3>
+                <span className="material-symbols-outlined" aria-hidden>
+                  info
                 </span>
-                <h3 style={{ marginTop: '0.9rem' }}>{addon.name}</h3>
-                <p className="pg-contracts-card-tag">{addon.tagline}</p>
-                <div className="pg-contracts-price">
-                  <strong>
-                    {rentAddonPrice.label}
-                    <em>{rentAddonPrice.suffix}</em>
-                  </strong>
-                </div>
-                <ul className="pg-contracts-features">
-                  {addon.features.map((f) => (
-                    <li key={f}>
-                      <span className="material-symbols-outlined" aria-hidden>
-                        check_circle
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <button type="button" onClick={openRentAddon} className="pg-contracts-btn">
-                  {loggedIn ? addon.ctaLoggedIn : addon.ctaGuest}
-                </button>
-                {addon.servicesLinkLabel ? (
-                  <Link to="/rent" className="pg-contracts-extra-link">
-                    {addon.servicesLinkLabel}
-                  </Link>
-                ) : null}
-              </article>
-            ) : null}
+                Πώς χωρίζονται
+              </h3>
+              <ul>
+                <li>
+                  <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — η αρχική του
+                  domain δείχνει εκδρομές
+                </li>
+                <li>
+                  <strong>Rent μόνο:</strong> συμβόλαιο {standalone.name} ({rentStandalonePrice.label}
+                  {rentStandalonePrice.suffix}) — η αρχική του domain δείχνει μόνο Rent, χωρίς
+                  λεωφορεία
+                </li>
+                <li>
+                  <strong>Και τα δύο:</strong> πλάνο λεωφορείων + add-on Ενοικιάσεις (
+                  {rentAddonPrice.label}
+                  {rentAddonPrice.suffix}) — εκδρομές και Rent στην ίδια αρχική
+                </li>
+                <li>
+                  Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ πρότυπα · GDPR · διαχείριση από Συμβόλαιο
+                </li>
+              </ul>
+            </div>
           </div>
         </section>
-
-        <div className="pg-contracts-info">
-          <h3>
-            <span className="material-symbols-outlined" aria-hidden>
-              info
-            </span>
-            Πώς χωρίζονται
-          </h3>
-          <ul>
-            <li>
-              <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — η αρχική του
-              domain δείχνει εκδρομές
-            </li>
-            <li>
-              <strong>Rent μόνο:</strong> συμβόλαιο {standalone.name} ({rentStandalonePrice.label}
-              {rentStandalonePrice.suffix}) — η αρχική του domain δείχνει μόνο Rent, χωρίς λεωφορεία
-            </li>
-            <li>
-              <strong>Και τα δύο:</strong> πλάνο λεωφορείων + add-on Ενοικιάσεις (
-              {rentAddonPrice.label}
-              {rentAddonPrice.suffix}) — εκδρομές και Rent στην ίδια αρχική
-            </li>
-            <li>
-              Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ πρότυπα · GDPR · διαχείριση από Συμβόλαιο
-            </li>
-          </ul>
-        </div>
-      </main>
     </div>
   );
 }
