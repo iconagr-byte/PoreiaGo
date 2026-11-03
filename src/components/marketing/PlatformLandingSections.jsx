@@ -113,37 +113,28 @@ export function HeroSection() {
 export function PainPointsSection() {
   return (
     <section className="pg-rest pg-audience" aria-labelledby="audience-title">
+      <div className="pg-audience-wave" aria-hidden />
+      <div className="pg-audience-wave pg-audience-wave--soft" aria-hidden />
+      <div className="pg-audience-orbit" aria-hidden />
+
       <div className="pg-audience-inner">
-        <div className="pg-audience-head">
-          <p className="pg-audience-kicker">
-            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
-              groups
-            </span>
-            {AUDIENCE.kicker}
-          </p>
+        <div className="pg-audience-head pg-audience-glass">
+          <p className="pg-audience-kicker">{AUDIENCE.kicker}</p>
           <h2 id="audience-title">{AUDIENCE.title}</h2>
           <p>{AUDIENCE.support}</p>
         </div>
 
         <div className="pg-audience-grid">
           {[
-            { key: 'buses', lane: AUDIENCE.buses, mod: 'buses', icon: 'directions_bus' },
-            { key: 'rent', lane: AUDIENCE.rent, mod: 'rent', icon: 'car_rental' },
-          ].map(({ key, lane, mod, icon }) => (
+            { key: 'buses', lane: AUDIENCE.buses, mod: 'buses' },
+            { key: 'rent', lane: AUDIENCE.rent, mod: 'rent' },
+          ].map(({ key, lane, mod }) => (
             <article key={key} className={`pg-audience-lane pg-audience-lane--${mod}`}>
-              <p className="pg-audience-lane-kicker">
-                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 15 }}>
-                  {icon}
-                </span>
-                {lane.kicker}
-              </p>
+              <p className="pg-audience-lane-kicker">{lane.kicker}</p>
               <h3>{lane.title}</h3>
               <ul>
                 {lane.points.map((point) => (
                   <li key={point.text}>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {point.icon}
-                    </span>
                     <span>{point.text}</span>
                   </li>
                 ))}

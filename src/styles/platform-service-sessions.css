@@ -428,57 +428,72 @@
   --pg-wallet-sky: #0ea5e9;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 70% 55% at 85% 20%, rgba(14, 165, 233, 0.16), transparent 58%),
-    radial-gradient(ellipse 50% 45% at 8% 80%, rgba(2, 132, 199, 0.1), transparent 55%),
-    linear-gradient(165deg, #07111f 0%, #0c1a2e 42%, #10243a 100%);
+  background: #07111f;
   color: #f8fafc;
 }
 
-.pg-wallet-atmosphere {
+.pg-wallet-wave {
   position: absolute;
-  inset: 0;
+  inset: -32% -28% -28% -18%;
+  border-radius: 46% 54% 48% 52% / 40% 42% 58% 60%;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.9) 0%,
+    rgba(251, 146, 60, 0.82) 16%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 70%,
+    rgba(20, 184, 166, 0.92) 100%
+  );
+  transform: rotate(-10deg) scale(1.12);
+  animation: pgWalletWave 16s ease-in-out infinite alternate;
+  opacity: 0.9;
   pointer-events: none;
   z-index: 0;
 }
 
-.pg-wallet-atmosphere-glow {
+.pg-wallet-wave--soft {
+  inset: -12% -40% 8% 22%;
+  opacity: 0.38;
+  filter: blur(20px);
+  animation-duration: 22s;
+  animation-direction: alternate-reverse;
+}
+
+.pg-wallet-orbit {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+  left: 78%;
+  top: 46%;
+  width: 24rem;
+  height: 24rem;
+  margin: -12rem 0 0 -12rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  animation: pgWalletSpin 36s linear infinite;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.pg-wallet-atmosphere-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.55;
-  animation: pgWalletOrb 12s ease-in-out infinite alternate;
+.pg-wallet-orbit--slow {
+  width: 32rem;
+  height: 32rem;
+  margin: -16rem 0 0 -16rem;
+  border-color: rgba(255, 255, 255, 0.08);
+  animation-duration: 52s;
+  animation-direction: reverse;
 }
 
-.pg-wallet-atmosphere-orb--a {
-  width: 18rem;
-  height: 18rem;
-  top: -4rem;
-  right: 8%;
-  background: rgba(14, 165, 233, 0.35);
-}
-
-.pg-wallet-atmosphere-orb--b {
-  width: 14rem;
-  height: 14rem;
-  bottom: 6%;
-  left: 4%;
-  background: rgba(56, 189, 248, 0.22);
-  animation-delay: -4s;
-}
-
-@keyframes pgWalletOrb {
+@keyframes pgWalletWave {
   from {
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: rotate(-10deg) scale(1.1) translate3d(0, 0, 0);
   }
   to {
-    transform: translate3d(12px, 18px, 0) scale(1.08);
+    transform: rotate(-4deg) scale(1.18) translate3d(-2%, 2%, 0);
+  }
+}
+
+@keyframes pgWalletSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -508,14 +523,27 @@
   text-align: left;
 }
 
+.pg-wallet-glass {
+  padding: 1.85rem 1.65rem 2rem;
+  border-radius: 1.35rem;
+  background: rgba(7, 17, 31, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+}
+
 .pg-session--wallet .pg-session-kicker {
   color: #7dd3fc;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
 }
 
 .pg-session--wallet .pg-session-hook {
   color: #fff;
-  font-size: clamp(1.85rem, 4.2vw, 2.85rem);
-  max-width: 18ch;
+  font-size: clamp(1.95rem, 4.2vw, 2.95rem);
+  max-width: 16ch;
+  letter-spacing: -0.04em;
 }
 
 .pg-wallet-hook-accent {
@@ -529,7 +557,8 @@
 .pg-session--wallet .pg-session-support {
   margin: 0 0 1.6rem;
   max-width: 34rem;
-  color: rgba(226, 232, 240, 0.78);
+  color: rgba(226, 232, 240, 0.86);
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
 }
 
 .pg-wallet-points {
@@ -541,41 +570,33 @@
 }
 
 .pg-wallet-points li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.85rem;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.pg-wallet-point-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.45rem;
-  height: 2.45rem;
-  border-radius: 0.9rem;
-  font-size: 1.2rem !important;
-  color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.14);
-  border: 1px solid rgba(125, 211, 252, 0.22);
+.pg-wallet-points li:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .pg-wallet-points strong {
   display: block;
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #fff;
   line-height: 1.25;
 }
 
-.pg-wallet-points li > div > span {
+.pg-wallet-points li > span {
   display: block;
-  margin-top: 0.22rem;
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.45;
-  color: rgba(203, 213, 225, 0.78);
+  color: rgba(226, 232, 240, 0.78);
 }
 
 .pg-session-cta--wallet {
@@ -1136,7 +1157,8 @@
   .pg-buses-rise,
   .pg-buses-journey-col,
   .pg-wallet-rise,
-  .pg-wallet-atmosphere-orb,
+  .pg-wallet-wave,
+  .pg-wallet-orbit,
   .pg-wallet-pass--back,
   .pg-wallet-pass--mid,
   .pg-wallet-pass--front,

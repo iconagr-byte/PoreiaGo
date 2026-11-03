@@ -1,5 +1,5 @@
 /**
- * Buses homepage — My Wallet session (hook + pass graphic + what it does).
+ * Buses homepage — My Wallet session (Aegean graphic shell + pass phone).
  */
 import { Link } from 'react-router-dom';
 import { WALLET_SESSION } from '../../lib/marketing/platformCopy.js';
@@ -26,18 +26,14 @@ export default function PlatformWalletSession() {
       className="pg-session pg-session--wallet"
       aria-labelledby="wallet-session-hook"
     >
-      <div className="pg-wallet-atmosphere" aria-hidden>
-        <div className="pg-wallet-atmosphere-glow" />
-        <div className="pg-wallet-atmosphere-orb pg-wallet-atmosphere-orb--a" />
-        <div className="pg-wallet-atmosphere-orb pg-wallet-atmosphere-orb--b" />
-      </div>
+      <div className="pg-wallet-wave" aria-hidden />
+      <div className="pg-wallet-wave pg-wallet-wave--soft" aria-hidden />
+      <div className="pg-wallet-orbit" aria-hidden />
+      <div className="pg-wallet-orbit pg-wallet-orbit--slow" aria-hidden />
 
       <div className="pg-wallet-layout">
-        <div className="pg-session-intro pg-session-intro--wallet">
+        <div className="pg-session-intro pg-session-intro--wallet pg-wallet-glass">
           <p className="pg-session-kicker pg-wallet-rise" style={{ '--pg-rise-delay': '0ms' }}>
-            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
-              account_balance_wallet
-            </span>
             {WALLET_SESSION.kicker}
           </p>
           <h2
@@ -58,13 +54,8 @@ export default function PlatformWalletSession() {
           >
             {WALLET_SESSION.points.map((point) => (
               <li key={point.label}>
-                <span className="pg-wallet-point-icon material-symbols-outlined" aria-hidden>
-                  {point.icon}
-                </span>
-                <div>
-                  <strong>{point.label}</strong>
-                  {point.detail ? <span>{point.detail}</span> : null}
-                </div>
+                <strong>{point.label}</strong>
+                {point.detail ? <span>{point.detail}</span> : null}
               </li>
             ))}
           </ul>
@@ -103,9 +94,6 @@ export default function PlatformWalletSession() {
                   <article className="pg-wallet-pass pg-wallet-pass--front">
                     <div className="pg-wallet-pass-top">
                       <span className="pg-wallet-pass-badge">{v.status}</span>
-                      <span className="material-symbols-outlined" aria-hidden>
-                        confirmation_number
-                      </span>
                     </div>
                     <p className="pg-wallet-pass-route-lg">{v.route}</p>
                     <div className="pg-wallet-pass-row">
