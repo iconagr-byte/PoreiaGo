@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { getDefaultIngressCname, getPlatformBaseDomain, tenantSubdomainFqdn } from '../../lib/platform/domain.js';
@@ -226,6 +226,7 @@ export default function SuperAdminPanel() {
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showCreatePasswordConfirm, setShowCreatePasswordConfirm] = useState(false);
   const [createAttempted, setCreateAttempted] = useState(false);
+  const createFormRef = useRef(null);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({
     legal_name: '',
@@ -423,48 +424,83 @@ export default function SuperAdminPanel() {
   ]);
   const createFormReady = createBlockers.length === 0;
 
+  /** Browser autofill often paints inputs without firing React onChange — sync from DOM. */
+  const readCreateFormFromDom = (formEl) => {
+    if (!formEl || typeof FormData === 'undefined') return { ...createForm };
+    const fd = new FormData(formEl);
+    const pick = (key, fallback = '') => {
+      const raw = fd.get(key);
+      return raw == null ? fallback : String(raw);
+    };
+    let legalName = pick('legal_name', createForm.legal_name);
+    let slug = slugify(pick('slug', createForm.slug));
+    let subdomain = slugify(pick('subdomain', createForm.subdomain));
+    if (!slug && legalName) slug = slugify(legalName);
+    if (!subdomain && slug) subdomain = slug;
+    return {
+      ...createForm,
+      legal_name: legalName,
+      slug,
+      subdomain,
+      vat_number: pick('vat_number', createForm.vat_number).replace(/\D/g, '').slice(0, 9),
+      admin_full_name: pick('admin_full_name', createForm.admin_full_name),
+      admin_email: pick('admin_email', createForm.admin_email),
+      admin_password: pick('admin_password', createForm.admin_password),
+      admin_password_confirm: pick(
+        'admin_password_confirm',
+        createForm.admin_password_confirm,
+      ),
+    };
+  };
+
+  const validateCreateSnapshot = (snap) => {
+    const pwdChecks = passwordChecks(snap.admin_password, snap.admin_email);
+    const passwordReady =
+      pwdChecks.length &&
+      pwdChecks.letter &&
+      pwdChecks.number &&
+      pwdChecks.special &&
+      pwdChecks.notEmail &&
+      pwdChecks.notLocal &&
+      Boolean(snap.admin_password_confirm) &&
+      snap.admin_password === snap.admin_password_confirm;
+    const missing = [];
+    if (String(snap.legal_name || '').trim().length < 2) missing.push('Επωνυμία γραφείου');
+    if (!isValidOfficeSlug(snap.slug)) missing.push('Slug (URL id)');
+    if (!isValidOfficeSlug(snap.subdomain || snap.slug)) missing.push('Subdomain');
+    if (!isValidAfm(snap.vat_number)) missing.push('ΑΦΜ (9 ψηφία ή κενό)');
+    if (String(snap.admin_full_name || '').trim().length < 2) missing.push('Ονοματεπώνυμο admin');
+    if (!isValidEmail(snap.admin_email)) missing.push('Email / username');
+    if (!passwordReady) missing.push('Κωδικός + επιβεβαίωση');
+    return { missing, passwordReady };
+  };
+
   const submitCreate = async (e) => {
     e.preventDefault();
     setCreateAttempted(true);
-    if (!createLegalNameOk) {
-      toast.error('Βάλε επωνυμία γραφείου (τουλάχιστον 2 χαρακτήρες)');
+    const snap = readCreateFormFromDom(e.currentTarget);
+    setCreateForm(snap);
+    if (!slugTouched && snap.slug) setSlugTouched(true);
+
+    const { missing } = validateCreateSnapshot(snap);
+    if (missing.length) {
+      toast.error(`Συμπλήρωσε: ${missing.join(' · ')}`);
       return;
     }
-    if (!createSlugOk || !createSubdomainOk) {
-      toast.error('Slug / subdomain: μόνο πεζά λατινικά, αριθμοί και παύλα (τουλάχιστον 2 χαρακτήρες)');
-      return;
-    }
-    if (!createAfmOk) {
-      toast.error('ΑΦΜ: ακριβώς 9 ψηφία ή άφησέ το κενό');
-      return;
-    }
-    if (!createAdminNameOk) {
-      toast.error('Βάλε ονοματεπώνυμο για τον admin');
-      return;
-    }
-    if (!createEmailOk) {
-      toast.error('Βάλε έγκυρο email σύνδεσης για τον admin');
-      return;
-    }
-    if (!createPasswordReady) {
-      toast.error(
-        'Κωδικός: ≥8, γράμμα, αριθμός, σύμβολο · όχι το email · και να ταιριάζει η επιβεβαίωση',
-      );
-      return;
-    }
+
     setWorking(true);
     try {
-      const mode = createForm.service_mode || 'buses';
+      const mode = snap.service_mode || 'buses';
       const payload = {
-        legal_name: createForm.legal_name.trim(),
-        slug: createForm.slug.trim().toLowerCase(),
-        subdomain: (createForm.subdomain || createForm.slug).trim().toLowerCase(),
-        plan: mode === 'rent' ? 'rent' : createForm.plan,
+        legal_name: snap.legal_name.trim(),
+        slug: snap.slug.trim().toLowerCase(),
+        subdomain: (snap.subdomain || snap.slug).trim().toLowerCase(),
+        plan: mode === 'rent' ? 'rent' : snap.plan === 'rent' ? 'starter' : snap.plan,
         service_mode: mode,
-        vat_number: createForm.vat_number.trim() || null,
-        admin_full_name: createForm.admin_full_name.trim(),
-        admin_email: createForm.admin_email.trim().toLowerCase(),
-        admin_password: createForm.admin_password,
+        vat_number: snap.vat_number.trim() || null,
+        admin_full_name: snap.admin_full_name.trim(),
+        admin_email: snap.admin_email.trim().toLowerCase(),
+        admin_password: snap.admin_password,
       };
       const result = await createPlatformTenant(payload);
       toast.success(`Δημιουργήθηκε: ${result.tenant?.legal_name || payload.legal_name}`);
@@ -481,6 +517,34 @@ export default function SuperAdminPanel() {
       setWorking(false);
     }
   };
+
+  const syncCreateFormFromDom = (formEl) => {
+    const snap = readCreateFormFromDom(formEl);
+    setCreateForm((prev) => {
+      const same =
+        prev.legal_name === snap.legal_name &&
+        prev.slug === snap.slug &&
+        prev.subdomain === snap.subdomain &&
+        prev.vat_number === snap.vat_number &&
+        prev.admin_full_name === snap.admin_full_name &&
+        prev.admin_email === snap.admin_email &&
+        prev.admin_password === snap.admin_password &&
+        prev.admin_password_confirm === snap.admin_password_confirm;
+      return same ? prev : snap;
+    });
+  };
+
+  // Password managers fill after mount without React onChange — pull DOM once.
+  useEffect(() => {
+    if (!showCreate) return undefined;
+    const timers = [120, 400, 900].map((ms) =>
+      window.setTimeout(() => {
+        if (createFormRef.current) syncCreateFormFromDom(createFormRef.current);
+      }, ms),
+    );
+    return () => timers.forEach((id) => window.clearTimeout(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when modal opens
+  }, [showCreate]);
 
   const openEdit = async (tenant) => {
     setDomainCheck(null);
@@ -1005,7 +1069,17 @@ export default function SuperAdminPanel() {
             ) : null
           }
         >
-          <form onSubmit={submitCreate} noValidate className="flex flex-col gap-4">
+          <form
+            ref={createFormRef}
+            onSubmit={submitCreate}
+            noValidate
+            className="flex flex-col gap-4"
+            onBlur={(e) => {
+              // Autofill often settles on blur without React onChange.
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              syncCreateFormFromDom(e.currentTarget);
+            }}
+          >
             <div
               className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-1.5 rounded-[22px] bg-slate-100/70 border border-slate-200/60"
               role="radiogroup"
@@ -1092,12 +1166,14 @@ export default function SuperAdminPanel() {
                   </div>
                 </div>
                 <Field
+                  name="legal_name"
                   label="Επωνυμία *"
                   value={createForm.legal_name}
                   onChange={onCreateNameChange}
                   required
                   placeholder="π.χ. Icona Rent"
                   autoFocus
+                  autoComplete="organization"
                   hint={
                     createAttempted && !createLegalNameOk
                       ? 'Υποχρεωτικό — πληκτρολόγησε την επωνυμία'
@@ -1108,6 +1184,7 @@ export default function SuperAdminPanel() {
                 />
                 <div className="grid grid-cols-2 gap-2.5">
                   <Field
+                    name="slug"
                     label="Slug (URL id) *"
                     value={createForm.slug}
                     onChange={(v) => {
@@ -1116,6 +1193,7 @@ export default function SuperAdminPanel() {
                     }}
                     required
                     placeholder="π.χ. iconarent"
+                    autoComplete="off"
                     hint={
                       createForm.slug
                         ? createSlugOk
@@ -1129,11 +1207,13 @@ export default function SuperAdminPanel() {
                     snug
                   />
                   <Field
+                    name="subdomain"
                     label="Subdomain *"
                     value={createForm.subdomain}
                     onChange={(v) => setCreateForm((f) => ({ ...f, subdomain: slugify(v) }))}
                     required
                     placeholder="π.χ. iconarent"
+                    autoComplete="off"
                     hint={
                       !createForm.subdomain
                         ? createAttempted
@@ -1193,12 +1273,14 @@ export default function SuperAdminPanel() {
                   )}
                 </div>
                 <Field
+                  name="vat_number"
                   label="ΑΦΜ (προαιρετικό)"
                   value={createForm.vat_number}
                   onChange={(v) =>
                     setCreateForm((f) => ({ ...f, vat_number: v.replace(/\D/g, '').slice(0, 9) }))
                   }
                   placeholder="9 ψηφία"
+                  autoComplete="off"
                   hint={!isValidAfm(createForm.vat_number) ? 'Ακριβώς 9 ψηφία' : null}
                   error={!isValidAfm(createForm.vat_number)}
                   snug
@@ -1245,14 +1327,17 @@ export default function SuperAdminPanel() {
                   </button>
                 </div>
                 <Field
+                  name="admin_full_name"
                   label="Ονοματεπώνυμο"
                   value={createForm.admin_full_name}
                   onChange={(v) => setCreateForm((f) => ({ ...f, admin_full_name: v }))}
                   required
                   placeholder="π.χ. Μαρία Παπαδοπούλου"
+                  autoComplete="name"
                   snug
                 />
                 <Field
+                  name="admin_email"
                   label="Username (email σύνδεσης)"
                   type="email"
                   value={createForm.admin_email}
@@ -1273,6 +1358,7 @@ export default function SuperAdminPanel() {
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   <PasswordField
                     id="new-office-admin-password"
+                    name="admin_password"
                     label="Κωδικός (≥ 8)"
                     value={createForm.admin_password}
                     onChange={(v) => setCreateForm((f) => ({ ...f, admin_password: v }))}
@@ -1285,6 +1371,7 @@ export default function SuperAdminPanel() {
                   />
                   <PasswordField
                     id="new-office-admin-password-confirm"
+                    name="admin_password_confirm"
                     label="Επιβεβαίωση"
                     value={createForm.admin_password_confirm}
                     onChange={(v) => setCreateForm((f) => ({ ...f, admin_password_confirm: v }))}
@@ -1398,16 +1485,20 @@ export default function SuperAdminPanel() {
                         ? 'Λεωφορεία + μενού ενοικιάσεων ενεργό από την αρχή.'
                         : 'Μόνο εκδρομές / λεωφορεία — χωρίς Rent.'}
                   </p>
-                  {!createFormReady ? (
-                    <p className="text-[12px] font-medium text-amber-700 leading-snug">
-                      Συμπλήρωσε: {createBlockers.join(' · ')}
-                    </p>
-                  ) : (
+                  {createFormReady ? (
                     <p className="text-[12px] font-medium text-emerald-700 leading-snug inline-flex items-center gap-1">
                       <span className="material-symbols-outlined text-[15px]" aria-hidden>
                         verified
                       </span>
                       Έτοιμο για δημιουργία
+                    </p>
+                  ) : createAttempted ? (
+                    <p className="text-[12px] font-medium text-amber-700 leading-snug">
+                      Συμπλήρωσε: {createBlockers.join(' · ')}
+                    </p>
+                  ) : (
+                    <p className="text-[12px] text-slate-500 leading-snug">
+                      Συμπλήρωσε επωνυμία + admin και πάτα Δημιουργία.
                     </p>
                   )}
                 </div>
@@ -1426,7 +1517,7 @@ export default function SuperAdminPanel() {
                     className={`px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-[0_10px_24px_rgba(2,132,199,0.25)] disabled:opacity-50 transition ${
                       createFormReady
                         ? 'bg-sky-600 hover:bg-sky-500'
-                        : 'bg-sky-600/75 hover:bg-sky-600'
+                        : 'bg-sky-600 hover:bg-sky-500'
                     }`}
                   >
                     {working ? 'Δημιουργία…' : 'Δημιουργία γραφείου'}
@@ -1905,6 +1996,7 @@ function Modal({
 }
 
 function Field({
+  name,
   label,
   value,
   onChange,
@@ -1922,6 +2014,7 @@ function Field({
     <label className="block text-sm">
       <span className="font-bold text-slate-500">{label}</span>
       <input
+        name={name}
         type={type}
         value={value}
         required={required}
@@ -1972,6 +2065,7 @@ function EyeIcon({ off = false }) {
 
 function PasswordField({
   id,
+  name,
   label,
   value,
   onChange,
@@ -1994,6 +2088,7 @@ function PasswordField({
       <div className="relative mt-1">
         <input
           id={inputId}
+          name={name}
           type={visible ? 'text' : 'password'}
           value={value}
           required={required}
