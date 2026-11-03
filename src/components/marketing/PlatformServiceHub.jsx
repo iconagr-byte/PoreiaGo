@@ -1,9 +1,6 @@
 import { Link } from 'react-router-dom';
-import {
-  HERO_BACKGROUND_IMAGE,
-  PLATFORM_NAME,
-  SERVICE_HUB,
-} from '../../lib/marketing/platformCopy.js';
+import { PLATFORM_NAME, SERVICE_HUB } from '../../lib/marketing/platformCopy.js';
+import { FlowVisual, HeroProductStage } from './PlatformHubVisuals.jsx';
 import '../../styles/platform-service-hub.css';
 
 function scrollToId(event, id) {
@@ -17,58 +14,53 @@ function scrollToId(event, id) {
 }
 
 /**
- * Marketing homepage — hero hook (how it works) first;
+ * Marketing homepage — Stripe-inspired light hero + how-it-works visuals;
  * Λεωφορεία / Ενοικιάσεις chooser sits below the fold.
  */
 export default function PlatformServiceHub() {
   return (
     <>
       <section className="pg-hub" aria-label={`${PLATFORM_NAME} — αρχική`}>
-        <div className="pg-hub-media" aria-hidden>
-          <img src={HERO_BACKGROUND_IMAGE} alt="" />
-          <div className="pg-hub-media-veil" />
-        </div>
-        <div className="pg-hub-glow" aria-hidden />
-
         <div className="pg-hub-inner">
           <div className="pg-hub-copy">
-            <p className="pg-hub-brand">
-              <span className="pg-hub-brand-accent">{PLATFORM_NAME}</span>
-            </p>
+            <p className="pg-hub-micro">{SERVICE_HUB.micro}</p>
             <h1 className="pg-hub-headline">
+              <span className="pg-hub-brand-line">{PLATFORM_NAME}</span>
               {SERVICE_HUB.hook}{' '}
-              <span className="pg-hub-headline-accent">{SERVICE_HUB.hookAccent}</span>
+              <span className="pg-hub-headline-accent">{SERVICE_HUB.hookLine2}</span>
             </h1>
             <p className="pg-hub-support">{SERVICE_HUB.support}</p>
 
             <div className="pg-hub-cta">
-              <a
-                href="#how-poreiago-works"
-                className="pg-hub-cta-primary"
-                onClick={(e) => scrollToId(e, 'how-poreiago-works')}
-              >
+              <Link to="/grafeia" className="pg-hub-cta-primary">
                 {SERVICE_HUB.primaryCta}
                 <span className="material-symbols-outlined" aria-hidden>
-                  arrow_downward
+                  arrow_forward
                 </span>
-              </a>
-              <Link to="/grafeia" className="pg-hub-cta-secondary">
-                {SERVICE_HUB.secondaryCta}
               </Link>
+              <a
+                href="#how-poreiago-works"
+                className="pg-hub-cta-secondary"
+                onClick={(e) => scrollToId(e, 'how-poreiago-works')}
+              >
+                {SERVICE_HUB.secondaryCta}
+              </a>
             </div>
           </div>
-        </div>
 
-        <a
-          href="#how-poreiago-works"
-          className="pg-hub-scroll"
-          onClick={(e) => scrollToId(e, 'how-poreiago-works')}
-          aria-label="Μετάβαση στο πώς δουλεύει"
-        >
-          <span className="material-symbols-outlined" aria-hidden>
-            expand_more
-          </span>
-        </a>
+          <HeroProductStage />
+        </div>
+      </section>
+
+      <section className="pg-hub-trust" aria-label="Γιατί PoreiaGo">
+        <div className="pg-hub-trust-inner">
+          {SERVICE_HUB.trust.map((item) => (
+            <div key={item.value} className="pg-hub-trust-item">
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section
@@ -78,19 +70,18 @@ export default function PlatformServiceHub() {
       >
         <div className="pg-hub-flow-inner">
           <header className="pg-hub-flow-intro">
-            <p className="pg-hub-flow-kicker">Πώς δουλεύει</p>
-            <h2 className="pg-hub-flow-title">Τρία βήματα · καθαρή ροή</h2>
+            <p className="pg-hub-flow-kicker">{SERVICE_HUB.flowKicker}</p>
+            <h2 className="pg-hub-flow-title">{SERVICE_HUB.flowTitle}</h2>
+            <p className="pg-hub-flow-support">{SERVICE_HUB.flowSupport}</p>
           </header>
 
-          <ol className="pg-hub-flow-steps">
-            {SERVICE_HUB.flow.map((item, index) => (
-              <li key={item.step} className="pg-hub-flow-step">
+          <ol className="pg-hub-flow-cards">
+            {SERVICE_HUB.flow.map((item) => (
+              <li key={item.step} className="pg-hub-flow-card">
+                <FlowVisual kind={item.visual} />
                 <span className="pg-hub-flow-num" aria-hidden>
                   {item.step}
                 </span>
-                {index < SERVICE_HUB.flow.length - 1 ? (
-                  <span className="pg-hub-flow-rail" aria-hidden />
-                ) : null}
                 <strong>{item.title}</strong>
                 <p>{item.body}</p>
               </li>
@@ -133,6 +124,10 @@ export default function PlatformServiceHub() {
                 </span>
               </Link>
             </div>
+
+            <p className="pg-hub-choose-foot">
+              <Link to="/grafeia">{SERVICE_HUB.contractsCta}</Link>
+            </p>
           </div>
         </div>
       </section>

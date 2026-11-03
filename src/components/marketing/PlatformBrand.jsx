@@ -9,8 +9,8 @@ export default function PlatformBrand({ className = '', variant = 'dark', asLink
       <span
         className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm shadow-lg ${
           isDark
-            ? 'bg-gradient-to-br from-sky-400 to-indigo-600 text-white'
-            : 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white'
+            ? 'bg-gradient-to-br from-sky-400 to-teal-500 text-white'
+            : 'bg-gradient-to-br from-sky-500 to-teal-600 text-white'
         }`}
       >
         T

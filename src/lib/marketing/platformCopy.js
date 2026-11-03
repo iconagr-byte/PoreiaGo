@@ -14,16 +14,27 @@ export const HERO = {
 };
 
 /**
- * Homepage hero — brand-first hook for candidate offices (how PoreiaGo works),
- * then service chooser below the fold.
+ * Homepage hero — Stripe-grade hook for candidate offices (how PoreiaGo works),
+ * then visual flow + service chooser below the fold.
  */
 export const SERVICE_HUB = {
-  hook: 'Το γραφείο σας online —',
-  hookAccent: 'χωρίς Excel, χωρίς πέντε εργαλεία',
+  micro: 'Πλατφόρμα για ταξιδιωτικά γραφεία · Ελλάδα & εξωτερικό',
+  hook: 'Υποδομή κρατήσεων',
+  hookLine2: 'για να μεγαλώσει το γραφείο σας.',
+  hookAccent: 'μεγαλώσει το γραφείο σας',
   support:
-    'Ο πελάτης κλείνει εκδρομή ή ενοικίαση στο site σας. Εσείς βλέπετε πληρότητα, στόλο και check-in από έναν πίνακα — με το δικό σας brand.',
-  primaryCta: 'Δείτε πώς δουλεύει',
-  secondaryCta: 'Συμβόλαια',
+    'Δεχτείτε κρατήσεις, τρέξτε λεωφορεία ή ενοικιάσεις και κρατήστε το δικό σας brand — από την πρώτη κράτηση μέχρι την πληρότητα της σεζόν.',
+  primaryCta: 'Ξεκινήστε',
+  secondaryCta: 'Δείτε πώς δουλεύει',
+  contractsCta: 'Συμβόλαια & τιμές',
+  trust: [
+    { value: '1 σύστημα', label: 'κρατήσεις · στόλος · GPS' },
+    { value: 'Δικό σας brand', label: 'site · domain · επωνυμία' },
+    { value: 'Λεωφορεία + Rent', label: 'μία πλατφόρμα, δύο πόρτες' },
+  ],
+  flowKicker: 'Πώς δουλεύει',
+  flowTitle: 'Τρία βήματα. Καθαρή ροή.',
+  flowSupport: 'Χωρίς Excel, χωρίς πέντε εργαλεία, χωρίς τηλέφωνα την τελευταία στιγμή.',
   chooseKicker: 'Διαλέξτε πόρτα',
   chooseTitle: 'Τι θέλετε να ανοίξετε πρώτα;',
   chooseSupport:
@@ -31,22 +42,25 @@ export const SERVICE_HUB = {
   busesLabel: 'Λεωφορεία',
   busesHint: 'Εκδρομές · QR · GPS · στόλος',
   rentLabel: 'Ενοικιάσεις',
-  rentHint: 'Αυτοκίνητα · συμβόλαιο · βοήθεια',
+  rentHint: 'Αυτοκίνητα · συμβόλαιο · check-in',
   flow: [
     {
       step: '01',
+      visual: 'office',
       title: 'Ανοίγετε το γραφείο',
-      body: 'Συμβόλαιο, brand και πίνακας στο PoreiaGo — έτοιμο σε λίγα λεπτά.',
+      body: 'Συμβόλαιο, brand και πίνακας στο PoreiaGo — έτοιμο σε λίγα λεπτά, με το όνομά σας.',
     },
     {
       step: '02',
+      visual: 'book',
       title: 'Ο πελάτης κλείνει online',
-      body: 'Εκδρομή ή ενοικίαση στο site σας, με QR ή ψηφιακό συμβόλαιο στο κινητό.',
+      body: 'Εκδρομή ή ενοικίαση στο site σας. QR εισιτήριο ή ψηφιακό συμβόλαιο στο κινητό.',
     },
     {
       step: '03',
+      visual: 'run',
       title: 'Εσείς τρέχετε την ημέρα',
-      body: 'Πληρότητα, στόλος, GPS και check-in από ένα σημείο — χωρίς τηλέφωνα την τελευταία στιγμή.',
+      body: 'Πληρότητα, στόλος, ζωντανό GPS και check-in — όλα από ένα σημείο.',
     },
   ],
 };

@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
+import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import { saasDevLogin, saasGoogleLogin, saasLogin } from '../services/saasApi.js';
+import '../styles/platform-admin-login.css';
 
 const DEV_DRIVER = 'driver@aerostride.com';
 
@@ -27,7 +29,7 @@ function postLoginNavigate(navigate, location, data) {
   return data;
 }
 
-/** Σύνδεση διαχειριστή — email + κωδικός ή Google (χωρίς UUID tenant). */
+/** Σύνδεση διαχειριστή — Stripe-inspired portal · email + κωδικός ή Google. */
 export default function AdminLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -128,35 +130,28 @@ export default function AdminLoginPage() {
   const busy = loading || googleLoading;
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-gray-900/20 rounded-full blur-[120px]" />
-
-      <div className="bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 card-inner-border w-full max-w-md relative z-10">
-        <div className="text-center mb-10">
-          <h1 className="font-headline-md text-headline-md font-bold text-on-surface tracking-tight mb-2">
-            Σύνδεση Διαχείρισης
-          </h1>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            Email + κωδικός ή Google — χωρίς τεχνικά IDs
-          </p>
+    <div className="pg-login">
+      <div className="pg-login-main">
+        <div className="pg-login-top">
+          <PlatformBrand variant="light" />
+          <Link to="/" className="pg-login-back">
+            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+              arrow_back
+            </span>
+            Αρχική
+          </Link>
         </div>
 
-        <div className="space-y-6">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-              {error}
-            </p>
-          )}
+        <div className="pg-login-center">
+          <div className="pg-login-card">
+            <h1>Σύνδεση στο γραφείο σας</h1>
+            <p>Email και κωδικός — ή Google. Χωρίς τεχνικά IDs.</p>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="block font-label-md text-label-md text-on-surface" htmlFor="email">
-                Email
-              </label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-lg">
-                  mail
-                </span>
+            {error ? <p className="pg-login-error">{error}</p> : null}
+
+            <form onSubmit={handleLogin} className="pg-login-form">
+              <div className="pg-login-field">
+                <label htmlFor="email">Email</label>
                 <input
                   id="email"
                   name="email"
@@ -164,128 +159,106 @@ export default function AdminLoginPage() {
                   autoComplete="username"
                   defaultValue=""
                   placeholder="email@γραφείο.gr"
-                  className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
                   required
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="block font-label-md text-label-md text-on-surface" htmlFor="password">
-                Κωδικός
-              </label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-lg">
-                  lock
-                </span>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  defaultValue=""
-                  className="w-full pl-12 pr-12 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
-                  placeholder="••••••••"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-outline hover:bg-black/[0.04] hover:text-on-surface transition-colors"
-                  aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
-                  aria-pressed={showPassword}
-                >
-                  <span className="material-symbols-outlined text-[22px]">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
+              <div className="pg-login-field">
+                <label htmlFor="password">Κωδικός</label>
+                <div className="pg-login-pass">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    defaultValue=""
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="pg-login-eye"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+                    aria-pressed={showPassword}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {(showAgency || import.meta.env.DEV) && (
+                <div className="pg-login-field">
+                  <label htmlFor="tenant_slug">
+                    Κωδικός εταιρείας <span style={{ color: '#94a3b8', fontWeight: 500 }}>(μόνο αν ζητηθεί)</span>
+                  </label>
+                  <input
+                    id="tenant_slug"
+                    name="tenant_slug"
+                    type="text"
+                    autoComplete="organization"
+                    value={tenantSlug}
+                    onChange={(e) => setTenantSlug(e.target.value)}
+                    placeholder="π.χ. admin-achillio-gr"
+                  />
+                  <p className="pg-login-hint">
+                    Συνήθως δεν χρειάζεται — μόνο αν το email ανήκει σε πολλές εταιρείες.
+                  </p>
+                </div>
+              )}
+
+              {!showAgency ? (
+                <button type="button" className="pg-login-agency-toggle" onClick={() => setShowAgency(true)}>
+                  Έχω κωδικό εταιρείας (σπάνια)
                 </button>
-              </div>
-            </div>
-
-            {(showAgency || import.meta.env.DEV) && (
-              <div className="space-y-2">
-                <label className="block font-label-md text-label-md text-on-surface" htmlFor="tenant_slug">
-                  Κωδικός εταιρείας <span className="text-gray-400 font-normal">(μόνο αν ζητηθεί)</span>
-                </label>
-                <input
-                  id="tenant_slug"
-                  name="tenant_slug"
-                  type="text"
-                  autoComplete="organization"
-                  value={tenantSlug}
-                  onChange={(e) => setTenantSlug(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-sm"
-                  placeholder="π.χ. admin-achillio-gr"
-                />
-                <p className="text-xs text-gray-500">
-                  Συνήθως δεν χρειάζεται — συμπληρώνεται μόνο αν το email ανήκει σε πολλές εταιρείες.
-                </p>
-              </div>
-            )}
-
-            {!showAgency && (
-              <button
-                type="button"
-                onClick={() => setShowAgency(true)}
-                className="text-xs text-primary font-semibold hover:underline"
-              >
-                Έχω κωδικό εταιρείας (σπάνια)
-              </button>
-            )}
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full mt-4 bg-gray-900 text-white py-4 rounded-full font-label-md text-label-md hover:scale-[0.98] transition-transform duration-200 shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {loading ? 'Σύνδεση…' : 'Είσοδος'}
-              <span className="material-symbols-outlined text-sm">dashboard</span>
-            </button>
-          </form>
-
-          {googleEnabled ? (
-            <>
-              <div className="flex items-center gap-3">
-                <span className="h-px flex-1 bg-outline-variant/30" />
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-                  ή με Google
-                </span>
-                <span className="h-px flex-1 bg-outline-variant/30" />
-              </div>
-
-              <GoogleSignInButton
-                disabled={busy}
-                onSuccess={handleGoogleCredential}
-                onDemoProfile={() =>
-                  setError(
-                    'Για demo Google χρειάζεται GOOGLE_CLIENT_ID στο server — χρησιμοποιήστε email/κωδικό.',
-                  )
-                }
-                onError={(msg) => setError(msg || 'Η σύνδεση με Google απέτυχε')}
-              />
-              {googleLoading ? (
-                <p className="text-xs text-center text-on-surface-variant">Επαλήθευση Google…</p>
               ) : null}
-            </>
-          ) : null}
+
+              <button type="submit" className="pg-login-submit" disabled={busy}>
+                {loading ? 'Σύνδεση…' : 'Είσοδος'}
+              </button>
+            </form>
+
+            {googleEnabled ? (
+              <>
+                <div className="pg-login-divider">ή με Google</div>
+                <GoogleSignInButton
+                  disabled={busy}
+                  onSuccess={handleGoogleCredential}
+                  onDemoProfile={() =>
+                    setError(
+                      'Για demo Google χρειάζεται GOOGLE_CLIENT_ID στο server — χρησιμοποιήστε email/κωδικό.',
+                    )
+                  }
+                  onError={(msg) => setError(msg || 'Η σύνδεση με Google απέτυχε')}
+                />
+                {googleLoading ? (
+                  <p className="pg-login-hint" style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+                    Επαλήθευση Google…
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+
+            <div className="pg-login-foot">
+              Νέο γραφείο;{' '}
+              <Link to="/grafeia">Δείτε συμβόλαια</Link>
+              <br />
+              Είστε πελάτης;{' '}
+              <Link to="/login">My Wallet σύνδεση</Link>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-8 text-center relative z-10 space-y-2">
-        <Link
-          to="/"
-          className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 justify-center"
-        >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Επιστροφή στην Αρχική
-        </Link>
-        <p className="text-xs text-on-surface-variant">
-          Είστε πελάτης;{' '}
-          <Link to="/login" className="text-primary font-semibold hover:underline">
-            My Wallet σύνδεση
-          </Link>
-        </p>
-      </div>
+      <aside className="pg-login-aside" aria-hidden>
+        <div className="pg-login-wave" />
+        <div className="pg-login-aside-copy">
+          <strong>Ένα σύστημα. Δικό σας brand.</strong>
+          <span>Κρατήσεις, στόλος, GPS και ενοικιάσεις — από τον πίνακα του γραφείου σας.</span>
+        </div>
+      </aside>
     </div>
   );
 }

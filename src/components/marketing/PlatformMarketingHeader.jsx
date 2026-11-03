@@ -62,9 +62,9 @@ export default function PlatformMarketingHeader() {
   };
 
   return (
-    <header className="pm-header">
+    <header className="pm-header pm-header--light">
       <div className="pm-header-inner">
-        <PlatformBrand variant="dark" />
+        <PlatformBrand variant="light" />
 
         <nav className="pm-nav pm-nav--slim" aria-label="Κύριο μενού">
           <a href="#how-poreiago-works" className="pm-nav-quiet" onClick={closeAll}>
