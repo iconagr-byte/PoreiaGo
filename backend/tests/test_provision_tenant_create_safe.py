@@ -36,7 +36,9 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
         self.assertIn("prepare_contabo_tenant_write", src)
         self.assertIn("INSERT INTO tenants", src)
         self.assertIn("tenant_plan_db_token", src)
-        self.assertIn("merge(tenant, load=False)", src)
+        # merge(load=False) rejects transient instances — Core insert + holder only.
+        self.assertNotIn("merge(tenant, load=False)", src)
+        self.assertIn("use_core_tenant", src)
         mods = (ROOT / "app/services/tenant_modules.py").read_text(encoding="utf-8")
         self.assertIn("async def prepare_contabo_tenant_write", mods)
         self.assertIn("detect_tenant_plan_persist_style", mods)
