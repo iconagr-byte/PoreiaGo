@@ -428,36 +428,47 @@
   --pg-wallet-sky: #0284c7;
   position: relative;
   overflow: hidden;
-  /* Cool ice mist on white — minimal */
+  /* Same shell as hub hero: white + soft edge glow + peach→cyan ribbon */
   background:
-    radial-gradient(ellipse 55% 45% at 88% 20%, rgba(14, 165, 233, 0.1), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 8% 85%, rgba(125, 211, 252, 0.08), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
   color: var(--pg-wallet-ink);
   border-block: 1px solid rgba(10, 37, 64, 0.06);
 }
 
 .pg-wallet-wave {
   position: absolute;
-  inset: -32% -28% -28% -18%;
-  border-radius: 46% 54% 48% 52% / 40% 42% 58% 60%;
+  top: 8%;
+  right: -6%;
+  bottom: 4%;
+  left: 42%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background: linear-gradient(
-    125deg,
-    rgba(186, 230, 253, 0.55) 0%,
-    rgba(125, 211, 252, 0.4) 40%,
-    rgba(224, 242, 254, 0.35) 100%
+    135deg,
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
   );
-  transform: rotate(-10deg) scale(1.12);
+  filter: blur(0.5px);
+  transform: rotate(-8deg) scale(1.05);
   animation: pgWalletWave 16s ease-in-out infinite alternate;
-  opacity: 0.55;
+  opacity: 0.95;
   pointer-events: none;
   z-index: 0;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.18);
 }
 
 .pg-wallet-wave--soft {
-  inset: -12% -40% 8% 22%;
-  opacity: 0.28;
-  filter: blur(28px);
+  top: 18%;
+  right: 8%;
+  bottom: 18%;
+  left: 52%;
+  opacity: 0.35;
+  filter: blur(36px);
+  box-shadow: none;
   animation-duration: 22s;
   animation-direction: alternate-reverse;
 }
@@ -470,7 +481,7 @@
   height: 24rem;
   margin: -12rem 0 0 -12rem;
   border-radius: 50%;
-  border: 1px solid rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   animation: pgWalletSpin 36s linear infinite;
   pointer-events: none;
   z-index: 0;
@@ -480,23 +491,40 @@
   width: 32rem;
   height: 32rem;
   margin: -16rem 0 0 -16rem;
-  border-color: rgba(14, 165, 233, 0.07);
+  border-color: rgba(14, 165, 233, 0.06);
   animation-duration: 52s;
   animation-direction: reverse;
 }
 
 @keyframes pgWalletWave {
   from {
-    transform: rotate(-10deg) scale(1.1) translate3d(0, 0, 0);
+    transform: rotate(-8deg) scale(1.05) translate3d(0, 0, 0);
   }
   to {
-    transform: rotate(-4deg) scale(1.18) translate3d(-2%, 2%, 0);
+    transform: rotate(-5deg) scale(1.08) translate3d(-1.5%, 1%, 0);
   }
 }
 
 @keyframes pgWalletSpin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .pg-wallet-wave {
+    left: 8%;
+    right: -12%;
+    top: auto;
+    bottom: -8%;
+    height: 42%;
+    opacity: 0.55;
+  }
+
+  .pg-wallet-wave--soft,
+  .pg-wallet-orbit,
+  .pg-wallet-orbit--slow {
+    display: none;
   }
 }
 
@@ -527,13 +555,13 @@
 }
 
 .pg-wallet-glass {
-  padding: 1.85rem 1.65rem 2rem;
-  border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(10, 37, 64, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.06);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 .pg-session--wallet .pg-session-kicker {

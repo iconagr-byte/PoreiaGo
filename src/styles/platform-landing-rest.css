@@ -15,35 +15,46 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  /* Lagoon mist on white — minimal */
+  /* Hub-matched white shell */
   background:
-    radial-gradient(ellipse 50% 45% at 10% 15%, rgba(45, 212, 191, 0.12), transparent 55%),
-    radial-gradient(ellipse 45% 40% at 90% 80%, rgba(14, 165, 233, 0.08), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #f4fbfa 100%);
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
   color: var(--pg-rest-ink);
   border-block: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .pg-audience-wave {
   position: absolute;
-  inset: -40% -30% -30% -20%;
-  border-radius: 48% 52% 45% 55% / 42% 38% 62% 58%;
+  top: -8%;
+  left: 18%;
+  right: 18%;
+  height: 58%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background: linear-gradient(
-    140deg,
-    rgba(153, 246, 228, 0.45) 0%,
-    rgba(94, 234, 212, 0.35) 40%,
-    rgba(186, 230, 253, 0.3) 100%
+    135deg,
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
   );
-  transform: rotate(6deg) scale(1.12);
+  filter: blur(0.5px);
+  transform: rotate(6deg) scale(1.05);
   animation: pgAudienceWave 16s ease-in-out infinite alternate;
-  opacity: 0.5;
+  opacity: 0.88;
   pointer-events: none;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.16);
 }
 
 .pg-audience-wave--soft {
-  inset: -15% 15% -25% -40%;
-  opacity: 0.25;
-  filter: blur(28px);
+  top: 4%;
+  left: 28%;
+  right: 28%;
+  height: 42%;
+  opacity: 0.32;
+  filter: blur(36px);
+  box-shadow: none;
   animation-duration: 22s;
   animation-direction: alternate-reverse;
 }
@@ -56,17 +67,17 @@
   height: 28rem;
   margin: -14rem 0 0 -14rem;
   border-radius: 50%;
-  border: 1px solid rgba(15, 118, 110, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   animation: pgAudienceSpin 42s linear infinite;
   pointer-events: none;
 }
 
 @keyframes pgAudienceWave {
   from {
-    transform: rotate(6deg) scale(1.1);
+    transform: rotate(6deg) scale(1.05);
   }
   to {
-    transform: rotate(10deg) scale(1.18) translate3d(-2%, 1%, 0);
+    transform: rotate(9deg) scale(1.08) translate3d(-1%, 1%, 0);
   }
 }
 
@@ -102,11 +113,11 @@
 .pg-audience-glass {
   padding: 1.85rem 1.6rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.08);
 }
 
 .pg-audience-kicker {
@@ -118,7 +129,7 @@
   font-weight: 750;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #0f766e;
+  color: #0284c7;
 }
 
 .pg-audience-head h2 {
@@ -276,58 +287,68 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  /* Warm sand mist on white — minimal */
   background:
-    radial-gradient(ellipse 55% 45% at 15% 20%, rgba(251, 191, 36, 0.1), transparent 55%),
-    radial-gradient(ellipse 45% 40% at 88% 75%, rgba(253, 186, 116, 0.08), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #fbf8f4 100%);
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
   color: var(--pg-rest-ink);
   border-block: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .pg-features-wave {
   position: absolute;
-  inset: -38% -28% -28% -18%;
-  border-radius: 48% 52% 46% 54% / 40% 44% 56% 60%;
+  top: -12%;
+  left: -8%;
+  width: 48%;
+  height: 70%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background: linear-gradient(
     135deg,
-    rgba(254, 243, 199, 0.55) 0%,
-    rgba(253, 186, 116, 0.35) 45%,
-    rgba(255, 247, 237, 0.4) 100%
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
   );
-  transform: rotate(-8deg) scale(1.12);
+  filter: blur(0.5px);
+  transform: rotate(-10deg) scale(1.05);
   animation: pgFeaturesWave 17s ease-in-out infinite alternate;
-  opacity: 0.5;
+  opacity: 0.88;
   pointer-events: none;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.16);
 }
 
 .pg-features-wave--soft {
-  inset: -12% -35% 6% 20%;
-  opacity: 0.25;
-  filter: blur(28px);
+  top: 8%;
+  left: 2%;
+  width: 36%;
+  height: 50%;
+  opacity: 0.3;
+  filter: blur(36px);
+  box-shadow: none;
   animation-duration: 23s;
   animation-direction: alternate-reverse;
 }
 
 .pg-features-orbit {
   position: absolute;
-  left: 72%;
-  top: 42%;
+  left: 22%;
+  top: 36%;
   width: 26rem;
   height: 26rem;
   margin: -13rem 0 0 -13rem;
   border-radius: 50%;
-  border: 1px solid rgba(180, 83, 9, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   animation: pgFeaturesSpin 40s linear infinite;
   pointer-events: none;
 }
 
 @keyframes pgFeaturesWave {
   from {
-    transform: rotate(-8deg) scale(1.1);
+    transform: rotate(-10deg) scale(1.05);
   }
   to {
-    transform: rotate(-3deg) scale(1.18) translate3d(-2%, 1%, 0);
+    transform: rotate(-6deg) scale(1.08) translate3d(1%, 1%, 0);
   }
 }
 
@@ -363,11 +384,11 @@
 .pg-features-glass {
   padding: 1.85rem 1.6rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.08);
 }
 
 .pg-features-kicker {
@@ -377,7 +398,7 @@
   font-weight: 750;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #c2410c;
+  color: #0284c7;
 }
 
 .pg-features-rest-head h2 {
@@ -506,6 +527,16 @@
 }
 
 @media (max-width: 900px) {
+  .pg-features-wave {
+    width: 70%;
+    height: 40%;
+    top: auto;
+    bottom: -6%;
+    left: 15%;
+    opacity: 0.45;
+  }
+
+  .pg-features-wave--soft,
   .pg-features-orbit {
     display: none;
   }
@@ -628,58 +659,68 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  /* Steel sky mist on white — minimal */
   background:
-    radial-gradient(ellipse 55% 45% at 82% 12%, rgba(14, 165, 233, 0.1), transparent 55%),
-    radial-gradient(ellipse 45% 40% at 12% 88%, rgba(56, 189, 248, 0.07), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
   color: var(--pg-rest-ink);
   border-block: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .pg-plans-wave {
   position: absolute;
-  inset: -36% -30% -30% -20%;
-  border-radius: 50% 48% 52% 46% / 42% 40% 60% 58%;
+  top: 6%;
+  right: -10%;
+  width: 52%;
+  height: 88%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background: linear-gradient(
-    140deg,
-    rgba(186, 230, 253, 0.5) 0%,
-    rgba(125, 211, 252, 0.35) 50%,
-    rgba(240, 249, 255, 0.4) 100%
+    135deg,
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
   );
-  transform: rotate(7deg) scale(1.12);
+  filter: blur(0.5px);
+  transform: rotate(7deg) scale(1.05);
   animation: pgPlansWave 16s ease-in-out infinite alternate;
-  opacity: 0.5;
+  opacity: 0.9;
   pointer-events: none;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.16);
 }
 
 .pg-plans-wave--soft {
-  inset: -15% 12% -22% -38%;
-  opacity: 0.25;
-  filter: blur(28px);
+  top: 18%;
+  right: 4%;
+  width: 38%;
+  height: 60%;
+  opacity: 0.3;
+  filter: blur(36px);
+  box-shadow: none;
   animation-duration: 22s;
   animation-direction: alternate-reverse;
 }
 
 .pg-plans-orbit {
   position: absolute;
-  left: 22%;
-  top: 58%;
+  left: 78%;
+  top: 48%;
   width: 28rem;
   height: 28rem;
   margin: -14rem 0 0 -14rem;
   border-radius: 50%;
-  border: 1px solid rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   animation: pgPlansSpin 44s linear infinite;
   pointer-events: none;
 }
 
 @keyframes pgPlansWave {
   from {
-    transform: rotate(7deg) scale(1.1);
+    transform: rotate(7deg) scale(1.05);
   }
   to {
-    transform: rotate(11deg) scale(1.18) translate3d(1%, -1%, 0);
+    transform: rotate(10deg) scale(1.08) translate3d(-1%, 1%, 0);
   }
 }
 
@@ -722,11 +763,11 @@
 .pg-plans-glass {
   padding: 1.85rem 1.55rem 2rem;
   border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.08);
 }
 
 @media (min-width: 768px) {
@@ -871,6 +912,16 @@
 }
 
 @media (max-width: 900px) {
+  .pg-plans-wave {
+    width: 80%;
+    height: 48%;
+    top: auto;
+    bottom: -10%;
+    right: -20%;
+    opacity: 0.45;
+  }
+
+  .pg-plans-wave--soft,
   .pg-plans-orbit {
     display: none;
   }
@@ -892,33 +943,44 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 1.25rem 5rem;
-  /* Mint mist on white — minimal */
   background:
-    radial-gradient(ellipse 50% 45% at 50% 8%, rgba(52, 211, 153, 0.1), transparent 55%),
-    radial-gradient(ellipse 40% 35% at 15% 90%, rgba(16, 185, 129, 0.07), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #f4faf7 100%);
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
 }
 
 .pg-final-wave {
   position: absolute;
-  inset: -42% -25% -35% -15%;
-  border-radius: 46% 54% 48% 52% / 38% 44% 56% 62%;
+  top: 4%;
+  left: 50%;
+  width: min(42rem, 88%);
+  height: 92%;
+  margin-left: calc(min(42rem, 88%) / -2);
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background: linear-gradient(
     135deg,
-    rgba(167, 243, 208, 0.45) 0%,
-    rgba(110, 231, 183, 0.32) 50%,
-    rgba(236, 253, 245, 0.4) 100%
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
   );
-  transform: rotate(-6deg) scale(1.1);
+  filter: blur(0.5px);
+  transform: rotate(-6deg) scale(1.05);
   animation: pgFinalWave 18s ease-in-out infinite alternate;
-  opacity: 0.5;
+  opacity: 0.88;
   pointer-events: none;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.16);
 }
 
 .pg-final-wave--soft {
-  inset: -10% -40% 0 25%;
-  opacity: 0.25;
-  filter: blur(28px);
+  width: min(32rem, 70%);
+  margin-left: calc(min(32rem, 70%) / -2);
+  height: 70%;
+  top: 16%;
+  opacity: 0.3;
+  filter: blur(36px);
+  box-shadow: none;
   animation-duration: 24s;
   animation-direction: alternate-reverse;
 }
@@ -931,17 +993,17 @@
   height: 30rem;
   margin: -15rem 0 0 -15rem;
   border-radius: 50%;
-  border: 1px solid rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   animation: pgFinalSpin 48s linear infinite;
   pointer-events: none;
 }
 
 @keyframes pgFinalWave {
   from {
-    transform: rotate(-6deg) scale(1.08);
+    transform: rotate(-6deg) scale(1.05);
   }
   to {
-    transform: rotate(-1deg) scale(1.16) translate3d(1%, 2%, 0);
+    transform: rotate(-3deg) scale(1.08) translate3d(1%, 1%, 0);
   }
 }
 
@@ -963,11 +1025,11 @@
 
 .pg-final-glass {
   border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.08);
 }
 
 @media (min-width: 768px) {

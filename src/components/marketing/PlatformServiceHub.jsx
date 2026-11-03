@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PLATFORM_NAME, SERVICE_HUB } from '../../lib/marketing/platformCopy.js';
-import { FlowVisual, HeroProductStage } from './PlatformHubVisuals.jsx';
+import { HeroProductStage } from './PlatformHubVisuals.jsx';
 import '../../styles/platform-service-hub.css';
 
 function scrollToId(event, id) {
@@ -78,7 +78,6 @@ export default function PlatformServiceHub() {
           <ol className="pg-hub-flow-cards">
             {SERVICE_HUB.flow.map((item) => (
               <li key={item.step} className="pg-hub-flow-card">
-                <FlowVisual kind={item.visual} />
                 <span className="pg-hub-flow-num" aria-hidden>
                   {item.step}
                 </span>
