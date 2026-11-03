@@ -6,7 +6,6 @@ import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
   FeaturesSection,
   FinalCtaSection,
-  HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
@@ -30,7 +29,6 @@ export default function FrontPage() {
         <PlatformWalletSession />
         <PainPointsSection />
         <FeaturesSection />
-        <HowItWorksSection />
         <PricingTeaserSection />
         <FinalCtaSection />
       </main>
