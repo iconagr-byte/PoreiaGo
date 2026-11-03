@@ -978,36 +978,55 @@ export default function SuperAdminPanel() {
       {showCreate && (
         <Modal
           title="Νέο γραφείο"
+          subtitle="Υπηρεσία, επωνυμία και admin — σε ένα βήμα"
           onClose={() => !working && setShowCreate(false)}
           size="xl"
           noScroll
+          headerExtra={
+            createSubdomainOk ? (
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(`${createForm.subdomain}.${getPlatformBaseDomain()}`)
+                }
+                className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[12px] font-semibold text-sky-800 hover:bg-sky-100 transition"
+                title="Αντιγραφή URL"
+              >
+                <span className="material-symbols-outlined text-[15px]" aria-hidden>
+                  link
+                </span>
+                <span className="truncate">
+                  {createForm.subdomain}.{getPlatformBaseDomain()}
+                </span>
+                <span className="material-symbols-outlined text-[14px] opacity-70" aria-hidden>
+                  content_copy
+                </span>
+              </button>
+            ) : null
+          }
         >
           <form onSubmit={submitCreate} noValidate className="flex flex-col gap-4">
             <div
-              className="grid grid-cols-3 gap-2.5"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-1.5 rounded-[22px] bg-slate-100/70 border border-slate-200/60"
               role="radiogroup"
               aria-label="Υπηρεσία γραφείου"
             >
               {SERVICE_MODES.map((mode) => {
                 const selected = createForm.service_mode === mode.id;
-                const tone =
+                const selectedTone =
                   mode.tone === 'teal'
-                    ? selected
-                      ? 'border-teal-500 bg-gradient-to-br from-teal-50 to-white shadow-[0_8px_24px_rgba(13,148,136,0.12)]'
-                      : 'border-slate-200/90 bg-white hover:border-teal-300 hover:bg-teal-50/30'
+                    ? 'bg-white border-teal-400 shadow-[0_6px_18px_rgba(13,148,136,0.14)] ring-1 ring-teal-100'
                     : mode.tone === 'indigo'
-                      ? selected
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-white shadow-[0_8px_24px_rgba(79,70,229,0.12)]'
-                        : 'border-slate-200/90 bg-white hover:border-indigo-300 hover:bg-indigo-50/30'
-                      : selected
-                        ? 'border-sky-500 bg-gradient-to-br from-sky-50 to-white shadow-[0_8px_24px_rgba(14,165,233,0.12)]'
-                        : 'border-slate-200/90 bg-white hover:border-sky-300 hover:bg-sky-50/30';
-                const iconTone =
-                  mode.tone === 'teal'
-                    ? 'bg-teal-100 text-teal-700'
+                      ? 'bg-white border-indigo-400 shadow-[0_6px_18px_rgba(79,70,229,0.14)] ring-1 ring-indigo-100'
+                      : 'bg-white border-sky-400 shadow-[0_6px_18px_rgba(14,165,233,0.14)] ring-1 ring-sky-100';
+                const idleTone = 'bg-transparent border-transparent hover:bg-white/70';
+                const iconTone = selected
+                  ? mode.tone === 'teal'
+                    ? 'bg-teal-500 text-white'
                     : mode.tone === 'indigo'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-sky-100 text-sky-700';
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-sky-500 text-white'
+                  : 'bg-white text-slate-500 border border-slate-200';
                 return (
                   <button
                     key={mode.id}
@@ -1022,7 +1041,9 @@ export default function SuperAdminPanel() {
                         plan: mode.id === 'rent' ? 'rent' : f.plan === 'rent' ? 'starter' : f.plan,
                       }))
                     }
-                    className={`rounded-2xl border px-3.5 py-3 text-left transition ${tone}`}
+                    className={`rounded-[18px] border px-3.5 py-3 text-left transition ${
+                      selected ? selectedTone : idleTone
+                    }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <span
@@ -1031,13 +1052,13 @@ export default function SuperAdminPanel() {
                       >
                         <span className="material-symbols-outlined text-[20px]">{mode.icon}</span>
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-slate-900 leading-tight">{mode.title}</p>
                         <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{mode.hint}</p>
                       </div>
                       {selected ? (
                         <span
-                          className={`material-symbols-outlined ml-auto text-[18px] ${
+                          className={`material-symbols-outlined text-[18px] ${
                             mode.tone === 'teal'
                               ? 'text-teal-600'
                               : mode.tone === 'indigo'
@@ -1055,16 +1076,16 @@ export default function SuperAdminPanel() {
               })}
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-              <section className="rounded-[22px] border border-slate-100 bg-slate-50/80 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
-                    <span className="material-symbols-outlined text-[16px]" aria-hidden>
+            <div className="grid gap-3.5 lg:grid-cols-2">
+              <section className="rounded-[22px] border border-sky-100 bg-gradient-to-b from-sky-50/80 to-white p-4 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white shadow-sm">
+                    <span className="material-symbols-outlined text-[17px]" aria-hidden>
                       apartment
                     </span>
                   </span>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-700/70">
                       Στοιχεία γραφείου
                     </p>
                     <p className="text-xs text-slate-500">Επωνυμία, URL και πλάνο</p>
@@ -1076,9 +1097,10 @@ export default function SuperAdminPanel() {
                   onChange={onCreateNameChange}
                   required
                   placeholder="π.χ. Icona Rent"
+                  autoFocus
                   hint={
                     createAttempted && !createLegalNameOk
-                      ? 'Υποχρεωτικό — πληκτρολόγησε την επωνυμία (όχι μόνο placeholder)'
+                      ? 'Υποχρεωτικό — πληκτρολόγησε την επωνυμία'
                       : null
                   }
                   error={createAttempted && !createLegalNameOk}
@@ -1100,8 +1122,8 @@ export default function SuperAdminPanel() {
                           ? 'Έγκυρο · πεζά, αριθμοί, παύλα'
                           : 'Μόνο a-z, 0-9, παύλα · ≥ 2'
                         : createAttempted
-                          ? 'Υποχρεωτικό — συμπληρώνεται αυτόματα από την επωνυμία'
-                          : 'Συμπληρώνεται αυτόματα από την επωνυμία'
+                          ? 'Υποχρεωτικό — συμπληρώνεται αυτόματα'
+                          : 'Αυτόματα από επωνυμία'
                     }
                     error={(createAttempted && !createSlugOk) || (Boolean(createForm.slug) && !createSlugOk)}
                     snug
@@ -1115,11 +1137,11 @@ export default function SuperAdminPanel() {
                     hint={
                       !createForm.subdomain
                         ? createAttempted
-                          ? 'Υποχρεωτικό — βάλε επωνυμία ή πληκτρολόγησε subdomain'
-                          : `Θα γίνει: {slug}.${getPlatformBaseDomain()}`
+                          ? 'Υποχρεωτικό'
+                          : `Θα γίνει {slug}.${getPlatformBaseDomain()}`
                         : !createSubdomainOk
                           ? 'Μόνο a-z, 0-9, παύλα · ≥ 2'
-                          : `${createForm.subdomain}.${getPlatformBaseDomain()}`
+                          : 'Έτοιμο για δημοσίευση'
                     }
                     error={
                       (createAttempted && !createSubdomainOk) ||
@@ -1128,55 +1150,71 @@ export default function SuperAdminPanel() {
                     snug
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500">Πλάνο</p>
                   {createForm.service_mode === 'rent' ? (
-                    <label className="block text-sm">
-                      <span className="font-bold text-slate-500">Πλάνο</span>
-                      <div className="mt-1 w-full px-3 py-2 rounded-xl bg-white border border-emerald-100 text-sm font-semibold text-emerald-800">
-                        Rent · μόνο ενοικιάσεις
-                      </div>
-                    </label>
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                        directions_car
+                      </span>
+                      Rent · μόνο ενοικιάσεις
+                    </div>
                   ) : (
-                    <label className="block text-sm">
-                      <span className="font-bold text-slate-500">Πλάνο</span>
-                      <select
-                        value={createForm.plan === 'rent' ? 'starter' : createForm.plan}
-                        onChange={(e) => setCreateForm((f) => ({ ...f, plan: e.target.value }))}
-                        className="mt-1 w-full px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-sky-200"
-                      >
-                        <option value="starter">Starter</option>
-                        <option value="professional">Professional</option>
-                        <option value="enterprise">Enterprise</option>
-                      </select>
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Πλάνο">
+                      {[
+                        { id: 'starter', label: 'Starter' },
+                        { id: 'professional', label: 'Professional' },
+                        { id: 'enterprise', label: 'Enterprise' },
+                      ].map((p) => {
+                        const active =
+                          (createForm.plan === 'rent' ? 'starter' : createForm.plan) === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            disabled={working}
+                            onClick={() => setCreateForm((f) => ({ ...f, plan: p.id }))}
+                            className={`rounded-full px-3.5 py-1.5 text-xs font-bold border transition ${
+                              active
+                                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300 hover:text-sky-700'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
                       {createForm.service_mode === 'both' ? (
-                        <p className="mt-1 text-[11px] text-slate-500">+ Rent add-on</p>
+                        <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">
+                          + Rent add-on
+                        </span>
                       ) : null}
-                    </label>
+                    </div>
                   )}
-                  <Field
-                    label="ΑΦΜ (προαιρετικό)"
-                    value={createForm.vat_number}
-                    onChange={(v) =>
-                      setCreateForm((f) => ({ ...f, vat_number: v.replace(/\D/g, '').slice(0, 9) }))
-                    }
-                    placeholder="9 ψηφία"
-                    hint={!isValidAfm(createForm.vat_number) ? 'Ακριβώς 9 ψηφία' : null}
-                    error={!isValidAfm(createForm.vat_number)}
-                    snug
-                  />
                 </div>
+                <Field
+                  label="ΑΦΜ (προαιρετικό)"
+                  value={createForm.vat_number}
+                  onChange={(v) =>
+                    setCreateForm((f) => ({ ...f, vat_number: v.replace(/\D/g, '').slice(0, 9) }))
+                  }
+                  placeholder="9 ψηφία"
+                  hint={!isValidAfm(createForm.vat_number) ? 'Ακριβώς 9 ψηφία' : null}
+                  error={!isValidAfm(createForm.vat_number)}
+                  snug
+                />
               </section>
 
-              <section className="rounded-[22px] border border-slate-100 bg-white p-4 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <section className="rounded-[22px] border border-slate-200/80 bg-white p-4 space-y-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white shrink-0">
-                      <span className="material-symbols-outlined text-[16px]" aria-hidden>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 text-white shrink-0 shadow-sm">
+                      <span className="material-symbols-outlined text-[17px]" aria-hidden>
                         admin_panel_settings
                       </span>
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
                         Admin γραφείου
                       </p>
                       <p className="text-xs text-slate-500 truncate">
@@ -1198,7 +1236,7 @@ export default function SuperAdminPanel() {
                       setShowCreatePasswordConfirm(true);
                       toast.success('Δημιουργήθηκε ισχυρός κωδικός');
                     }}
-                    className="inline-flex items-center gap-1 shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white hover:border-sky-200"
+                    className="inline-flex items-center gap-1 shrink-0 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-800 hover:bg-sky-100"
                   >
                     <span className="material-symbols-outlined text-[14px]" aria-hidden>
                       autorenew
@@ -1227,50 +1265,52 @@ export default function SuperAdminPanel() {
                       ? createEmailOk
                         ? 'Έγκυρο username για σύνδεση στο back office'
                         : 'Χρειάζεται έγκυρο email (π.χ. name@domain.gr)'
-                      : 'Το email είναι το username σύνδεσης — όχι κοινόχρηστο'
+                      : 'Το email είναι το username σύνδεσης'
                   }
                   error={Boolean(createForm.admin_email) && !createEmailOk}
                   snug
                 />
-                <PasswordField
-                  id="new-office-admin-password"
-                  label="Κωδικός (≥ 8)"
-                  value={createForm.admin_password}
-                  onChange={(v) => setCreateForm((f) => ({ ...f, admin_password: v }))}
-                  visible={showCreatePassword}
-                  onToggleVisible={() => setShowCreatePassword((v) => !v)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  snug
-                />
-                <PasswordField
-                  id="new-office-admin-password-confirm"
-                  label="Επιβεβαίωση κωδικού"
-                  value={createForm.admin_password_confirm}
-                  onChange={(v) => setCreateForm((f) => ({ ...f, admin_password_confirm: v }))}
-                  visible={showCreatePasswordConfirm}
-                  onToggleVisible={() => setShowCreatePasswordConfirm((v) => !v)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  error={
-                    Boolean(createForm.admin_password_confirm) &&
-                    createForm.admin_password !== createForm.admin_password_confirm
-                  }
-                  hint={
-                    createForm.admin_password_confirm &&
-                    createForm.admin_password !== createForm.admin_password_confirm
-                      ? 'Οι κωδικοί δεν ταιριάζουν'
-                      : createForm.admin_password_confirm &&
-                          createForm.admin_password === createForm.admin_password_confirm
-                        ? 'Οι κωδικοί ταιριάζουν'
-                        : null
-                  }
-                  snug
-                />
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <PasswordField
+                    id="new-office-admin-password"
+                    label="Κωδικός (≥ 8)"
+                    value={createForm.admin_password}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, admin_password: v }))}
+                    visible={showCreatePassword}
+                    onToggleVisible={() => setShowCreatePassword((v) => !v)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    snug
+                  />
+                  <PasswordField
+                    id="new-office-admin-password-confirm"
+                    label="Επιβεβαίωση"
+                    value={createForm.admin_password_confirm}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, admin_password_confirm: v }))}
+                    visible={showCreatePasswordConfirm}
+                    onToggleVisible={() => setShowCreatePasswordConfirm((v) => !v)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    error={
+                      Boolean(createForm.admin_password_confirm) &&
+                      createForm.admin_password !== createForm.admin_password_confirm
+                    }
+                    hint={
+                      createForm.admin_password_confirm &&
+                      createForm.admin_password !== createForm.admin_password_confirm
+                        ? 'Δεν ταιριάζουν'
+                        : createForm.admin_password_confirm &&
+                            createForm.admin_password === createForm.admin_password_confirm
+                          ? 'Ταιριάζουν'
+                          : null
+                    }
+                    snug
+                  />
+                </div>
                 {createForm.admin_password ? (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5 space-y-2">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[11px] font-bold text-slate-500">Ισχύς κωδικού</p>
                       <span
@@ -1300,7 +1340,7 @@ export default function SuperAdminPanel() {
                                   : createPwdStrength.tone === 'sky'
                                     ? 'bg-sky-400'
                                     : 'bg-emerald-400'
-                              : 'bg-slate-200'
+                              : 'bg-white/80 border border-slate-200'
                           }`}
                         />
                       ))}
@@ -1342,52 +1382,57 @@ export default function SuperAdminPanel() {
                   </div>
                 ) : (
                   <p className="text-[11px] text-slate-500 leading-snug px-0.5">
-                    Γεννήτρια ή χειροκίνητα: ≥ 8, γράμμα, αριθμός, σύμβολο. Όχι το email ως κωδικός.
+                    Πάτα «Γεννήτρια» ή βάλε χειροκίνητα ≥ 8, γράμμα, αριθμός, σύμβολο.
                   </p>
                 )}
               </section>
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-slate-500 leading-snug">
-                  {createForm.service_mode === 'rent'
-                    ? 'Θα ανοίξει μόνο το Rent storefront (/rent).'
-                    : createForm.service_mode === 'both'
-                      ? 'Λεωφορεία + μενού ενοικιάσεων ενεργό από την αρχή.'
-                      : 'Μόνο εκδρομές / λεωφορεία — χωρίς Rent.'}
-                </p>
+            <div className="rounded-[20px] border border-slate-200/80 bg-gradient-to-r from-white via-sky-50/40 to-white px-4 py-3.5 space-y-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-semibold text-slate-800 leading-snug">
+                    {createForm.service_mode === 'rent'
+                      ? 'Θα ανοίξει μόνο το Rent storefront (/rent).'
+                      : createForm.service_mode === 'both'
+                        ? 'Λεωφορεία + μενού ενοικιάσεων ενεργό από την αρχή.'
+                        : 'Μόνο εκδρομές / λεωφορεία — χωρίς Rent.'}
+                  </p>
+                  {!createFormReady ? (
+                    <p className="text-[12px] font-medium text-amber-700 leading-snug">
+                      Συμπλήρωσε: {createBlockers.join(' · ')}
+                    </p>
+                  ) : (
+                    <p className="text-[12px] font-medium text-emerald-700 leading-snug inline-flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[15px]" aria-hidden>
+                        verified
+                      </span>
+                      Έτοιμο για δημιουργία
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2 shrink-0">
                   <button
                     type="button"
                     disabled={working}
                     onClick={() => setShowCreate(false)}
-                    className="px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-white"
+                    className="px-4 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
                   >
                     Άκυρο
                   </button>
                   <button
                     type="submit"
                     disabled={working}
-                    className={`px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-[0_8px_20px_rgba(2,132,199,0.28)] disabled:opacity-50 ${
+                    className={`px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-[0_10px_24px_rgba(2,132,199,0.25)] disabled:opacity-50 transition ${
                       createFormReady
                         ? 'bg-sky-600 hover:bg-sky-500'
-                        : 'bg-sky-600/70 hover:bg-sky-600'
+                        : 'bg-sky-600/75 hover:bg-sky-600'
                     }`}
                   >
                     {working ? 'Δημιουργία…' : 'Δημιουργία γραφείου'}
                   </button>
                 </div>
               </div>
-              {!createFormReady ? (
-                <p className="text-[11px] font-medium text-amber-700 leading-snug">
-                  Συμπλήρωσε: {createBlockers.join(' · ')}
-                </p>
-              ) : (
-                <p className="text-[11px] font-medium text-emerald-700 leading-snug">
-                  Έτοιμο για δημιουργία
-                </p>
-              )}
             </div>
           </form>
         </Modal>
@@ -1787,42 +1832,70 @@ function Metric({ label, value, warn, icon }) {
 
 function Modal({
   title,
+  subtitle = null,
   onClose,
   children,
   wide = false,
   compact = false,
   size = null,
   noScroll = false,
+  headerExtra = null,
 }) {
   const widthClass =
-    size === 'xl' ? 'max-w-4xl' : size === 'lg' || wide ? 'max-w-2xl' : 'max-w-lg';
+    size === 'xl' ? 'max-w-5xl' : size === 'lg' || wide ? 'max-w-2xl' : 'max-w-lg';
   const heightClass = noScroll
     ? 'max-h-none overflow-visible'
     : compact
       ? 'max-h-[min(92vh,44rem)] overflow-y-auto'
       : 'max-h-[90vh] overflow-y-auto';
 
+  useEffect(() => {
+    if (typeof onClose !== 'function') return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-slate-950/45 backdrop-blur-[3px]">
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-gradient-to-br from-sky-50/95 via-white/90 to-teal-50/90 backdrop-blur-md"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && typeof onClose === 'function') onClose();
+      }}
+    >
       <div
-        className={`w-full rounded-[28px] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)] border border-slate-100/80 ${heightClass} ${widthClass} ${
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : 'Διάλογος'}
+        className={`w-full rounded-[28px] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.10)] border border-slate-200/70 ring-1 ring-white ${heightClass} ${widthClass} ${
           size === 'xl' ? 'p-5 sm:p-6' : compact ? 'p-5 sm:p-6' : 'p-6'
         }`}
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between gap-3 ${size === 'xl' || compact ? 'mb-3' : 'mb-4'}`}>
-          <div>
-            <h4 className="text-lg font-bold tracking-tight text-slate-900">{title}</h4>
-            {size === 'xl' || compact ? (
-              <p className="text-xs text-slate-500 mt-0.5">Επίλεξε υπηρεσία και στοιχεία admin</p>
+        <div
+          className={`flex items-start justify-between gap-3 ${
+            size === 'xl' || compact ? 'mb-4' : 'mb-4'
+          }`}
+        >
+          <div className="min-w-0">
+            <h4 className="text-xl font-bold tracking-tight text-slate-900">{title}</h4>
+            {subtitle || size === 'xl' || compact ? (
+              <p className="text-sm text-slate-500 mt-1 leading-snug">
+                {subtitle || 'Επίλεξε υπηρεσία και στοιχεία admin'}
+              </p>
             ) : null}
+            {headerExtra}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500"
+            className="w-10 h-10 shrink-0 rounded-full border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-200 flex items-center justify-center text-slate-500 hover:text-sky-700 transition"
             aria-label="Κλείσιμο"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
         {children}
@@ -1843,6 +1916,7 @@ function Field({
   error,
   snug = false,
   autoComplete,
+  autoFocus = false,
 }) {
   return (
     <label className="block text-sm">
@@ -1854,9 +1928,10 @@ function Field({
         minLength={minLength}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
-        className={`mt-1 w-full px-3 ${snug ? 'py-2 rounded-xl' : 'py-2.5 rounded-2xl'} bg-slate-50 border text-sm outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white ${
-          error ? 'border-rose-300' : 'border-slate-100'
+        className={`mt-1 w-full px-3 ${snug ? 'py-2.5 rounded-xl' : 'py-2.5 rounded-2xl'} bg-white border text-sm outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 ${
+          error ? 'border-rose-300' : 'border-slate-200'
         }`}
       />
       {hint ? (
