@@ -28,17 +28,18 @@
   width: 100%;
   max-width: 72rem;
   margin: 0 auto;
-  padding: 7rem 1.25rem 3.5rem;
+  padding: 7rem 1.25rem 6.75rem;
   display: grid;
-  gap: 2.5rem;
+  gap: 3rem;
   align-items: center;
 }
 
 @media (min-width: 960px) {
   .pg-hub-inner {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    padding: 8rem 2rem 4.5rem;
-    gap: 2rem;
+    padding: 8.5rem 2rem 8.5rem;
+    gap: 2.75rem;
+    min-height: min(92vh, 52rem);
   }
 }
 
@@ -170,19 +171,19 @@
 
 .pg-hub-stage {
   position: relative;
-  min-height: 22rem;
+  min-height: 28rem;
   animation: pgHubRise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
 }
 
 @media (min-width: 960px) {
   .pg-hub-stage {
-    min-height: 28rem;
+    min-height: 36rem;
   }
 }
 
 .pg-hub-ribbon {
   position: absolute;
-  inset: -8% -12% -18% 8%;
+  inset: -6% -14% -28% 4%;
   border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
   background:
     linear-gradient(
@@ -194,7 +195,7 @@
       rgba(20, 184, 166, 0.95) 100%
     );
   filter: blur(0.5px);
-  transform: rotate(-8deg) scale(1.05);
+  transform: rotate(-8deg) scale(1.08);
   animation: pgHubRibbon 16s ease-in-out infinite alternate;
   opacity: 0.95;
 }
@@ -205,11 +206,11 @@
   display: grid;
   place-items: center;
   min-height: inherit;
-  padding: 1rem 0.5rem;
+  padding: 1.5rem 0.5rem 2.25rem;
 }
 
 .pg-hub-desk {
-  width: min(100%, 22rem);
+  width: min(100%, 24rem);
   margin-left: 1.5rem;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.94);
@@ -258,7 +259,7 @@
 .pg-hub-desk-body {
   display: grid;
   grid-template-columns: 2.4rem 1fr;
-  min-height: 12.5rem;
+  min-height: 15.5rem;
 }
 
 .pg-hub-desk-side {

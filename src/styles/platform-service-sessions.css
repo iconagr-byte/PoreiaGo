@@ -425,10 +425,14 @@
 
 .pg-session--wallet {
   --pg-wallet-ink: #0b1220;
-  --pg-wallet-sky: #0ea5e9;
+  --pg-wallet-sky: #38bdf8;
   position: relative;
   overflow: hidden;
-  background: #07111f;
+  /* Cool ice night — distinct from lagoon / dusk / emerald stages */
+  background:
+    radial-gradient(ellipse 70% 55% at 12% 18%, rgba(56, 189, 248, 0.22), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 88% 78%, rgba(147, 197, 253, 0.14), transparent 50%),
+    #081525;
   color: #f8fafc;
 }
 
@@ -437,16 +441,16 @@
   inset: -32% -28% -28% -18%;
   border-radius: 46% 54% 48% 52% / 40% 42% 58% 60%;
   background: linear-gradient(
-    135deg,
-    rgba(245, 158, 11, 0.9) 0%,
-    rgba(251, 146, 60, 0.82) 16%,
-    rgba(56, 189, 248, 0.85) 48%,
-    rgba(34, 211, 238, 0.9) 70%,
-    rgba(20, 184, 166, 0.92) 100%
+    125deg,
+    rgba(30, 64, 175, 0.92) 0%,
+    rgba(14, 165, 233, 0.9) 28%,
+    rgba(125, 211, 252, 0.88) 58%,
+    rgba(186, 230, 253, 0.82) 78%,
+    rgba(224, 242, 254, 0.75) 100%
   );
   transform: rotate(-10deg) scale(1.12);
   animation: pgWalletWave 16s ease-in-out infinite alternate;
-  opacity: 0.9;
+  opacity: 0.82;
   pointer-events: none;
   z-index: 0;
 }
@@ -526,15 +530,15 @@
 .pg-wallet-glass {
   padding: 1.85rem 1.65rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(7, 17, 31, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 21, 37, 0.58);
+  border: 1px solid rgba(147, 197, 253, 0.22);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+  box-shadow: 0 24px 50px rgba(2, 12, 32, 0.35);
 }
 
 .pg-session--wallet .pg-session-kicker {
-  color: #7dd3fc;
+  color: #93c5fd;
   font-size: 0.78rem;
   letter-spacing: 0.14em;
 }
@@ -548,7 +552,7 @@
 
 .pg-wallet-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #7dd3fc 0%, #38bdf8 50%, #e0f2fe 100%);
+  background: linear-gradient(105deg, #93c5fd 0%, #38bdf8 45%, #e0f2fe 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

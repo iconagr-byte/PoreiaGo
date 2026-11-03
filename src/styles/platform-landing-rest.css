@@ -15,9 +15,13 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  background: #07111f;
+  /* Lagoon — teal left → deep Aegean right */
+  background:
+    radial-gradient(ellipse 55% 50% at 8% 12%, rgba(251, 191, 36, 0.28), transparent 50%),
+    radial-gradient(ellipse 60% 55% at 92% 70%, rgba(12, 74, 110, 0.55), transparent 55%),
+    linear-gradient(105deg, #0f766e 0%, #0e7490 38%, #0c4a6e 72%, #082f49 100%);
   color: #f8fafc;
-  border-block: 1px solid rgba(255, 255, 255, 0.06);
+  border-block: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .pg-audience-wave {
@@ -26,14 +30,15 @@
   border-radius: 48% 52% 45% 55% / 42% 38% 62% 58%;
   background: linear-gradient(
     140deg,
-    rgba(245, 158, 11, 0.85) 0%,
-    rgba(45, 212, 191, 0.88) 30%,
-    rgba(14, 165, 233, 0.82) 60%,
-    rgba(20, 184, 166, 0.92) 100%
+    rgba(251, 191, 36, 0.72) 0%,
+    rgba(45, 212, 191, 0.9) 26%,
+    rgba(34, 211, 238, 0.88) 52%,
+    rgba(14, 116, 144, 0.85) 78%,
+    rgba(12, 74, 110, 0.9) 100%
   );
   transform: rotate(6deg) scale(1.12);
   animation: pgAudienceWave 16s ease-in-out infinite alternate;
-  opacity: 0.88;
+  opacity: 0.78;
   pointer-events: none;
 }
 
@@ -99,11 +104,11 @@
 .pg-audience-glass {
   padding: 1.85rem 1.6rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(7, 17, 31, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(4, 47, 46, 0.55);
+  border: 1px solid rgba(153, 246, 228, 0.22);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+  box-shadow: 0 24px 50px rgba(2, 44, 40, 0.35);
 }
 
 .pg-audience-kicker {
@@ -115,7 +120,7 @@
   font-weight: 750;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #7dd3fc;
+  color: #99f6e4;
 }
 
 .pg-audience-head h2 {
@@ -253,7 +258,7 @@
   text-align: center;
   font-size: 0.98rem;
   line-height: 1.55;
-  color: rgba(226, 232, 240, 0.78);
+  color: rgba(204, 251, 241, 0.88);
 }
 
 @media (max-width: 900px) {
@@ -273,9 +278,13 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  background: #07111f;
+  /* Warm coastal dusk — amber / sand, no lagoon teal */
+  background:
+    radial-gradient(ellipse 65% 50% at 18% 20%, rgba(251, 146, 60, 0.35), transparent 55%),
+    radial-gradient(ellipse 50% 45% at 85% 75%, rgba(234, 88, 12, 0.2), transparent 50%),
+    linear-gradient(160deg, #1c1410 0%, #2a1810 42%, #120c0a 100%);
   color: #f8fafc;
-  border-block: 1px solid rgba(255, 255, 255, 0.06);
+  border-block: 1px solid rgba(255, 237, 213, 0.08);
 }
 
 .pg-features-wave {
@@ -284,14 +293,15 @@
   border-radius: 48% 52% 46% 54% / 40% 44% 56% 60%;
   background: linear-gradient(
     135deg,
-    rgba(245, 158, 11, 0.88) 0%,
-    rgba(56, 189, 248, 0.86) 42%,
-    rgba(45, 212, 191, 0.9) 72%,
-    rgba(20, 184, 166, 0.92) 100%
+    rgba(251, 191, 36, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 28%,
+    rgba(249, 115, 22, 0.72) 52%,
+    rgba(253, 186, 116, 0.7) 78%,
+    rgba(254, 243, 199, 0.55) 100%
   );
   transform: rotate(-8deg) scale(1.12);
   animation: pgFeaturesWave 17s ease-in-out infinite alternate;
-  opacity: 0.88;
+  opacity: 0.8;
   pointer-events: none;
 }
 
@@ -357,11 +367,11 @@
 .pg-features-glass {
   padding: 1.85rem 1.6rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(7, 17, 31, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(28, 20, 16, 0.58);
+  border: 1px solid rgba(253, 186, 116, 0.28);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+  box-shadow: 0 24px 50px rgba(28, 12, 4, 0.38);
 }
 
 .pg-features-kicker {
@@ -371,7 +381,7 @@
   font-weight: 750;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #7dd3fc;
+  color: #fdba74;
 }
 
 .pg-features-rest-head h2 {
@@ -422,15 +432,15 @@
 }
 
 .pg-features-lane--buses .pg-features-lane-kicker {
-  color: var(--pg-rest-sky);
+  color: #0369a1;
 }
 
 .pg-features-lane--rent .pg-features-lane-kicker {
-  color: var(--pg-rest-teal);
+  color: #c2410c;
 }
 
 .pg-features-lane--shared .pg-features-lane-kicker {
-  color: #64748b;
+  color: #78716c;
 }
 
 .pg-features-lane h3 {
@@ -488,15 +498,15 @@
 }
 
 .pg-features-lane--buses .pg-features-lane-link {
-  color: var(--pg-rest-sky);
+  color: #0369a1;
 }
 
 .pg-features-lane--rent .pg-features-lane-link {
-  color: var(--pg-rest-teal);
+  color: #c2410c;
 }
 
 .pg-features-lane--shared .pg-features-lane-link {
-  color: #0369a1;
+  color: #92400e;
 }
 
 @media (max-width: 900px) {
@@ -622,9 +632,13 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 0;
-  background: #07111f;
+  /* Steel sky — crisp blue SaaS, no amber / teal wash */
+  background:
+    radial-gradient(ellipse 60% 50% at 80% 15%, rgba(56, 189, 248, 0.28), transparent 55%),
+    radial-gradient(ellipse 50% 45% at 10% 85%, rgba(14, 165, 233, 0.18), transparent 50%),
+    linear-gradient(165deg, #0b1526 0%, #102a44 48%, #0a1628 100%);
   color: #f8fafc;
-  border-block: 1px solid rgba(255, 255, 255, 0.06);
+  border-block: 1px solid rgba(125, 211, 252, 0.1);
 }
 
 .pg-plans-wave {
@@ -633,14 +647,15 @@
   border-radius: 50% 48% 52% 46% / 42% 40% 60% 58%;
   background: linear-gradient(
     140deg,
-    rgba(251, 146, 60, 0.85) 0%,
-    rgba(56, 189, 248, 0.88) 40%,
-    rgba(34, 211, 238, 0.9) 68%,
-    rgba(20, 184, 166, 0.92) 100%
+    rgba(3, 105, 161, 0.95) 0%,
+    rgba(14, 165, 233, 0.9) 32%,
+    rgba(56, 189, 248, 0.88) 58%,
+    rgba(125, 211, 252, 0.82) 82%,
+    rgba(224, 242, 254, 0.7) 100%
   );
   transform: rotate(7deg) scale(1.12);
   animation: pgPlansWave 16s ease-in-out infinite alternate;
-  opacity: 0.88;
+  opacity: 0.8;
   pointer-events: none;
 }
 
@@ -713,11 +728,11 @@
 .pg-plans-glass {
   padding: 1.85rem 1.55rem 2rem;
   border-radius: 1.5rem;
-  background: rgba(7, 17, 31, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(11, 21, 38, 0.58);
+  border: 1px solid rgba(125, 211, 252, 0.24);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+  box-shadow: 0 24px 50px rgba(8, 20, 40, 0.38);
 }
 
 @media (min-width: 768px) {
@@ -732,7 +747,7 @@
   font-weight: 750;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7dd3fc;
+  color: #bae6fd;
 }
 
 .pg-plans-copy h2 {
@@ -858,7 +873,7 @@
   font-style: normal;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--pg-rest-teal);
+  color: #0284c7;
 }
 
 @media (max-width: 900px) {
@@ -883,7 +898,11 @@
   position: relative;
   overflow: hidden;
   padding: 4.5rem 1.25rem 5rem;
-  background: #07111f;
+  /* Emerald depth — mint / forest, no amber */
+  background:
+    radial-gradient(ellipse 55% 50% at 50% 0%, rgba(52, 211, 153, 0.22), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 15% 90%, rgba(16, 185, 129, 0.18), transparent 50%),
+    linear-gradient(175deg, #022c26 0%, #064e3b 45%, #022c22 100%);
 }
 
 .pg-final-wave {
@@ -892,13 +911,14 @@
   border-radius: 46% 54% 48% 52% / 38% 44% 56% 62%;
   background: linear-gradient(
     135deg,
-    rgba(245, 158, 11, 0.82) 0%,
-    rgba(14, 165, 233, 0.88) 45%,
-    rgba(45, 212, 191, 0.9) 100%
+    rgba(6, 95, 70, 0.95) 0%,
+    rgba(16, 185, 129, 0.88) 35%,
+    rgba(52, 211, 153, 0.85) 65%,
+    rgba(167, 243, 208, 0.7) 100%
   );
   transform: rotate(-6deg) scale(1.1);
   animation: pgFinalWave 18s ease-in-out infinite alternate;
-  opacity: 0.86;
+  opacity: 0.78;
   pointer-events: none;
 }
 
@@ -950,11 +970,11 @@
 
 .pg-final-glass {
   border-radius: 1.5rem;
-  background: rgba(7, 17, 31, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(2, 44, 38, 0.58);
+  border: 1px solid rgba(110, 231, 183, 0.24);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 6, 23, 0.28);
+  box-shadow: 0 24px 50px rgba(2, 40, 32, 0.38);
 }
 
 @media (min-width: 768px) {
@@ -991,15 +1011,15 @@
 }
 
 .pg-final-cta-btn--buses {
-  background: rgba(14, 165, 233, 0.18);
-  border: 1px solid rgba(125, 211, 252, 0.45);
-  color: #e0f2fe;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(110, 231, 183, 0.45);
+  color: #d1fae5;
 }
 
 .pg-final-cta-btn--rent {
-  background: rgba(45, 212, 191, 0.16);
-  border: 1px solid rgba(94, 234, 212, 0.4);
-  color: #ccfbf1;
+  background: rgba(52, 211, 153, 0.16);
+  border: 1px solid rgba(167, 243, 208, 0.4);
+  color: #ecfdf5;
 }
 
 @media (max-width: 900px) {
