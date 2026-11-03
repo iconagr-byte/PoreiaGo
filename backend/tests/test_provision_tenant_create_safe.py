@@ -62,9 +62,43 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
         mods = (ROOT / "app/services/tenant_modules.py").read_text(encoding="utf-8")
         self.assertIn("pg_tenant_plan_type_exists", mods)
         self.assertIn('"has_plan_enum"', mods)
+        self.assertIn("base_amount_cents", mods)
+        self.assertIn("build_subscription_insert_sql", mods)
         src = (ROOT / "app/services/platform_admin_service.py").read_text(encoding="utf-8")
         self.assertIn("tenant_plan_sql_expr", src)
         self.assertIn("has_plan_enum", src)
+        self.assertIn("build_subscription_insert_sql", src)
+
+    def test_build_subscription_insert_omits_missing_columns(self):
+        from app.services.tenant_modules import build_subscription_insert_sql
+
+        sql, binds = build_subscription_insert_sql(
+            columns={"id", "tenant_id", "plan", "status"},
+            plan_sql=":plan",
+        )
+        self.assertIn("INSERT INTO subscriptions", sql)
+        self.assertIn("plan", sql)
+        self.assertIn("status", sql)
+        self.assertNotIn("base_amount_cents", sql)
+        self.assertEqual(binds, ["id", "tenant_id", "plan", "status"])
+
+        sql_full, binds_full = build_subscription_insert_sql(
+            columns={
+                "id",
+                "tenant_id",
+                "plan",
+                "status",
+                "base_amount_cents",
+                "trial_ends_at",
+                "cancel_at_period_end",
+                "metered_buses",
+                "metered_trips",
+            },
+            plan_sql="CAST(:plan AS tenant_plan)",
+        )
+        self.assertIn("base_amount_cents", sql_full)
+        self.assertIn("trial_ends_at", sql_full)
+        self.assertIn("base_amount_cents", binds_full)
 
 
 if __name__ == "__main__":
