@@ -424,16 +424,17 @@
 /* ——— My Wallet session (buses homepage) ——— */
 
 .pg-session--wallet {
-  --pg-wallet-ink: #0b1220;
-  --pg-wallet-sky: #38bdf8;
+  --pg-wallet-ink: #0a2540;
+  --pg-wallet-sky: #0284c7;
   position: relative;
   overflow: hidden;
-  /* Cool ice night — distinct from lagoon / dusk / emerald stages */
+  /* Cool ice mist on white — minimal */
   background:
-    radial-gradient(ellipse 70% 55% at 12% 18%, rgba(56, 189, 248, 0.22), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 88% 78%, rgba(147, 197, 253, 0.14), transparent 50%),
-    #081525;
-  color: #f8fafc;
+    radial-gradient(ellipse 55% 45% at 88% 20%, rgba(14, 165, 233, 0.1), transparent 58%),
+    radial-gradient(ellipse 45% 40% at 8% 85%, rgba(125, 211, 252, 0.08), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: var(--pg-wallet-ink);
+  border-block: 1px solid rgba(10, 37, 64, 0.06);
 }
 
 .pg-wallet-wave {
@@ -442,23 +443,21 @@
   border-radius: 46% 54% 48% 52% / 40% 42% 58% 60%;
   background: linear-gradient(
     125deg,
-    rgba(30, 64, 175, 0.92) 0%,
-    rgba(14, 165, 233, 0.9) 28%,
-    rgba(125, 211, 252, 0.88) 58%,
-    rgba(186, 230, 253, 0.82) 78%,
-    rgba(224, 242, 254, 0.75) 100%
+    rgba(186, 230, 253, 0.55) 0%,
+    rgba(125, 211, 252, 0.4) 40%,
+    rgba(224, 242, 254, 0.35) 100%
   );
   transform: rotate(-10deg) scale(1.12);
   animation: pgWalletWave 16s ease-in-out infinite alternate;
-  opacity: 0.82;
+  opacity: 0.55;
   pointer-events: none;
   z-index: 0;
 }
 
 .pg-wallet-wave--soft {
   inset: -12% -40% 8% 22%;
-  opacity: 0.38;
-  filter: blur(20px);
+  opacity: 0.28;
+  filter: blur(28px);
   animation-duration: 22s;
   animation-direction: alternate-reverse;
 }
@@ -471,7 +470,7 @@
   height: 24rem;
   margin: -12rem 0 0 -12rem;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(14, 165, 233, 0.12);
   animation: pgWalletSpin 36s linear infinite;
   pointer-events: none;
   z-index: 0;
@@ -481,7 +480,7 @@
   width: 32rem;
   height: 32rem;
   margin: -16rem 0 0 -16rem;
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(14, 165, 233, 0.07);
   animation-duration: 52s;
   animation-direction: reverse;
 }
@@ -530,21 +529,21 @@
 .pg-wallet-glass {
   padding: 1.85rem 1.65rem 2rem;
   border-radius: 1.35rem;
-  background: rgba(8, 21, 37, 0.58);
-  border: 1px solid rgba(147, 197, 253, 0.22);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 50px rgba(2, 12, 32, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px rgba(10, 37, 64, 0.06);
 }
 
 .pg-session--wallet .pg-session-kicker {
-  color: #93c5fd;
+  color: #0284c7;
   font-size: 0.78rem;
   letter-spacing: 0.14em;
 }
 
 .pg-session--wallet .pg-session-hook {
-  color: #fff;
+  color: var(--pg-wallet-ink);
   font-size: clamp(1.95rem, 4.2vw, 2.95rem);
   max-width: 16ch;
   letter-spacing: -0.04em;
@@ -552,7 +551,7 @@
 
 .pg-wallet-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #93c5fd 0%, #38bdf8 45%, #e0f2fe 100%);
+  background: linear-gradient(105deg, #0284c7 0%, #0ea5e9 55%, #0891b2 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -561,7 +560,7 @@
 .pg-session--wallet .pg-session-support {
   margin: 0 0 1.6rem;
   max-width: 34rem;
-  color: rgba(226, 232, 240, 0.86);
+  color: #475569;
   font-size: clamp(1rem, 1.5vw, 1.1rem);
 }
 
@@ -578,7 +577,7 @@
   flex-direction: column;
   gap: 0.2rem;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(10, 37, 64, 0.08);
 }
 
 .pg-wallet-points li:first-child {
@@ -591,7 +590,7 @@
   font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--pg-wallet-ink);
   line-height: 1.25;
 }
 
@@ -600,16 +599,16 @@
   font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.45;
-  color: rgba(226, 232, 240, 0.78);
+  color: #64748b;
 }
 
 .pg-session-cta--wallet {
-  background: #fff;
-  color: #0b1220;
+  background: #0a2540;
+  color: #fff;
 }
 
 .pg-session-cta--wallet:hover {
-  background: #e0f2fe;
+  background: #133556;
 }
 
 .pg-wallet-visual {
@@ -619,7 +618,7 @@
 
 .pg-wallet-phone {
   width: min(100%, 280px);
-  filter: drop-shadow(0 28px 48px rgba(2, 8, 23, 0.55));
+  filter: drop-shadow(0 22px 40px rgba(10, 37, 64, 0.16));
 }
 
 .pg-wallet-phone-bezel {
