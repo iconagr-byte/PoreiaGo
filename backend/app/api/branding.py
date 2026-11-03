@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas import (
     TenantBrandingSettingsResponse,
     TenantBrandingSettingsUpdate,
+    TenantDomainDnsCheckResponse,
     TenantSiteAppearanceResponse,
     TenantSiteAppearanceUpdate,
 )
@@ -78,6 +79,74 @@ async def get_branding_settings(
             logger.exception("Branding GET failed")
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable") from exc
     return TenantBrandingSettingsResponse(**data)
+
+
+@router.get("/domain/dns-check", response_model=TenantDomainDnsCheckResponse)
+async def check_custom_domain_dns_status(
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    payload: Annotated[dict, Depends(get_token_payload)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+    domain: str | None = None,
+):
+    """
+    Live DNS check for the office custom domain (Achillio-style path for any office).
+
+    Verifies www CNAME → www.poreiago.com (or platform ingress) and optional apex A → VPS IP.
+    """
+    from travel_platform.growth.domain_dns import check_custom_domain_dns
+
+    slug = _tenant_slug(payload)
+    target = (domain or "").strip().lower()
+    if not target:
+        try:
+            settings = await TenantBrandingService(db).get_settings(tenant_id, tenant_slug=slug)
+            target = str(settings.get("custom_domain") or "").strip().lower()
+        except Exception:
+            target = ""
+    result = check_custom_domain_dns(target)
+    return TenantDomainDnsCheckResponse(**result)
+
+
+@router.post("/domain/provision-edge", response_model=TenantDomainDnsCheckResponse)
+async def provision_custom_domain_edge(
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    payload: Annotated[dict, Depends(get_token_payload)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+    domain: str | None = None,
+):
+    """Re-run edge sync (Traefik YAML / nginx apex→www / NPM hosts) + return DNS status."""
+    from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
+    from travel_platform.growth.npm_domains import upsert_npm_custom_domain
+
+    slug = _tenant_slug(payload)
+    target = (domain or "").strip().lower()
+    if not target:
+        try:
+            settings = await TenantBrandingService(db).get_settings(tenant_id, tenant_slug=slug)
+            target = str(settings.get("custom_domain") or "").strip().lower()
+        except Exception:
+            target = ""
+
+    edge_info: dict = {}
+    try:
+        edge_info = await sync_edge_custom_domains_from_db(db)
+    except Exception as exc:
+        logger.warning("Edge provision failed: %s", exc)
+        edge_info = {"error": str(exc)[:200]}
+
+    npm_one: dict = {}
+    if target:
+        try:
+            npm_one = await upsert_npm_custom_domain(target)
+        except Exception as exc:
+            npm_one = {"error": str(exc)[:200]}
+
+    result = check_custom_domain_dns(target)
+    result["edge"] = {"sync": edge_info, "npm": npm_one}
+    return TenantDomainDnsCheckResponse(**result)
 
 
 @router.put("/settings", response_model=TenantBrandingSettingsResponse)
