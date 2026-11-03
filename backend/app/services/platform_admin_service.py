@@ -618,11 +618,13 @@ class PlatformAdminService:
         plan_db = tenant_plan_db_token(resolved_plan, plan_style)
         plan_sql = tenant_plan_sql_expr(has_plan_enum=has_plan_enum)
 
-        # Core-insert when Contabo has legacy name col OR name-style tokens OR real PG enum,
-        # then attach an in-memory ORM instance (no reload → no LookupError on 'starter').
+        # Core-insert when Contabo has legacy name col OR name-style tokens OR real PG enum.
+        # Keep a transient Tenant holder afterwards — merge(load=False) rejects unpersisted
+        # instances, and session.get() can LookupError on STARTER vs starter.
         use_core_tenant = bool(
             schema_flags.get("has_name_col") or plan_style == "name" or has_plan_enum
         )
+        settings_before_provision = settings_raw
         if use_core_tenant:
             name_cols = ", name" if schema_flags.get("has_name_col") else ""
             name_vals = ", :name" if schema_flags.get("has_name_col") else ""
@@ -661,8 +663,6 @@ class PlatformAdminService:
                 settings_json=settings_raw,
                 isolation_strategy=isolation,
             )
-            # load=False: register PK in identity map without SELECT (avoids enum LookupError).
-            tenant = await self._session.merge(tenant, load=False)
         else:
             tenant = Tenant(
                 id=tenant_id,
@@ -682,7 +682,7 @@ class PlatformAdminService:
         trial_end = datetime.now(timezone.utc) + timedelta(days=14)
         base_cents = int(_PLAN_BASE_CENTS.get(resolved_plan, 0))
         # Match tenants.plan token style via Core when Contabo uses name tokens or PG enum.
-        if plan_style == "name" or has_plan_enum:
+        if plan_style == "name" or has_plan_enum or use_core_tenant:
             await self._session.execute(
                 text(
                     f"""
@@ -697,7 +697,7 @@ class PlatformAdminService:
                 ),
                 {
                     "id": sub_id,
-                    "tenant_id": tenant.id,
+                    "tenant_id": tenant_id,
                     "plan": plan_db,
                     "status": SubscriptionStatus.TRIALING.value,
                     "base_amount_cents": base_cents,
@@ -718,7 +718,7 @@ class PlatformAdminService:
 
         admin = User(
             id=uuid4(),
-            tenant_id=tenant.id,
+            tenant_id=tenant_id,
             email=admin_email.strip().lower(),
             password_hash=hash_password(admin_password),
             full_name=admin_full_name.strip(),
@@ -731,6 +731,18 @@ class PlatformAdminService:
             await provision_tenant_schema(self._session, tenant)
         elif tenant.isolation_strategy == IsolationStrategy.DATABASE.value:
             await provision_dedicated_database(self._session, tenant)
+        # Schema/dedicated provision may mutate settings_json on the transient holder —
+        # persist via Core UPDATE (object is not in the ORM identity map).
+        if use_core_tenant and tenant.settings_json != settings_before_provision:
+            await self._session.execute(
+                text("UPDATE tenants SET settings_json = :settings_json WHERE id = :id"),
+                {"settings_json": tenant.settings_json, "id": tenant_id},
+            )
+        if use_core_tenant and getattr(tenant, "database_dsn", None):
+            await self._session.execute(
+                text("UPDATE tenants SET database_dsn = :dsn WHERE id = :id"),
+                {"dsn": tenant.database_dsn, "id": tenant_id},
+            )
         logger.info(
             "Provisioned tenant %s (%s) plan_db=%s style=%s enum=%s name_col=%s",
             tenant.slug,
