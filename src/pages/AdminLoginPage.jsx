@@ -254,7 +254,62 @@ export default function AdminLoginPage() {
 
       <aside className="pg-login-aside" aria-hidden>
         <div className="pg-login-wave" />
+        <div className="pg-login-wave pg-login-wave--soft" />
+        <div className="pg-login-orbit" />
+        <div className="pg-login-orbit pg-login-orbit--slow" />
+
+        <div className="pg-login-float pg-login-float--desk">
+          <div className="pg-login-desk">
+            <div className="pg-login-desk-bar">
+              <i />
+              <i />
+              <i />
+              <em>πίνακας γραφείου</em>
+            </div>
+            <div className="pg-login-desk-body">
+              <strong>Σήμερα</strong>
+              <div className="pg-login-meter">
+                <span />
+              </div>
+              <div className="pg-login-bars">
+                {[48, 72, 58, 90, 66, 84].map((h, idx) => (
+                  <b key={idx} style={{ height: `${h}%` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pg-login-float pg-login-float--phone">
+          <div className="pg-login-phone">
+            <span>My Wallet</span>
+            <strong>QR εισιτήριο</strong>
+            <div className="pg-login-qr">
+              {Array.from({ length: 25 }).map((_, i) => (
+                <i key={i} className={i % 3 === 0 || i % 5 === 0 ? 'on' : ''} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="pg-login-float pg-login-float--pin">
+          <div className="pg-login-pin">
+            <span className="material-symbols-outlined">near_me</span>
+            Live GPS
+          </div>
+        </div>
+
+        <div className="pg-login-float pg-login-float--chip">
+          <span className="material-symbols-outlined">directions_bus</span>
+          Εκδρομές
+        </div>
+        <div className="pg-login-float pg-login-float--chip2">
+          <span className="material-symbols-outlined">car_rental</span>
+          Rent
+        </div>
+
         <div className="pg-login-aside-copy">
+          <p className="pg-login-aside-kicker">PoreiaGo</p>
           <strong>Ένα σύστημα. Δικό σας brand.</strong>
           <span>Κρατήσεις, στόλος, GPS και ενοικιάσεις — από τον πίνακα του γραφείου σας.</span>
         </div>

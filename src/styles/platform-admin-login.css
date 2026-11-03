@@ -260,7 +260,7 @@
   display: none;
   position: relative;
   overflow: hidden;
-  background: #0b1224;
+  background: #07111f;
 }
 
 @media (min-width: 960px) {
@@ -271,7 +271,7 @@
 
 .pg-login-wave {
   position: absolute;
-  inset: -20% -30% -10% -10%;
+  inset: -28% -35% -18% -18%;
   border-radius: 46% 54% 48% 52% / 40% 42% 58% 60%;
   background: linear-gradient(
     135deg,
@@ -282,46 +282,384 @@
     rgba(20, 184, 166, 0.95) 100%
   );
   transform: rotate(-12deg) scale(1.15);
-  animation: pgLoginWave 18s ease-in-out infinite alternate;
+  animation: pgLoginWave 14s ease-in-out infinite alternate;
+  opacity: 0.95;
+}
+
+.pg-login-wave--soft {
+  inset: -10% -40% 10% 20%;
+  opacity: 0.45;
+  filter: blur(18px);
+  animation-duration: 20s;
+  animation-direction: alternate-reverse;
+}
+
+.pg-login-orbit {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 22rem;
+  height: 22rem;
+  margin: -11rem 0 0 -11rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.04);
+  animation: pgLoginSpin 28s linear infinite;
+  pointer-events: none;
+}
+
+.pg-login-orbit--slow {
+  width: 28rem;
+  height: 28rem;
+  margin: -14rem 0 0 -14rem;
+  border-color: rgba(255, 255, 255, 0.1);
+  animation-duration: 42s;
+  animation-direction: reverse;
+}
+
+.pg-login-float {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pg-login-float--desk {
+  top: 14%;
+  right: 10%;
+  animation: pgLoginFloatA 6.5s ease-in-out infinite;
+}
+
+.pg-login-float--phone {
+  left: 9%;
+  top: 42%;
+  animation: pgLoginFloatB 5.8s ease-in-out infinite;
+}
+
+.pg-login-float--pin {
+  right: 16%;
+  bottom: 28%;
+  animation: pgLoginFloatC 4.8s ease-in-out infinite;
+}
+
+.pg-login-float--chip {
+  left: 14%;
+  top: 18%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(11, 18, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ecfeff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+  animation: pgLoginFloatB 7s ease-in-out infinite reverse;
+}
+
+.pg-login-float--chip2 {
+  right: 12%;
+  top: 52%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+  animation: pgLoginFloatA 6.2s ease-in-out infinite reverse;
+}
+
+.pg-login-float--chip .material-symbols-outlined,
+.pg-login-float--chip2 .material-symbols-outlined {
+  font-size: 1rem;
+  color: #7dd3fc;
+}
+
+.pg-login-desk {
+  width: 11.5rem;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.28);
+}
+
+.pg-login-desk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.4rem 0.55rem;
+  background: #e2e8f0;
+}
+
+.pg-login-desk-bar i {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.pg-login-desk-bar i:nth-child(1) {
+  background: #f87171;
+}
+.pg-login-desk-bar i:nth-child(2) {
+  background: #fbbf24;
+}
+.pg-login-desk-bar i:nth-child(3) {
+  background: #34d399;
+}
+
+.pg-login-desk-bar em {
+  margin-left: 0.3rem;
+  font-style: normal;
+  font-size: 0.55rem;
+  font-weight: 650;
+  color: #64748b;
+}
+
+.pg-login-desk-body {
+  padding: 0.55rem 0.6rem 0.65rem;
+}
+
+.pg-login-desk-body strong {
+  display: block;
+  font-size: 0.68rem;
+  color: #0f172a;
+  margin-bottom: 0.35rem;
+}
+
+.pg-login-meter {
+  height: 0.3rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.pg-login-meter span {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0ea5e9, #14b8a6, #f59e0b);
+  animation: pgLoginMeter 3.2s ease-in-out infinite alternate;
+}
+
+.pg-login-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.22rem;
+  height: 2.4rem;
+}
+
+.pg-login-bars b {
+  flex: 1;
+  border-radius: 0.18rem 0.18rem 0.08rem 0.08rem;
+  background: linear-gradient(180deg, #38bdf8, #0284c7);
+}
+
+.pg-login-phone {
+  width: 7.4rem;
+  padding: 0.7rem 0.65rem 0.8rem;
+  border-radius: 1.1rem;
+  background: #0b1224;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.4);
+}
+
+.pg-login-phone span {
+  display: block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+
+.pg-login-phone strong {
+  display: block;
+  margin: 0.15rem 0 0.45rem;
+  font-size: 0.82rem;
+  letter-spacing: -0.02em;
+}
+
+.pg-login-qr {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 0.4rem;
+  border-radius: 0.45rem;
+  background: #fff;
+}
+
+.pg-login-qr i {
+  aspect-ratio: 1;
+  border-radius: 1px;
+  background: #e2e8f0;
+}
+
+.pg-login-qr i.on {
+  background: #0f172a;
+}
+
+.pg-login-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(11, 18, 36, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  color: #ecfeff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.12);
+  animation: pgLoginPulse 2.4s ease-in-out infinite;
+}
+
+.pg-login-pin .material-symbols-outlined {
+  font-size: 1rem;
+  color: #38bdf8;
 }
 
 .pg-login-aside-copy {
   position: absolute;
-  left: 2rem;
-  right: 2rem;
-  bottom: 2.5rem;
-  z-index: 1;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  width: min(88%, 20rem);
+  text-align: center;
   color: #fff;
+  padding: 1.35rem 1.2rem;
+  border-radius: 1.15rem;
+  background: rgba(7, 17, 31, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.28);
+  animation: pgLoginCopyIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pg-login-aside-kicker {
+  margin: 0 0 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7dd3fc;
 }
 
 .pg-login-aside-copy strong {
   display: block;
-  font-size: 1.35rem;
-  font-weight: 750;
-  letter-spacing: -0.03em;
-  margin-bottom: 0.45rem;
-  text-shadow: 0 8px 24px rgba(2, 6, 23, 0.35);
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin-bottom: 0.55rem;
+  text-shadow: 0 10px 28px rgba(2, 6, 23, 0.35);
 }
 
 .pg-login-aside-copy span {
   display: block;
-  max-width: 18rem;
+  margin: 0 auto;
+  max-width: 17rem;
   font-size: 0.95rem;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 @keyframes pgLoginWave {
   from {
-    transform: rotate(-12deg) scale(1.15) translate3d(0, 0, 0);
+    transform: rotate(-12deg) scale(1.12) translate3d(0, 0, 0);
   }
   to {
-    transform: rotate(-8deg) scale(1.2) translate3d(-2%, 2%, 0);
+    transform: rotate(-5deg) scale(1.22) translate3d(-3%, 2%, 0);
+  }
+}
+
+@keyframes pgLoginSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pgLoginFloatA {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+@keyframes pgLoginFloatB {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-2deg);
+  }
+  50% {
+    transform: translate3d(0, 10px, 0) rotate(2deg);
+  }
+}
+
+@keyframes pgLoginFloatC {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(6px, -8px, 0);
+  }
+}
+
+@keyframes pgLoginMeter {
+  from {
+    width: 58%;
+  }
+  to {
+    width: 86%;
+  }
+}
+
+@keyframes pgLoginPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(14, 165, 233, 0.08);
+  }
+}
+
+@keyframes pgLoginCopyIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pg-login-wave {
-    animation: none;
+  .pg-login-wave,
+  .pg-login-orbit,
+  .pg-login-float,
+  .pg-login-float--chip,
+  .pg-login-float--chip2,
+  .pg-login-meter span,
+  .pg-login-pin,
+  .pg-login-aside-copy {
+    animation: none !important;
   }
 }
