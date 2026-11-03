@@ -135,48 +135,6 @@ export default function AgencyPlansPage() {
         <div className="pg-contracts-orbit" aria-hidden />
         <div className="pg-contracts-orbit pg-contracts-orbit--slow" aria-hidden />
 
-        <div className="pg-contracts-float pg-contracts-float--desk" aria-hidden>
-          <div className="pg-contracts-desk">
-            <div className="pg-contracts-desk-bar">
-              <i />
-              <i />
-              <i />
-            </div>
-            <div className="pg-contracts-desk-body">
-              <strong>Πίνακας γραφείου</strong>
-              <div className="pg-contracts-meter">
-                <span />
-              </div>
-              <div className="pg-contracts-bars">
-                {[48, 72, 58, 90, 66, 84].map((h, idx) => (
-                  <b key={idx} style={{ height: `${h}%` }} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pg-contracts-float pg-contracts-float--phone" aria-hidden>
-          <div className="pg-contracts-phone">
-            <span>My Wallet</span>
-            <strong>QR εισιτήριο</strong>
-            <div className="pg-contracts-qr">
-              {Array.from({ length: 25 }).map((_, i) => (
-                <i key={i} className={i % 3 === 0 || i % 5 === 0 ? 'on' : ''} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="pg-contracts-float pg-contracts-float--chip" aria-hidden>
-          <span className="material-symbols-outlined">directions_bus</span>
-          Εκδρομές
-        </div>
-        <div className="pg-contracts-float pg-contracts-float--chip2" aria-hidden>
-          <span className="material-symbols-outlined">car_rental</span>
-          Rent
-        </div>
-
         <div className="pg-contracts-hero-inner">
           <div className="pg-contracts-hero-copy">
             <span className="pg-contracts-badge">
@@ -288,22 +246,6 @@ export default function AgencyPlansPage() {
           <div className="pg-contracts-rent-wave" aria-hidden />
           <div className="pg-contracts-rent-wave pg-contracts-rent-wave--soft" aria-hidden />
           <div className="pg-contracts-rent-orbit" aria-hidden />
-
-          <div className="pg-contracts-float pg-contracts-float--rent-key" aria-hidden>
-            <span className="material-symbols-outlined">vpn_key</span>
-            Digital check-in
-          </div>
-          <div className="pg-contracts-float pg-contracts-float--rent-map" aria-hidden>
-            <span className="material-symbols-outlined">sos</span>
-            SOS 24/7
-          </div>
-          <div className="pg-contracts-float pg-contracts-float--rent-wallet" aria-hidden>
-            <div className="pg-contracts-rent-wallet">
-              <span>Rent Wallet</span>
-              <strong>Κράτηση ενεργή</strong>
-              <em>QR · συμβόλαιο</em>
-            </div>
-          </div>
 
           <div className="pg-contracts-rent-inner">
             <header className="pg-contracts-rent-head">
