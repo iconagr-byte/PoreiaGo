@@ -22,6 +22,7 @@ import {
 } from '../../lib/homepage/homepageThemes.js';
 import EmailConnectWizard from './email/EmailConnectWizard.jsx';
 import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
+import CustomDomainSetupWizard from './CustomDomainSetupWizard.jsx';
 import '../../styles/office-setup-wizard.css';
 
 /** Curated presets for fast onboarding — full gallery lives in Σχεδιασμός σελίδων. */
@@ -72,6 +73,7 @@ const STEPS = [
   { id: 'welcome', title: 'Καλώς ήρθατε' },
   { id: 'office', title: 'Γραφείο' },
   { id: 'brand', title: 'Εμφάνιση' },
+  { id: 'domain', title: 'Domain' },
   { id: 'email', title: 'Email' },
   { id: 'payments', title: 'Πληρωμές' },
   { id: 'fiscal', title: 'Πάροχος' },
@@ -103,7 +105,7 @@ function MarkIcon() {
 
 /**
  * Full-screen Apple-style onboarding for offices after contract purchase.
- * Collects: identity, branding, email, payments, first vehicle.
+ * Collects: identity, branding, custom domain, email, payments, first vehicle.
  */
 export default function OfficeSetupWizard({
   rentEnabled = false,
@@ -155,9 +157,11 @@ export default function OfficeSetupWizard({
 
   const [emailConnected, setEmailConnected] = useState(false);
   const [fiscalConnected, setFiscalConnected] = useState(false);
+  const [domainConnected, setDomainConnected] = useState(false);
   const [completed, setCompleted] = useState({
     office: false,
     brand: false,
+    domain: false,
     email: false,
     payments: false,
     fiscal: false,
@@ -421,7 +425,11 @@ export default function OfficeSetupWizard({
     }
     if (id === 'brand') {
       if (!(await saveBrand())) return;
-      setStep(3);
+      setStep(stepIndex('domain'));
+      return;
+    }
+    if (id === 'domain') {
+      setStep(stepIndex('email'));
       return;
     }
     if (id === 'email') {
@@ -489,13 +497,14 @@ export default function OfficeSetupWizard({
                 <h1 className="office-setup-title">Ας στήσουμε το γραφείο σας σε λίγα λεπτά</h1>
                 <p className="office-setup-subtitle">
                   Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας ό,τι χρειάζεται για να
-                  λειτουργήσετε — επωνυμία, εμφάνιση, email, πληρωμές και πρώτο όχημα.
+                  λειτουργήσετε — επωνυμία, εμφάνιση, δικό σας domain, email, πληρωμές και πρώτο
+                  όχημα.
                 </p>
                 <div className="office-setup-feature-row">
                   <div className="office-setup-feature">
                     <div className="office-setup-feature-icon">1</div>
-                    <strong>Ταυτότητα &amp; αρχική</strong>
-                    <p>Επωνυμία, logo, θέμα ιστοσελίδας και επικοινωνία.</p>
+                    <strong>Ταυτότητα &amp; domain</strong>
+                    <p>Επωνυμία, εμφάνιση και δικό σας domain (όπως Achillio) με CNAME.</p>
                   </div>
                   <div className="office-setup-feature">
                     <div
@@ -746,6 +755,32 @@ export default function OfficeSetupWizard({
               </>
             )}
 
+            {STEPS[step].id === 'domain' && (
+              <>
+                <p className="office-setup-eyebrow">Ιστοσελίδα</p>
+                <h2 className="office-setup-title">Δικό σας domain σε λίγα βήματα</h2>
+                <p className="office-setup-subtitle">
+                  Ίδιο μονοπάτι με Achillio Travel — CNAME στο www, χωρίς αλλαγή nameservers.
+                </p>
+                <div className="office-setup-email-wrap">
+                  <CustomDomainSetupWizard
+                    compact
+                    embedded
+                    onComplete={() => {
+                      setDomainConnected(true);
+                      setCompleted((c) => ({ ...c, domain: true }));
+                      toast.success('Domain ρυθμίστηκε');
+                      setStep(stepIndex('email'));
+                    }}
+                    onSkip={() => {
+                      setCompleted((c) => ({ ...c, domain: false }));
+                      setStep(stepIndex('email'));
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
             {STEPS[step].id === 'email' && (
               <>
                 <p className="office-setup-eyebrow">Email</p>
@@ -956,6 +991,12 @@ export default function OfficeSetupWizard({
                   </li>
                   <li>
                     <i>✓</i>{' '}
+                    {completed.domain || domainConnected
+                      ? 'Domain συνδεδεμένο'
+                      : 'Domain — μπορείτε αργότερα'}
+                  </li>
+                  <li>
+                    <i>✓</i>{' '}
                     {completed.email || emailConnected ? 'Email συνδεδεμένο' : 'Email — μπορείτε αργότερα'}
                   </li>
                   <li>
@@ -981,6 +1022,15 @@ export default function OfficeSetupWizard({
                 </button>
               )}
               <div className="office-setup-actions-right">
+                {STEPS[step].id === 'domain' && (
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-secondary"
+                    onClick={() => setStep(stepIndex('email'))}
+                  >
+                    Παράλειψη domain
+                  </button>
+                )}
                 {STEPS[step].id === 'email' && (
                   <button
                     type="button"
@@ -1008,7 +1058,9 @@ export default function OfficeSetupWizard({
                     Παράλειψη στόλου
                   </button>
                 )}
-                {STEPS[step].id !== 'email' && STEPS[step].id !== 'fiscal' && (
+                {STEPS[step].id !== 'email' &&
+                  STEPS[step].id !== 'fiscal' &&
+                  STEPS[step].id !== 'domain' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-primary"

@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import {
-  checkTenantDomainDns,
   fetchTenantBrandingSettings,
-  provisionTenantDomainEdge,
   updateTenantBrandingSettings,
 } from '../../services/growthApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 import { cacheBranding } from '../../lib/branding/applyBranding.js';
-import { DEFAULT_INGRESS_CNAME, getPlatformBaseDomain } from '../../lib/platform/domain.js';
+import { getPlatformBaseDomain } from '../../lib/platform/domain.js';
+import CustomDomainSetupWizard from './CustomDomainSetupWizard.jsx';
 
 const EMPTY_DNS = {
   cname_host: '',
@@ -75,9 +74,7 @@ export default function BrandingPanel() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
-  const [dnsCheck, setDnsCheck] = useState(null);
-  const [checkingDns, setCheckingDns] = useState(false);
-  const [provisioning, setProvisioning] = useState(false);
+  const [domainWizardKey, setDomainWizardKey] = useState(0);
 
   const patch = (updater) => {
     setDirty(true);
@@ -115,7 +112,6 @@ export default function BrandingPanel() {
     load();
   }, [load]);
 
-  const dns = form.dns_instructions || EMPTY_DNS;
   const hasCustomDomain = Boolean(form.custom_domain?.trim());
   const primary = form.primary_color || '#0b4f6c';
   const officeCode = form.subdomain || form.slug || '—';
@@ -166,64 +162,6 @@ export default function BrandingPanel() {
       toast.error(err.message || 'Αποτυχία');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const cnameHost = dns.cname_host || (hasCustomDomain ? `www.${form.custom_domain.replace(/^www\./, '')}` : '');
-  const cnameTarget = dns.cname_target || DEFAULT_INGRESS_CNAME;
-  const apexHost = dns.apex_host || (hasCustomDomain ? form.custom_domain.replace(/^www\./, '') : '');
-  const apexA = dns.apex_a_record || '169.58.199.186';
-  const cnameLine = hasCustomDomain ? `${cnameHost}  CNAME  ${cnameTarget}` : '';
-  const apexLine = hasCustomDomain && apexHost ? `${apexHost}  A  ${apexA}` : '';
-
-  const runDnsCheck = async () => {
-    const domain = String(form.custom_domain || '')
-      .trim()
-      .toLowerCase()
-      .replace(/^www\./, '');
-    if (!domain) {
-      toast.error('Συμπλήρωσε πρώτα το custom domain');
-      return;
-    }
-    setCheckingDns(true);
-    try {
-      const result = await checkTenantDomainDns(domain);
-      setDnsCheck(result);
-      if (result?.ready_for_tls) {
-        toast.success(result.message || 'DNS έτοιμο');
-      } else {
-        toast(result?.message || 'DNS σε εκκρεμότητα', { icon: 'ℹ️' });
-      }
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία ελέγχου DNS');
-      setDnsCheck({ ready_for_tls: false, message: err.message || 'Αποτυχία' });
-    } finally {
-      setCheckingDns(false);
-    }
-  };
-
-  const runProvisionEdge = async () => {
-    const domain = String(form.custom_domain || '')
-      .trim()
-      .toLowerCase()
-      .replace(/^www\./, '');
-    if (!domain) {
-      toast.error('Αποθήκευσε πρώτα το custom domain');
-      return;
-    }
-    if (dirty) {
-      toast.error('Αποθήκευσε τις αλλαγές πριν το edge sync');
-      return;
-    }
-    setProvisioning(true);
-    try {
-      const result = await provisionTenantDomainEdge(domain);
-      setDnsCheck(result);
-      toast.success(result?.ready_for_tls ? 'Edge sync OK — DNS έτοιμο' : 'Edge sync ολοκληρώθηκε');
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία edge sync');
-    } finally {
-      setProvisioning(false);
     }
   };
 
@@ -342,9 +280,39 @@ export default function BrandingPanel() {
           </SectionCard>
 
           <SectionCard
+            tone="teal"
             icon="public"
-            title="Δικό σας domain"
-            subtitle="Συνδέστε το domain του γραφείου σας (χωρίς www)."
+            title="Δικό σας domain — βήμα βήμα"
+            subtitle="Ίδιο μονοπάτι με Achillio Travel: καταχώρηση → DNS CNAME → έλεγχος → HTTPS."
+          >
+            <div className="cdw-branding-shell">
+              <CustomDomainSetupWizard
+                key={domainWizardKey}
+                compact
+                initialDomain={form.custom_domain}
+                onComplete={async (result) => {
+                  await load();
+                  toast.success(
+                    result?.domain
+                      ? `Domain έτοιμο: www.${result.domain}`
+                      : 'Οδηγός domain ολοκληρώθηκε',
+                  );
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              className="text-xs font-bold text-teal-800 hover:underline"
+              onClick={() => setDomainWizardKey((k) => k + 1)}
+            >
+              Επανεκκίνηση οδηγού domain
+            </button>
+          </SectionCard>
+
+          <SectionCard
+            icon="badge"
+            title="Επωνυμία & checkout"
+            subtitle="Εμφανίζονται στην ιστοσελίδα και στα links πληρωμής."
           >
             <label className="block text-sm">
               <span className="font-bold text-slate-700">Επωνυμία γραφείου</span>
@@ -354,27 +322,6 @@ export default function BrandingPanel() {
                 onChange={(e) => patch({ display_name: e.target.value })}
                 placeholder="π.χ. Achillio Travel"
               />
-            </label>
-
-            <label className="block text-sm">
-              <span className="font-bold text-slate-700">Custom domain</span>
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  className={`${FIELD} mt-0 font-mono`}
-                  placeholder="bookings.myagency.gr"
-                  value={form.custom_domain}
-                  onChange={(e) =>
-                    patch({
-                      custom_domain: e.target.value
-                        .trim()
-                        .toLowerCase()
-                        .replace(/^https?:\/\//, '')
-                        .split('/')[0],
-                    })
-                  }
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">Παράδειγμα: bookings.achillio.gr — όχι www.</p>
             </label>
 
             <label className="block text-sm">
@@ -439,94 +386,6 @@ export default function BrandingPanel() {
                 ) : null}
               </label>
             </div>
-          </SectionCard>
-
-          <SectionCard
-            tone="teal"
-            icon="route"
-            title="Οδηγίες DNS"
-            subtitle={
-              hasCustomDomain
-                ? 'Ίδιο μονοπάτι με Achillio Travel: CNAME το www + προαιρετικό A στο apex. Μετά Αποθήκευση → Έλεγχος DNS.'
-                : 'Συμπλήρωσε custom domain και αποθήκευσε για να εμφανιστεί το CNAME.'
-            }
-          >
-            {hasCustomDomain ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-white border border-teal-100 px-3.5 py-3 font-mono text-xs overflow-x-auto space-y-2">
-                  <p className="text-slate-400"># 1) Υποχρεωτικό — www στο PoreiaGo</p>
-                  <p className="text-slate-800 whitespace-pre">{cnameLine}</p>
-                  <p className="text-slate-400 pt-1"># 2) Προαιρετικό — apex χωρίς www</p>
-                  <p className="text-slate-800 whitespace-pre">{apexLine}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => copyText(cnameLine, 'CNAME αντιγράφηκε')}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3.5 py-2 text-xs font-bold text-teal-900 hover:bg-teal-50"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    Αντιγραφή CNAME
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => copyText(apexLine, 'A record αντιγράφηκε')}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3.5 py-2 text-xs font-bold text-teal-900 hover:bg-teal-50"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    Αντιγραφή A
-                  </button>
-                  <button
-                    type="button"
-                    onClick={runDnsCheck}
-                    disabled={checkingDns}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-900 hover:bg-sky-100 disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">dns</span>
-                    {checkingDns ? 'Έλεγχος…' : 'Έλεγχος DNS'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={runProvisionEdge}
-                    disabled={provisioning || dirty}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">cloud_sync</span>
-                    {provisioning ? 'Sync…' : 'Edge sync'}
-                  </button>
-                </div>
-                {dnsCheck ? (
-                  <div
-                    className={`rounded-2xl border px-3.5 py-3 text-sm ${
-                      dnsCheck.ready_for_tls
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
-                        : 'border-amber-200 bg-amber-50 text-amber-950'
-                    }`}
-                  >
-                    <p className="font-bold">
-                      www {dnsCheck.www_ok ? '✓' : '✗'} · apex {dnsCheck.apex_ok ? '✓' : '✗'}
-                      {dnsCheck.ready_for_tls ? ' · έτοιμο για TLS' : ''}
-                    </p>
-                    {dnsCheck.message ? <p className="mt-1 text-xs leading-relaxed">{dnsCheck.message}</p> : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm text-teal-900/80 rounded-2xl border border-dashed border-teal-200 bg-white/70 px-3.5 py-3">
-                Δεν έχει οριστεί ακόμα custom domain.
-              </p>
-            )}
-
-            {Array.isArray(dns.notes) && dns.notes.length > 0 ? (
-              <ul className="text-xs text-teal-950/90 space-y-1.5">
-                {dns.notes.map((note) => (
-                  <li key={note} className="flex gap-2">
-                    <span className="material-symbols-outlined text-[15px] text-teal-700 shrink-0">info</span>
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
           </SectionCard>
 
           <div className="rounded-[22px] border border-slate-200 bg-slate-50/50 overflow-hidden">

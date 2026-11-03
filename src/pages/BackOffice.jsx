@@ -89,6 +89,7 @@ import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx
 import OfficeSetupWizard, {
   isOfficeSetupComplete,
 } from '../components/admin/OfficeSetupWizard.jsx';
+import DomainSetupNudge from '../components/admin/DomainSetupNudge.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
@@ -869,6 +870,15 @@ export default function BackOffice() {
         <h2 className="dash-apple-title">Επισκόπηση</h2>
         <p className="dash-apple-subtitle">Έσοδα, στόλος και κρατήσεις — με μια ματιά</p>
       </header>
+
+      {!showOfficeSetup ? (
+        <DomainSetupNudge
+          onOpenDomain={() => {
+            setSettingsSubTab('domain');
+            setActiveTab('settings');
+          }}
+        />
+      ) : null}
 
       <div className="dash-apple-kpi-grid">
         <DashboardKpiCard
