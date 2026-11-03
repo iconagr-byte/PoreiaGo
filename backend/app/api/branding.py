@@ -90,20 +90,24 @@ async def check_custom_domain_dns_status(
     domain: str | None = None,
 ):
     """
-    Live DNS check for the office custom domain (Achillio-style path for any office).
+    Live DNS check for THIS office's saved custom domain only.
 
-    Verifies www CNAME → www.poreiago.com (or platform ingress) and optional apex A → VPS IP.
+    Verifies www CNAME → www.poreiago.com and optional apex A → VPS IP.
     """
     from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.domain_security import (
+        assert_domain_owned_by_tenant,
+        enforce_rate_limit,
+        load_tenant_custom_domain,
+    )
 
-    slug = _tenant_slug(payload)
-    target = (domain or "").strip().lower()
-    if not target:
-        try:
-            settings = await TenantBrandingService(db).get_settings(tenant_id, tenant_slug=slug)
-            target = str(settings.get("custom_domain") or "").strip().lower()
-        except Exception:
-            target = ""
+    if not enforce_rate_limit(f"dns:{tenant_id}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many DNS checks")
+    owned = await load_tenant_custom_domain(db, tenant_id)
+    try:
+        target = assert_domain_owned_by_tenant(domain, owned)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     result = check_custom_domain_dns(target)
     return TenantDomainDnsCheckResponse(**result)
 
@@ -116,36 +120,47 @@ async def provision_custom_domain_edge(
     _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
     domain: str | None = None,
 ):
-    """Re-run edge sync (Traefik YAML / nginx apex→www / NPM hosts) + return DNS status."""
+    """
+    Edge sync for THIS office's saved custom domain only.
+
+    Regenerates Traefik/nginx maps from DB, upserts NPM host for the owned domain,
+    never accepts arbitrary third-party domains.
+    """
     from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.domain_security import (
+        assert_domain_owned_by_tenant,
+        enforce_rate_limit,
+        load_tenant_custom_domain,
+        sanitize_edge_status,
+    )
     from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
     from travel_platform.growth.npm_domains import upsert_npm_custom_domain
 
-    slug = _tenant_slug(payload)
-    target = (domain or "").strip().lower()
-    if not target:
-        try:
-            settings = await TenantBrandingService(db).get_settings(tenant_id, tenant_slug=slug)
-            target = str(settings.get("custom_domain") or "").strip().lower()
-        except Exception:
-            target = ""
+    if not enforce_rate_limit(f"prov:{tenant_id}", max_calls=6):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many edge sync requests")
 
-    edge_info: dict = {}
+    owned = await load_tenant_custom_domain(db, tenant_id)
     try:
-        edge_info = await sync_edge_custom_domains_from_db(db)
-    except Exception as exc:
-        logger.warning("Edge provision failed: %s", exc)
-        edge_info = {"error": str(exc)[:200]}
+        target = assert_domain_owned_by_tenant(domain, owned)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    try:
+        # Full map rewrite is required so apex→www stays consistent for all offices,
+        # but the HTTP response never lists other tenants' domains.
+        await sync_edge_custom_domains_from_db(db, provision_npm=False)
+    except Exception:
+        logger.warning("Edge map sync failed for tenant %s", tenant_id, exc_info=True)
 
     npm_one: dict = {}
-    if target:
-        try:
-            npm_one = await upsert_npm_custom_domain(target)
-        except Exception as exc:
-            npm_one = {"error": str(exc)[:200]}
+    try:
+        npm_one = await upsert_npm_custom_domain(target)
+    except Exception:
+        logger.warning("NPM upsert failed for owned domain tenant=%s", tenant_id, exc_info=True)
+        npm_one = {"ok": False, "error": "edge_provision_failed"}
 
     result = check_custom_domain_dns(target)
-    result["edge"] = {"sync": edge_info, "npm": npm_one}
+    result["edge"] = sanitize_edge_status(owned_domain=target, npm_result=npm_one)
     return TenantDomainDnsCheckResponse(**result)
 
 

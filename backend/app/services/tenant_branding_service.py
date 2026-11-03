@@ -193,6 +193,13 @@ class TenantBrandingService:
             normalized = normalize_custom_domain(custom_domain)
             if normalized and not _DOMAIN_RE.match(normalized):
                 raise ValueError("Invalid custom domain format (example: travel.agency.gr)")
+            if normalized:
+                from travel_platform.growth.domain_security import is_valid_public_domain
+
+                if not is_valid_public_domain(normalized):
+                    raise ValueError(
+                        "Αυτό το domain δεν επιτρέπεται (δεσμευμένο για την πλατφόρμα PoreiaGo)"
+                    )
             # Seal: only Achillio Travel may own achilliotravel.com.
             if normalized and _is_achillio_travel_host(normalized) and not is_achillio_travel_office(
                 tenant

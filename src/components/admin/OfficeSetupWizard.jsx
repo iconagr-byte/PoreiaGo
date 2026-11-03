@@ -496,15 +496,14 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Νέο γραφείο</p>
                 <h1 className="office-setup-title">Ας στήσουμε το γραφείο σας σε λίγα λεπτά</h1>
                 <p className="office-setup-subtitle">
-                  Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας ό,τι χρειάζεται για να
-                  λειτουργήσετε — επωνυμία, εμφάνιση, δικό σας domain, email, πληρωμές και πρώτο
-                  όχημα.
+                  Ξεκινάτε αμέσως στο PoreiaGo (subdomain με SSL). Το δικό σας domain το
+                  συνδέετε μετά, από τον οδηγό — χωρίς αλλαγή nameservers.
                 </p>
                 <div className="office-setup-feature-row">
                   <div className="office-setup-feature">
                     <div className="office-setup-feature-icon">1</div>
-                    <strong>Ταυτότητα &amp; domain</strong>
-                    <p>Επωνυμία, εμφάνιση και δικό σας domain (όπως Achillio) με CNAME.</p>
+                    <strong>PoreiaGo πρώτα</strong>
+                    <p>Επωνυμία &amp; εμφάνιση στο subdomain · μετά προαιρετικά το δικό σας domain.</p>
                   </div>
                   <div className="office-setup-feature">
                     <div
@@ -758,9 +757,10 @@ export default function OfficeSetupWizard({
             {STEPS[step].id === 'domain' && (
               <>
                 <p className="office-setup-eyebrow">Ιστοσελίδα</p>
-                <h2 className="office-setup-title">Δικό σας domain σε λίγα βήματα</h2>
+                <h2 className="office-setup-title">Προαιρετικά: δικό σας domain</h2>
                 <p className="office-setup-subtitle">
-                  Ίδιο μονοπάτι με Achillio Travel — CNAME στο www, χωρίς αλλαγή nameservers.
+                  Το γραφείο ήδη λειτουργεί στο PoreiaGo. Αν θέλετε δική σας διεύθυνση (όπως
+                  Achillio), ακολουθήστε τα βήματα — αλλιώς πατήστε Παράλειψη.
                 </p>
                 <div className="office-setup-email-wrap">
                   <CustomDomainSetupWizard

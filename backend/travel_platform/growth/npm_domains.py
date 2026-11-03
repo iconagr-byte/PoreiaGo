@@ -71,11 +71,34 @@ def _xfh_snippet() -> str:
     return DEFAULT_XFH_SNIPPET
 
 
+def _npm_httpx_verify(base_url: str) -> bool:
+    """Verify TLS for HTTPS NPM API; allow plain HTTP only on loopback."""
+    url = (base_url or "").strip().lower()
+    if url.startswith("https://"):
+        return True
+    if url.startswith("http://127.0.0.1") or url.startswith("http://localhost"):
+        return True
+    # Non-loopback HTTP is rejected by caller; default verify on.
+    return True
+
+
+def _npm_base_allowed(base_url: str) -> bool:
+    url = (base_url or "").strip().lower()
+    if not url:
+        return False
+    if url.startswith("https://"):
+        return True
+    return url.startswith("http://127.0.0.1") or url.startswith("http://localhost")
+
+
 class NpmClient:
     def __init__(self, base_url: str | None = None, timeout: float = 12.0) -> None:
         self.base = (base_url or os.getenv("NPM_API_URL") or "").rstrip("/")
+        if not _npm_base_allowed(self.base):
+            raise RuntimeError("NPM_API_URL must be https://… or http://127.0.0.1 / localhost")
         self.timeout = timeout
         self._token: str | None = (os.getenv("NPM_TOKEN") or "").strip() or None
+        self._verify = _npm_httpx_verify(self.base)
 
     async def _ensure_token(self, client: httpx.AsyncClient) -> str:
         if self._token:
@@ -122,7 +145,7 @@ class NpmClient:
         forward_host, forward_port = _frontend_upstream()
         snippet = _xfh_snippet()
 
-        async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, verify=self._verify) as client:
             token = await self._ensure_token(client)
             hosts = await self.list_proxy_hosts(client, token)
             existing = None
@@ -172,7 +195,7 @@ class NpmClient:
                 )
             if res.status_code >= 400:
                 logger.warning("NPM proxy upsert failed for %s: %s %s", www, res.status_code, res.text[:300])
-                return {"ok": False, "error": f"proxy_{res.status_code}", "detail": res.text[:300]}
+                return {"ok": False, "error": f"proxy_{res.status_code}"}
             proxy = res.json()
 
             # Apex → www redirection host (same as Achillio SERP fix).

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from typing import Annotated
 
-from app.core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_deps import require_superadmin
+from app.core.database import get_db
 from olympus.tenant.domain_resolver import DomainResolver
 
 router = APIRouter(prefix="/tls", tags=["platform-tls"])
@@ -37,7 +39,7 @@ async def validate_domain_for_tls(
     session: AsyncSession = Depends(get_db),
 ):
     """
-    Traefik onDemand TLS ask endpoint.
+    Traefik onDemand TLS ask endpoint (must stay public).
     Returns 200 with allowed=true only if domain is mapped in tenants.custom_domain.
     """
     resolver = DomainResolver(session)
@@ -47,18 +49,26 @@ async def validate_domain_for_tls(
 
 @router.get("/dns-check", response_model=TlsDnsCheckResponse)
 async def dns_check_custom_domain(
-    domain: str = Query(..., min_length=3),
+    domain: str = Query(..., min_length=3, max_length=255),
     session: AsyncSession = Depends(get_db),
+    _: Annotated[None, Depends(require_superadmin)],
 ):
     """
-    Registry + live DNS (www CNAME / apex A) — SuperAdmin «Έλεγχος DNS».
-    Same automation path as Achillio Travel for any office domain.
+    Registry + live DNS — SuperAdmin only (not a public DNS oracle).
+    Traefik continues to use /validate-domain without auth.
     """
     from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.domain_security import enforce_rate_limit, is_valid_public_domain, normalize_apex
+
+    apex = normalize_apex(domain)
+    if not apex or not is_valid_public_domain(apex):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid domain")
+    if not enforce_rate_limit(f"sa-dns:{apex}", max_calls=30):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many DNS checks")
 
     resolver = DomainResolver(session)
-    allowed = await resolver.is_custom_domain_allowed(domain)
-    dns = check_custom_domain_dns(domain)
+    allowed = await resolver.is_custom_domain_allowed(apex)
+    dns = check_custom_domain_dns(apex)
     msg = dns.get("message") or ""
     if not allowed:
         msg = "Δεν είναι στο registry. Αποθήκευσε το domain και ξαναέλεγξε. " + msg
@@ -66,7 +76,7 @@ async def dns_check_custom_domain(
         msg = "Registry OK + DNS www έτοιμο για TLS. " + msg
     return TlsDnsCheckResponse(
         allowed=allowed,
-        domain=dns.get("domain") or domain,
+        domain=dns.get("domain") or apex,
         www_ok=bool(dns.get("www_ok")),
         apex_ok=bool(dns.get("apex_ok")),
         ready_for_tls=bool(dns.get("ready_for_tls")),

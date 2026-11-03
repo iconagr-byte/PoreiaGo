@@ -89,7 +89,7 @@ import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx
 import OfficeSetupWizard, {
   isOfficeSetupComplete,
 } from '../components/admin/OfficeSetupWizard.jsx';
-import DomainSetupNudge from '../components/admin/DomainSetupNudge.jsx';
+import OfficeSetupChecklist from '../components/admin/OfficeSetupChecklist.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
@@ -794,6 +794,26 @@ export default function BackOffice() {
             </p>
           </header>
 
+          {!showOfficeSetup ? (
+            <OfficeSetupChecklist
+              rentEnabled
+              fleetCount={Array.isArray(fleetVehicles) ? fleetVehicles.length : 0}
+              onOpenDomain={() => {
+                setSettingsSubTab('domain');
+                setActiveTab('settings');
+              }}
+              onOpenPayments={() => {
+                setSettingsSubTab('payments');
+                setActiveTab('settings');
+              }}
+              onOpenAppearance={() => {
+                setSettingsSubTab('domain');
+                setActiveTab('settings');
+              }}
+              onOpenFleet={() => setActiveTab('fleet_rental')}
+            />
+          ) : null}
+
           <div className="dash-apple-kpi-grid">
             <DashboardKpiCard
               label="Οχήματα"
@@ -872,11 +892,22 @@ export default function BackOffice() {
       </header>
 
       {!showOfficeSetup ? (
-        <DomainSetupNudge
+        <OfficeSetupChecklist
+          rentEnabled={false}
+          fleetCount={Array.isArray(fleetVehicles) ? fleetVehicles.length : 0}
           onOpenDomain={() => {
             setSettingsSubTab('domain');
             setActiveTab('settings');
           }}
+          onOpenPayments={() => {
+            setSettingsSubTab('payments');
+            setActiveTab('settings');
+          }}
+          onOpenAppearance={() => {
+            setSettingsSubTab('domain');
+            setActiveTab('settings');
+          }}
+          onOpenFleet={() => setActiveTab('fleet')}
         />
       ) : null}
 

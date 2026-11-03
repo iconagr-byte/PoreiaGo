@@ -217,11 +217,11 @@ export default function CustomDomainSetupWizard({
         <div className="cdw-pane">
           <h3 className="cdw-title">Συνδέστε το δικό σας domain</h3>
           <p className="cdw-copy">
-            Όπως το Achillio Travel με <strong>achilliotravel.com</strong> — χωρίς αλλαγή nameservers.
-            Αρκεί ένα CNAME στο DNS του παρόχου σας.
+            Το γραφείο δουλεύει ήδη στο PoreiaGo. Προαιρετικά, όπως το Achillio Travel με{' '}
+            <strong>achilliotravel.com</strong> — χωρίς αλλαγή nameservers. Αρκεί ένα CNAME.
           </p>
           <ol className="cdw-list">
-            <li>Καταχωρείτε το domain στο PoreiaGo</li>
+            <li>Καταχωρείτε το domain στο Control Panel</li>
             <li>Βάζετε CNAME: <code>www</code> → <code>www.poreiago.com</code></li>
             <li>Ελέγχουμε το DNS και ενεργοποιούμε HTTPS</li>
           </ol>

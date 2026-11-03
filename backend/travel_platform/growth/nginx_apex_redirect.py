@@ -101,8 +101,10 @@ def _maybe_reload_frontend_nginx() -> None:
     import shutil
     import subprocess
 
-    marker = (os.getenv("NGINX_RELOAD_AFTER_MAP") or "1").strip().lower()
-    if marker in {"0", "false", "no", "off"}:
+    # Off by default — Contabo deploy/repair scripts reload nginx explicitly.
+    # Avoid tenant-triggered docker reload storms from provision-edge.
+    marker = (os.getenv("NGINX_RELOAD_AFTER_MAP") or "0").strip().lower()
+    if marker not in {"1", "true", "yes", "on"}:
         return
     fe_name = (os.getenv("FRONTEND_CONTAINER") or "").strip()
     map_src = nginx_map_path()
