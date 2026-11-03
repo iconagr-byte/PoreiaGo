@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PlatformBrand from './PlatformBrand.jsx';
 import '../../styles/platform-marketing-header.css';
@@ -37,31 +37,11 @@ const BUS_LINKS = [
 ];
 
 /**
- * PoreiaGo marketing homepage header — buses vs rent clearly separated.
+ * PoreiaGo marketing homepage header — slim chrome.
+ * Λεωφορεία / Ενοικιάσεις live below the hero (service hub), not in the top bar.
  */
 export default function PlatformMarketingHeader() {
-  const [busOpen, setBusOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const busMenuId = useId();
-  const busWrapRef = useRef(null);
-
-  useEffect(() => {
-    if (!busOpen) return undefined;
-    const onDoc = (e) => {
-      if (busWrapRef.current && !busWrapRef.current.contains(e.target)) {
-        setBusOpen(false);
-      }
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') setBusOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [busOpen]);
 
   useEffect(() => {
     if (!mobileOpen) return undefined;
@@ -78,7 +58,6 @@ export default function PlatformMarketingHeader() {
   }, [mobileOpen]);
 
   const closeAll = () => {
-    setBusOpen(false);
     setMobileOpen(false);
   };
 
@@ -87,58 +66,13 @@ export default function PlatformMarketingHeader() {
       <div className="pm-header-inner">
         <PlatformBrand variant="dark" />
 
-        <nav className="pm-nav" aria-label="Κύριο μενού">
-          <div className="pm-nav-cluster pm-nav-cluster--bus" ref={busWrapRef}>
-            <button
-              type="button"
-              className={`pm-nav-trigger${busOpen ? ' is-open' : ''}`}
-              aria-expanded={busOpen}
-              aria-controls={busMenuId}
-              aria-haspopup="menu"
-              onClick={() => setBusOpen((o) => !o)}
-            >
-              <span className="material-symbols-outlined pm-nav-trigger-icon" aria-hidden>
-                directions_bus
-              </span>
-              <span>Λεωφορεία</span>
-              <span className="material-symbols-outlined pm-nav-chevron" aria-hidden>
-                expand_more
-              </span>
-            </button>
-            {busOpen ? (
-              <div id={busMenuId} className="pm-nav-dropdown" role="menu">
-                <p className="pm-nav-dropdown-kicker">Υπηρεσίες λεωφορείου</p>
-                {BUS_LINKS.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    role="menuitem"
-                    className="pm-nav-dropdown-item"
-                    onClick={closeAll}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <span className="pm-nav-dropdown-copy">
-                      <strong>{item.label}</strong>
-                      <span>{item.hint}</span>
-                    </span>
-                  </a>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <span className="pm-nav-rule" aria-hidden />
-
-          <div className="pm-nav-cluster pm-nav-cluster--rent">
-            <Link to="/rent" className="pm-nav-rent" onClick={closeAll}>
-              <span className="material-symbols-outlined" aria-hidden>
-                car_rental
-              </span>
-              Ενοικιάσεις
-            </Link>
-          </div>
+        <nav className="pm-nav pm-nav--slim" aria-label="Κύριο μενού">
+          <a href="#how-poreiago-works" className="pm-nav-quiet" onClick={closeAll}>
+            Πώς δουλεύει
+          </a>
+          <a href="#choose-service" className="pm-nav-quiet" onClick={closeAll}>
+            Υπηρεσίες
+          </a>
         </nav>
 
         <div className="pm-header-actions">
@@ -169,6 +103,33 @@ export default function PlatformMarketingHeader() {
       {mobileOpen ? (
         <div id="pm-mobile-panel" className="pm-mobile">
           <nav className="pm-mobile-nav" aria-label="Μενού κινητού">
+            <section className="pm-mobile-section">
+              <p className="pm-mobile-label">
+                <span className="material-symbols-outlined" aria-hidden>
+                  info
+                </span>
+                Ξεκινήστε εδώ
+              </p>
+              <a href="#how-poreiago-works" className="pm-mobile-link" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  route
+                </span>
+                <span>
+                  <strong>Πώς δουλεύει</strong>
+                  <em>Τρία βήματα · καθαρή ροή</em>
+                </span>
+              </a>
+              <a href="#choose-service" className="pm-mobile-link" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  door_open
+                </span>
+                <span>
+                  <strong>Διαλέξτε υπηρεσία</strong>
+                  <em>Λεωφορεία ή Ενοικιάσεις</em>
+                </span>
+              </a>
+            </section>
+
             <section className="pm-mobile-section">
               <p className="pm-mobile-label">
                 <span className="material-symbols-outlined" aria-hidden>

@@ -1,4 +1,4 @@
-/* PoreiaGo homepage service hub — brand + two doors */
+/* PoreiaGo homepage — hero hook, how-it-works flow, then service doors */
 
 .pg-hub {
   --pg-hub-sky: #38bdf8;
@@ -57,17 +57,17 @@
   width: 100%;
   max-width: 72rem;
   margin: 0 auto;
-  padding: 7.5rem 1rem 4.5rem;
+  padding: 7.5rem 1rem 5.5rem;
 }
 
 @media (min-width: 768px) {
   .pg-hub-inner {
-    padding: 8.5rem 2rem 5.5rem;
+    padding: 8.5rem 2rem 6rem;
   }
 }
 
 .pg-hub-copy {
-  max-width: 36rem;
+  max-width: 38rem;
 }
 
 .pg-hub-brand {
@@ -90,7 +90,7 @@
 
 .pg-hub-headline {
   margin: 0 0 0.85rem;
-  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  font-size: clamp(1.4rem, 3.4vw, 2rem);
   font-weight: 650;
   letter-spacing: -0.025em;
   line-height: 1.2;
@@ -98,28 +98,279 @@
   animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
 }
 
+.pg-hub-headline-accent {
+  color: #fff;
+  font-weight: 750;
+}
+
 .pg-hub-support {
   margin: 0 0 2rem;
-  max-width: 30rem;
+  max-width: 32rem;
   font-size: clamp(1rem, 2.2vw, 1.125rem);
   line-height: 1.55;
   color: var(--pg-hub-muted);
   animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
 }
 
+.pg-hub-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.26s both;
+}
+
+.pg-hub-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 3rem;
+  padding: 0.7rem 1.35rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.pg-hub-cta-primary .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.pg-hub-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.pg-hub-cta-primary:focus-visible {
+  outline: 2px solid var(--pg-hub-sky);
+  outline-offset: 3px;
+}
+
+.pg-hub-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: 0.7rem 1.1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.pg-hub-cta-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.pg-hub-cta-secondary:focus-visible {
+  outline: 2px solid var(--pg-hub-sky);
+  outline-offset: 3px;
+}
+
+.pg-hub-scroll {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 1.35rem;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  animation: pgHubBounce 1.8s ease-in-out infinite;
+}
+
+.pg-hub-scroll .material-symbols-outlined {
+  font-size: 1.75rem;
+}
+
+.pg-hub-scroll:hover {
+  color: #fff;
+}
+
+.pg-hub-scroll:focus-visible {
+  outline: 2px solid var(--pg-hub-sky);
+  outline-offset: 3px;
+}
+
+/* —— How it works + service chooser —— */
+
+.pg-hub-flow {
+  position: relative;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(14, 165, 233, 0.12), transparent 55%),
+    linear-gradient(180deg, #020617 0%, #0b1224 48%, #020617 100%);
+  color: #f8fafc;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica,
+    sans-serif;
+  scroll-margin-top: 5rem;
+}
+
+.pg-hub-flow-inner {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4rem 1rem 4.5rem;
+}
+
+@media (min-width: 768px) {
+  .pg-hub-flow-inner {
+    padding: 5rem 2rem 5.5rem;
+  }
+}
+
+.pg-hub-flow-intro {
+  max-width: 36rem;
+  margin: 0 0 2.5rem;
+}
+
+.pg-hub-flow-kicker {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+
+.pg-hub-flow-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.pg-hub-flow-steps {
+  list-style: none;
+  margin: 0 0 3.25rem;
+  padding: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 900px) {
+  .pg-hub-flow-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+.pg-hub-flow-step {
+  position: relative;
+  padding: 0;
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pg-hub-flow-step:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.pg-hub-flow-step:nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+.pg-hub-flow-num {
+  display: block;
+  margin-bottom: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  color: rgba(125, 211, 252, 0.85);
+}
+
+.pg-hub-flow-rail {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .pg-hub-flow-rail {
+    display: block;
+    position: absolute;
+    top: 0.55rem;
+    left: 2.6rem;
+    right: -0.85rem;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.45), rgba(45, 212, 191, 0.15));
+  }
+}
+
+.pg-hub-flow-step strong {
+  display: block;
+  margin: 0 0 0.45rem;
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.pg-hub-flow-step p {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.pg-hub-choose {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  scroll-margin-top: 5.5rem;
+}
+
+.pg-hub-choose-title {
+  margin: 0 0 0.55rem;
+  font-size: clamp(1.45rem, 3vw, 1.95rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.pg-hub-choose-support {
+  margin: 0 0 1.75rem;
+  max-width: 34rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.7);
+}
+
 .pg-hub-doors {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+  gap: 0.85rem;
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
 
 .pg-hub-door {
   display: inline-flex;
   align-items: center;
   gap: 0.85rem;
-  min-height: 3.75rem;
-  padding: 0.85rem 1.35rem 0.85rem 1.1rem;
+  min-height: 3.85rem;
+  padding: 0.9rem 1.4rem 0.9rem 1.1rem;
   border-radius: 999px;
   text-decoration: none;
   transition:
@@ -225,16 +476,47 @@
   }
 }
 
+@keyframes pgHubBounce {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(6px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pg-hub-brand,
   .pg-hub-headline,
   .pg-hub-support,
+  .pg-hub-cta,
   .pg-hub-doors,
-  .pg-hub-media img {
+  .pg-hub-flow-step,
+  .pg-hub-media img,
+  .pg-hub-scroll {
     animation: none !important;
   }
 
-  .pg-hub-door:hover {
+  .pg-hub-door:hover,
+  .pg-hub-cta-primary:hover {
     transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .pg-hub-door {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .pg-hub-door-arrow {
+    margin-left: auto;
+  }
+
+  .pg-hub-cta-primary,
+  .pg-hub-cta-secondary {
+    width: 100%;
+    justify-content: center;
   }
 }

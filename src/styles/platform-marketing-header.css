@@ -46,6 +46,29 @@
   }
 }
 
+.pm-nav--slim {
+  gap: 1.35rem;
+}
+
+.pm-nav-quiet {
+  color: var(--pm-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.pm-nav-quiet:hover {
+  color: #fff;
+}
+
+.pm-nav-quiet:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+  border-radius: 0.35rem;
+}
+
 .pm-nav-cluster {
   position: relative;
   display: flex;
