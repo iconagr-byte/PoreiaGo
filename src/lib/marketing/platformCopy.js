@@ -46,19 +46,16 @@ export const SERVICE_HUB = {
   flow: [
     {
       step: '01',
-      visual: 'office',
       title: 'Ανοίγετε το γραφείο',
       body: 'Συμβόλαιο, brand και πίνακας στο PoreiaGo — έτοιμο σε λίγα λεπτά, με το όνομά σας.',
     },
     {
       step: '02',
-      visual: 'book',
       title: 'Ο πελάτης κλείνει online',
       body: 'Εκδρομή ή ενοικίαση στο site σας. QR εισιτήριο ή ψηφιακό συμβόλαιο στο κινητό.',
     },
     {
       step: '03',
-      visual: 'run',
       title: 'Εσείς τρέχετε την ημέρα',
       body: 'Πληρότητα, στόλος, ζωντανό GPS και check-in — όλα από ένα σημείο.',
     },
