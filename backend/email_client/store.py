@@ -202,7 +202,7 @@ async def upsert_message(data: dict) -> tuple[dict | None, bool]:
         # Durable trash: IMAP sync of INBOX/Sent/Spam must not resurrect
         # messages the user already moved to Κάδος (local or IMAP).
         cur = await db.execute(
-            "SELECT folder FROM email_messages WHERE id = ?",
+            "SELECT folder, is_read FROM email_messages WHERE id = ?",
             (eid,),
         )
         prev = await cur.fetchone()
@@ -211,6 +211,12 @@ async def upsert_message(data: dict) -> tuple[dict | None, bool]:
             folder = FOLDER_TRASH
         else:
             folder = incoming_folder
+        # Durable read: opening mail in PoreiaGo sets is_read locally. IMAP poll
+        # every few seconds must not clobber that with a still-unread \\Seen flag
+        # (blue unread dots kept coming back on every sync).
+        incoming_read = bool(data.get("is_read"))
+        prev_read = bool(prev["is_read"]) if prev is not None else False
+        is_read = 1 if (prev_read or incoming_read) else 0
         await db.execute(
             """
             UPDATE email_messages
@@ -226,7 +232,7 @@ async def upsert_message(data: dict) -> tuple[dict | None, bool]:
                 data.get("body_html", ""),
                 data.get("body_text"),
                 folder,
-                1 if data.get("is_read") else 0,
+                is_read,
                 data.get("date") or now,
                 data.get("imap_uid"),
                 sid,

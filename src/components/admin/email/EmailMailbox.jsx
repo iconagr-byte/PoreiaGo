@@ -258,15 +258,31 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   }, [emailSettingsId, runSync]);
 
   const selectMessage = async (id) => {
+    const wasUnread = Boolean(messages.find((m) => m.id === id && !m.is_read));
     setSelectedId(id);
     setReplyOpen(false);
+    // Optimistic: clear the blue unread dot immediately (IMAP poll used to revive it).
+    if (wasUnread) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
+      setFolders((prev) =>
+        prev.map((f) =>
+          f.name === activeFolder && f.unread > 0
+            ? { ...f, unread: Math.max(0, (f.unread || 0) - 1) }
+            : f,
+        ),
+      );
+    }
     try {
       const msg = await fetchMailboxMessage(id);
       setDetail(msg);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
       const cust = await fetchMessageCustomer(id);
       setCustomer(cust);
       loadFolders();
-      loadMessages();
     } catch (err) {
       mailboxToastError(err.message);
     }
