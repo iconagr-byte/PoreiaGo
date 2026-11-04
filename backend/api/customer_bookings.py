@@ -226,6 +226,23 @@ async def get_my_booking(
     return booking
 
 
+def _wallet_owns_booking(booking_row, *, email: str, cached: dict | None = None) -> bool:
+    """Customer may delete bookings they own or claimed into My Wallet."""
+    key = str(email or "").strip().lower()
+    if not key:
+        return False
+    owner = str(getattr(booking_row, "passenger_email", None) or "").strip().lower()
+    meta = dict(getattr(booking_row, "metadata_json", None) or {})
+    wallet_email = str(meta.get("wallet_customer_email") or "").strip().lower()
+    if owner == key or wallet_email == key:
+        return True
+    # Desk booking with empty passenger_email but wallet-sealed cache row.
+    if not owner:
+        cached_email = str((cached or {}).get("email") or "").strip().lower()
+        return cached_email == key
+    return False
+
+
 @router.delete("/api/customer/bookings/{booking_id}")
 async def delete_my_booking(
     booking_id: str,
@@ -240,7 +257,11 @@ async def delete_my_booking(
     import logging
     from uuid import UUID
 
-    from ticketing.customer_bookings import delete_booking_by_aliases, delete_booking_for_customer
+    from ticketing.customer_bookings import (
+        delete_booking_by_aliases,
+        delete_booking_for_customer,
+        find_booking_by_aliases,
+    )
     from ticketing.wallet_booking_reconcile import purge_wallet_booking_aliases
 
     log = logging.getLogger(__name__)
@@ -250,18 +271,32 @@ async def delete_my_booking(
     if not key or not email:
         raise HTTPException(status_code=400, detail="Missing booking id")
 
-    cached = await get_booking(key, tenant_id=tid)
+    # SQLite PK is B-… while clients often send saasBookingId (UUID).
+    cached = await find_booking_by_aliases([key], email=email, tenant_id=tid)
     if cached and str(cached.get("email", "")).lower() != email:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    aliases = {
+    from api.admin_booking_mapper import booking_id_aliases, local_id_from_reference
+
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for raw in (
         key,
-        str((cached or {}).get("id") or "").strip(),
-        str((cached or {}).get("saasBookingId") or "").strip(),
-        str((cached or {}).get("pnr") or "").strip(),
-        str((cached or {}).get("ticketRef") or "").strip(),
-    }
-    aliases = [a for a in aliases if a]
+        (cached or {}).get("id"),
+        (cached or {}).get("saasBookingId"),
+        (cached or {}).get("pnr"),
+        (cached or {}).get("ticketRef"),
+        (cached or {}).get("reference_code"),
+    ):
+        text = str(raw or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        aliases.append(text)
+        for extra in booking_id_aliases(text):
+            if extra and extra not in seen:
+                seen.add(extra)
+                aliases.append(extra)
 
     deleted_pg = False
     trip_title = str((cached or {}).get("tripTitle") or (cached or {}).get("trip_title") or "Εκδρομή")
@@ -276,10 +311,11 @@ async def delete_my_booking(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid office seal") from exc
 
+    pg_error: Exception | None = None
     try:
         from sqlalchemy import text
 
-        from api.admin_booking_mapper import booking_to_admin_dict, local_id_from_reference
+        from api.admin_booking_mapper import booking_to_admin_dict
         from api.admin_bookings_router import (
             _find_booking,
             _hard_delete_booking,
@@ -287,6 +323,7 @@ async def delete_my_booking(
         )
         from app.core.auth_deps import apply_tenant_rls
         from app.core.database import AsyncSessionLocal
+        from ticketing.wallet_booking_reconcile import fetch_postgres_wallet_bookings
 
         async with AsyncSessionLocal() as db:
             await apply_tenant_rls(db, tenant_uuid)
@@ -295,9 +332,31 @@ async def delete_my_booking(
                 booking = await _find_booking(db, tenant_uuid, alias)
                 if booking:
                     break
+            # Fallback: scan this customer's Postgres rows (desk claim / email variants).
+            if booking is None:
+                pg_ok, pg_items = await fetch_postgres_wallet_bookings(
+                    email=email, tenant_id=str(tid)
+                )
+                if pg_ok and pg_items:
+                    alias_set = {a for a in aliases} | {a.upper() for a in aliases} | {
+                        a.lower() for a in aliases
+                    }
+                    for item in pg_items:
+                        candidates = {
+                            str(item.get("id") or ""),
+                            str(item.get("saasBookingId") or ""),
+                            str(item.get("pnr") or ""),
+                            str(item.get("ticketRef") or ""),
+                        }
+                        if candidates & alias_set:
+                            saas = str(item.get("saasBookingId") or item.get("id") or "")
+                            if saas:
+                                booking = await _find_booking(db, tenant_uuid, saas)
+                            if booking:
+                                break
+
             if booking:
-                owner = str(booking.passenger_email or "").strip().lower()
-                if owner and owner != email:
+                if not _wallet_owns_booking(booking, email=email, cached=cached):
                     raise HTTPException(
                         status_code=403,
                         detail="Η κράτηση ανήκει σε άλλο λογαριασμό",
@@ -316,14 +375,11 @@ async def delete_my_booking(
                     if reference_code
                     else booking_id_pg
                 )
-                aliases = list(
-                    {
-                        *aliases,
-                        booking_id_pg,
-                        reference_code,
-                        local_id,
-                    }
-                )
+                for extra in (booking_id_pg, reference_code, local_id):
+                    text_extra = str(extra or "").strip()
+                    if text_extra and text_extra not in seen:
+                        seen.add(text_extra)
+                        aliases.append(text_extra)
                 try:
                     await _hard_delete_booking(db, booking, tenant_uuid)
                     await db.commit()
@@ -353,6 +409,7 @@ async def delete_my_booking(
     except HTTPException:
         raise
     except Exception as exc:
+        pg_error = exc
         log.warning("wallet delete postgres failed: %s", exc, exc_info=True)
 
     # Always drop sealed wallet cache (and any alias rows).
@@ -376,6 +433,47 @@ async def delete_my_booking(
     if not deleted_pg and not cached:
         # Nothing found — still 404 so clients can clear local dismissals.
         raise HTTPException(status_code=404, detail="Booking not found")
+
+    if not deleted_pg and pg_error is not None:
+        # Do not pretend success — reconcile would resurrect the Postgres row.
+        raise HTTPException(
+            status_code=503,
+            detail="Αποτυχία διαγραφής κράτησης από το γραφείο — δοκιμάστε ξανά",
+        ) from pg_error
+
+    if not deleted_pg and cached:
+        # Cache-only hit but Postgres still has a matching customer booking —
+        # refuse success so the 20s wallet poll cannot bring it back.
+        try:
+            from ticketing.wallet_booking_reconcile import fetch_postgres_wallet_bookings
+
+            pg_ok, pg_items = await fetch_postgres_wallet_bookings(
+                email=email, tenant_id=str(tid)
+            )
+            if pg_ok:
+                alias_set = {a for a in aliases} | {a.upper() for a in aliases} | {
+                    a.lower() for a in aliases
+                }
+                still_there = False
+                for item in pg_items:
+                    candidates = {
+                        str(item.get("id") or ""),
+                        str(item.get("saasBookingId") or ""),
+                        str(item.get("pnr") or ""),
+                        str(item.get("ticketRef") or ""),
+                    }
+                    if candidates & alias_set:
+                        still_there = True
+                        break
+                if still_there:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Η κράτηση υπάρχει ακόμα στο γραφείο — δοκιμάστε ξανά",
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            log.debug("post-delete postgres verify skipped", exc_info=True)
 
     # Office bell — desktop polling / WS picks this up without hard refresh.
     try:
