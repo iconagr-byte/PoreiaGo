@@ -206,7 +206,14 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   const finishDriverLogin = () => {
     try {
+      // Clears customer JWT / userRole — restore driver role after (saveDriverSession
+      // may have set it earlier, then parallel customer auth left a customer token).
       logoutCustomer();
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem('userRole', 'driver');
     } catch {
       /* ignore */
     }

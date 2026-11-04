@@ -1,9 +1,13 @@
 /**
  * Single login form → detect account role and home path.
  *
- * Tries customer + driver in parallel. Driver wins when both succeed and the
- * last native role was driver; otherwise customer wallet/rent. Multi-host
- * driver login (Achillio + PoreiaGo) lives in driverPortalApi.loginDriver.
+ * Tries customer + driver in parallel. When both succeed:
+ *   - remembered wallet/rent → customer surface (explicit last customer use)
+ *   - otherwise → driver command center (ops / native phone default)
+ *
+ * This avoids Achillio drivers who also have a wallet account being stuck in
+ * My Wallet forever (old default preferred customer and wiped the driver JWT).
+ * Multi-host driver login (Achillio + PoreiaGo) lives in driverPortalApi.loginDriver.
  */
 
 import { loginCustomer } from '../../services/customerAuthApi.js';
@@ -154,11 +158,15 @@ export async function attemptUnifiedLogin(email, password, hints = {}) {
   const driver = settled[1];
 
   if (customer.ok && driver.ok) {
-    // Same credentials work for both — honor last driver session if remembered.
-    if (getRememberedNativeRoleHome() === NATIVE_ROLE_DRIVER) {
-      return driver.value;
+    // Same email works as customer AND driver (common for office ops accounts).
+    // Prefer the last *customer* surface only when the user clearly used Wallet/Rent;
+    // otherwise open the driver command center so native phone login is not stuck
+    // in My Wallet after the customer path clears the driver JWT.
+    const remembered = getRememberedNativeRoleHome();
+    if (remembered === NATIVE_ROLE_WALLET || remembered === NATIVE_ROLE_RENT) {
+      return customer.value;
     }
-    return customer.value;
+    return driver.value;
   }
   if (driver.ok) return driver.value;
   if (customer.ok) return customer.value;
