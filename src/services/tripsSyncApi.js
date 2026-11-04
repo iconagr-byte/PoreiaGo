@@ -120,8 +120,10 @@ export async function fetchOfficeTripCatalog() {
 export async function hydrateTripsFromServer() {
   const { mergeServerTripsIntoStore } = await import('../lib/trips/tripStore.js');
   let rows = [];
+  let catalogOk = false;
   try {
     rows = await fetchOfficeTripCatalog();
+    catalogOk = Array.isArray(rows);
   } catch (err) {
     console.warn('[trips-sync] admin catalog fetch failed', err);
     rows = [];
@@ -157,7 +159,8 @@ export async function hydrateTripsFromServer() {
     console.warn('[trips-sync] public catalog merge failed', err);
   }
 
-  return mergeServerTripsIntoStore(rows);
+  // Only prune when the durable office catalog loaded — never wipe on network failure.
+  return mergeServerTripsIntoStore(rows, { pruneMissing: catalogOk });
 }
 
 export async function syncAllLocalTrips() {

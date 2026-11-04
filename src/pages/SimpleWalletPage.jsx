@@ -28,6 +28,8 @@ import {
   dismissWalletPass,
   loadDismissedWalletPassIds,
 } from '../lib/wallet/walletPassLifecycle.js';
+import { deleteMyBookingOnServer } from '../services/customerBookingsApi.js';
+import { notifyBookingsChanged } from '../lib/ticketing/bookingSyncEvents.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import {
   expandWalletTickets,
@@ -537,14 +539,36 @@ function WalletAuthenticatedApp() {
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   };
 
-  /** Apple Wallet «Remove Pass» — hide on this device only (does not cancel office booking). */
+  /**
+   * Delete ticket everywhere — Postgres office booking + this Wallet.
+   * Desktop «Κρατήσεις ανά Ταξίδι» drops it on the next live sync.
+   */
   const handleRemovePass = useCallback(
-    (booking) => {
+    async (booking) => {
       if (!booking) return;
       const aliases = [booking.id, booking.saasBookingId, booking.pnr].filter(Boolean);
       if (!aliases.length) return;
+      const deleteKey = booking.saasBookingId || booking.pnr || booking.id;
+      try {
+        await deleteMyBookingOnServer(deleteKey);
+      } catch (err) {
+        // 404 = already gone on server — still clear local Wallet.
+        if (!/404|not found|δεν βρέθηκε/i.test(String(err?.message || ''))) {
+          throw err;
+        }
+      }
       const next = dismissWalletPass(aliases);
       setDismissedPassIds(next);
+      setBookings((prev) =>
+        prev.filter((b) => {
+          const keys = [b.id, b.saasBookingId, b.pnr].filter(Boolean).map(String);
+          return !aliases.map(String).some((a) => keys.includes(a));
+        }),
+      );
+      notifyBookingsChanged({
+        reason: 'wallet-delete',
+        bookingId: booking.id,
+      });
       const snap = loadLastPass();
       const snapId = snap?.booking?.id;
       if (

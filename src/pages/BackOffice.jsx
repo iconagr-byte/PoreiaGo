@@ -15,6 +15,8 @@ import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRental
 import { loadBookings, cancelBooking, deleteBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
+import { subscribeOfficeCatalogSync } from '../lib/ticketing/bookingSyncEvents.js';
+import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 import { ensureDriverSession } from '../services/ticketingApi.js';
 import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
@@ -435,6 +437,61 @@ export default function BackOffice() {
       cancelled = true;
     };
   }, [activeTab, location.key]);
+
+  // Live sync: wallet/native/other-PC deletes appear here without hard refresh.
+  useEffect(() => {
+    if (activeTab !== 'bookings' && activeTab !== 'dashboard' && activeTab !== 'trips') {
+      return undefined;
+    }
+    let cancelled = false;
+    let busy = false;
+    const softReloadBookings = async () => {
+      if (cancelled || busy) return;
+      busy = true;
+      try {
+        const merged = await loadMergedBookings();
+        if (!cancelled) setBookings(merged);
+      } catch {
+        /* keep last good list */
+      } finally {
+        busy = false;
+      }
+    };
+    const softReloadTrips = async () => {
+      if (cancelled) return;
+      try {
+        const result = await hydrateTripsFromServer();
+        if (!cancelled && result?.trips) setTrips(result.trips);
+        else if (!cancelled) setTrips(loadTrips());
+      } catch {
+        if (!cancelled) setTrips(loadTrips());
+      }
+    };
+    const unsub = subscribeOfficeCatalogSync({
+      onBookings: () => {
+        void softReloadBookings();
+      },
+      onTrips: () => {
+        void softReloadTrips();
+      },
+    });
+    // Poll while the office list is open (wallet delete → desktop within ~2s).
+    const pollMs = Math.max(2000, LIVE_REFRESH_MS * 2);
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (activeTab === 'bookings' || activeTab === 'dashboard') {
+        void softReloadBookings();
+      }
+      if (activeTab === 'bookings' || activeTab === 'trips' || activeTab === 'dashboard') {
+        void softReloadTrips();
+      }
+    }, pollMs);
+    return () => {
+      cancelled = true;
+      unsub();
+      window.clearInterval(pollId);
+    };
+  }, [activeTab]);
 
   // Πελατολόγιο: hydrate buses vs rent CRM separately (never mix lists).
   useEffect(() => {
@@ -1972,7 +2029,12 @@ export default function BackOffice() {
             type="button"
             onClick={() => {
               setBookingsLoading(true);
-              setTrips(loadTrips());
+              void hydrateTripsFromServer()
+                .then((result) => {
+                  if (result?.trips) setTrips(result.trips);
+                  else setTrips(loadTrips());
+                })
+                .catch(() => setTrips(loadTrips()));
               loadMergedBookings()
                 .then(setBookings)
                 .finally(() => setBookingsLoading(false));

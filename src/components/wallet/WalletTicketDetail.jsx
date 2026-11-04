@@ -95,16 +95,18 @@ export default function WalletTicketDetail({
     }
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
     if (!onRemovePass || removing) return;
     const ok = window.confirm(
-      'Διαγραφή εισιτηρίου από το Wallet;\n\nΗ κράτηση στο γραφείο δεν ακυρώνεται — το εισιτήριο απλώς αφαιρείται από αυτή τη συσκευή.',
+      'Διαγραφή εισιτηρίου οριστικά;\n\nΘα φύγει από το Wallet και από τις κρατήσεις του γραφείου (όλες οι συσκευές). Δεν αναιρείται.',
     );
     if (!ok) return;
     setRemoving(true);
     try {
-      onRemovePass(booking);
-      toast.success('Το εισιτήριο αφαιρέθηκε από το Wallet');
+      await onRemovePass(booking);
+      toast.success('Το εισιτήριο διαγράφηκε από παντού');
+    } catch (err) {
+      toast.error(err?.message || 'Αποτυχία διαγραφής εισιτηρίου');
     } finally {
       setRemoving(false);
     }
