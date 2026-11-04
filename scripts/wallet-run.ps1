@@ -1,5 +1,5 @@
-# PoreiaGo native app (canonical) - build + install on emulator/USB device
-# Package: com.poreiago.wallet — ONE install, role-routed after login:
+﻿# PoreiaGo native app (canonical) - build + install on emulator/USB device
+# Package: com.poreiago.wallet - ONE install, role-routed after login:
 #   driver JWT      -> /driver (CommandCenter)
 #   bus customer    -> /wallet (My Wallet)
 #   rent customer   -> /rent/wallet (Rent menu)
@@ -441,7 +441,7 @@ function Wait-ForPackageService([int]$minutes = 3) {
       Write-Host "OK: package service ready" -ForegroundColor Green
       return $true
     }
-    # One adb bounce mid-wait — often unsticks a half-booted emulator.
+    # One adb bounce mid-wait - often unsticks a half-booted emulator.
     if (-not $nudgeAdb -and ((Get-Date) - $started).TotalSeconds -ge [Math]::Max(20, ($minutes * 30))) {
       Restart-AdbServer
       $nudgeAdb = $true
@@ -499,7 +499,7 @@ function Show-PackageServiceHelp([string]$apkPath) {
   Write-Host ""
   Write-Host "=== INSTALL FAILED: Can't find service: package ===" -ForegroundColor Red
   Write-Host "EN: Emulator booted but PackageManager is not ready (half-booted AVD)." -ForegroundColor Yellow
-  Write-Host "EL: Το emulator άνοιξε, αλλά το PackageManager δεν είναι έτοιμο." -ForegroundColor Yellow
+  Write-Host "EL: To emulator anoixe, alla to PackageManager den einai etoimo." -ForegroundColor Yellow
   Write-Host ""
   Write-Host ("APK ready: " + $apkPath) -ForegroundColor Green
   Write-Host "Recover:" -ForegroundColor Cyan
@@ -635,7 +635,7 @@ if (-not $online -or $online.Count -eq 0) {
 
 if (-not (Install-WalletApk $apk)) {
   Show-PackageServiceHelp $apk
-  throw "install failed (PackageManager not ready — Cold Boot the AVD, then wallet-boot-and-install.ps1)"
+  throw "install failed (PackageManager not ready - Cold Boot the AVD, then wallet-boot-and-install.ps1)"
 }
 
 $ErrorActionPreference = "Continue"
@@ -683,4 +683,4 @@ if (Test-Path -LiteralPath $shaScript) {
 Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In.") -ForegroundColor Green
 Write-Host "Do NOT press Studio Run (cache fight / Unknown error). For Logcat only:" -ForegroundColor Yellow
 Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1" -ForegroundColor Cyan
-Write-Host "  then File → Open → android\  (not repo root)" -ForegroundColor Cyan
+Write-Host "  then File -> Open -> android\  (not repo root)" -ForegroundColor Cyan
