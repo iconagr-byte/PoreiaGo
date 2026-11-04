@@ -53,7 +53,14 @@ function setupStorageKey(tenantId) {
 
 export function isOfficeSetupComplete(tenantId) {
   try {
-    return localStorage.getItem(setupStorageKey(tenantId)) === 'done';
+    const key = setupStorageKey(tenantId);
+    if (localStorage.getItem(key) === 'done') return true;
+    // Older builds used an unscoped flag — migrate once into this tenant.
+    if (localStorage.getItem(STORAGE_KEY_BASE) === 'done') {
+      localStorage.setItem(key, 'done');
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -328,8 +335,11 @@ export default function OfficeSetupWizard({
       .split('/')[0]
       .replace(/^www\./, '');
 
-  const saveDomain = async ({ requireCustom = false } = {}) => {
-    const custom = normalizeCustomDomain(domain.custom_domain);
+  const saveDomain = async ({ requireCustom = false, customDomain } = {}) => {
+    // Prefer explicit override so «Μόνο subdomain» does not race setState.
+    const custom = normalizeCustomDomain(
+      customDomain !== undefined ? customDomain : domain.custom_domain,
+    );
     if (requireCustom && !custom) {
       toast.error('Συμπληρώστε το custom domain ή πατήστε «Μόνο subdomain»');
       return false;
@@ -346,13 +356,11 @@ export default function OfficeSetupWizard({
         primary_color: brand.accent || '#0071e3',
         logo_url: brand.logo_url || '',
         custom_domain: custom || '',
-        checkout_base_url:
-          domain.checkout_base_url.trim() ||
-          (custom
-            ? `https://${custom}`
-            : domain.subdomain_fqdn
-              ? `https://${domain.subdomain_fqdn}`
-              : ''),
+        checkout_base_url: custom
+          ? domain.checkout_base_url.trim() || `https://${custom}`
+          : domain.subdomain_fqdn
+            ? `https://${domain.subdomain_fqdn}`
+            : '',
       };
       const saved = await updateTenantBrandingSettings(payload);
       const dns = saved?.dns_instructions || {};
@@ -1240,7 +1248,14 @@ export default function OfficeSetupWizard({
                     disabled={busy}
                     onClick={async () => {
                       setDomain((d) => ({ ...d, custom_domain: '' }));
-                      if (!(await saveDomain({ requireCustom: false }))) return;
+                      if (
+                        !(await saveDomain({
+                          requireCustom: false,
+                          customDomain: '',
+                        }))
+                      ) {
+                        return;
+                      }
                       setStep(stepIndex('brand'));
                     }}
                   >
