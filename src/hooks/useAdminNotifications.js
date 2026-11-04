@@ -11,6 +11,7 @@ import {
 import { fetchDriverChatUnread, fetchDriverChatThreads } from '../services/platformApi.js';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
+import { notifyBookingsChanged } from '../lib/ticketing/bookingSyncEvents.js';
 
 const STORAGE_KEY = 'admin_notif_inbox_v1';
 const CHAT_BASELINE_KEY = 'admin_notif_chat_baseline_v1';
@@ -104,6 +105,16 @@ function alertToItem(row) {
   } else if (type === 'NEW_BOOKING' || type === 'BOOKING_PAID') {
     title = 'Νέα κράτηση';
     tab = row.metadata?.tab || 'bookings';
+  } else if (type === 'BOOKING_DELETED') {
+    title = 'Διαγραφή εισιτηρίου';
+    tab = row.metadata?.tab || 'bookings';
+  }
+  if (type === 'NEW_BOOKING' || type === 'BOOKING_PAID' || type === 'BOOKING_DELETED') {
+    try {
+      notifyBookingsChanged({ reason: type.toLowerCase(), alertId: row.id });
+    } catch {
+      /* ignore */
+    }
   }
   return normalizeItem({
     id: `alert-${row.id}`,
