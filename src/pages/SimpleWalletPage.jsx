@@ -428,8 +428,11 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // Rent passes share this shell when the sealed office has Rent.
-  const rentAvailable = shouldShowRentStorefront(officeModules);
+  // Rent only with active contract — native localhost must not unlock marketing demo Rent
+  // (Achillio Travel stays bus-only even on Capacitor).
+  const rentAvailable = shouldShowRentStorefront(officeModules, {
+    native: nativeWallet,
+  });
   const tabs = useMemo(
     () => (rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals')),
     [rentAvailable],
