@@ -1,7 +1,12 @@
 import { loadTrips } from '../trips/tripStore.js';
 import { fetchAdminBookings } from '../../services/adminBookingsApi.js';
 import { getSaasToken, fetchSaasBookings } from '../../services/saasApi.js';
-import { loadAllBookingsAsync, loadBookings, mergeBookingsIntoStore } from './bookingStore.js';
+import {
+  loadAllBookingsAsync,
+  loadBookings,
+  mergeBookingsIntoStore,
+  saveBookings,
+} from './bookingStore.js';
 import { CHECK_IN } from './constants.js';
 import { formatDepositPaymentStatus } from '../payments/depositPayment.js';
 import { localIdFromReference } from './bookingIds.js';
@@ -120,7 +125,9 @@ export async function loadMergedBookings() {
           return keys.every((k) => !pgKeys.has(k));
         });
         const merged = stripDemoBookings([...pg, ...localOnly]);
-        mergeBookingsIntoStore(merged);
+        // Replace cache — mergeBookingsIntoStore never drops Postgres-deleted rows,
+        // so wallet/office deletes left zombies that soft-reload could resurrect.
+        saveBookings(merged);
         return merged;
       }
     }

@@ -328,35 +328,53 @@ async def delete_my_booking(
         async with AsyncSessionLocal() as db:
             await apply_tenant_rls(db, tenant_uuid)
             booking = None
-            for alias in aliases:
-                booking = await _find_booking(db, tenant_uuid, alias)
-                if booking:
-                    break
-            # Fallback: scan this customer's Postgres rows (desk claim / email variants).
-            if booking is None:
-                pg_ok, pg_items = await fetch_postgres_wallet_bookings(
-                    email=email, tenant_id=str(tid)
-                )
-                if pg_ok and pg_items:
-                    alias_set = {a for a in aliases} | {a.upper() for a in aliases} | {
-                        a.lower() for a in aliases
+            found_in_customer_wallet = False
+            # Prefer the customer's own Postgres wallet list (same seal as My Wallet).
+            # Fixes desk bookings where passenger_email ≠ login but the ticket shows
+            # in the app (wallet_customer_email / claim) — and stops 404→local-only
+            # dismiss while Contabo still holds BK-… rows for the office.
+            pg_ok, pg_items = await fetch_postgres_wallet_bookings(
+                email=email, tenant_id=str(tid)
+            )
+            alias_set = {a for a in aliases} | {a.upper() for a in aliases} | {
+                a.lower() for a in aliases
+            }
+            if pg_ok and pg_items:
+                for item in pg_items:
+                    candidates = {
+                        str(item.get("id") or ""),
+                        str(item.get("saasBookingId") or ""),
+                        str(item.get("pnr") or ""),
+                        str(item.get("ticketRef") or ""),
+                        str(item.get("reference_code") or ""),
                     }
-                    for item in pg_items:
-                        candidates = {
-                            str(item.get("id") or ""),
-                            str(item.get("saasBookingId") or ""),
-                            str(item.get("pnr") or ""),
-                            str(item.get("ticketRef") or ""),
-                        }
-                        if candidates & alias_set:
-                            saas = str(item.get("saasBookingId") or item.get("id") or "")
-                            if saas:
-                                booking = await _find_booking(db, tenant_uuid, saas)
+                    candidates |= {c.upper() for c in candidates if c} | {
+                        c.lower() for c in candidates if c
+                    }
+                    if not (candidates & alias_set):
+                        continue
+                    saas = str(item.get("saasBookingId") or item.get("id") or "")
+                    if saas:
+                        booking = await _find_booking(db, tenant_uuid, saas)
+                    if booking is None:
+                        for alias in aliases:
+                            booking = await _find_booking(db, tenant_uuid, alias)
                             if booking:
                                 break
+                    if booking:
+                        found_in_customer_wallet = True
+                        break
+
+            if booking is None:
+                for alias in aliases:
+                    booking = await _find_booking(db, tenant_uuid, alias)
+                    if booking:
+                        break
 
             if booking:
-                if not _wallet_owns_booking(booking, email=email, cached=cached):
+                if not found_in_customer_wallet and not _wallet_owns_booking(
+                    booking, email=email, cached=cached
+                ):
                     raise HTTPException(
                         status_code=403,
                         detail="Η κράτηση ανήκει σε άλλο λογαριασμό",
