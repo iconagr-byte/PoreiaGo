@@ -15,6 +15,7 @@ import {
   validatePlatformDomain,
 } from '../../services/platformSaasApi.js';
 import { getSaasToken, startImpersonationSession } from '../../services/saasApi.js';
+import { clearOfficeSetupComplete } from './OfficeSetupWizard.jsx';
 
 const PLAN_META = {
   starter: {
@@ -503,13 +504,33 @@ export default function SuperAdminPanel() {
         admin_password: snap.admin_password,
       };
       const result = await createPlatformTenant(payload);
-      toast.success(`Δημιουργήθηκε: ${result.tenant?.legal_name || payload.legal_name}`);
+      const tenant = result?.tenant || null;
+      const tenantId = tenant?.id || null;
+      toast.success(`Δημιουργήθηκε: ${tenant?.legal_name || payload.legal_name}`);
       setShowCreate(false);
       setCreateForm(EMPTY_CREATE);
       setSlugTouched(false);
       setShowCreatePassword(false);
       setShowCreatePasswordConfirm(false);
       setCreateAttempted(false);
+      // Open the new office and force the full setup wizard (name + domain + …).
+      if (tenantId) {
+        try {
+          clearOfficeSetupComplete(tenantId);
+          const tokenResponse = await impersonatePlatformTenant(tenantId);
+          startImpersonationSession(tokenResponse);
+          toast.success('Άνοιγμα wizard ρύθμισης γραφείου…');
+          window.location.assign('/admin?tab=dashboard&officeSetup=1');
+          return;
+        } catch (impErr) {
+          toast.error(
+            impErr?.message ||
+              'Το γραφείο δημιουργήθηκε — άνοιξέ το χειροκίνητα για το wizard',
+          );
+          load();
+          return;
+        }
+      }
       load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία δημιουργίας γραφείου');
