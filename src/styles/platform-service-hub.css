@@ -411,48 +411,7 @@
   color: rgba(248, 250, 252, 0.55);
 }
 
-/* —— Trust strip —— */
-
-.pg-hub-trust {
-  background: #fff;
-  border-block: 1px solid var(--pg-hub-line);
-}
-
-.pg-hub-trust-inner {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 1.35rem 1.25rem;
-  display: grid;
-  gap: 1rem;
-}
-
-@media (min-width: 720px) {
-  .pg-hub-trust-inner {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 1.5rem 2rem;
-    gap: 1.5rem;
-  }
-}
-
-.pg-hub-trust-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.pg-hub-trust-item strong {
-  font-size: 1.05rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  color: var(--pg-hub-ink);
-}
-
-.pg-hub-trust-item span {
-  font-size: 0.85rem;
-  color: #64748b;
-}
-
-/* —— How it works cards —— */
+/* —— Service chooser —— */
 
 .pg-hub-flow {
   background: #fff;
@@ -474,15 +433,6 @@
   .pg-hub-flow-inner {
     padding: 4.75rem 2rem 5.25rem;
   }
-}
-
-.pg-hub-flow-kicker {
-  margin: 0 0 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #0284c7;
 }
 
 /* —— Choose doors —— */
