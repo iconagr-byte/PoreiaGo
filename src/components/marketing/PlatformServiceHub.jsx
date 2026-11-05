@@ -52,29 +52,17 @@ export default function PlatformServiceHub() {
         </div>
       </section>
 
-      <section className="pg-hub-trust" aria-label="Γιατί PoreiaGo">
-        <div className="pg-hub-trust-inner">
-          {SERVICE_HUB.trust.map((item) => (
-            <div key={item.value} className="pg-hub-trust-item">
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section
         id="choose-service"
         className="pg-hub-flow"
-        aria-label="Διαλέξτε πόρτα υπηρεσίας"
+        aria-label="Υπηρεσίες PoreiaGo"
       >
         <div className="pg-hub-flow-inner">
           <div className="pg-hub-choose">
-            <p className="pg-hub-flow-kicker">{SERVICE_HUB.chooseKicker}</p>
             <h2 className="pg-hub-choose-title">{SERVICE_HUB.chooseTitle}</h2>
             <p className="pg-hub-choose-support">{SERVICE_HUB.chooseSupport}</p>
 
-            <div className="pg-hub-doors" role="group" aria-label="Πόρτες υπηρεσιών">
+            <div className="pg-hub-doors" role="group" aria-label="Υπηρεσίες">
               <a
                 href="#session-buses"
                 className="pg-hub-door pg-hub-door--buses"

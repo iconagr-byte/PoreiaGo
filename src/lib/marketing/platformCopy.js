@@ -25,14 +25,8 @@ export const SERVICE_HUB = {
   support:
     'Δεχτείτε κρατήσεις, τρέξτε λεωφορεία ή ενοικιάσεις και κρατήστε το δικό σας brand — από την πρώτη κράτηση μέχρι την πληρότητα της σεζόν.',
   primaryCta: 'Ξεκινήστε',
-  secondaryCta: 'Διαλέξτε πόρτα',
+  secondaryCta: 'Υπηρεσίες',
   contractsCta: 'Συμβόλαια & τιμές',
-  trust: [
-    { value: '1 σύστημα', label: 'κρατήσεις · στόλος · GPS' },
-    { value: 'Δικό σας brand', label: 'site · domain · επωνυμία' },
-    { value: 'Λεωφορεία + Rent', label: 'μία πλατφόρμα, δύο πόρτες' },
-  ],
-  chooseKicker: 'Διαλέξτε πόρτα',
   chooseTitle: 'Τι θέλετε να ανοίξετε πρώτα;',
   chooseSupport:
     'Ίδια πλατφόρμα PoreiaGo · ξεχωριστή εμπειρία για κάθε υπηρεσία. Ξεκινάτε στο subdomain σας · το δικό σας domain μετά.',
