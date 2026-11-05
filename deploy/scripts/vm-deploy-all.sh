@@ -106,8 +106,9 @@ repair_external_frontend_nginx() {
   local cid="$1"
   local conf="$DEPLOY_DIR/nginx/frontend.conf"
   local shared="$DEPLOY_DIR/nginx/frontend-shared.inc"
+  local apex_map="$DEPLOY_DIR/nginx/apex-www-redirect.map"
   [[ -n "$cid" && -f "$conf" ]] || return 0
-  echo "==> Repair external frontend nginx (/api → api-blue + Achillio SPA shell)"
+  echo "==> Repair external frontend nginx (/api → api-blue + custom-domain apex→www)"
   docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
 
   local conf_src=""
@@ -115,18 +116,24 @@ repair_external_frontend_nginx() {
   if [[ -n "$conf_src" && -d "$(dirname "$conf_src")" ]]; then
     echo "  force-sync frontend.conf → $conf_src"
     cp "$conf" "$conf_src" || echo "  WARN: could not write $conf_src"
+    conf_dir="$(dirname "$conf_src")"
     if [[ -f "$shared" ]]; then
-      conf_dir="$(dirname "$conf_src")"
       cp "$shared" "$conf_dir/frontend-shared.inc" 2>/dev/null || true
       echo "  docker cp frontend-shared.inc → container conf.d"
       docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
         || echo "  WARN: could not docker cp frontend-shared.inc"
+    fi
+    if [[ -f "$apex_map" ]]; then
+      cp "$apex_map" "$conf_dir/apex-www-redirect.map" 2>/dev/null || true
+      docker cp "$apex_map" "$cid:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null \
+        || echo "  WARN: could not docker cp apex-www-redirect.map"
     fi
   else
     if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
       echo "  WARN: could not copy frontend.conf into container — reload anyway"
     fi
     [[ -f "$shared" ]] && docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
+    [[ -f "$apex_map" ]] && docker cp "$apex_map" "$cid:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null || true
   fi
 
   if docker exec "$cid" nginx -t 2>/dev/null; then
