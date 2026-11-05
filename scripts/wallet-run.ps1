@@ -174,7 +174,7 @@ if (
 ) {
   $hashAfter = (Get-FileHash -LiteralPath $selfPath -Algorithm SHA256).Hash
   if ($hashBefore -and $hashAfter -and ($hashBefore -ne $hashAfter)) {
-    Write-Host "==> wallet-run.ps1 updated from git — restarting with fresh script" -ForegroundColor Yellow
+    Write-Host "==> wallet-run.ps1 updated from git - restarting with fresh script" -ForegroundColor Yellow
     $env:POREIAGO_WALLET_RUN_REEXEC = "1"
     $argList = @(
       "-ExecutionPolicy", "Bypass",
@@ -755,10 +755,10 @@ Start-Sleep -Seconds 3
 $pidLine = Get-WalletPid
 if (-not $pidLine) {
   Write-Host ""
-  Write-Host "INSTALL OK — auto-launch failed on this OEM (FORCE_STOP)." -ForegroundColor Yellow
+  Write-Host "INSTALL OK - auto-launch failed on this OEM (FORCE_STOP)." -ForegroundColor Yellow
   Write-Host "Open PoreiaGo from the phone app drawer, OR run:" -ForegroundColor Yellow
   Write-Host ("  & `"$adb`" shell am start --user 0 -n com.poreiago.wallet/com.poreiago.wallet.MainActivity") -ForegroundColor Cyan
-  Write-Host "APK is already on the device — no rebuild needed." -ForegroundColor Green
+  Write-Host "APK is already on the device - no rebuild needed." -ForegroundColor Green
   Write-Host ""
   Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
   $shaScript = Join-Path $repo "scripts\wallet-google-sha1.ps1"
