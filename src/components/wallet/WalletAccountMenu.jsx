@@ -271,7 +271,7 @@ export default function WalletAccountMenu({
               <span className="wallet-account-sheet-item-body">
                 <span className="wallet-account-sheet-item-label">Ασφάλεια</span>
                 <span className="wallet-account-sheet-item-hint">
-                  Βιομετρικά, PIN, κωδικός, email
+                  Γρήγορη σύνδεση, PIN, κωδικός, email
                 </span>
               </span>
               <span className="material-symbols-outlined wallet-account-sheet-chevron" aria-hidden>

@@ -685,10 +685,10 @@
 }
 
 .wallet-app--phone .wallet-topbar-brand img {
-  max-height: 28px;
-  height: 28px;
+  max-height: 36px;
+  height: 36px;
   width: auto;
-  max-width: min(112px, 40vw);
+  max-width: min(140px, 44vw);
 }
 
 .wallet-more-trip-list {
