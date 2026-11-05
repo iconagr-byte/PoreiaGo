@@ -947,12 +947,13 @@ function WalletAuthenticatedApp() {
           />
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-8"
+              className="h-7 max-w-[9.5rem]"
               variant="light"
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
               tenantId={sealedTenantId}
+              compact={Boolean(nativeWallet || isPhone)}
             />
           </div>
           <WalletNotificationBell

@@ -6,8 +6,13 @@ import {
   loadCachedSiteAppearance,
   resolveSiteAssetUrl,
 } from '../../services/siteAppearanceApi.js';
-import { officeLogoImageStyle, resolveOfficeBrand, clampLogoHeight } from '../../lib/branding/officeBrand.js';
+import {
+  officeLogoImageStyle,
+  resolveOfficeBrand,
+  clampLogoHeight,
+} from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
 import { WALLET_TENANT_CHANGED_EVENT } from '../../lib/wallet/walletTenantSeal.js';
 
@@ -64,12 +69,18 @@ export default function OfficeBrandMark({
   tenantId = '',
   /** Optional minimum height for admin sidebar / drawers (px). */
   minHeightPx,
+  /**
+   * Mobile / Capacitor top bar: cap logo so website header sizes (48–96px)
+   * do not overflow the wallet chrome. Native always uses compact.
+   */
+  compact = false,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
   const [imgBroken, setImgBroken] = useState(false);
   const isDark = variant === 'dark';
   const sealedTenantId = String(tenantId || '').trim();
+  const useCompact = Boolean(compact) || isNativeApp();
 
   useEffect(() => {
     let cancelled = false;
@@ -128,24 +139,33 @@ export default function OfficeBrandMark({
     brand.name ||
     (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const resolvedHeight =
-    minHeightPx != null
+    !useCompact && minHeightPx != null
       ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))
       : undefined;
   const logoStyle = officeLogoImageStyle(
     resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
+    { compact: useCompact },
   );
+  // On a phone top bar, logo alone is enough — name next to a big mark overflows.
+  const showName = brand.showName && !(useCompact && logoSrc);
 
   const inner = logoSrc ? (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span
+      className={`inline-flex items-center ${useCompact ? 'gap-1.5' : 'gap-2'} ${className}`}
+    >
       <img
         src={logoSrc}
         alt={label || 'Logo'}
         style={logoStyle}
-        className="object-contain"
+        className={`object-contain${useCompact ? ' office-brand-mark__logo--compact' : ''}`}
         onError={() => setImgBroken(true)}
       />
-      {brand.showName && (
-        <span className={`font-bold tracking-tight text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+      {showName && (
+        <span
+          className={`font-bold tracking-tight truncate ${
+            useCompact ? 'text-sm max-w-[7.5rem]' : 'text-base'
+          } ${isDark ? 'text-white' : 'text-slate-900'}`}
+        >
           {brand.displayName || brand.name}
         </span>
       )}
@@ -158,12 +178,22 @@ export default function OfficeBrandMark({
     >
       <span
         className={`flex items-center justify-center rounded-lg text-xs font-bold ${
-          minHeightPx != null ? 'h-11 w-11 text-sm' : 'h-8 w-8'
+          useCompact
+            ? 'h-7 w-7 text-[11px]'
+            : minHeightPx != null
+              ? 'h-11 w-11 text-sm'
+              : 'h-8 w-8'
         } ${isDark ? 'bg-white/20 text-white' : 'bg-slate-900 text-white'}`}
       >
         {(label || 'Γ').charAt(0).toUpperCase()}
       </span>
-      <span className={minHeightPx != null ? 'text-lg' : 'text-base'}>{label}</span>
+      <span
+        className={
+          useCompact ? 'text-sm truncate max-w-[9rem]' : minHeightPx != null ? 'text-lg' : 'text-base'
+        }
+      >
+        {label}
+      </span>
     </span>
   );
 

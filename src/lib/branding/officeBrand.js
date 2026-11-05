@@ -107,18 +107,35 @@ function logoBgColor(mode) {
   }
 }
 
-/** Inline styles for office logo images (header / footer / admin). */
-export function officeLogoImageStyle(siteAppearance = {}) {
+/** Caps for phone / Capacitor top bars (website header sizes are often 48–96px). */
+export const NATIVE_LOGO_MAX_HEIGHT_PX = 28;
+export const NATIVE_LOGO_MAX_WIDTH_PX = 112;
+
+/**
+ * Inline styles for office logo images (header / footer / admin).
+ * @param {object} siteAppearance
+ * @param {{ compact?: boolean }} [opts] — compact: mobile / native topbar (smaller + tighter).
+ */
+export function officeLogoImageStyle(siteAppearance = {}, opts = {}) {
+  const compact = opts.compact === true;
   const radius = clampLogoRadius(siteAppearance.logo_radius_px);
-  const padding = clampLogoPadding(siteAppearance.logo_padding_px);
+  let padding = clampLogoPadding(siteAppearance.logo_padding_px);
+  let height = clampLogoHeight(siteAppearance.logo_height_px);
+  let maxWidth = clampLogoMaxWidth(siteAppearance.logo_max_width_px);
+  if (compact) {
+    height = Math.min(height, NATIVE_LOGO_MAX_HEIGHT_PX);
+    maxWidth = Math.min(maxWidth, NATIVE_LOGO_MAX_WIDTH_PX);
+    padding = Math.min(padding, 2);
+  }
   const bgMode = normalizeLogoBgMode(siteAppearance.logo_bg_mode);
-  const shadow = siteAppearance.logo_shadow === true;
+  const shadow = siteAppearance.logo_shadow === true && !compact;
   const style = {
-    height: `${clampLogoHeight(siteAppearance.logo_height_px)}px`,
+    height: `${height}px`,
     width: 'auto',
-    maxWidth: `${clampLogoMaxWidth(siteAppearance.logo_max_width_px)}px`,
+    maxWidth: `${maxWidth}px`,
+    maxHeight: compact ? `${NATIVE_LOGO_MAX_HEIGHT_PX}px` : undefined,
     objectFit: 'contain',
-    borderRadius: `${radius}px`,
+    borderRadius: `${Math.min(radius, compact ? 8 : radius)}px`,
     padding: padding ? `${padding}px` : undefined,
     background: bgMode === 'none' ? undefined : logoBgColor(bgMode),
     boxShadow: shadow ? '0 4px 14px rgba(15, 23, 42, 0.14)' : undefined,
