@@ -67,9 +67,9 @@ describe('resolveOfficeBrand', () => {
       },
       { compact: true },
     );
-    expect(style.height).toBe('28px');
-    expect(style.maxWidth).toBe('112px');
-    expect(style.maxHeight).toBe('28px');
+    expect(style.height).toBe('36px');
+    expect(style.maxWidth).toBe('140px');
+    expect(style.maxHeight).toBe('36px');
     expect(style.padding).toBe('2px');
     expect(style.boxShadow).toBeUndefined();
   });

@@ -210,9 +210,9 @@ html[data-poreiago-app='wallet'] .wallet-topbar-brand img,
 html[data-poreiago-app='app'] .wallet-topbar-brand img,
 html[data-poreiago-app='wallet'] .office-brand-mark__logo--compact,
 html[data-poreiago-app='app'] .office-brand-mark__logo--compact {
-  max-height: 28px !important;
-  height: 28px !important;
-  max-width: min(112px, 40vw) !important;
+  max-height: 36px !important;
+  height: 36px !important;
+  max-width: min(140px, 44vw) !important;
   width: auto !important;
   padding: 0 !important;
   box-shadow: none !important;

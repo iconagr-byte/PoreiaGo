@@ -108,8 +108,8 @@ function logoBgColor(mode) {
 }
 
 /** Caps for phone / Capacitor top bars (website header sizes are often 48–96px). */
-export const NATIVE_LOGO_MAX_HEIGHT_PX = 28;
-export const NATIVE_LOGO_MAX_WIDTH_PX = 112;
+export const NATIVE_LOGO_MAX_HEIGHT_PX = 36;
+export const NATIVE_LOGO_MAX_WIDTH_PX = 140;
 
 /**
  * Inline styles for office logo images (header / footer / admin).
