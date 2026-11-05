@@ -147,6 +147,15 @@ if ($Branch -ne "main") {
   }
 }
 
+# PowerShell loads this file into memory once. If git reset updates wallet-run.ps1
+# on disk mid-run, launch/install fixes never apply until the NEXT process.
+# Re-exec once after reset when the script bytes change.
+$selfPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+$hashBefore = ""
+if ($selfPath -and (Test-Path -LiteralPath $selfPath)) {
+  $hashBefore = (Get-FileHash -LiteralPath $selfPath -Algorithm SHA256).Hash
+}
+
 Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
 git fetch origin $Branch
 if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
@@ -157,6 +166,30 @@ if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branc
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
 Write-Host ("OK: building from origin/" + $Branch) -ForegroundColor Green
+
+if (
+  $env:POREIAGO_WALLET_RUN_REEXEC -ne "1" -and
+  $selfPath -and
+  (Test-Path -LiteralPath $selfPath)
+) {
+  $hashAfter = (Get-FileHash -LiteralPath $selfPath -Algorithm SHA256).Hash
+  if ($hashBefore -and $hashAfter -and ($hashBefore -ne $hashAfter)) {
+    Write-Host "==> wallet-run.ps1 updated from git - restarting with fresh script" -ForegroundColor Yellow
+    $env:POREIAGO_WALLET_RUN_REEXEC = "1"
+    $argList = @(
+      "-ExecutionPolicy", "Bypass",
+      "-File", $selfPath,
+      "-Branch", $Branch,
+      "-WaitMinutes", "$WaitMinutes"
+    )
+    if ($Sdk) { $argList += @("-Sdk", $Sdk) }
+    if ($JavaHome) { $argList += @("-JavaHome", $JavaHome) }
+    if ($StartEmulator) { $argList += "-StartEmulator" }
+    & powershell.exe @argList
+    exit $LASTEXITCODE
+  }
+}
+$env:POREIAGO_WALLET_RUN_REEXEC = $null
 
 $staleDirs = @(
   (Join-Path $repo "dist"),
@@ -658,21 +691,50 @@ function Invoke-WalletAmStart([string[]]$amArgs) {
   $out = & $adb shell @amArgs 2>&1 | Out-String
   $code = $LASTEXITCODE
   $ErrorActionPreference = $prev
-  Write-Host $out.TrimEnd()
-  $failed = ($code -ne 0) -or ($out -match '(?i)Error:|unable to resolve|does not exist|SecurityException')
+  if ($out.Trim()) { Write-Host $out.TrimEnd() }
+  $failed = ($code -ne 0) -or ($out -match '(?i)Error:|unable to resolve|does not exist|SecurityException|Activity class')
   return -not $failed
 }
 
+function Get-WalletPid {
+  $ErrorActionPreference = "Continue"
+  $p = (& $adb shell pidof com.poreiago.wallet 2>$null | Out-String).Trim()
+  if (-not $p) {
+    $p = (& $adb shell "pidof -s com.poreiago.wallet" 2>$null | Out-String).Trim()
+  }
+  if (-not $p) {
+    $psLine = & $adb shell "ps -A 2>/dev/null | grep com.poreiago.wallet" 2>$null | Out-String
+    if ($psLine -match 'com\.poreiago\.wallet') { $p = "ps" }
+  }
+  $ErrorActionPreference = "Stop"
+  return $p
+}
+
+# Clear FORCE_STOP so OEM resolvers accept the next start.
+$ErrorActionPreference = "Continue"
+& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+& $adb shell pm enable com.poreiago.wallet 2>$null | Out-Null
+$ErrorActionPreference = "Stop"
+
 $launchOk = $false
-# 1) Explicit FQCN + MAIN/LAUNCHER (matches wallet-open.ps1; wakes stopped packages).
+# 1) Explicit FQCN (Blackview / FORCE_STOP safe). Never use package-only -p first.
 if (Invoke-WalletAmStart @(
     "am", "start", "--user", "0", "-W",
-    "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity",
-    "-a", "android.intent.action.MAIN",
-    "-c", "android.intent.category.LAUNCHER"
+    "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
   )) { $launchOk = $true }
 
-# 2) Short component form some OEMs prefer.
+# 2) FQCN + MAIN/LAUNCHER.
+if (-not $launchOk) {
+  Write-Host "am start FQCN failed - retry with MAIN/LAUNCHER ..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "am", "start", "--user", "0", "-W",
+      "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity",
+      "-a", "android.intent.action.MAIN",
+      "-c", "android.intent.category.LAUNCHER"
+    )) { $launchOk = $true }
+}
+
+# 3) Short component form some OEMs prefer.
 if (-not $launchOk) {
   Write-Host "am start FQCN failed - trying /.MainActivity ..." -ForegroundColor Yellow
   if (Invoke-WalletAmStart @(
@@ -681,7 +743,7 @@ if (-not $launchOk) {
     )) { $launchOk = $true }
 }
 
-# 3) Monkey launcher (last resort for stubborn FORCE_STOP).
+# 4) Monkey launcher (last resort for stubborn FORCE_STOP).
 if (-not $launchOk) {
   Write-Host "am start failed - trying launcher monkey..." -ForegroundColor Yellow
   if (Invoke-WalletAmStart @(
@@ -690,26 +752,21 @@ if (-not $launchOk) {
 }
 
 Start-Sleep -Seconds 3
-$ErrorActionPreference = "Continue"
-$pidLine = (& $adb shell pidof com.poreiago.wallet 2>$null | Out-String).Trim()
+$pidLine = Get-WalletPid
 if (-not $pidLine) {
-  # Some OEM builds omit pidof; fall back to ps.
-  $pidLine = (& $adb shell "pidof -s com.poreiago.wallet" 2>$null | Out-String).Trim()
-}
-if (-not $pidLine) {
-  $psLine = & $adb shell "ps -A 2>/dev/null | grep com.poreiago.wallet" 2>$null | Out-String
-  if ($psLine -match 'com\.poreiago\.wallet') {
-    $pidLine = "ps"
+  Write-Host ""
+  Write-Host "INSTALL OK - auto-launch failed on this OEM (FORCE_STOP)." -ForegroundColor Yellow
+  Write-Host "Open PoreiaGo from the phone app drawer, OR run:" -ForegroundColor Yellow
+  Write-Host ("  & `"$adb`" shell am start --user 0 -n com.poreiago.wallet/com.poreiago.wallet.MainActivity") -ForegroundColor Cyan
+  Write-Host "APK is already on the device - no rebuild needed." -ForegroundColor Green
+  Write-Host ""
+  Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
+  $shaScript = Join-Path $repo "scripts\wallet-google-sha1.ps1"
+  if (Test-Path -LiteralPath $shaScript) {
+    & powershell -ExecutionPolicy Bypass -File $shaScript
   }
-}
-$ErrorActionPreference = "Stop"
-if (-not $pidLine) {
-  $ErrorActionPreference = "Continue"
-  Write-Host "==> package activities (diagnose launch / Error type 3):" -ForegroundColor Yellow
-  & $adb shell dumpsys package com.poreiago.wallet | Select-String -Pattern 'Activity|enabled|versionName|ActivityInfo' | Select-Object -First 40 | Out-Host
-  & $adb logcat -d -t 80 AndroidRuntime:E ActivityManager:E Capacitor:E chromium:E *:S | Out-Host
-  $ErrorActionPreference = "Stop"
-  throw "App installed but did not stay open. On phone: open PoreiaGo from the app drawer once. Or: adb shell am start --user 0 -n com.poreiago.wallet/com.poreiago.wallet.MainActivity"
+  Write-Host "DONE - Wallet installed (launch manually on phone)." -ForegroundColor Green
+  exit 0
 }
 Write-Host ""
 Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
