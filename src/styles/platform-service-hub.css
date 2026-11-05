@@ -441,20 +441,24 @@
   padding-top: 0;
   border-top: 0;
   scroll-margin-top: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .pg-hub-choose-title {
-  margin: 0 0 0.5rem;
-  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  margin: 0 0 0.55rem;
+  font-size: clamp(1.55rem, 3.4vw, 2.15rem);
   font-weight: 750;
   letter-spacing: -0.03em;
   color: var(--pg-hub-ink);
 }
 
 .pg-hub-choose-support {
-  margin: 0 0 1.5rem;
-  max-width: 34rem;
-  font-size: 1rem;
+  margin: 0 auto 1.85rem;
+  max-width: 36rem;
+  font-size: 1.05rem;
   line-height: 1.55;
   color: var(--pg-hub-muted);
 }
@@ -462,17 +466,24 @@
 .pg-hub-doors {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.85rem;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1.1rem;
+  width: 100%;
+  max-width: 52rem;
 }
 
 .pg-hub-door {
   display: inline-flex;
   align-items: center;
-  gap: 0.85rem;
-  min-height: 3.85rem;
-  padding: 0.9rem 1.35rem 0.9rem 1.05rem;
+  gap: 1.05rem;
+  flex: 1 1 15.5rem;
+  max-width: 24rem;
+  min-height: 5.35rem;
+  padding: 1.2rem 1.65rem 1.2rem 1.25rem;
   border-radius: 999px;
   text-decoration: none;
+  text-align: left;
   transition:
     transform 0.22s ease,
     background-color 0.22s ease,
@@ -481,7 +492,7 @@
 }
 
 .pg-hub-door:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px) scale(1.015);
 }
 
 .pg-hub-door:focus-visible {
@@ -493,36 +504,39 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
+  flex-shrink: 0;
+  width: 3.05rem;
+  height: 3.05rem;
   border-radius: 999px;
-  font-size: 1.25rem;
+  font-size: 1.55rem;
 }
 
 .pg-hub-door-copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.1rem;
+  gap: 0.18rem;
   line-height: 1.15;
+  min-width: 0;
 }
 
 .pg-hub-door-copy strong {
-  font-size: 0.98rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 1.18rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
 }
 
 .pg-hub-door-copy span {
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   font-weight: 500;
-  opacity: 0.78;
+  opacity: 0.82;
 }
 
 .pg-hub-door-arrow {
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   opacity: 0.75;
-  margin-left: 0.15rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .pg-hub-door--buses {
@@ -557,8 +571,8 @@
 }
 
 .pg-hub-choose-foot {
-  margin: 1.35rem 0 0;
-  font-size: 0.9rem;
+  margin: 1.65rem 0 0;
+  font-size: 0.95rem;
 }
 
 .pg-hub-choose-foot a {
@@ -620,7 +634,10 @@
 
 @media (max-width: 640px) {
   .pg-hub-door {
+    flex: 1 1 100%;
+    max-width: 100%;
     width: 100%;
+    min-height: 5rem;
     justify-content: flex-start;
   }
 
