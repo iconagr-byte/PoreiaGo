@@ -40,6 +40,7 @@ import {
   unlockQuickLogin,
 } from '../lib/wallet/walletDeviceSecurity.js';
 import { getApiBase } from '../config/api.js';
+import BookingLookupEntryLink from '../components/BookingLookupEntryLink.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -649,16 +650,8 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             </Link>
           </p>
           {!isNativeApp() ? (
-            <p className="text-xs text-center mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-              <Link to="/my-booking" className={linkClass}>
-                Εύρεση κράτησης λεωφορείου
-              </Link>
-              <span className="text-[#d2d2d7]" aria-hidden>
-                ·
-              </span>
-              <Link to="/rent/my-booking" className={linkClass}>
-                Εύρεση κράτησης ενοικίασης
-              </Link>
+            <p className="text-xs text-center mt-3">
+              <BookingLookupEntryLink preferRent={rentIntent} className={linkClass} />
             </p>
           ) : null}
         </>
