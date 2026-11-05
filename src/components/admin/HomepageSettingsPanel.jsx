@@ -629,26 +629,27 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         : HOME_SECTIONS;
 
   const selectSection = useCallback(
-    (id) => {
+    (id, opts = {}) => {
+      const { scroll = true } = opts;
       const next = sanitizeSection(id, navSections);
       setSection(next);
       const params = new URLSearchParams(searchParams);
       if (next === DEFAULT_SECTION) params.delete('section');
       else params.set('section', next);
       setSearchParams(params, { replace: true });
-      // Always ask the Split preview to smooth-scroll (even when re-clicking the same item).
-      if (designPage === 'home') {
+      // Left-nav clicks scroll the preview. Builder opens from the iframe must NOT
+      // scroll — «Γενικά» maps to hero and was yanking the page to the top.
+      if (scroll && designPage === 'home') {
         postPdwScrollToSection(next);
       }
     },
     [designPage, navSections, searchParams, setSearchParams],
   );
 
-  // Sync left-nav ↔ Divi-like inline Builder in the preview iframe (focus + scroll).
+  // Sync left-nav highlight into the preview iframe (outline only — no scroll).
   useEffect(() => {
     if (designPage !== 'home') return undefined;
     postPdwBridge({ type: PDW_BRIDGE.SECTION_FOCUS, section });
-    postPdwScrollToSection(section);
     return undefined;
   }, [designPage, section]);
 
@@ -656,7 +657,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     if (designPage !== 'home') return undefined;
     return subscribePdwBridge((msg) => {
       if (msg.type === PDW_BRIDGE.SELECT_SECTION && msg.section) {
-        selectSection(msg.section);
+        // Preview already shows this section (Builder / click-to-edit). Update
+        // left-nav only — scrolling would jump the iframe (e.g. Γενικά → hero top).
+        selectSection(msg.section, { scroll: false });
         return;
       }
       if (msg.type === PDW_BRIDGE.REQUEST_THEMES) {

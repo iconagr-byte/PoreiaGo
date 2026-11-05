@@ -115,6 +115,8 @@ export function PreviewDesignModeProvider({ children, appearance }) {
   const openBuilder = useCallback(
     (sectionId, instanceId = null) => {
       if (!sectionId) return;
+      // Highlight left-nav only — parent must not scrollPreviewToSection here
+      // (Γενικά → hero was jumping the preview to the top on every Builder click).
       selectSection(sectionId);
       setOpenBuilderState((cur) => {
         if (cur.section === sectionId && cur.instance === instanceId) {
