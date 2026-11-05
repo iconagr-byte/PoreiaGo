@@ -605,17 +605,20 @@ export default function StorefrontDemoPage() {
       </PreviewEditableSection>
 
       {previewOn ? (
-        <div className="sf-preview-dock" aria-label="Builder ενότητες σελίδας">
+        <div className="sf-preview-dock" aria-label="Studio — γρήγορες ενότητες">
+          <p className="sf-preview-dock__label">Studio</p>
           <PreviewBuilderControl
             sectionId="general"
             label="Γενικά"
-            variant="inline"
+            variant="dock"
+            buttonLabel="Γενικά"
             instanceId="dock-general"
           />
           <PreviewBuilderControl
             sectionId="slider"
             label="Slider"
-            variant="inline"
+            variant="dock"
+            buttonLabel="Slider"
             instanceId="dock-slider"
           />
         </div>

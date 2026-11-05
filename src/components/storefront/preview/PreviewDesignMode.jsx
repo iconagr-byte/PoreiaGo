@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   isStorefrontPreviewMode,
   pushHomepagePreviewDraft,
@@ -174,15 +175,18 @@ export function PreviewDesignModeProvider({ children, appearance }) {
 
 /**
  * Compact Builder control — place inline (e.g. right of ΠΡΟΓΡΑΜΜΑ ΕΚΔΡΟΜΩΝ)
- * or as a floating bar on a section overlay.
+ * or as a floating bar on a section overlay. Opens a fixed studio drawer
+ * (not an absolute dropdown) so the preview never jumps.
  */
 export function PreviewBuilderControl({
   sectionId,
   label,
   variant = 'inline',
   className = '',
-  /** Unique key when several controls share the same sectionId (one popover at a time). */
+  /** Unique key when several controls share the same sectionId (one drawer at a time). */
   instanceId = null,
+  /** Button caption. Defaults to section title in dock, else «Επεξεργασία». */
+  buttonLabel,
 }) {
   const ctx = usePreviewDesignMode();
   const wrapRef = useRef(null);
@@ -192,13 +196,18 @@ export function PreviewBuilderControl({
     ? ctx.isBuilderOpen(sectionId, instanceId)
     : ctx.openSection === sectionId && ctx.openInstance === instanceId;
   const title = label || ctx.sectionLabel(sectionId);
+  const chipLabel =
+    buttonLabel ||
+    (variant === 'dock' ? title : 'Επεξεργασία');
 
   return (
     <div
       ref={wrapRef}
-      className={`sf-preview-builder ${variant === 'bar' ? 'is-bar' : 'is-inline'} ${
-        variant === 'card' ? 'is-card' : ''
-      } ${isOpen ? 'is-open' : ''} ${className}`.trim()}
+      className={`sf-preview-builder ${variant === 'bar' ? 'is-bar' : ''} ${
+        variant === 'inline' || variant === 'dock' ? 'is-inline' : ''
+      } ${variant === 'card' ? 'is-card' : ''} ${variant === 'dock' ? 'is-dock' : ''} ${
+        isOpen ? 'is-open' : ''
+      } ${className}`.trim()}
       data-pdw-section={sectionId}
       data-pdw-instance={instanceId || undefined}
     >
@@ -207,23 +216,27 @@ export function PreviewBuilderControl({
         className={`sf-preview-builder__btn${isOpen ? ' is-open' : ''}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        title={`Builder · ${title}`}
+        title={`Studio · ${title}`}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          const y = typeof window !== 'undefined' ? window.scrollY : 0;
           ctx.openBuilder(sectionId, instanceId);
+          // Opening the portal must not change scroll position.
+          if (typeof window !== 'undefined') {
+            requestAnimationFrame(() => {
+              window.scrollTo(0, y);
+            });
+          }
         }}
       >
         <span className="material-symbols-outlined sf-preview-builder__icon" aria-hidden>
-          build
+          {isOpen ? 'close' : 'edit_square'}
         </span>
-        <span className="sf-preview-builder__label">Builder</span>
-        <span className="material-symbols-outlined sf-preview-builder__chev" aria-hidden>
-          {isOpen ? 'expand_less' : 'expand_more'}
-        </span>
+        <span className="sf-preview-builder__label">{isOpen ? 'Κλείσιμο' : chipLabel}</span>
       </button>
       {isOpen ? (
-        <PreviewBuilderPopover
+        <PreviewBuilderStudio
           sectionId={sectionId}
           title={title}
           form={ctx.form}
@@ -262,7 +275,11 @@ export function PreviewCardBuilder({
   );
 }
 
-function PreviewBuilderPopover({
+/**
+ * Fixed right-side studio drawer (portal). Replaces the old absolute dropdown
+ * that jumped with the section and felt unreliable on long pages.
+ */
+function PreviewBuilderStudio({
   sectionId,
   title,
   form,
@@ -271,48 +288,104 @@ function PreviewBuilderPopover({
   onSelectThemes,
   anchorRef,
 }) {
-  const popRef = useRef(null);
+  const panelRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const scrollYRef = useRef(
+    typeof window !== 'undefined' ? window.scrollY : 0,
+  );
 
   useEffect(() => {
+    scrollYRef.current = typeof window !== 'undefined' ? window.scrollY : 0;
+    closeBtnRef.current?.focus?.({ preventScroll: true });
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
     const onDoc = (e) => {
       const t = e.target;
-      if (popRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
+      // Backdrop / outside click closes without scrolling the host page.
       onClose();
     };
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDoc);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDoc);
+      if (typeof window !== 'undefined') {
+        window.scrollTo({
+          top: scrollYRef.current,
+          left: 0,
+          behavior: 'auto',
+        });
+      }
     };
   }, [onClose, anchorRef]);
 
-  return (
-    <div
-      ref={popRef}
-      className="sf-preview-builder__popover"
-      role="dialog"
-      aria-label={`Builder · ${title}`}
-      /* Comfortable 2-col template reading; CSS clamps with vw/vh on small admins */
-      style={{
-        ['--sf-builder-popover-w']: '36rem',
-        ['--sf-builder-popover-max-h']: '44rem',
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <div className="sf-preview-builder__popover-scroll">
-        <PageDesignBuilderPanel
-          section={sectionId}
-          form={form}
-          setForm={setForm}
-          onSelectThemes={onSelectThemes}
-        />
-      </div>
-    </div>
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="sf-studio" role="presentation">
+      <button
+        type="button"
+        className="sf-studio__backdrop"
+        aria-label="Κλείσιμο studio"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <aside
+        ref={panelRef}
+        className="sf-studio__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Studio · ${title}`}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <header className="sf-studio__chrome">
+          <div className="sf-studio__chrome-copy min-w-0">
+            <p className="sf-studio__eyebrow">Page Studio</p>
+            <h2 className="sf-studio__heading truncate">{title}</h2>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            className="sf-studio__close"
+            aria-label="Κλείσιμο"
+            onClick={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              close
+            </span>
+          </button>
+        </header>
+        <div className="sf-studio__scroll">
+          <PageDesignBuilderPanel
+            section={sectionId}
+            form={form}
+            setForm={setForm}
+            onSelectThemes={onSelectThemes}
+            onClose={onClose}
+            studio
+          />
+        </div>
+        <footer className="sf-studio__footer">
+          <p className="sf-studio__hint">
+            Οι αλλαγές φαίνονται αμέσως στο preview · πάτα «Αποθήκευση» στη γραμμή εργαλείων.
+          </p>
+        </footer>
+      </aside>
+    </div>,
+    document.body,
   );
 }
 
