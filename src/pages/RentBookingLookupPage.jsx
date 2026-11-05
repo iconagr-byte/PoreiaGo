@@ -186,7 +186,7 @@ export default function RentBookingLookupPage() {
           </div>
 
           <h1 id="rent-booking-lookup-title" className="booking-lookup-title">
-            Εύρεση κράτησης ενοικίασης
+            Εύρεση κράτησης
           </h1>
           <p className="booking-lookup-lead">
             Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις την κράτηση
