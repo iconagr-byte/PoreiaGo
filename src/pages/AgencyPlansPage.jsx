@@ -242,7 +242,7 @@ export default function AgencyPlansPage() {
         </section>
       </main>
 
-        <section className="pg-contracts-rent-stage" aria-label="Ενοικιάσεις">
+        <section id="contracts-rent" className="pg-contracts-rent-stage" aria-label="Ενοικιάσεις">
           <div className="pg-contracts-rent-wave" aria-hidden />
           <div className="pg-contracts-rent-wave pg-contracts-rent-wave--soft" aria-hidden />
           <div className="pg-contracts-rent-orbit" aria-hidden />
