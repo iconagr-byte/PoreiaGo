@@ -360,8 +360,9 @@ export default function SuperAdminPanel() {
     try {
       const tokenResponse = await impersonatePlatformTenant(tenant.id);
       startImpersonationSession(tokenResponse);
-      toast.success(`Άνοιγμα ως: ${tenant.legal_name || tenant.slug}`);
-      window.location.assign('/admin?tab=dashboard');
+      // Always land in the setup wizard (επωνυμία · domain · εμφάνιση · …).
+      toast.success(`Άνοιγμα wizard: ${tenant.legal_name || tenant.slug}`);
+      window.location.assign('/admin?tab=dashboard&officeSetup=1');
     } catch (e) {
       const msg = String(e?.message || '').trim();
       toast.error(
