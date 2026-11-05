@@ -648,29 +648,68 @@ if (-not $bootHit) { throw "Native /wallet cold-start missing from android asset
 Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
 
 Write-Host "==> launch My Wallet" -ForegroundColor Cyan
-$ErrorActionPreference = "Continue"
-# Prefer launcher intent (lets PackageManager resolve MainActivity).
-& $adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p com.poreiago.wallet | Out-Host
-$launchOk = ($LASTEXITCODE -eq 0)
-if (-not $launchOk) {
-  & $adb shell am start -W -n com.poreiago.wallet/com.poreiago.wallet.MainActivity | Out-Host
-  $launchOk = ($LASTEXITCODE -eq 0)
+# Fresh installs are FORCE_STOPPED. Package-only (-p) MAIN/LAUNCHER often fails on
+# OEM phones (Blackview etc.) with "unable to resolve Intent" even when MainActivity
+# exists. Always start by explicit component. Do NOT pipe to Out-Host before checking
+# exit code / Error text - piping made LASTEXITCODE look like success and skipped fallbacks.
+function Invoke-WalletAmStart([string[]]$amArgs) {
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $out = & $adb shell @amArgs 2>&1 | Out-String
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+  Write-Host $out.TrimEnd()
+  $failed = ($code -ne 0) -or ($out -match '(?i)Error:|unable to resolve|does not exist|SecurityException')
+  return -not $failed
 }
+
+$launchOk = $false
+# 1) Explicit FQCN + MAIN/LAUNCHER (matches wallet-open.ps1; wakes stopped packages).
+if (Invoke-WalletAmStart @(
+    "am", "start", "--user", "0", "-W",
+    "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity",
+    "-a", "android.intent.action.MAIN",
+    "-c", "android.intent.category.LAUNCHER"
+  )) { $launchOk = $true }
+
+# 2) Short component form some OEMs prefer.
 if (-not $launchOk) {
-  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1 | Out-Host
+  Write-Host "am start FQCN failed - trying /.MainActivity ..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "am", "start", "--user", "0", "-W",
+      "-n", "com.poreiago.wallet/.MainActivity"
+    )) { $launchOk = $true }
 }
-$ErrorActionPreference = "Stop"
+
+# 3) Monkey launcher (last resort for stubborn FORCE_STOP).
+if (-not $launchOk) {
+  Write-Host "am start failed - trying launcher monkey..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "monkey", "-p", "com.poreiago.wallet", "-c", "android.intent.category.LAUNCHER", "1"
+    )) { $launchOk = $true }
+}
+
 Start-Sleep -Seconds 3
 $ErrorActionPreference = "Continue"
-$pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
+$pidLine = (& $adb shell pidof com.poreiago.wallet 2>$null | Out-String).Trim()
+if (-not $pidLine) {
+  # Some OEM builds omit pidof; fall back to ps.
+  $pidLine = (& $adb shell "pidof -s com.poreiago.wallet" 2>$null | Out-String).Trim()
+}
+if (-not $pidLine) {
+  $psLine = & $adb shell "ps -A 2>/dev/null | grep com.poreiago.wallet" 2>$null | Out-String
+  if ($psLine -match 'com\.poreiago\.wallet') {
+    $pidLine = "ps"
+  }
+}
 $ErrorActionPreference = "Stop"
 if (-not $pidLine) {
   $ErrorActionPreference = "Continue"
-  Write-Host "==> package activities (diagnose Error type 3):" -ForegroundColor Yellow
+  Write-Host "==> package activities (diagnose launch / Error type 3):" -ForegroundColor Yellow
   & $adb shell dumpsys package com.poreiago.wallet | Select-String -Pattern 'Activity|enabled|versionName|ActivityInfo' | Select-Object -First 40 | Out-Host
   & $adb logcat -d -t 80 AndroidRuntime:E ActivityManager:E Capacitor:E chromium:E *:S | Out-Host
   $ErrorActionPreference = "Stop"
-  throw "App crashed on open - paste logcat above. If Activity class does not exist: Device Manager -> Wipe Data on the AVD, Cold Boot, rerun wallet-open.ps1 -Rebuild. Do NOT press Studio Run."
+  throw "App installed but did not stay open. On phone: open PoreiaGo from the app drawer once. Or: adb shell am start --user 0 -n com.poreiago.wallet/com.poreiago.wallet.MainActivity"
 }
 Write-Host ""
 Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
