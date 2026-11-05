@@ -27,6 +27,8 @@ export const SERVICE_HUB = {
   primaryCta: 'Ξεκινήστε',
   secondaryCta: 'Υπηρεσίες',
   contractsCta: 'Συμβόλαια & τιμές',
+  contractsHint: 'Μηνιαία ή ετήσια πλάνα · ξεκινήστε όταν είστε έτοιμοι',
+  contractsChips: ['Μηνιαίο', 'Ετήσιο', 'Add-on Rent'],
   chooseTitle: 'Τι θέλετε να ανοίξετε πρώτα;',
   chooseSupport:
     'Ίδια πλατφόρμα PoreiaGo · ξεχωριστή εμπειρία για κάθε υπηρεσία. Ξεκινάτε στο subdomain σας · το δικό σας domain μετά.',
