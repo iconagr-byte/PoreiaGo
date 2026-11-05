@@ -178,7 +178,6 @@ export default function OfficeSetupWizard({
     beneficiary: '',
     iban: '',
     bic: '',
-    deposit_percent: 30,
   });
 
   const [fleet, setFleet] = useState({
@@ -280,7 +279,6 @@ export default function OfficeSetupWizard({
             beneficiary: bank.beneficiary || '',
             iban: bank.iban || '',
             bic: bank.bic || '',
-            deposit_percent: payments?.deposit?.percent || 30,
           }));
         }
       } finally {
@@ -467,8 +465,8 @@ export default function OfficeSetupWizard({
     }
     setBusy(true);
     try {
+      // Deposit % stays out of onboarding — configure later in Πληρωμές.
       await updatePaymentSettings({
-        deposit: { enabled: true, percent: Number(pay.deposit_percent) || 30 },
         methods: {
           bank_transfer: { enabled: true },
           card: { enabled: true },
@@ -496,8 +494,6 @@ export default function OfficeSetupWizard({
         checkout_bank_beneficiary: pay.beneficiary.trim(),
         checkout_bank_iban: pay.iban.trim().replace(/\s+/g, ''),
         checkout_bank_bic: pay.bic.trim(),
-        checkout_deposit_enabled: true,
-        checkout_deposit_percent: Number(pay.deposit_percent) || 30,
       });
       setCompleted((c) => ({ ...c, payments: true }));
       return true;
@@ -1032,7 +1028,7 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Πληρωμές</p>
                 <h2 className="office-setup-title">Πού να πληρώνουν οι πελάτες;</h2>
                 <p className="office-setup-subtitle">
-                  Τραπεζικός λογαριασμός για καταθέσεις και προκαταβολή κράτησης.
+                  Τραπεζικός λογαριασμός για καταθέσεις. Η προκαταβολή ρυθμίζεται μετά από Πληρωμές.
                 </p>
                 <div className="office-setup-grid cols-2">
                   <div className="office-setup-field">
@@ -1070,18 +1066,6 @@ export default function OfficeSetupWizard({
                       onChange={(e) => setPay((p) => ({ ...p, bic: e.target.value }))}
                       placeholder="ERBKGRAA"
                     />
-                  </div>
-                  <div className="office-setup-field">
-                    <label htmlFor="os-dep">Προκαταβολή %</label>
-                    <input
-                      id="os-dep"
-                      type="number"
-                      min={5}
-                      max={90}
-                      value={pay.deposit_percent}
-                      onChange={(e) => setPay((p) => ({ ...p, deposit_percent: e.target.value }))}
-                    />
-                    <p className="office-setup-hint">Συνήθως 30% για κρατήσεις.</p>
                   </div>
                 </div>
               </>
