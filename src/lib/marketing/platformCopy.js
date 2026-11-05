@@ -144,6 +144,106 @@ export const RENT_SESSION = {
   ctaTo: '/rent',
 };
 
+/**
+ * /rent platform showcase — light hub (homepage-style graphics) + capability session.
+ * Not a pure customer booking strip: explains the whole Rent product.
+ */
+export const RENT_SHOWCASE_HUB = {
+  micro: 'PoreiaGo Rent · ενοικιάσεις για ταξιδιωτικά γραφεία',
+  brand: 'PoreiaGo',
+  brandAccent: 'Rent',
+  hook: 'Κράτηση αυτοκινήτου',
+  hookLine2: 'όπως πρέπει να είναι.',
+  support:
+    'Στόλος γραφείου, ημερομηνίες, ασφάλεια, ψηφιακό συμβόλαιο και QR στο My Wallet — μία καθαρή ροή από την αναζήτηση μέχρι την παραλαβή.',
+  primaryCta: 'Δες διαθεσιμότητα',
+  secondaryCta: 'Τι μπορείς να κάνεις',
+  primaryHref: '#rent-guest-search',
+  secondaryHref: '#session-rent-capabilities',
+};
+
+export const RENT_CAPABILITIES_SESSION = {
+  id: 'session-rent-capabilities',
+  kicker: 'Όλο το Rent',
+  hook: 'Τι μπορείς να κάνεις σε αυτή τη σελίδα',
+  hookAccent: 'αυτή τη σελίδα',
+  support:
+    'Δεν είναι μόνο λίστα αυτοκινήτων. Είναι η πλήρης εμπειρία ενοικίασης: από την αναζήτηση και την επιλογή, μέχρι συμβόλαιο, Wallet και υποστήριξη στο δρόμο.',
+  groups: [
+    {
+      id: 'find',
+      label: 'Βρίσκεις',
+      items: [
+        {
+          icon: 'search',
+          label: 'Αναζήτηση ημερομηνιών',
+          detail: 'Παραλαβή, επιστροφή και ώρες σε μία γραμμή',
+        },
+        {
+          icon: 'directions_car',
+          label: 'Στόλος γραφείου',
+          detail: 'Κατηγορίες, τιμή/ημέρα και φίλτρα όπως τα βλέπει ο πελάτης',
+        },
+        {
+          icon: 'location_on',
+          label: 'Σημεία παραλαβής',
+          detail: 'Γραφείο, αεροδρόμιο ή άλλο σημείο που ορίζει το γραφείο',
+        },
+      ],
+    },
+    {
+      id: 'book',
+      label: 'Κλείνεις',
+      items: [
+        {
+          icon: 'health_and_safety',
+          label: 'Ασφάλεια & extras',
+          detail: 'CDW / SCDW και πρόσθετα πριν την πληρωμή',
+        },
+        {
+          icon: 'payments',
+          label: 'Καθαρή πληρωμή',
+          detail: 'Σύνολο ημερών και προκαταβολή — χωρίς κρυφά βήματα',
+        },
+        {
+          icon: 'draw',
+          label: 'Ψηφιακό συμβόλαιο',
+          detail: 'Όροι και υπογραφή στο κινητό ή στο desk',
+        },
+      ],
+    },
+    {
+      id: 'drive',
+      label: 'Οδηγείς',
+      items: [
+        {
+          icon: 'qr_code_2',
+          label: 'Pass στο My Wallet',
+          detail: 'QR κράτησης πάντα στο κινητό',
+        },
+        {
+          icon: 'fact_check',
+          label: 'Online check-in',
+          detail: 'Checklist πριν φύγεις από το σημείο παραλαβής',
+        },
+        {
+          icon: 'sos',
+          label: 'Οδική βοήθεια',
+          detail: 'Υποστήριξη γραφείου όταν τη χρειαστείς',
+        },
+      ],
+    },
+  ],
+  ctaLabel: 'Ξεκίνα από την αναζήτηση',
+  ctaHref: '#rent-guest-search',
+  visual: {
+    title: 'Κράτηση Rent',
+    model: 'Compact · DEMO-RENT',
+    meta: '3 ημέρες · Παραλαβή γραφείο',
+    status: 'Έτοιμο στο Wallet',
+  },
+};
+
 /** Digital rental contracts — session on /rent. */
 export const RENT_CONTRACTS_SESSION = {
   id: 'session-rent-contracts',

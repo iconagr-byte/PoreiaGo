@@ -1,0 +1,781 @@
+/**
+ * /rent platform showcase — light hub (homepage-style) + Apple capability session.
+ */
+
+.rent-show-hub {
+  --rent-show-sky: #0ea5e9;
+  --rent-show-cyan: #22d3ee;
+  --rent-show-teal: #0d9488;
+  --rent-show-ink: #0a2540;
+  --rent-show-muted: #425466;
+  --rent-show-bg: #f6f9fc;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(13, 148, 136, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(14, 165, 233, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, var(--rent-show-bg) 100%);
+  color: var(--rent-show-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rent-show-hub-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 5.5rem 1.25rem 4.5rem;
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+@media (min-width: 960px) {
+  .rent-show-hub-inner {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    padding: 6.5rem 2rem 5.5rem;
+    gap: 2.5rem;
+    min-height: min(78vh, 40rem);
+  }
+}
+
+.rent-show-hub-copy {
+  max-width: 34rem;
+}
+
+.rent-show-hub-micro {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  animation: rentShowRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rent-show-hub-brand {
+  display: block;
+  margin: 0 0 0.55rem;
+  font-size: clamp(2.35rem, 6vw, 3.45rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--rent-show-ink);
+}
+
+.rent-show-hub-brand-accent {
+  background: linear-gradient(105deg, var(--rent-show-sky) 0%, var(--rent-show-cyan) 42%, var(--rent-show-teal) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rent-show-hub-headline {
+  margin: 0 0 1.1rem;
+  font-size: clamp(1.75rem, 4vw, 2.65rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: var(--rent-show-ink);
+  animation: rentShowRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.rent-show-hub-headline-accent {
+  background: linear-gradient(100deg, #0f766e 0%, #0ea5e9 55%, #0891b2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rent-show-hub-support {
+  margin: 0 0 1.75rem;
+  max-width: 32rem;
+  font-size: clamp(1.02rem, 2vw, 1.125rem);
+  line-height: 1.55;
+  color: var(--rent-show-muted);
+  animation: rentShowRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+}
+
+.rent-show-hub-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  animation: rentShowRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+}
+
+.rent-show-hub-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.85rem;
+  padding: 0.65rem 1.2rem;
+  border-radius: 0.65rem;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.28);
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.rent-show-hub-cta-primary .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+.rent-show-hub-cta-primary:hover {
+  background: #0d9488;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.34);
+}
+
+.rent-show-hub-cta-primary:focus-visible {
+  outline: 2px solid var(--rent-show-sky);
+  outline-offset: 3px;
+}
+
+.rent-show-hub-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.85rem;
+  padding: 0.65rem 1.05rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(10, 37, 64, 0.14);
+  background: #fff;
+  color: var(--rent-show-ink);
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rent-show-hub-cta-secondary:hover {
+  background: #f1f5f9;
+  border-color: rgba(10, 37, 64, 0.22);
+}
+
+.rent-show-hub-cta-secondary:focus-visible {
+  outline: 2px solid var(--rent-show-sky);
+  outline-offset: 3px;
+}
+
+/* —— Rent product stage —— */
+
+.rent-show-stage {
+  position: relative;
+  min-height: 24rem;
+  animation: rentShowRise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+@media (min-width: 960px) {
+  .rent-show-stage {
+    min-height: 30rem;
+  }
+}
+
+.rent-show-ribbon {
+  position: absolute;
+  inset: -6% -14% -28% 4%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(13, 148, 136, 0.95) 0%,
+      rgba(20, 184, 166, 0.9) 22%,
+      rgba(14, 165, 233, 0.88) 52%,
+      rgba(34, 211, 238, 0.9) 72%,
+      rgba(6, 182, 212, 0.92) 100%
+    );
+  filter: blur(0.5px);
+  transform: rotate(-8deg) scale(1.08);
+  animation: rentShowRibbon 16s ease-in-out infinite alternate;
+  opacity: 0.95;
+}
+
+.rent-show-stage-stack {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: inherit;
+  padding: 1.5rem 0.5rem 2.25rem;
+}
+
+.rent-show-desk {
+  width: min(100%, 24rem);
+  margin-left: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 24px 60px rgba(10, 37, 64, 0.18),
+    0 2px 0 rgba(255, 255, 255, 0.8) inset;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.rent-show-desk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  background: #f1f5f9;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rent-show-desk-bar span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.rent-show-desk-bar span:nth-child(1) {
+  background: #f87171;
+}
+.rent-show-desk-bar span:nth-child(2) {
+  background: #fbbf24;
+}
+.rent-show-desk-bar span:nth-child(3) {
+  background: #34d399;
+}
+
+.rent-show-desk-bar em {
+  margin-left: 0.45rem;
+  font-style: normal;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.rent-show-desk-body {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  min-height: 14.5rem;
+}
+
+.rent-show-desk-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.45rem;
+  background: #042f2e;
+}
+
+.rent-show-desk-side i {
+  display: block;
+  width: 100%;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.rent-show-desk-side i.is-on {
+  background: linear-gradient(90deg, #2dd4bf, #38bdf8);
+}
+
+.rent-show-desk-main {
+  padding: 0.85rem 0.9rem 1rem;
+}
+
+.rent-show-desk-main strong {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.55rem;
+}
+
+.rent-show-meter {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+}
+
+.rent-show-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0d9488, #0ea5e9, #22d3ee);
+}
+
+.rent-show-cars {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.rent-show-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.rent-show-car-row em {
+  margin-left: auto;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: #0f766e;
+}
+
+.rent-show-car-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #0ea5e9;
+  flex-shrink: 0;
+}
+
+.rent-show-car-dot--teal {
+  background: #14b8a6;
+}
+
+.rent-show-car-dot--amber {
+  background: #f59e0b;
+}
+
+.rent-show-desk-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: #64748b;
+}
+
+.rent-show-desk-row em {
+  font-style: normal;
+  color: #0f766e;
+}
+
+.rent-show-phone {
+  position: absolute;
+  right: 4%;
+  bottom: 8%;
+  width: 9.6rem;
+  padding: 0.85rem 0.75rem 1rem;
+  border-radius: 1.35rem;
+  background: linear-gradient(165deg, #0f172a 0%, #042f2e 100%);
+  color: #ecfeff;
+  box-shadow:
+    0 22px 48px rgba(2, 6, 23, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  transform: rotate(6deg);
+  animation: rentShowPhone 7s ease-in-out infinite alternate;
+}
+
+.rent-show-phone-notch {
+  width: 2.4rem;
+  height: 0.35rem;
+  margin: 0 auto 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.rent-show-phone-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5eead4;
+}
+
+.rent-show-phone strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.rent-show-phone-trip {
+  display: block;
+  margin: 0.2rem 0 0.65rem;
+  font-size: 0.65rem;
+  color: rgba(236, 254, 255, 0.72);
+}
+
+.rent-show-qr {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.12rem;
+  padding: 0.45rem;
+  border-radius: 0.45rem;
+  background: #fff;
+  margin-bottom: 0.55rem;
+}
+
+.rent-show-qr i {
+  aspect-ratio: 1;
+  border-radius: 0.08rem;
+  background: #e2e8f0;
+}
+
+.rent-show-qr i.on {
+  background: #0f172a;
+}
+
+.rent-show-phone-seat {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(236, 254, 255, 0.78);
+}
+
+/* —— Capability session (Apple #f5f5f7) —— */
+
+.rent-cap-session {
+  position: relative;
+  overflow: hidden;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  scroll-margin-top: 5.5rem;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rent-home > .rent-cap-session {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.rent-cap-intro {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 4.25rem 1.25rem 1.5rem;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .rent-cap-intro {
+    padding: 5rem 2rem 1.75rem;
+  }
+}
+
+.rent-cap-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d9488;
+}
+
+.rent-cap-hook {
+  margin: 0 0 1rem;
+  font-size: clamp(1.75rem, 4vw, 2.65rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: #1d1d1f;
+}
+
+.rent-cap-hook-accent {
+  font-style: normal;
+  color: #0d9488;
+}
+
+.rent-cap-support {
+  margin: 0 auto;
+  max-width: 38rem;
+  font-size: clamp(1.02rem, 2vw, 1.15rem);
+  line-height: 1.55;
+  color: #86868b;
+}
+
+.rent-cap-layout {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 1rem;
+  display: grid;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+@media (min-width: 980px) {
+  .rent-cap-layout {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.75fr);
+    gap: 2.75rem;
+    padding: 2rem 2rem 1.25rem;
+    align-items: center;
+  }
+}
+
+.rent-cap-journey {
+  display: grid;
+  gap: 1.75rem;
+  text-align: left;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 1.75rem;
+}
+
+@media (min-width: 860px) {
+  .rent-cap-journey {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .rent-cap-col + .rent-cap-col {
+    padding-left: 1.4rem;
+    margin-left: 0.25rem;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+  }
+}
+
+.rent-cap-col-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0 0 1.1rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0d9488;
+}
+
+.rent-cap-col-label span {
+  font-variant-numeric: tabular-nums;
+  color: rgba(13, 148, 136, 0.45);
+}
+
+.rent-cap-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.05rem;
+}
+
+.rent-cap-col li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.rent-cap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  font-size: 1.15rem !important;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.08);
+  border: 1px solid rgba(13, 148, 136, 0.14);
+}
+
+.rent-cap-col strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+  margin-bottom: 0.15rem;
+}
+
+.rent-cap-col li > div > span {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #86868b;
+}
+
+.rent-cap-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.rent-cap-pass {
+  width: min(100%, 17.5rem);
+  padding: 1.25rem 1.2rem 1.35rem;
+  border-radius: 1.35rem;
+  background: linear-gradient(165deg, #042f2e 0%, #0b3d4a 55%, #0f766e 100%);
+  color: #ecfeff;
+  box-shadow:
+    0 18px 40px rgba(4, 47, 46, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  animation: rentShowPhone 8s ease-in-out infinite alternate;
+}
+
+.rent-cap-pass-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.rent-cap-pass-badge {
+  display: inline-flex;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(94, 234, 212, 0.18);
+  color: #99f6e4;
+}
+
+.rent-cap-pass-top .material-symbols-outlined {
+  font-size: 1.35rem;
+  color: #5eead4;
+}
+
+.rent-cap-pass-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(236, 254, 255, 0.65);
+}
+
+.rent-cap-pass-model {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.rent-cap-pass-meta {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  color: rgba(236, 254, 255, 0.72);
+}
+
+.rent-cap-pass-qr {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.18rem;
+  width: 5.5rem;
+  padding: 0.5rem;
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.rent-cap-pass-qr i {
+  aspect-ratio: 1;
+  border-radius: 0.1rem;
+  background: #e2e8f0;
+}
+
+.rent-cap-pass-qr i.on {
+  background: #042f2e;
+}
+
+.rent-cap-cta-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 1.25rem 4rem;
+}
+
+@media (min-width: 768px) {
+  .rent-cap-cta-wrap {
+    padding-bottom: 4.75rem;
+  }
+}
+
+.rent-cap-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.85rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: 999px;
+  background: #1d1d1f;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.rent-cap-cta .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+.rent-cap-cta:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+.rent-cap-cta:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 3px;
+}
+
+.rent-cap-rise {
+  animation: rentShowRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
+@keyframes rentShowRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rentShowRibbon {
+  from {
+    transform: rotate(-8deg) scale(1.06) translate3d(0, 0, 0);
+  }
+  to {
+    transform: rotate(-5deg) scale(1.1) translate3d(1.5%, -1%, 0);
+  }
+}
+
+@keyframes rentShowPhone {
+  from {
+    transform: rotate(6deg) translateY(0);
+  }
+  to {
+    transform: rotate(4deg) translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rent-show-ribbon,
+  .rent-show-phone,
+  .rent-cap-pass,
+  .rent-show-hub-micro,
+  .rent-show-hub-headline,
+  .rent-show-hub-support,
+  .rent-show-hub-cta,
+  .rent-show-stage,
+  .rent-cap-rise {
+    animation: none !important;
+  }
+}
