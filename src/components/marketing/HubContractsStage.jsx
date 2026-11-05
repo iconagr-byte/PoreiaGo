@@ -9,11 +9,11 @@ import { SERVICE_HUB } from '../../lib/marketing/platformCopy.js';
 
 function PlanPrice({ plan }) {
   if (plan.contactSales || plan.monthlyEur == null) {
-    return <span className="pg-hub-full-price is-custom">Κατόπιν συνεννόησης</span>;
+    return <span className="pg-apple-price is-custom">Κατόπιν συνεννόησης</span>;
   }
   const price = displayPrice(plan, 'month');
   return (
-    <span className="pg-hub-full-price">
+    <span className="pg-apple-price">
       <b>{price.label}</b>
       <small>{price.suffix}</small>
     </span>
@@ -21,7 +21,7 @@ function PlanPrice({ plan }) {
 }
 
 /**
- * Full-size minimal contracts stage: all bus plan provisions + Rent add-on features.
+ * Apple-aesthetic contracts stage — bus tiers + Rent add-on.
  */
 export default function HubContractsStage() {
   const buses = AGENCY_PLANS;
@@ -29,109 +29,105 @@ export default function HubContractsStage() {
   const addonPrice = rentAddonDisplayPrice('month', addon);
 
   return (
-    <div className="pg-hub-contracts-stage" id="hub-contracts">
-      <header className="pg-hub-contracts-intro">
-        <p className="pg-hub-contracts-kicker">{SERVICE_HUB.contractsKicker}</p>
-        <h3 className="pg-hub-contracts-hook">
-          {SERVICE_HUB.contractsHook}{' '}
+    <div className="pg-apple-contracts" id="hub-contracts">
+      <header className="pg-apple-contracts-intro">
+        <p className="pg-apple-eyebrow">{SERVICE_HUB.contractsKicker}</p>
+        <h3 className="pg-apple-title">
+          {SERVICE_HUB.contractsHook}
+          <br />
           <span>{SERVICE_HUB.contractsHookAccent}</span>
         </h3>
-        <p className="pg-hub-contracts-support">{SERVICE_HUB.contractsSupport}</p>
+        <p className="pg-apple-lead">{SERVICE_HUB.contractsSupport}</p>
       </header>
 
-      <div className="pg-hub-full-pair">
-        <section className="pg-hub-full-panel pg-hub-full-panel--buses" aria-label="Συμβόλαια λεωφορείων">
-          <header className="pg-hub-full-head">
-            <span className="pg-hub-full-icon material-symbols-outlined" aria-hidden>
-              directions_bus
-            </span>
-            <div>
-              <p className="pg-hub-full-badge">Λεωφορεία</p>
-              <h4>Συμβόλαια λεωφορείων</h4>
-              <p>Starter · Professional · Enterprise — μηνιαίο ή ετήσιο</p>
-            </div>
-          </header>
-
-          <div className="pg-hub-full-tiers">
-            {buses.map((plan) => (
-              <article
-                key={plan.id}
-                className={`pg-hub-full-tier${plan.highlighted ? ' is-hi' : ''}`}
-              >
-                <div className="pg-hub-full-tier-top">
-                  <div>
-                    {plan.highlighted ? <em className="pg-hub-full-pill">Προτεινόμενο</em> : null}
-                    <h5>{plan.name}</h5>
-                    <p>{plan.tagline}</p>
-                  </div>
-                  <PlanPrice plan={plan} />
-                </div>
-                <ul>
-                  {(plan.features || []).map((feature) => (
-                    <li key={feature}>
-                      <span className="material-symbols-outlined" aria-hidden>
-                        check
-                      </span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
+      <section className="pg-apple-panel" aria-label="Συμβόλαια λεωφορείων">
+        <header className="pg-apple-panel-head">
+          <span className="pg-apple-glyph" aria-hidden>
+            <span className="material-symbols-outlined">directions_bus</span>
+          </span>
+          <div>
+            <p className="pg-apple-label">Λεωφορεία</p>
+            <h4>Συμβόλαια λεωφορείων</h4>
+            <p>Starter · Professional · Enterprise — μηνιαίο ή ετήσιο</p>
           </div>
+        </header>
 
-          <Link to="/grafeia" className="pg-hub-full-cta pg-hub-full-cta--buses">
+        <div className="pg-apple-tiers">
+          {buses.map((plan) => (
+            <article
+              key={plan.id}
+              className={`pg-apple-tier${plan.highlighted ? ' is-featured' : ''}`}
+            >
+              {plan.highlighted ? <em className="pg-apple-chip">Προτεινόμενο</em> : null}
+              <h5>{plan.name}</h5>
+              <p className="pg-apple-tier-tag">{plan.tagline}</p>
+              <PlanPrice plan={plan} />
+              <ul className="pg-apple-list">
+                {(plan.features || []).map((feature) => (
+                  <li key={feature}>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      check_circle
+                    </span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+
+        <div className="pg-apple-actions">
+          <Link to="/grafeia" className="pg-apple-btn pg-apple-btn--blue">
             Δείτε πλάνα λεωφορείων
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
           </Link>
-        </section>
+        </div>
+      </section>
 
-        <section
-          className="pg-hub-full-panel pg-hub-full-panel--rent"
-          aria-label="Add-on Ενοικιάσεις"
-        >
-          <header className="pg-hub-full-head">
-            <span className="pg-hub-full-icon pg-hub-full-icon--rent material-symbols-outlined" aria-hidden>
-              car_rental
-            </span>
-            <div>
-              <p className="pg-hub-full-badge pg-hub-full-badge--rent">{addon.badge}</p>
-              <h4>{addon.name}</h4>
-              <p>{addon.tagline}</p>
-            </div>
-          </header>
-
-          <div className="pg-hub-full-addon-price">
-            <b>
-              +{addonPrice.label}
-              <small>{addonPrice.suffix}</small>
-            </b>
-            <span>Πάνω σε οποιοδήποτε συμβόλαιο λεωφορείων</span>
+      <section className="pg-apple-panel pg-apple-panel--rent" aria-label="Add-on Ενοικιάσεις">
+        <header className="pg-apple-panel-head">
+          <span className="pg-apple-glyph pg-apple-glyph--mint" aria-hidden>
+            <span className="material-symbols-outlined">car_rental</span>
+          </span>
+          <div>
+            <p className="pg-apple-label pg-apple-label--mint">{addon.badge}</p>
+            <h4>{addon.name}</h4>
+            <p>{addon.tagline}</p>
           </div>
+        </header>
 
-          <ul className="pg-hub-full-features">
-            {(addon.features || []).map((feature) => (
-              <li key={feature}>
-                <span className="material-symbols-outlined" aria-hidden>
-                  check
-                </span>
-                {feature}
-              </li>
-            ))}
-          </ul>
+        <div className="pg-apple-price-card">
+          <span className="pg-apple-price pg-apple-price--mint">
+            <b>+{addonPrice.label}</b>
+            <small>{addonPrice.suffix}</small>
+          </span>
+          <span className="pg-apple-price-note">Πάνω σε οποιοδήποτε συμβόλαιο λεωφορείων</span>
+        </div>
 
-          <Link to="/grafeia#contracts-rent" className="pg-hub-full-cta pg-hub-full-cta--rent">
+        <ul className="pg-apple-list">
+          {(addon.features || []).map((feature) => (
+            <li key={feature}>
+              <span className="material-symbols-outlined" aria-hidden>
+                check_circle
+              </span>
+              {feature}
+            </li>
+          ))}
+        </ul>
+
+        <div className="pg-apple-actions">
+          <Link to="/grafeia#contracts-rent" className="pg-apple-btn pg-apple-btn--mint">
             {addon.ctaGuest || 'Προσθήκη Rent'}
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
           </Link>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      <p className="pg-hub-contracts-all">
+      <p className="pg-apple-footnote">
         <Link to="/grafeia">{SERVICE_HUB.contractsAllCta}</Link>
       </p>
     </div>
