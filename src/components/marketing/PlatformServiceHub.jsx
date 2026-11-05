@@ -94,9 +94,33 @@ export default function PlatformServiceHub() {
               </Link>
             </div>
 
-            <p className="pg-hub-choose-foot">
-              <Link to="/grafeia">{SERVICE_HUB.contractsCta}</Link>
-            </p>
+            <Link to="/grafeia" className="pg-hub-contracts">
+              <span className="pg-hub-contracts-glow" aria-hidden />
+              <span className="pg-hub-contracts-doc" aria-hidden>
+                <span className="pg-hub-contracts-doc-seal">
+                  <span className="material-symbols-outlined">verified</span>
+                </span>
+                <span className="pg-hub-contracts-doc-lines">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="pg-hub-contracts-doc-tag">€</span>
+              </span>
+              <span className="pg-hub-contracts-copy">
+                <strong>{SERVICE_HUB.contractsCta}</strong>
+                <span>{SERVICE_HUB.contractsHint}</span>
+                <span className="pg-hub-contracts-chips">
+                  {SERVICE_HUB.contractsChips.map((chip) => (
+                    <em key={chip}>{chip}</em>
+                  ))}
+                </span>
+              </span>
+              <span className="pg-hub-contracts-go" aria-hidden>
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </span>
+            </Link>
           </div>
         </div>
       </section>
