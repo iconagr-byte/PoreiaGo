@@ -56,6 +56,23 @@ describe('resolveOfficeBrand', () => {
     expect(style.background).toBe('#ffffff');
     expect(style.boxShadow).toContain('rgba');
   });
+
+  it('caps height and width for compact / native top bars', () => {
+    const style = officeLogoImageStyle(
+      {
+        logo_height_px: 96,
+        logo_max_width_px: 320,
+        logo_padding_px: 12,
+        logo_shadow: true,
+      },
+      { compact: true },
+    );
+    expect(style.height).toBe('28px');
+    expect(style.maxWidth).toBe('112px');
+    expect(style.maxHeight).toBe('28px');
+    expect(style.padding).toBe('2px');
+    expect(style.boxShadow).toBeUndefined();
+  });
 });
 
 describe('scrubSiteAppearancePlaceholders', () => {

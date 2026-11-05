@@ -198,3 +198,22 @@ html[data-poreiago-app='wallet'] .wallet-app--phone {
   border: 0;
   box-shadow: none;
 }
+
+/* Office logo in native top bar — keep mobile-friendly (admin header sizes can be 48–96px). */
+html[data-poreiago-app='wallet'] .wallet-topbar-brand,
+html[data-poreiago-app='app'] .wallet-topbar-brand {
+  max-width: min(9.5rem, 42vw);
+  justify-content: center;
+}
+
+html[data-poreiago-app='wallet'] .wallet-topbar-brand img,
+html[data-poreiago-app='app'] .wallet-topbar-brand img,
+html[data-poreiago-app='wallet'] .office-brand-mark__logo--compact,
+html[data-poreiago-app='app'] .office-brand-mark__logo--compact {
+  max-height: 28px !important;
+  height: 28px !important;
+  max-width: min(112px, 40vw) !important;
+  width: auto !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
