@@ -1760,6 +1760,67 @@
   min-width: 0;
 }
 
+.pdw-builder__studio-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.75rem 1.05rem 0;
+}
+
+.pdw-builder__studio-intro .pdw-builder__blurb {
+  margin: 0.15rem 0 0;
+  -webkit-line-clamp: 3;
+}
+
+.pdw-builder__panel.is-studio .pdw-builder__body {
+  padding-top: 0.55rem;
+}
+
+.pdw-picker__selected-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #64748b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pdw-picker__tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.pdw-picker__tools-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.32rem 0.65rem 0.32rem 0.45rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pdw-picker__tools-toggle .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.pdw-picker__tools-toggle:hover,
+.pdw-picker__tools-toggle.is-open {
+  background: #eff6ff;
+  border-color: rgba(0, 113, 227, 0.35);
+  color: #0071e3;
+}
+
 .pdw-builder__kicker {
   margin: 0;
   font-size: 0.58rem;
