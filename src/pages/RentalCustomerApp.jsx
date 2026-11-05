@@ -63,8 +63,9 @@ import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
-import PlatformRentSession from '../components/marketing/PlatformRentSession.jsx';
 import PlatformRentContractsSession from '../components/marketing/PlatformRentContractsSession.jsx';
+import RentShowcaseHub from '../components/marketing/RentShowcaseHub.jsx';
+import RentCapabilitiesSession from '../components/marketing/RentCapabilitiesSession.jsx';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import LoginPage from './LoginPage.jsx';
@@ -362,6 +363,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         </header>
 
         <main className="rent-home rent-home--guest-land">
+          {isPlatformMarketingHost() ? (
+            <RentShowcaseHub brandLabel={branding.brandLabel} />
+          ) : null}
+
           <RentGuestHero
             brandLabel={branding.brandLabel}
             logoUrl={branding.logoUrl}
@@ -432,6 +437,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               }}
             />
           </RentGuestHero>
+
+          <RentCapabilitiesSession />
 
           <div className="rent-home-stack rent-home-stack--landing">
             {/* Filters sit in a left page column — outside the car-results frame. */}
@@ -587,8 +594,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             />
-
-            {isPlatformMarketingHost() ? <PlatformRentSession placement="page" /> : null}
           </div>
         </main>
       </div>

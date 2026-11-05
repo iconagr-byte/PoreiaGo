@@ -6,14 +6,19 @@ import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 const QUICK_NAV = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
-  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
+  { id: 'session-rent-capabilities', el: 'Τι κάνεις', en: 'What you can do' },
   { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
-  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
 ];
 
 const NAV_ITEMS = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
+  {
+    id: 'session-rent-capabilities',
+    el: 'Τι μπορείς',
+    en: 'Capabilities',
+    icon: 'auto_awesome',
+  },
   {
     id: 'session-rent-contracts',
     el: 'Συμβόλαιο',
