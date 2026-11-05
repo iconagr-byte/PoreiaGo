@@ -225,9 +225,15 @@ export default function BackOffice() {
   const [brandRefreshKey, setBrandRefreshKey] = useState(0);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [rentSummary, setRentSummary] = useState(null);
-  const [showOfficeSetup, setShowOfficeSetup] = useState(
-    () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
-  );
+  const [showOfficeSetup, setShowOfficeSetup] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+    } catch {
+      /* ignore */
+    }
+    return Boolean(location.state?.officeSetup) || !isOfficeSetupComplete();
+  });
   const officeMode = officeModeFromModules(officeModules);
   const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
@@ -410,8 +416,15 @@ export default function BackOffice() {
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
     }
-    if (location.state?.officeSetup) {
-      setShowOfficeSetup(true);
+    {
+      let forceSetup = Boolean(location.state?.officeSetup);
+      try {
+        const q = new URLSearchParams(location.search || '');
+        if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') forceSetup = true;
+      } catch {
+        /* ignore */
+      }
+      if (forceSetup) setShowOfficeSetup(true);
     }
     if (
       location.state?.routesMarket === MARKET_DOMESTIC ||
@@ -2484,9 +2497,39 @@ export default function BackOffice() {
       {showOfficeSetup && (
         <OfficeSetupWizard
           rentEnabled={rentMenuVisible}
-          forceOpen={Boolean(location.state?.officeSetup)}
-          onFinished={() => setShowOfficeSetup(false)}
-          onDismiss={() => setShowOfficeSetup(false)}
+          forceOpen={(() => {
+            try {
+              const q = new URLSearchParams(location.search || '');
+              if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+            } catch {
+              /* ignore */
+            }
+            return Boolean(location.state?.officeSetup);
+          })()}
+          onFinished={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
+          onDismiss={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
         />
       )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
