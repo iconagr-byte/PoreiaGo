@@ -729,8 +729,8 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Domain &amp; διεύθυνση</p>
                 <h2 className="office-setup-title">Η διεύθυνση του γραφείου σας στο web</h2>
                 <p className="office-setup-subtitle">
-                  Το subdomain της πλατφόρμας είναι ήδη έτοιμο. Προαιρετικά συνδέστε το δικό σας
-                  domain με ένα CNAME.
+                  Το subdomain ανοίγει αυτόματα από το PoreiaGo DNS — ο πελάτης δεν ρυθμίζει
+                  τίποτα. Προαιρετικά συνδέστε δικό σας domain με ένα CNAME.
                 </p>
 
                 <div className="office-setup-domain-hero">
