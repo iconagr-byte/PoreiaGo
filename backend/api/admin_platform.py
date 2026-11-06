@@ -1060,13 +1060,84 @@ async def get_login_audits(
     success: bool | None = Query(default=None),
     q: str | None = Query(default=None, max_length=120),
 ):
-    """Login history: χρόνος, IP, συσκευή — admin / customer / driver."""
+    """Login history: χρόνος, IP, συσκευή, γραφείο — admin / customer / driver."""
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
     from travel_platform.settings.login_audit_store import actor_type_label, list_login_events
 
-    rows = list_login_events(limit=limit, actor_type=actor_type, success=success, q=q)
+    # Fetch without q first so we can match office labels after DB enrich.
+    fetch_cap = 500 if (q and str(q).strip()) else limit
+    rows = list_login_events(
+        limit=fetch_cap,
+        actor_type=actor_type,
+        success=success,
+        q=None,
+    )
+
+    tenant_ids: set[UUID] = set()
     for row in rows:
+        raw = str(row.get("tenant_id") or "").strip()
+        if not raw:
+            continue
+        try:
+            tenant_ids.add(UUID(raw))
+        except ValueError:
+            continue
+
+    labels: dict[str, dict[str, str | None]] = {}
+    if tenant_ids:
+        try:
+            async with AsyncSessionLocal() as db:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[str(t.id)] = {
+                        "tenant_name": getattr(t, "legal_name", None),
+                        "tenant_slug": getattr(t, "slug", None),
+                    }
+        except Exception:
+            logger.debug("login-audits tenant label enrich failed", exc_info=True)
+
+    needle = " ".join(str(q or "").lower().split()).strip()
+    out: list[dict] = []
+    for row in rows:
+        tid = str(row.get("tenant_id") or "").strip() or None
+        meta = labels.get(tid or "") if tid else None
+        name = (meta or {}).get("tenant_name") if meta else None
+        slug = (meta or {}).get("tenant_slug") if meta else None
+        if name and slug and str(slug) not in str(name):
+            office_label = f"{name} · {slug}"
+        else:
+            office_label = name or slug or (f"Γραφείο {tid[:8]}…" if tid else "Χωρίς γραφείο")
         row["actor_type_label"] = actor_type_label(row.get("actor_type"))
-    return {"items": rows, "total": len(rows)}
+        row["tenant_name"] = name
+        row["tenant_slug"] = slug
+        row["office_label"] = office_label
+        if needle:
+            blob = " ".join(
+                str(x or "")
+                for x in (
+                    office_label,
+                    name,
+                    slug,
+                    tid,
+                    row.get("identity"),
+                    row.get("actor_name"),
+                    row.get("ip"),
+                    row.get("device"),
+                    row.get("detail"),
+                    row.get("actor_id"),
+                )
+            ).lower()
+            if needle not in blob:
+                continue
+        out.append(row)
+        if len(out) >= limit:
+            break
+    return {"items": out, "total": len(out)}
 
 
 @router.get("/drivers", response_model=list[FleetDriverResponse])
