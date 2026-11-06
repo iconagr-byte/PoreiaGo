@@ -185,9 +185,9 @@ export default function RentGuestLandingExtras({
       <section className="rent-stripe-session rent-stripe-session--cta" aria-label="Παραλαβή">
         <div className="rent-stripe-inner rent-stripe-cta-band">
           <div>
-            <p className="rent-stripe-kicker rent-stripe-kicker--on-teal">Παραλαβή & επιστροφή</p>
-            <h2 className="rent-stripe-title rent-stripe-title--light">Έτοιμοι για το δρόμο</h2>
-            <p className="rent-stripe-sub rent-stripe-sub--on-teal">
+            <p className="rent-stripe-kicker">Παραλαβή & επιστροφή</p>
+            <h2 className="rent-stripe-title">Έτοιμοι για το δρόμο</h2>
+            <p className="rent-stripe-sub">
               Παραλαβή από τα σημεία του γραφείου, προαιρετικό one-way και έλεγχος πριν την αναχώρηση.
             </p>
             <ul className="rent-stripe-checks">
@@ -211,7 +211,7 @@ export default function RentGuestLandingExtras({
               </li>
             </ul>
             <div className="rent-stripe-actions">
-              <button type="button" className="rent-stripe-cta rent-stripe-cta--white" onClick={startSearch}>
+              <button type="button" className="rent-stripe-cta" onClick={startSearch}>
                 Ξεκίνα αναζήτηση
                 <span className="material-symbols-outlined" aria-hidden>
                   arrow_forward
@@ -220,7 +220,7 @@ export default function RentGuestLandingExtras({
               {typeof onRequireLogin === 'function' ? (
                 <button
                   type="button"
-                  className="rent-stripe-cta rent-stripe-cta--ghost"
+                  className="rent-stripe-cta rent-stripe-cta--secondary"
                   onClick={onRequireLogin}
                 >
                   Έχεις ήδη λογαριασμό;
