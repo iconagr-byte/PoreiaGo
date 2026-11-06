@@ -1467,11 +1467,458 @@
   background: #f6f9fc;
 }
 
+/* ——— Rich Stripe-like floats (teal hero theme) ——— */
+
+.rent-stripe-session--rich .rent-stripe-inner {
+  max-width: 1180px;
+}
+
+.rent-stripe-card--rich {
+  min-height: 20.5rem;
+  padding: 1.45rem 1.35rem 1.2rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(10, 37, 64, 0.07);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 14px 36px rgba(10, 37, 64, 0.06);
+}
+
+.rent-stripe-card--rich.rent-stripe-card--wide,
+.rent-stripe-card--rich.rent-stripe-card--tall {
+  min-height: 23.5rem;
+}
+
+.rent-stripe-card--rich .rent-stripe-card-top h3 {
+  max-width: 18ch;
+  font-size: clamp(1.12rem, 2.1vw, 1.4rem);
+}
+
+.rent-stripe-card--rich .rent-stripe-card-expand {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  color: #0f766e;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.16);
+}
+
+.rent-stripe-card--rich .rent-stripe-card-expand .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-stripe-card--rich .rent-stripe-viz {
+  min-height: 12.5rem;
+  margin: 0.35rem -0.2rem -0.45rem;
+  padding: 1.35rem 1.1rem 1.15rem;
+  border-radius: 1.15rem;
+  overflow: hidden;
+}
+
+.rent-stripe-card--rich.rent-stripe-card--teal .rent-stripe-viz {
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 78%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(145deg, #99f6e4 0%, #2dd4bf 38%, #0d9488 78%, #0f766e 100%);
+}
+.rent-stripe-card--rich.rent-stripe-card--sky .rent-stripe-viz {
+  background:
+    radial-gradient(ellipse 60% 50% at 85% 20%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(165deg, #e0f2fe 0%, #7dd3fc 42%, #0284c7 100%);
+}
+.rent-stripe-card--rich.rent-stripe-card--mint .rent-stripe-viz {
+  background: linear-gradient(160deg, #ecfdf5 0%, #5eead4 48%, #0d9488 100%);
+}
+.rent-stripe-card--rich.rent-stripe-card--cyan .rent-stripe-viz {
+  background: linear-gradient(160deg, #ecfeff 0%, #67e8f9 45%, #0891b2 100%);
+}
+.rent-stripe-card--rich.rent-stripe-card--deep .rent-stripe-viz {
+  background: linear-gradient(155deg, #ccfbf1 0%, #14b8a6 40%, #115e59 100%);
+}
+
+.rent-stripe-viz--stack {
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+}
+
+.rent-stripe-viz--center {
+  align-items: center;
+  justify-content: center;
+}
+
+.rent-stripe-float {
+  position: relative;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(10, 37, 64, 0.2);
+  color: var(--rent-stripe-ink);
+}
+
+.rent-stripe-float-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #64748b;
+}
+.rent-stripe-float-chrome i {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+.rent-stripe-float-chrome i:first-child {
+  background: #f87171;
+}
+.rent-stripe-float-chrome i:nth-child(2) {
+  background: #fbbf24;
+}
+.rent-stripe-float-chrome i:nth-child(3) {
+  background: #34d399;
+}
+.rent-stripe-float-chrome span {
+  margin-left: 0.35rem;
+}
+
+.rent-stripe-float--phone {
+  width: min(42%, 9.2rem);
+  padding: 0.75rem 0.8rem 0.9rem;
+  z-index: 2;
+  transform: translate(0.35rem, 0.35rem) rotate(-3deg);
+  animation: rentStripeFloatA 5.5s ease-in-out infinite;
+}
+.rent-stripe-float--phone .rent-stripe-float-label {
+  margin: 0.35rem 0 0.1rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.rent-stripe-float--phone strong {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: -0.02em;
+}
+.rent-stripe-float-pill {
+  display: inline-flex;
+  margin-top: 0.7rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.rent-stripe-float--browser {
+  width: min(58%, 14.5rem);
+  margin-left: -1.35rem;
+  padding: 0.8rem 0.85rem 0.95rem;
+  z-index: 3;
+  transform: translateY(-0.15rem) rotate(1.2deg);
+  animation: rentStripeFloatB 6s ease-in-out infinite;
+}
+
+.rent-stripe-cal-lite-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.rent-stripe-cal-lite-head em {
+  font-style: normal;
+  color: var(--rent-stripe-teal);
+}
+.rent-stripe-cal-lite .rent-stripe-cal-grid {
+  margin-bottom: 0.5rem;
+}
+.rent-stripe-cal-lite p {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.rent-stripe-float--meter {
+  width: min(88%, 13.5rem);
+  margin-bottom: -1.6rem;
+  padding: 0.85rem 0.95rem;
+  z-index: 2;
+  transform: translateY(-0.4rem);
+  animation: rentStripeFloatA 5.8s ease-in-out infinite;
+}
+.rent-stripe-float--meter strong {
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 0.15rem;
+}
+.rent-stripe-float--meter p {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  color: #64748b;
+}
+.rent-stripe-meter {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.rent-stripe-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0d9488, #0ea5e9, #22d3ee);
+}
+.rent-stripe-float--meter em {
+  display: block;
+  margin-top: 0.4rem;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.rent-stripe-float--list {
+  width: min(92%, 14.5rem);
+  padding: 0.9rem 1rem 1rem;
+  z-index: 3;
+  animation: rentStripeFloatB 6.2s ease-in-out infinite;
+}
+.rent-stripe-float--list strong {
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 0.55rem;
+}
+.rent-stripe-float--list ul {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.rent-stripe-float--list li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+.rent-stripe-float--list em {
+  margin-left: auto;
+  font-style: normal;
+  color: var(--rent-stripe-teal);
+}
+.rent-stripe-float--list .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+}
+
+.rent-stripe-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.28rem;
+  height: 3.1rem;
+  padding-top: 0.25rem;
+}
+.rent-stripe-bars i {
+  flex: 1;
+  border-radius: 0.28rem 0.28rem 0.12rem 0.12rem;
+  background: linear-gradient(180deg, #38bdf8, #0d9488);
+  opacity: 0.9;
+}
+
+.rent-stripe-float--shield {
+  width: min(100%, 12.5rem);
+  padding: 1.15rem 1.05rem 1.2rem;
+  text-align: center;
+  animation: rentStripeFloatA 5.6s ease-in-out infinite;
+}
+.rent-stripe-float-icon {
+  font-size: 2rem !important;
+  color: #0d9488;
+}
+.rent-stripe-float--shield strong {
+  display: block;
+  margin: 0.4rem 0 0.25rem;
+  font-size: 1rem;
+}
+.rent-stripe-float--shield p {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+.rent-stripe-float-tag {
+  display: inline-flex;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0f766e;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.rent-stripe-float--sign {
+  width: min(100%, 13rem);
+  padding: 1rem 1.05rem 1.1rem;
+  animation: rentStripeFloatB 5.9s ease-in-out infinite;
+}
+.rent-stripe-float-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0d9488;
+}
+.rent-stripe-float--sign > strong {
+  display: block;
+  margin-bottom: 0.55rem;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.rent-stripe-float--sign ul {
+  list-style: none;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  display: grid;
+  gap: 0.28rem;
+}
+.rent-stripe-float--sign li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+}
+.rent-stripe-float--sign li .material-symbols-outlined {
+  font-size: 0.95rem;
+  color: #0d9488;
+}
+.rent-stripe-sign-ink {
+  color: #0f766e;
+  margin-bottom: 0.35rem;
+}
+.rent-stripe-sign-ink svg {
+  width: 100%;
+  height: 2.2rem;
+}
+.rent-stripe-float--sign em {
+  display: inline-flex;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0f766e;
+  font-style: normal;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.rent-stripe-float--wallet {
+  width: min(100%, 11.5rem);
+  padding: 0.95rem 1rem 1.05rem;
+  background: linear-gradient(165deg, #0f172a 0%, #042f2e 100%);
+  color: #ecfeff;
+  border: none;
+  animation: rentStripeFloatA 6s ease-in-out infinite;
+}
+.rent-stripe-float--wallet > p {
+  margin: 0 0 0.25rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #5eead4;
+}
+.rent-stripe-float--wallet > strong {
+  display: block;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.rent-stripe-float--wallet > span {
+  display: block;
+  margin: 0.15rem 0 0.55rem;
+  font-size: 0.68rem;
+  color: rgba(236, 254, 255, 0.72);
+}
+.rent-stripe-float--wallet .rent-stripe-qr--lg {
+  margin: 0.35rem 0 0.55rem;
+}
+.rent-stripe-float--wallet > em {
+  font-style: normal;
+  font-size: 0.65rem;
+  font-weight: 650;
+  color: #99f6e4;
+}
+
+@keyframes rentStripeFloatA {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes rentStripeFloatB {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.rent-stripe-float--phone {
+  animation-name: rentStripePhone;
+}
+@keyframes rentStripePhone {
+  0%,
+  100% {
+    transform: translate(0.35rem, 0.35rem) rotate(-3deg);
+  }
+  50% {
+    transform: translate(0.35rem, -0.15rem) rotate(-2.2deg);
+  }
+}
+
+.rent-stripe-float--browser {
+  animation-name: rentStripeBrowser;
+}
+@keyframes rentStripeBrowser {
+  0%,
+  100% {
+    transform: translateY(-0.15rem) rotate(1.2deg);
+  }
+  50% {
+    transform: translateY(-0.55rem) rotate(1.6deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rent-stripe-card {
     transition: none;
   }
   .rent-stripe-card:hover {
     transform: none;
+  }
+  .rent-stripe-float,
+  .rent-stripe-float--phone,
+  .rent-stripe-float--browser,
+  .rent-stripe-float--meter,
+  .rent-stripe-float--list,
+  .rent-stripe-float--shield,
+  .rent-stripe-float--sign,
+  .rent-stripe-float--wallet {
+    animation: none !important;
   }
 }
