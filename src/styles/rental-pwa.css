@@ -8226,3 +8226,22 @@
 .rent-app[data-rent-theme='deal_flash'] .rent-pick-head-sub {
   color: #1d1d1f;
 }
+
+/* Discreet office admin entry — bottom of tenant /rent only. */
+.rent-office-staff-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1.25rem 1.25rem 1.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  background: #fafafa;
+}
+
+.rent-phone-stage--desktop .rent-office-staff-foot {
+  padding-inline: 1.75rem;
+  max-width: 72rem;
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
