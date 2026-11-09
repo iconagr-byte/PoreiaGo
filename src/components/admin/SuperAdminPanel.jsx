@@ -357,12 +357,16 @@ export default function SuperAdminPanel() {
   };
 
   const openAsOffice = async (tenant) => {
+    if (!tenant?.is_active) {
+      toast.error('Το γραφείο είναι σε αναστολή — επανενεργοποίησέ το πρώτα');
+      return;
+    }
     setWorking(true);
     try {
       const tokenResponse = await impersonatePlatformTenant(tenant.id);
       startImpersonationSession(tokenResponse);
       // Always land in the setup wizard (επωνυμία · domain · εμφάνιση · …).
-      toast.success(`Άνοιγμα wizard: ${tenant.legal_name || tenant.slug}`);
+      toast.success(`Άνοιγμα: ${tenant.legal_name || tenant.slug}`);
       window.location.assign('/admin?tab=dashboard&officeSetup=1');
     } catch (e) {
       const msg = String(e?.message || '').trim();
@@ -824,31 +828,37 @@ export default function SuperAdminPanel() {
       <section className="rounded-[28px] border border-slate-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 space-y-4">
           <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-            <div className="flex flex-1 gap-2 min-w-0">
-              <div className="relative flex-1 min-w-[12rem]">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-                  search
-                </span>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && load({ q: search })}
-                  placeholder="Αναζήτηση ονόματος ή slug…"
-                  className="w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-200"
-                />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-1 gap-2 min-w-0">
+                <div className="relative flex-1 min-w-[12rem]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                    search
+                  </span>
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && load({ q: search })}
+                    placeholder="Αναζήτηση ονόματος ή slug…"
+                    className="w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => load({ q: search })}
+                  className="px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold shrink-0"
+                >
+                  Αναζήτηση
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => load({ q: search })}
-                className="px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold shrink-0"
-              >
-                Αναζήτηση
-              </button>
+              <p className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-400 px-1">
+                <span className="material-symbols-outlined text-[14px]">ads_click</span>
+                Διπλό κλικ στη γραμμή για άνοιγμα γραφείου · Enter όταν είναι εστιασμένη
+              </p>
             </div>
             <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-0.5 self-start">
               {[
-                { id: 'table', icon: 'table_rows', label: 'Πίνακας' },
+                { id: 'table', icon: 'table_rows', label: 'Λίστα' },
                 { id: 'cards', icon: 'grid_view', label: 'Κάρτες' },
               ].map((opt) => (
                 <button
@@ -887,7 +897,7 @@ export default function SuperAdminPanel() {
               </button>
             ))}
             <span className="w-px h-6 bg-slate-200 self-center mx-1 hidden sm:block" />
-            {['all', 'starter', 'professional', 'enterprise'].map((p) => (
+            {['all', 'starter', 'professional', 'enterprise', 'rent'].map((p) => (
               <button
                 key={p}
                 type="button"
@@ -948,116 +958,22 @@ export default function SuperAdminPanel() {
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100 bg-slate-50/80">
-                  <th className="px-5 py-3 font-bold">Γραφείο</th>
-                  <th className="px-3 py-3 font-bold">Πλάνο</th>
-                  <th className="px-3 py-3 font-bold">Συνδρομή</th>
-                  <th className="px-3 py-3 font-bold">Κατάσταση</th>
-                  <th className="px-3 py-3 font-bold">Δημιουργία</th>
-                  <th className="px-5 py-3 font-bold text-right">Ενέργειες</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {tenants.map((t) => {
-                  const plan = PLAN_META[t.plan] || PLAN_META.starter;
-                  const subKey = String(t.subscription?.status || '').toLowerCase();
-                  const sub = SUB_META[subKey] || { label: t.subscription?.status || '—', chip: 'bg-slate-100 text-slate-600' };
-                  const host = officeHost(t);
-                  return (
-                    <tr key={t.id} className="hover:bg-sky-50/40 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-100 to-teal-50 text-sky-700 flex items-center justify-center shrink-0 border border-sky-100">
-                            <span className="material-symbols-outlined text-[20px]">storefront</span>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900 truncate">{t.legal_name}</span>
-                              {isRecent(t.created_at) && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                  ΝΕΟ
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-mono truncate">{t.slug}</div>
-                            {host && (
-                              <button
-                                type="button"
-                                onClick={() => copyText(host)}
-                                className="text-[11px] text-sky-700 hover:underline truncate max-w-full"
-                                title="Αντιγραφή URL"
-                              >
-                                {host}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${plan.chip}`}>
-                          {plan.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${sub.chip}`}>
-                          {sub.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            t.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          {t.is_active ? 'ενεργό' : 'σε αναστολή'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4 text-xs text-slate-500 whitespace-nowrap">
-                        {formatDate(t.created_at)}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap justify-end gap-1.5">
-                          <ActionBtn
-                            disabled={working || !t.is_active}
-                            onClick={() => openAsOffice(t)}
-                            tone="primary"
-                            icon="login"
-                            label="Άνοιγμα"
-                          />
-                          <ActionBtn
-                            disabled={working}
-                            onClick={() => openEdit(t)}
-                            tone="neutral"
-                            icon="edit"
-                            label="Επεξεργασία"
-                          />
-                          {t.is_active ? (
-                            <ActionBtn
-                              disabled={working}
-                              onClick={() => toggleTenant(t, true)}
-                              tone="danger"
-                              icon="block"
-                              label="Αναστολή"
-                            />
-                          ) : (
-                            <ActionBtn
-                              disabled={working}
-                              onClick={() => toggleTenant(t, false)}
-                              tone="success"
-                              icon="check_circle"
-                              label="Επανενεργοποίηση"
-                            />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="divide-y divide-slate-100/90">
+            <div className="hidden lg:grid grid-cols-[minmax(0,1.6fr)_auto_auto] gap-4 px-5 py-2.5 text-[11px] uppercase tracking-wider text-slate-400 font-bold bg-slate-50/70">
+              <span>Γραφείο</span>
+              <span className="min-w-[14rem]">Κατάσταση</span>
+              <span className="text-right min-w-[13rem]">Ενέργειες</span>
+            </div>
+            {tenants.map((t) => (
+              <TenantListRow
+                key={t.id}
+                tenant={t}
+                working={working}
+                onOpen={() => openAsOffice(t)}
+                onEdit={() => openEdit(t)}
+                onToggle={() => toggleTenant(t, t.is_active)}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -1863,24 +1779,164 @@ function MetaChip({ icon, label, value }) {
   );
 }
 
-function TenantCard({ tenant, working, onOpen, onEdit, onToggle }) {
+function TenantStatusChips({ tenant, compact = false }) {
   const plan = PLAN_META[tenant.plan] || PLAN_META.starter;
   const subKey = String(tenant.subscription?.status || '').toLowerCase();
-  const sub = SUB_META[subKey] || { label: tenant.subscription?.status || '—', chip: 'bg-slate-100 text-slate-600' };
+  const sub = SUB_META[subKey] || {
+    label: tenant.subscription?.status || '—',
+    chip: 'bg-slate-100 text-slate-600',
+  };
+  const chipPad = compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs';
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className={`${chipPad} rounded-full font-bold border ${plan.chip}`}>{plan.label}</span>
+      <span className={`${chipPad} rounded-full font-bold ${sub.chip}`}>{sub.label}</span>
+      <span
+        className={`${chipPad} rounded-full font-bold ${
+          tenant.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+        }`}
+      >
+        {tenant.is_active ? 'ενεργό' : 'αναστολή'}
+      </span>
+    </div>
+  );
+}
+
+function TenantListRow({ tenant, working, onOpen, onEdit, onToggle }) {
   const host = officeHost(tenant);
+  const canOpen = Boolean(tenant.is_active) && !working;
 
   return (
-    <article className={`rounded-[24px] border bg-gradient-to-br p-4 shadow-sm ${plan.accent}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Άνοιγμα γραφείου ${tenant.legal_name || tenant.slug}`}
+      title={canOpen ? 'Διπλό κλικ για άνοιγμα' : 'Το γραφείο είναι σε αναστολή'}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        onOpen();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`group relative grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_auto_auto] gap-3 lg:gap-4 items-center px-4 sm:px-5 py-4 outline-none transition-colors ${
+        canOpen
+          ? 'cursor-pointer hover:bg-sky-50/55 focus-visible:bg-sky-50/70'
+          : 'cursor-default hover:bg-slate-50/80 opacity-90'
+      }`}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-full bg-sky-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      />
+
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-500 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-sky-500/20">
+          <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            storefront
+          </span>
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-bold text-slate-900 truncate">{tenant.legal_name}</span>
+            {isRecent(tenant.created_at) && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                ΝΕΟ
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono truncate">{tenant.slug}</div>
+          {host ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                copyText(host);
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="text-[11px] text-sky-700 hover:underline truncate max-w-full text-left"
+              title="Αντιγραφή URL"
+            >
+              {host}
+            </button>
+          ) : null}
+          <p className="mt-1 text-[11px] text-slate-400 lg:hidden">{formatDate(tenant.created_at)}</p>
+        </div>
+      </div>
+
+      <div className="min-w-0 lg:min-w-[14rem] space-y-1.5">
+        <TenantStatusChips tenant={tenant} compact />
+        <p className="hidden lg:block text-[11px] text-slate-400">{formatDate(tenant.created_at)}</p>
+      </div>
+
+      <div
+        className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-1.5 min-w-0 lg:min-w-[13rem]"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <ActionBtn
+          disabled={working || !tenant.is_active}
+          onClick={onOpen}
+          tone="primary"
+          icon="login"
+          label="Άνοιγμα"
+        />
+        <ActionBtn disabled={working} onClick={onEdit} tone="neutral" icon="edit" label="Επεξεργασία" />
+        <ActionBtn
+          disabled={working}
+          onClick={onToggle}
+          tone={tenant.is_active ? 'danger' : 'success'}
+          icon={tenant.is_active ? 'block' : 'check_circle'}
+          label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TenantCard({ tenant, working, onOpen, onEdit, onToggle }) {
+  const plan = PLAN_META[tenant.plan] || PLAN_META.starter;
+  const host = officeHost(tenant);
+  const canOpen = Boolean(tenant.is_active) && !working;
+
+  return (
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`Άνοιγμα γραφείου ${tenant.legal_name || tenant.slug}`}
+      title={canOpen ? 'Διπλό κλικ για άνοιγμα' : 'Το γραφείο είναι σε αναστολή'}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        onOpen();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`rounded-[24px] border bg-gradient-to-br p-4 shadow-sm outline-none transition-all ${plan.accent} ${
+        canOpen
+          ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-sky-200'
+          : 'opacity-90'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h5 className="font-bold text-slate-900 truncate">{tenant.legal_name}</h5>
             {isRecent(tenant.created_at) && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">ΝΕΟ</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                ΝΕΟ
+              </span>
             )}
           </div>
           <p className="text-[11px] font-mono text-slate-500 mt-0.5">{tenant.slug}</p>
-          {host && <p className="text-[11px] text-sky-700 mt-0.5 truncate">{host}</p>}
+          {host ? <p className="text-[11px] text-sky-700 mt-0.5 truncate">{host}</p> : null}
         </div>
         <span
           className={`px-2 py-1 rounded-full text-[10px] font-bold shrink-0 ${
@@ -1890,31 +1946,43 @@ function TenantCard({ tenant, working, onOpen, onEdit, onToggle }) {
           {tenant.is_active ? 'ενεργό' : 'αναστολή'}
         </span>
       </div>
-      <div className="flex flex-wrap gap-1.5 mt-3">
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${plan.chip}`}>{plan.label}</span>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sub.chip}`}>{sub.label}</span>
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 text-slate-500 border border-slate-100">
-          {formatDate(tenant.created_at)}
-        </span>
+      <div className="mt-3">
+        <TenantStatusChips tenant={tenant} compact />
+        <p className="mt-2 text-[11px] text-slate-400">{formatDate(tenant.created_at)}</p>
       </div>
-      <div className="flex flex-wrap gap-1.5 mt-4">
-        <ActionBtn disabled={working || !tenant.is_active} onClick={onOpen} tone="primary" icon="login" label="Άνοιγμα" />
+      <div
+        className="flex flex-wrap gap-1.5 mt-4"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <ActionBtn
+          disabled={working || !tenant.is_active}
+          onClick={onOpen}
+          tone="primary"
+          icon="login"
+          label="Άνοιγμα"
+        />
         <ActionBtn disabled={working} onClick={onEdit} tone="neutral" icon="edit" label="Επεξεργασία" />
         <ActionBtn
           disabled={working}
           onClick={onToggle}
           tone={tenant.is_active ? 'danger' : 'success'}
           icon={tenant.is_active ? 'block' : 'check_circle'}
-          label={tenant.is_active ? 'Αναστολή' : 'Επανενεργοποίηση'}
+          label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
         />
       </div>
+      {canOpen ? (
+        <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Διπλό κλικ · άνοιγμα
+        </p>
+      ) : null}
     </article>
   );
 }
 
 function ActionBtn({ disabled, onClick, tone, icon, label }) {
   const tones = {
-    primary: 'bg-sky-600 text-white hover:bg-sky-700',
+    primary: 'bg-sky-600 text-white hover:bg-sky-700 shadow-sm shadow-sky-600/20',
     neutral: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50',
     danger: 'bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100',
     success: 'bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100',
@@ -1924,7 +1992,7 @@ function ActionBtn({ disabled, onClick, tone, icon, label }) {
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold disabled:opacity-50 ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold disabled:opacity-50 transition-colors ${tones[tone]}`}
     >
       <span className="material-symbols-outlined text-[14px]">{icon}</span>
       {label}
