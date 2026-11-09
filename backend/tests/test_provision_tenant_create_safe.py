@@ -100,6 +100,21 @@ class ProvisionTenantCreateSafeTests(unittest.TestCase):
         self.assertIn("trial_ends_at", sql_full)
         self.assertIn("base_amount_cents", binds_full)
 
+    def test_delete_tenant_uses_savepoints_and_sql_delete(self):
+        src = (ROOT / "app/services/platform_admin_service.py").read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == "PlatformAdminService":
+                for item in node.body:
+                    if isinstance(item, ast.AsyncFunctionDef) and item.name == "delete_tenant":
+                        text = ast.get_source_segment(src, item) or ""
+                        self.assertIn("begin_nested", text)
+                        self.assertIn("DELETE FROM tenants WHERE id", text)
+                        self.assertIn("SET LOCAL row_security = off", text)
+                        self.assertNotIn("await self._session.delete(tenant)", text)
+                        return
+        self.fail("delete_tenant not found")
+
 
 if __name__ == "__main__":
     unittest.main()
