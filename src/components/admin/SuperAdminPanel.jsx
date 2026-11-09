@@ -5,6 +5,7 @@ import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { getDefaultIngressCname, getPlatformBaseDomain, tenantSubdomainFqdn } from '../../lib/platform/domain.js';
 import {
   createPlatformTenant,
+  deletePlatformTenant,
   fetchPlatformOverview,
   fetchPlatformTenant,
   fetchPlatformTenants,
@@ -355,6 +356,35 @@ export default function SuperAdminPanel() {
       load();
     } catch (e) {
       toast.error(e.message || 'Η ενέργεια απέτυχε');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const removeTenant = async (tenant) => {
+    const label = tenant.legal_name || tenant.slug || 'γραφείο';
+    const slug = String(tenant.slug || '').trim();
+    if (
+      !window.confirm(
+        `Οριστική διαγραφή του «${label}»;\n\nΘα χαθούν χρήστες, κρατήσεις και ρυθμίσεις. Δεν αναιρείται.`,
+      )
+    ) {
+      return;
+    }
+    if (slug) {
+      const typed = window.prompt(`Πληκτρολόγησε το slug για επιβεβαίωση:\n${slug}`);
+      if (String(typed || '').trim() !== slug) {
+        toast.error('Η διαγραφή ακυρώθηκε — λάθος slug');
+        return;
+      }
+    }
+    setWorking(true);
+    try {
+      await deletePlatformTenant(tenant.id);
+      toast.success(`Διαγράφηκε: ${label}`);
+      load();
+    } catch (e) {
+      toast.error(e.message || 'Η διαγραφή απέτυχε');
     } finally {
       setWorking(false);
     }
@@ -989,6 +1019,7 @@ export default function SuperAdminPanel() {
                 onOpen={() => openAsOffice(t)}
                 onEdit={() => openEdit(t)}
                 onToggle={() => toggleTenant(t, t.is_active)}
+                onDelete={() => removeTenant(t)}
               />
             ))}
           </div>
@@ -997,7 +1028,7 @@ export default function SuperAdminPanel() {
             <div className="hidden lg:grid grid-cols-[minmax(0,1.6fr)_auto_auto] gap-4 px-5 py-2.5 text-[11px] uppercase tracking-wider text-slate-400 font-bold bg-slate-50/70">
               <span>Γραφείο</span>
               <span className="min-w-[14rem]">Κατάσταση</span>
-              <span className="text-right min-w-[13rem]">Ενέργειες</span>
+              <span className="text-right min-w-[16rem]">Ενέργειες</span>
             </div>
             {tenants.map((t) => (
               <TenantListRow
@@ -1007,6 +1038,7 @@ export default function SuperAdminPanel() {
                 onOpen={() => openAsOffice(t)}
                 onEdit={() => openEdit(t)}
                 onToggle={() => toggleTenant(t, t.is_active)}
+                onDelete={() => removeTenant(t)}
               />
             ))}
           </div>
@@ -1893,7 +1925,7 @@ function TenantStatusChips({ tenant, compact = false }) {
   );
 }
 
-function TenantListRow({ tenant, working, onOpen, onEdit, onToggle }) {
+function TenantListRow({ tenant, working, onOpen, onEdit, onToggle, onDelete }) {
   const host = officeHost(tenant);
   const canOpen = Boolean(tenant.is_active) && !working;
 
@@ -1964,7 +1996,7 @@ function TenantListRow({ tenant, working, onOpen, onEdit, onToggle }) {
       </div>
 
       <div
-        className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-1.5 min-w-0 lg:min-w-[13rem]"
+        className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-1.5 min-w-0 lg:min-w-[16rem]"
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
@@ -1984,12 +2016,13 @@ function TenantListRow({ tenant, working, onOpen, onEdit, onToggle }) {
           icon={tenant.is_active ? 'block' : 'check_circle'}
           label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
         />
+        <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
       </div>
     </div>
   );
 }
 
-function TenantCard({ tenant, working, onOpen, onEdit, onToggle }) {
+function TenantCard({ tenant, working, onOpen, onEdit, onToggle, onDelete }) {
   const plan = PLAN_META[tenant.plan] || PLAN_META.starter;
   const host = officeHost(tenant);
   const canOpen = Boolean(tenant.is_active) && !working;
@@ -2061,6 +2094,7 @@ function TenantCard({ tenant, working, onOpen, onEdit, onToggle }) {
           icon={tenant.is_active ? 'block' : 'check_circle'}
           label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
         />
+        <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
       </div>
       {canOpen ? (
         <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
