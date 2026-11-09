@@ -44,6 +44,11 @@ export const RENT_HEADER_STYLES = ['glass', 'solid', 'dark', 'brand', 'ink', 'so
 export function rentHeroPhoto(idOrPath) {
   const raw = String(idOrPath || '').trim();
   if (!raw) return '/images/rent-hero-coastal-v2.jpg';
+  // Never show the Achillio bus demo on Rent surfaces.
+  const lower = raw.toLowerCase();
+  if (lower.includes('hero-bus-achillio') || lower.includes('achillio')) {
+    return '/images/rent-hero-coastal-v2.jpg';
+  }
   if (raw.startsWith('/') || raw.startsWith('http')) return raw;
   return `https://images.unsplash.com/photo-${raw}?auto=format&fit=crop&w=2000&q=85`;
 }

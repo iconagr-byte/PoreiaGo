@@ -61,6 +61,9 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
         settings["site_appearance"] = {
             "rent_office_name": name,
             "footer_brand_name": name,
+            # Never seed Achillio bus photo on rent-only offices — coastal sea hero.
+            "hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+            "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
             "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
             "rent_hero_copy": (
                 "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
