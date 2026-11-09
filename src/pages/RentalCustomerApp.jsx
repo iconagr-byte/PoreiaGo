@@ -580,22 +580,24 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             </div>
           </div>
 
-          <RentCapabilitiesSession />
-
-          {/* Digital contracts — after the booking mid unit (nav «Συμβόλαιο»). */}
-          <PlatformRentContractsSession />
-
-          <div className="rent-home-stack rent-home-stack--landing">
-            <RentGuestLandingExtras
-              brandLabel={branding.brandLabel}
-              onRequireLogin={onRequireLogin}
-              onStartSearch={() => {
-                document
-                  .getElementById('rent-guest-search')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-            />
-          </div>
+          {/* Platform marketing only — never on tenant office /rent. */}
+          {isPlatformMarketingHost() ? (
+            <>
+              <RentCapabilitiesSession />
+              <PlatformRentContractsSession />
+              <div className="rent-home-stack rent-home-stack--landing">
+                <RentGuestLandingExtras
+                  brandLabel={branding.brandLabel}
+                  onRequireLogin={onRequireLogin}
+                  onStartSearch={() => {
+                    document
+                      .getElementById('rent-guest-search')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                />
+              </div>
+            </>
+          ) : null}
         </main>
       </div>
       <RentVehicleDetailSheet
