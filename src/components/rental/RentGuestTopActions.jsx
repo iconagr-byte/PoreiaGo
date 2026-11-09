@@ -1,18 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
+import { isPlatformMarketingHost } from '../../lib/platform/tenantHost.js';
 
-const QUICK_NAV = [
+/** Booking-only nav — always on office + platform /rent. */
+const BOOKING_QUICK_NAV = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
+];
+
+/** Capability showcase links — platform marketing host only. */
+const MARKETING_QUICK_NAV = [
   { id: 'session-rent-capabilities', el: 'Τι κάνεις', en: 'What you can do' },
   { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
 ];
 
-const NAV_ITEMS = [
+const BOOKING_NAV_ITEMS = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
+];
+
+const MARKETING_NAV_ITEMS = [
   {
     id: 'session-rent-capabilities',
     el: 'Τι μπορείς',
@@ -68,6 +77,17 @@ export default function RentGuestTopActions({
   const rootRef = useRef(null);
   const menuBtnRef = useRef(null);
   const tel = phoneHref(phone);
+  const showMarketingNav = isPlatformMarketingHost();
+  const quickNav = useMemo(
+    () =>
+      showMarketingNav ? [...BOOKING_QUICK_NAV, ...MARKETING_QUICK_NAV] : BOOKING_QUICK_NAV,
+    [showMarketingNav],
+  );
+  const navItems = useMemo(
+    () =>
+      showMarketingNav ? [...BOOKING_NAV_ITEMS, ...MARKETING_NAV_ITEMS] : BOOKING_NAV_ITEMS,
+    [showMarketingNav],
+  );
 
   useEffect(() => {
     markPreferRentLookup();
@@ -142,7 +162,7 @@ export default function RentGuestTopActions({
       {menuOpen ? (
         <div className="rent-top-menu rent-top-menu--guest rent-top-menu--left" role="menu">
           <p className="rent-top-menu-kicker">{browseKicker}</p>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -247,7 +267,7 @@ export default function RentGuestTopActions({
 
       <div className="rent-top-actions">
         <nav className="rent-top-quick" aria-label={el ? 'Γρήγορη πλοήγηση' : 'Quick navigation'}>
-          {QUICK_NAV.map((item) => (
+          {quickNav.map((item) => (
             <button
               key={item.id}
               type="button"
