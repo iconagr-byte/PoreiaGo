@@ -238,6 +238,12 @@ export default function AdminLoginPage() {
               </button>
             </form>
 
+            <div className="pg-login-forgot-wrap">
+              <Link to="/admin/forgot-password" className="pg-login-forgot">
+                Ξέχασα τον κωδικό μου
+              </Link>
+            </div>
+
             {googleEnabled ? (
               <>
                 <div className="pg-login-divider">ή με Google</div>

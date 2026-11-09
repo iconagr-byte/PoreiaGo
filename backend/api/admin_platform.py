@@ -89,6 +89,7 @@ from schemas.platform_admin import (
     PlatformUserUpdate,
     AdminPasswordResetSendByUser,
     AdminPasswordResetSendByEmail,
+    AdminPasswordResetRequestPublic,
     AdminPasswordResetConfirm,
     AdminPasswordResetSendResponse,
     VehicleCreate,
@@ -590,6 +591,7 @@ async def _send_reset_for_db_user(
     user,
     *,
     include_reset_url: bool = False,
+    public_base: str | None = None,
 ) -> AdminPasswordResetSendResponse:
     from travel_platform.settings.admin_password_reset import (
         build_reset_url,
@@ -602,7 +604,7 @@ async def _send_reset_for_db_user(
         tenant_id=str(user.tenant_id),
         password_hash=user.password_hash,
     )
-    reset_url = build_reset_url(token)
+    reset_url = build_reset_url(token, public_base=public_base)
     try:
         await send_admin_reset_email(
             to_email=user.email,
@@ -839,6 +841,91 @@ async def send_password_reset_by_email(
         except Exception:
             pass
         return result
+
+
+@router.post(
+    "/password-reset/request",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def request_admin_password_reset_public(
+    request: Request,
+    body: AdminPasswordResetRequestPublic,
+):
+    """
+    Public forgot-password from office /admin/login.
+
+    Always returns a generic success message (no email enumeration).
+    Scopes to the tenant resolved from Host when on an office subdomain.
+    """
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import (
+        allow_request_attempt,
+        find_users_by_email,
+    )
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_request_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
+    generic = AdminPasswordResetSendResponse(
+        ok=True,
+        message="Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε οδηγίες επαναφοράς (έλεγχος και spam).",
+        email=None,
+        user_id=None,
+        tenant_id=None,
+    )
+
+    email = str(body.email).strip().lower()
+    if not email:
+        return generic
+
+    # Prefer explicit office host from the SPA (API Host is often api.*).
+    host = (
+        str(body.host or "").split(":")[0].strip().lower()
+        or (request.headers.get("origin") or "").replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].strip().lower()
+        or (request.headers.get("host") or "").split(":")[0].strip().lower()
+    )
+    public_base = None
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[
+        0
+    ].strip()
+    if host and host not in ("api.poreiago.com", "localhost", "127.0.0.1"):
+        public_base = f"{proto}://{host}"
+
+    tenant_id = None
+    try:
+        from olympus.tenant.domain_resolver import DomainResolver
+
+        async with AsyncSessionLocal() as db:
+            resolved = await DomainResolver(db).resolve(host)
+            if resolved and resolved.tenant_id:
+                tenant_id = resolved.tenant_id
+    except Exception as exc:
+        logger.warning("password-reset/request host resolve failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            users = await find_users_by_email(db, email)
+            active = [u for u in users if u.is_active]
+            if tenant_id is not None:
+                active = [u for u in active if u.tenant_id == tenant_id]
+            if len(active) != 1:
+                return generic
+            await _send_reset_for_db_user(
+                active[0],
+                include_reset_url=False,
+                public_base=public_base,
+            )
+    except Exception as exc:
+        logger.warning("password-reset/request failed for %s: %s", email, exc)
+    return generic
 
 
 @router.post("/password-reset/confirm")
