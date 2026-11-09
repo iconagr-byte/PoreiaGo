@@ -78,9 +78,11 @@ export default function StorefrontHero({
   siteAppearance,
   templateId = 'fullscreen_overlay',
   searchForm,
+  /** Override bus demo fallback (rent-only offices use coastal sea hero). */
+  imageFallback = '/images/hero-bus-achillio.png',
 }) {
   const heroUrl =
-    resolveSiteAssetUrl(siteAppearance.hero_image_url) || '/images/hero-bus-achillio.png';
+    resolveSiteAssetUrl(siteAppearance.hero_image_url) || imageFallback;
   const sliderOn = readPageSlider(siteAppearance, 'home').enabled;
   const overlayStrength = heroOverlayStrength(siteAppearance);
   const minHeight = heroMinHeightCss(siteAppearance, 820);

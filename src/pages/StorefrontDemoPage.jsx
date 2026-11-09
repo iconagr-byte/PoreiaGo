@@ -51,15 +51,6 @@ import {
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
 
-const RENT_ONLY_HERO = {
-  hero_badge: 'Ενοικιάσεις οχημάτων',
-  hero_title: 'Νοίκιασε όχημα,',
-  hero_title_accent: 'online σε λίγα λεπτά.',
-  hero_subtitle:
-    'Διάλεξε από τον στόλο ενοικίασης, κλείσε ημερομηνίες και παρέλαβε — χωρίς εκδρομές λεωφορείου σε αυτή τη σελίδα.',
-  hero_search_label: 'Ενοικίαση',
-};
-
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
   const isLiveTenantSite = isTenantStorefrontHost();
@@ -94,6 +85,7 @@ export default function StorefrontDemoPage() {
   const [fleetShowcase, setFleetShowcase] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [modules, setModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [modulesReady, setModulesReady] = useState(false);
   const [rentalVehicles, setRentalVehicles] = useState([]);
   const [rentalLoading, setRentalLoading] = useState(false);
 
@@ -131,21 +123,6 @@ export default function StorefrontDemoPage() {
     (showDomestic ? filteredDomestic.length : 0) +
     (showInternational ? filteredInternational.length : 0);
 
-  const heroAppearance = useMemo(() => {
-    if (!rentOnly) return siteAppearance;
-    const brand =
-      siteAppearance.footer_brand_name ||
-      siteAppearance.display_name ||
-      '';
-    return {
-      ...siteAppearance,
-      ...RENT_ONLY_HERO,
-      hero_subtitle: brand
-        ? `Κλείσε online από τον στόλο του ${brand} — ημερομηνίες, παραλαβή και επιστροφή σε λίγα βήματα.`
-        : RENT_ONLY_HERO.hero_subtitle,
-    };
-  }, [rentOnly, siteAppearance]);
-
   useEffect(() => {
     // Marketing host redirects away — do not load office storefront data there.
     if (!allowStorefront) return undefined;
@@ -171,7 +148,9 @@ export default function StorefrontDemoPage() {
     };
 
     const loadCommon = () => {
-      fetchOfficeModules().then(setModules);
+      fetchOfficeModules()
+        .then(setModules)
+        .finally(() => setModulesReady(true));
       fetchPlatformSettings().then(setPricingSettings);
     };
 
@@ -261,33 +240,6 @@ export default function StorefrontDemoPage() {
     '--sf-secondary': siteAppearance.secondary_color || '#1e3a5f',
     '--sf-surface': siteAppearance.surface_color || '#f8fafc',
   };
-
-  const rentHeroCta = (
-    <div className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-xl">
-      <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-        {heroAppearance.hero_search_label || 'Ενοικίαση'}
-      </p>
-      <p className="text-sm text-white/85 leading-relaxed">
-        Διαθέσιμος στόλος για ημερήσια ή πολυήμερη ενοικίαση. Συνέχισε στην εφαρμογή Rent για ημερομηνίες και κράτηση.
-      </p>
-      <div className="flex flex-wrap gap-3 pt-1">
-        <Link
-          to="/rent"
-          className="bg-teal-600 text-white px-8 py-3.5 rounded-full font-label-md font-bold hover:bg-teal-500 transition-all inline-flex items-center justify-center gap-2"
-        >
-          Δες στόλο ενοικίασης
-          <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-        </Link>
-        <a
-          href="#rent"
-          className="px-8 py-3.5 rounded-full font-label-md font-bold bg-white text-slate-900 hover:bg-white/90 transition-all inline-flex items-center gap-2"
-        >
-          Περισσότερα
-          <span className="material-symbols-outlined text-[20px]">expand_more</span>
-        </a>
-      </div>
-    </div>
-  );
 
   const searchForm = (
     <form
@@ -442,6 +394,14 @@ export default function StorefrontDemoPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Rent-only offices land on /rent (sea hero + search + full fleet) — no bus photo gate.
+  if (!modulesReady) {
+    return <div className="min-h-screen bg-slate-950" aria-busy="true" />;
+  }
+  if (rentOnly) {
+    return <Navigate to="/rent" replace />;
+  }
+
   const brandName =
     siteAppearance.footer_brand_name || siteAppearance.display_name || '';
   const showBusFleet = tripsEnabled && siteAppearance.show_fleet_section !== false;
@@ -460,9 +420,9 @@ export default function StorefrontDemoPage() {
       <main>
         <PreviewEditableSection sectionId="hero" label="Hero">
           <StorefrontHero
-            siteAppearance={heroAppearance}
+            siteAppearance={siteAppearance}
             templateId={siteAppearance.hero_template || 'fullscreen_overlay'}
-            searchForm={rentOnly ? rentHeroCta : searchForm}
+            searchForm={searchForm}
           />
         </PreviewEditableSection>
 

@@ -2,7 +2,9 @@
  * Smoke test for guest hero benefits + search layout resolvers.
  */
 import {
+  isBusDemoHeroUrl,
   RENT_GUEST_HERO_BENEFITS,
+  RENT_GUEST_HERO_IMAGE,
   resolveRentGuestHeroBenefits,
   resolveRentGuestSearchLayout,
 } from './rentGuestHero.js';
@@ -30,5 +32,20 @@ const off = resolveRentGuestSearchLayout({
 });
 console.assert(!off.showDropoffToggle && !off.showPromo, 'layout toggles off');
 console.assert(off.submitLabel === 'Go', 'custom submit');
+
+console.assert(isBusDemoHeroUrl('') === true, 'empty → bus demo');
+console.assert(isBusDemoHeroUrl(null) === true, 'null → bus demo');
+console.assert(
+  isBusDemoHeroUrl('/images/hero-bus-achillio.png') === true,
+  'achillio bus path',
+);
+console.assert(
+  isBusDemoHeroUrl(RENT_GUEST_HERO_IMAGE) === false,
+  'coastal is not bus demo',
+);
+console.assert(
+  isBusDemoHeroUrl('/uploads/office-hero.jpg') === false,
+  'custom upload ok',
+);
 
 console.log('rentGuestHero: OK');
