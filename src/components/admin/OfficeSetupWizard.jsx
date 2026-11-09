@@ -108,6 +108,45 @@ const STEPS = [
 function stepIndex(id) {
   return STEPS.findIndex((s) => s.id === id);
 }
+
+/** Platform placeholder seeds — treat as empty so office identity wins. */
+export function isPlatformPlaceholderName(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return true;
+  return (
+    v === 'poreiago travel' ||
+    v === 'poreiago' ||
+    v === 'aerostride' ||
+    v === 'iconarent' ||
+    v === 'icona rent'
+  );
+}
+
+export function isPlatformPlaceholderEmail(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return true;
+  return (
+    v.endsWith('@poreiago.app') ||
+    v.endsWith('@poreiago.com') ||
+    v.endsWith('@aerostride.com')
+  );
+}
+
+export function pickOfficeName(...candidates) {
+  for (const c of candidates) {
+    const v = String(c || '').trim();
+    if (v && !isPlatformPlaceholderName(v)) return v;
+  }
+  return '';
+}
+
+export function pickOfficeEmail(...candidates) {
+  for (const c of candidates) {
+    const v = String(c || '').trim();
+    if (v && !isPlatformPlaceholderEmail(v)) return v;
+  }
+  return '';
+}
 function MarkIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -218,23 +257,42 @@ export default function OfficeSetupWizard({
           fetchTenantBrandingSettings().catch(() => null),
         ]);
         if (cancelled) return;
-        if (plat) {
-          setOffice((o) => ({
-            ...o,
-            company_name: plat.company_name || o.company_name,
-            support_email: plat.support_email || o.support_email,
-            timezone: plat.timezone || o.timezone,
-            default_locale: plat.default_locale || o.default_locale,
-            smtp_from_email: plat.smtp_from_email || o.smtp_from_email,
-          }));
-        }
+        const brandName = pickOfficeName(
+          branding?.display_name,
+          appearance?.footer_brand_name,
+          appearance?.rent_office_name,
+          plat?.company_name,
+        );
+        const supportEmail = pickOfficeEmail(
+          branding?.support_email,
+          branding?.contact_email,
+          appearance?.footer_contact_email,
+          plat?.support_email,
+        );
+        const smtpFrom = pickOfficeEmail(plat?.smtp_from_email, supportEmail);
+
+        setOffice((o) => ({
+          ...o,
+          company_name: brandName || o.company_name,
+          support_email: supportEmail || o.support_email,
+          timezone: plat?.timezone || o.timezone,
+          default_locale: plat?.default_locale || o.default_locale,
+          smtp_from_email: smtpFrom || o.smtp_from_email,
+        }));
+
         if (appearance) {
           setBrand((b) => ({
             ...b,
-            footer_brand_name: appearance.footer_brand_name || b.footer_brand_name,
+            footer_brand_name:
+              pickOfficeName(
+                appearance.footer_brand_name,
+                appearance.rent_office_name,
+                brandName,
+              ) || b.footer_brand_name,
             footer_contact_phone: appearance.footer_contact_phone || '',
             footer_address: appearance.footer_address || '',
-            rent_office_name: appearance.rent_office_name || '',
+            rent_office_name:
+              pickOfficeName(appearance.rent_office_name, brandName) || '',
             hero_title: appearance.hero_title || '',
             accent: appearance.accent_color || b.accent,
             logo_url: appearance.logo_url || '',
@@ -258,14 +316,10 @@ export default function OfficeSetupWizard({
             notes: Array.isArray(dns.notes) ? dns.notes : [],
             saved: Boolean(branding.custom_domain),
           }));
-          if (branding.display_name) {
-            setOffice((o) => ({
-              ...o,
-              company_name: o.company_name || branding.display_name,
-            }));
+          if (brandName) {
             setBrand((b) => ({
               ...b,
-              footer_brand_name: b.footer_brand_name || branding.display_name,
+              footer_brand_name: pickOfficeName(b.footer_brand_name, brandName),
               accent: branding.primary_color || b.accent,
               logo_url: b.logo_url || branding.logo_url || '',
             }));
