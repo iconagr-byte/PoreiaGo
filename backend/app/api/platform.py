@@ -304,6 +304,28 @@ async def reactivate_tenant(
     return {"reactivated": True, "tenant_id": str(tenant_id)}
 
 
+@router.delete("/tenants/{tenant_id}")
+async def delete_tenant(
+    tenant_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """Permanently delete an office. Blocked for PoreiaGo / Achillio platform desks."""
+    try:
+        result = await PlatformAdminService(db).delete_tenant(tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not result.get("ok"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    try:
+        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+
+        await sync_traefik_custom_domains_from_db(db)
+    except Exception:
+        pass
+    return {"deleted": True, **result}
+
+
 @router.post("/tenants/{tenant_id}/impersonate", response_model=TokenResponse)
 async def impersonate_tenant(
     tenant_id: UUID,

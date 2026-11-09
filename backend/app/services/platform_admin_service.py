@@ -933,3 +933,66 @@ class PlatformAdminService:
         if sub and sub.status == SubscriptionStatus.PAST_DUE:
             sub.status = SubscriptionStatus.ACTIVE
         return True
+
+    async def delete_tenant(self, tenant_id: UUID) -> dict:
+        """Permanently remove an office (CASCADE child rows). Guards platform offices."""
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+
+        try:
+            await self._session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+
+        result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            return {"ok": False, "reason": "not_found"}
+
+        if is_poreiago_platform_office(tenant) or is_achillio_travel_office(tenant):
+            raise ValueError(
+                "Απαγορεύεται η διαγραφή του κεντρικού γραφείου PoreiaGo ή Achillio Travel"
+            )
+
+        slug = str(getattr(tenant, "slug", "") or "")
+        legal = str(getattr(tenant, "legal_name", "") or "")
+        subdomain = str(getattr(tenant, "subdomain", "") or "")
+
+        # Tables that use TenantScopedMixin without FK CASCADE — clear them first.
+        tid = str(tenant_id)
+        for stmt in (
+            "DELETE FROM vehicle_inspections WHERE rental_booking_id IN "
+            "(SELECT id FROM rental_bookings WHERE tenant_id = CAST(:tid AS uuid))",
+            "DELETE FROM rental_bookings WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM rental_vehicles WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM luggage_checkins WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM passenger_flight_seats WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM trip_segments WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM flight_status_events WHERE flight_id IN "
+            "(SELECT id FROM flights WHERE tenant_id = CAST(:tid AS uuid))",
+            "DELETE FROM flights WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM miles_transactions WHERE account_id IN "
+            "(SELECT id FROM loyalty_accounts WHERE tenant_id = CAST(:tid AS uuid))",
+            "DELETE FROM loyalty_accounts WHERE tenant_id = CAST(:tid AS uuid)",
+        ):
+            try:
+                await self._session.execute(text(stmt), {"tid": tid})
+            except Exception:
+                logger.debug("tenant delete cleanup skipped: %s", stmt, exc_info=True)
+
+        try:
+            await self._session.delete(tenant)
+            await self._session.flush()
+        except Exception as exc:
+            logger.exception("tenant delete failed for %s", tenant_id)
+            raise ValueError(f"Η διαγραφή απέτυχε: {exc}") from exc
+
+        return {
+            "ok": True,
+            "tenant_id": tid,
+            "slug": slug,
+            "subdomain": subdomain,
+            "legal_name": legal,
+        }
