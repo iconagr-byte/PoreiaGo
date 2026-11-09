@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { getDefaultIngressCname, getPlatformBaseDomain, tenantSubdomainFqdn } from '../../lib/platform/domain.js';
@@ -1971,9 +1972,13 @@ function Modal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  // Portal to body so the admin sidebar (z-20 sibling of main) cannot cover
+  // the left edge of the dialog — fixed + high z inside main still loses to aside.
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-gradient-to-br from-sky-50/95 via-white/90 to-teal-50/90 backdrop-blur-md"
+      className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6 bg-gradient-to-br from-sky-50/95 via-white/90 to-teal-50/90 backdrop-blur-md"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && typeof onClose === 'function') onClose();
@@ -1988,11 +1993,7 @@ function Modal({
         }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div
-          className={`flex items-start justify-between gap-3 ${
-            size === 'xl' || compact ? 'mb-4' : 'mb-4'
-          }`}
-        >
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
             <h4 className="text-xl font-bold tracking-tight text-slate-900">{title}</h4>
             {subtitle || size === 'xl' || compact ? (
@@ -2013,7 +2014,8 @@ function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
