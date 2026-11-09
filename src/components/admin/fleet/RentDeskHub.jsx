@@ -170,9 +170,11 @@ export default function RentDeskHub({
                               >
                                 {t.label}
                               </span>
-                              <span className="block text-[10px] text-on-surface-variant truncate mt-0.5 leading-snug">
-                                {t.description}
-                              </span>
+                              {t.description ? (
+                                <span className="block text-[10px] text-on-surface-variant truncate mt-0.5 leading-snug">
+                                  {t.description}
+                                </span>
+                              ) : null}
                             </span>
                           </button>
                         </li>
@@ -192,9 +194,11 @@ export default function RentDeskHub({
                 <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
                   {active.label}
                 </h2>
-                <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
-                  {active.description}
-                </p>
+                {active.description ? (
+                  <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
+                    {active.description}
+                  </p>
+                ) : null}
               </div>
               <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-teal-500/[0.08] border-teal-500/15">
                 <span className="material-symbols-outlined text-[20px] text-teal-700">
