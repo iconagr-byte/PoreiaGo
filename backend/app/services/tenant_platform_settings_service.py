@@ -81,6 +81,13 @@ class TenantPlatformSettingsService:
         platform = settings.get("platform")
         base = platform if isinstance(platform, dict) else {}
         merged = {**DEFAULT_PLATFORM_SETTINGS, **base}
+        # New offices inherit PoreiaGo defaults until edited — surface the real
+        # legal / display name so Office Setup does not show «PoreiaGo Travel».
+        legal = str(getattr(tenant, "legal_name", None) or "").strip()
+        stored_name = str(base.get("company_name") or "").strip()
+        default_name = str(DEFAULT_PLATFORM_SETTINGS.get("company_name") or "").strip()
+        if legal and (not stored_name or stored_name == default_name):
+            merged["company_name"] = legal
         resolved = resolve_tenant_checkout_base(tenant, base_domain=_base_domain())
         # Only the explicitly stored value counts — empty/missing → office origin
         # (Achillio → achilliotravel.com, PoreiaGo → poreiago.com).
