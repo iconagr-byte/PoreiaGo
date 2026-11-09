@@ -311,6 +311,19 @@ async def lifespan(app: FastAPI):
             "Achillio ops driver ensure skipped: %s", exc
         )
     try:
+        from travel_platform.settings.office_admin_bootstrap import (
+            repair_office_admin_bootstraps,
+        )
+
+        repaired_admins = await repair_office_admin_bootstraps()
+        __import__("logging").getLogger("poreiago.startup").info(
+            "Office admin bootstrap: %s", repaired_admins
+        )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Office admin bootstrap skipped: %s", exc
+        )
+    try:
         from app.core.database import AsyncSessionLocal
         from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
 

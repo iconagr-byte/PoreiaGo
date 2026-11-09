@@ -281,13 +281,16 @@ _POREIAGO_HOME_EMAILS = frozenset(
 _ACHILLIO_HOME_EMAILS = _POREIAGO_HOME_EMAILS
 
 # Profiles used only when a home driver row is missing entirely (recreate).
+# force_password: deploy/boot repair resets the hash so unified /login and
+# /driver always unlock with the known password (same pattern as axdafnis).
+# Override at deploy via POREIAGO_AXILLEAS_PASSWORD.
 _POREIAGO_HOME_PROFILES: dict[str, dict] = {
     "axilleas0@yahoo.gr": {
         "name": "Αχιλλέας Χαραλαμπίδης",
         "license_no": "AXILLEAS-HOME-LIC",
         "phone": "+306900000001",
-        # Admin can reset from Οδηγοί → Επεξεργασία; default unlocks /driver login.
-        "password": DEFAULT_DRIVER_PASSWORD,
+        "password": "Dimtsa@1234",
+        "force_password": True,
     },
 }
 _ACHILLIO_HOME_PROFILES = _POREIAGO_HOME_PROFILES
@@ -499,9 +502,17 @@ async def repair_poreiago_home_drivers() -> dict:
     if not platform_tid or platform_tid == DEMO_TENANT_ID:
         return {"ok": False, "reason": "poreiago_platform_tenant_missing"}
 
+    env_pw = str(os.getenv("POREIAGO_AXILLEAS_PASSWORD") or "").strip()
     reports = []
     for email in _POREIAGO_HOME_EMAILS:
-        reports.append(ensure_home_driver_on_tenant(email, platform_tid))
+        override = env_pw if email == "axilleas0@yahoo.gr" and env_pw else None
+        reports.append(
+            ensure_home_driver_on_tenant(
+                email,
+                platform_tid,
+                password_override=override,
+            )
+        )
     return {
         "ok": True,
         "poreiago_tenant_id": platform_tid,
