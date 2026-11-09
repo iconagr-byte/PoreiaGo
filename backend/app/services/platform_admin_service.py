@@ -935,16 +935,18 @@ class PlatformAdminService:
         return True
 
     async def delete_tenant(self, tenant_id: UUID) -> dict:
-        """Permanently remove an office (CASCADE child rows). Guards platform offices."""
+        """Permanently remove an office (DB CASCADE child rows). Guards platform offices.
+
+        Uses a raw DELETE (not ORM session.delete) so SQLAlchemy does not lazy-load
+        users/bookings mid-transaction. Optional pre-cleanups run in SAVEPOINTs so a
+        missing table cannot abort the whole transaction.
+        """
         from app.services.tenant_modules import (
             is_achillio_travel_office,
             is_poreiago_platform_office,
         )
 
-        try:
-            await self._session.execute(text("SET LOCAL row_security = off"))
-        except Exception:
-            pass
+        await self._session.execute(text("SET LOCAL row_security = off"))
 
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
         tenant = result.scalar_one_or_none()
@@ -959,35 +961,38 @@ class PlatformAdminService:
         slug = str(getattr(tenant, "slug", "") or "")
         legal = str(getattr(tenant, "legal_name", "") or "")
         subdomain = str(getattr(tenant, "subdomain", "") or "")
-
-        # Tables that use TenantScopedMixin without FK CASCADE — clear them first.
         tid = str(tenant_id)
+
+        # Best-effort extras that may not exist on every deploy — never poison the txn.
         for stmt in (
-            "DELETE FROM vehicle_inspections WHERE rental_booking_id IN "
-            "(SELECT id FROM rental_bookings WHERE tenant_id = CAST(:tid AS uuid))",
+            "DELETE FROM vehicle_inspections WHERE tenant_id = CAST(:tid AS uuid)",
             "DELETE FROM rental_bookings WHERE tenant_id = CAST(:tid AS uuid)",
             "DELETE FROM rental_vehicles WHERE tenant_id = CAST(:tid AS uuid)",
-            "DELETE FROM luggage_checkins WHERE tenant_id = CAST(:tid AS uuid)",
-            "DELETE FROM passenger_flight_seats WHERE tenant_id = CAST(:tid AS uuid)",
-            "DELETE FROM trip_segments WHERE tenant_id = CAST(:tid AS uuid)",
-            "DELETE FROM flight_status_events WHERE flight_id IN "
-            "(SELECT id FROM flights WHERE tenant_id = CAST(:tid AS uuid))",
-            "DELETE FROM flights WHERE tenant_id = CAST(:tid AS uuid)",
-            "DELETE FROM miles_transactions WHERE account_id IN "
-            "(SELECT id FROM loyalty_accounts WHERE tenant_id = CAST(:tid AS uuid))",
-            "DELETE FROM loyalty_accounts WHERE tenant_id = CAST(:tid AS uuid)",
         ):
             try:
-                await self._session.execute(text(stmt), {"tid": tid})
+                async with self._session.begin_nested():
+                    await self._session.execute(text(stmt), {"tid": tid})
             except Exception:
                 logger.debug("tenant delete cleanup skipped: %s", stmt, exc_info=True)
 
+        # Drop ORM identity so SQLAlchemy does not lazy-load users mid-delete.
+        # Child FKs are ON DELETE CASCADE at the DB layer.
         try:
-            await self._session.delete(tenant)
+            self._session.expunge(tenant)
+        except Exception:
+            pass
+        try:
+            res = await self._session.execute(
+                text("DELETE FROM tenants WHERE id = CAST(:tid AS uuid)"),
+                {"tid": tid},
+            )
+            if res.rowcount == 0:
+                return {"ok": False, "reason": "not_found"}
             await self._session.flush()
         except Exception as exc:
             logger.exception("tenant delete failed for %s", tenant_id)
-            raise ValueError(f"Η διαγραφή απέτυχε: {exc}") from exc
+            detail = str(getattr(exc, "orig", None) or exc).split("\n", 1)[0][:240]
+            raise ValueError(f"Η διαγραφή απέτυχε: {detail}") from exc
 
         return {
             "ok": True,
