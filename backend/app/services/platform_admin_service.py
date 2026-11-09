@@ -963,6 +963,17 @@ class PlatformAdminService:
         subdomain = str(getattr(tenant, "subdomain", "") or "")
         tid = str(tenant_id)
 
+        # Cancel Stripe first so CASCADE does not orphan a live remote subscription.
+        try:
+            async with self._session.begin_nested():
+                await BillingService(self._session).cancel_stripe_subscription_best_effort(
+                    tenant_id
+                )
+        except Exception:
+            logger.warning(
+                "Stripe cancel before tenant delete failed for %s", tenant_id, exc_info=True
+            )
+
         # Best-effort extras that may not exist on every deploy — never poison the txn.
         for stmt in (
             "DELETE FROM vehicle_inspections WHERE tenant_id = CAST(:tid AS uuid)",
