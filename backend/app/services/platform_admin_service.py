@@ -775,6 +775,8 @@ class PlatformAdminService:
         contact_email: str | None = None,
         contact_phone: str | None = None,
         admin_notes: str | None = None,
+        admin_password: str | None = None,
+        admin_email: str | None = None,
     ) -> Tenant | None:
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
         tenant = result.scalar_one_or_none()
@@ -824,7 +826,91 @@ class PlatformAdminService:
             settings["ops"] = ops
             tenant.settings_json = json.dumps(settings, ensure_ascii=False)
 
+        if admin_password is not None or admin_email is not None:
+            await self._upsert_office_admin_credentials(
+                tenant_id,
+                admin_email=admin_email,
+                admin_password=admin_password,
+                fallback_name=tenant.legal_name or tenant.slug,
+            )
+
         return tenant
+
+    async def _upsert_office_admin_credentials(
+        self,
+        tenant_id: UUID,
+        *,
+        admin_email: str | None,
+        admin_password: str | None,
+        fallback_name: str,
+    ) -> None:
+        """Set login credentials for the office's primary admin user."""
+        email_l = (admin_email or "").strip().lower() or None
+        pwd = (admin_password or "").strip() or None
+        if pwd is not None and len(pwd) < 8:
+            raise ValueError("Ο κωδικός admin πρέπει να έχει τουλάχιστον 8 χαρακτήρες")
+
+        users = (
+            await self._session.execute(
+                select(User)
+                .where(User.tenant_id == tenant_id)
+                .order_by(func.lower(User.email)),
+            )
+        ).scalars().all()
+
+        def _is_admin(u: User) -> bool:
+            roles = {str(r).lower() for r in (u.roles or [])}
+            return bool(
+                roles
+                & {
+                    UserRole.TENANT_ADMIN.value,
+                    UserRole.SUPERADMIN.value,
+                    UserRole.DISPATCHER.value,
+                }
+            )
+
+        target = None
+        if email_l:
+            target = next(
+                (u for u in users if str(u.email or "").lower() == email_l),
+                None,
+            )
+        if target is None:
+            admins = [u for u in users if _is_admin(u) and u.is_active]
+            target = admins[0] if admins else (users[0] if users else None)
+
+        if target is None:
+            if not email_l or not pwd:
+                raise ValueError(
+                    "Δεν υπάρχει admin σε αυτό το γραφείο — συμπλήρωσε email και κωδικό",
+                )
+            target = User(
+                tenant_id=tenant_id,
+                email=email_l,
+                password_hash=hash_password(pwd),
+                full_name=(fallback_name or email_l).strip(),
+                roles=[UserRole.TENANT_ADMIN.value],
+                is_active=True,
+                mfa_enabled=False,
+            )
+            self._session.add(target)
+            await self._session.flush()
+            return
+
+        if email_l and str(target.email or "").lower() != email_l:
+            dup = next(
+                (u for u in users if str(u.email or "").lower() == email_l and u.id != target.id),
+                None,
+            )
+            if dup:
+                raise ValueError("Το email admin χρησιμοποιείται ήδη σε αυτό το γραφείο")
+            target.email = email_l
+        if pwd:
+            target.password_hash = hash_password(pwd)
+        if not _is_admin(target):
+            target.roles = [UserRole.TENANT_ADMIN.value]
+        target.is_active = True
+        await self._session.flush()
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str = "superadmin") -> bool:
         billing = BillingService(self._session)

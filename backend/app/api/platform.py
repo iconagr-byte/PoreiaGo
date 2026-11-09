@@ -263,6 +263,8 @@ async def update_tenant(
             contact_email=body.contact_email,
             contact_phone=body.contact_phone,
             admin_notes=body.admin_notes,
+            admin_password=body.admin_password,
+            admin_email=str(body.admin_email) if body.admin_email else None,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

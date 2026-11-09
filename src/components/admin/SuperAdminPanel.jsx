@@ -239,7 +239,11 @@ export default function SuperAdminPanel() {
     contact_email: '',
     contact_phone: '',
     admin_notes: '',
+    admin_email: '',
+    admin_password: '',
+    admin_password_confirm: '',
   });
+  const [showEditAdminPassword, setShowEditAdminPassword] = useState(false);
   const [domainCheck, setDomainCheck] = useState(null);
   const [checkingDomain, setCheckingDomain] = useState(false);
 
@@ -575,6 +579,7 @@ export default function SuperAdminPanel() {
 
   const openEdit = async (tenant) => {
     setDomainCheck(null);
+    setShowEditAdminPassword(false);
     setEditing(tenant);
     setEditForm({
       legal_name: tenant.legal_name || '',
@@ -585,6 +590,9 @@ export default function SuperAdminPanel() {
       contact_email: tenant.contact_email || '',
       contact_phone: tenant.contact_phone || '',
       admin_notes: tenant.admin_notes || '',
+      admin_email: tenant.contact_email || tenant.admin_email || '',
+      admin_password: '',
+      admin_password_confirm: '',
     });
     try {
       const full = await fetchPlatformTenant(tenant.id);
@@ -598,6 +606,9 @@ export default function SuperAdminPanel() {
         contact_email: full.contact_email || '',
         contact_phone: full.contact_phone || '',
         admin_notes: full.admin_notes || '',
+        admin_email: full.contact_email || full.admin_email || '',
+        admin_password: '',
+        admin_password_confirm: '',
       });
     } catch {
       /* keep list snapshot */
@@ -645,10 +656,26 @@ export default function SuperAdminPanel() {
       toast.error('Μη έγκυρο custom domain');
       return;
     }
+    const adminPwd = String(editForm.admin_password || '').trim();
+    const adminEmail = String(editForm.admin_email || '').trim().toLowerCase();
+    if (adminPwd) {
+      if (adminPwd.length < 8) {
+        toast.error('Ο κωδικός admin πρέπει να έχει τουλάχιστον 8 χαρακτήρες');
+        return;
+      }
+      if (adminPwd !== String(editForm.admin_password_confirm || '').trim()) {
+        toast.error('Οι κωδικοί admin δεν ταιριάζουν');
+        return;
+      }
+      if (adminEmail && !isValidEmail(adminEmail)) {
+        toast.error('Μη έγκυρο email admin');
+        return;
+      }
+    }
     setWorking(true);
     try {
       const wasActive = editing.is_active !== false;
-      await updatePlatformTenant(editing.id, {
+      const patch = {
         legal_name: editForm.legal_name.trim(),
         plan: editForm.plan,
         vat_number: editForm.vat_number.trim(),
@@ -656,15 +683,23 @@ export default function SuperAdminPanel() {
         contact_email: editForm.contact_email.trim(),
         contact_phone: editForm.contact_phone.trim(),
         admin_notes: editForm.admin_notes.trim(),
-      });
+      };
+      if (adminPwd) {
+        patch.admin_password = adminPwd;
+        if (adminEmail) patch.admin_email = adminEmail;
+      } else if (adminEmail) {
+        patch.admin_email = adminEmail;
+      }
+      await updatePlatformTenant(editing.id, patch);
       if (wasActive && !editForm.is_active) {
         await suspendPlatformTenant(editing.id);
       } else if (!wasActive && editForm.is_active) {
         await reactivatePlatformTenant(editing.id);
       }
-      toast.success('Το γραφείο ενημερώθηκε');
+      toast.success(adminPwd ? 'Γραφείο + κωδικός admin ενημερώθηκαν' : 'Το γραφείο ενημερώθηκε');
       setEditing(null);
       setDomainCheck(null);
+      setShowEditAdminPassword(false);
       load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενημέρωσης');
@@ -1485,6 +1520,8 @@ export default function SuperAdminPanel() {
             onOpenAsOffice={() => openAsOffice(editing)}
             onSubmit={submitEdit}
             onCancel={() => !working && setEditing(null)}
+            showAdminPassword={showEditAdminPassword}
+            onToggleAdminPassword={() => setShowEditAdminPassword((v) => !v)}
           />
         </Modal>
       )}
@@ -1503,6 +1540,8 @@ function EditTenantForm({
   onOpenAsOffice,
   onSubmit,
   onCancel,
+  showAdminPassword = false,
+  onToggleAdminPassword,
 }) {
   const plan = PLAN_META[form.plan] || PLAN_META.starter;
   const subKey = String(tenant.subscription?.status || '').toLowerCase();
@@ -1623,6 +1662,58 @@ function EditTenantForm({
             />
           </button>
         </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Είσοδος admin γραφείου
+          </p>
+          <button
+            type="button"
+            onClick={onToggleAdminPassword}
+            className="text-[11px] font-bold text-sky-700 hover:underline"
+          >
+            {showAdminPassword ? 'Απόκρυψη' : 'Ορισμός / αλλαγή κωδικού'}
+          </button>
+        </div>
+        {showAdminPassword ? (
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3.5 space-y-3">
+            <p className="text-xs text-slate-600 leading-snug">
+              Ορίζει τον κωδικό για είσοδο στο{' '}
+              <span className="font-mono text-[11px] text-slate-800">/admin/login</span> αυτού του
+              γραφείου.
+            </p>
+            <Field
+              label="Email admin"
+              type="email"
+              value={form.admin_email || ''}
+              onChange={(v) => patch('admin_email', v)}
+              placeholder="admin@example.com"
+              autoComplete="off"
+            />
+            <Field
+              label="Νέος κωδικός"
+              type="password"
+              value={form.admin_password || ''}
+              onChange={(v) => patch('admin_password', v)}
+              placeholder="τουλάχιστον 8 χαρακτήρες"
+              autoComplete="new-password"
+            />
+            <Field
+              label="Επιβεβαίωση κωδικού"
+              type="password"
+              value={form.admin_password_confirm || ''}
+              onChange={(v) => patch('admin_password_confirm', v)}
+              placeholder="ξανά ο ίδιος κωδικός"
+              autoComplete="new-password"
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Αν δεν μπαίνεις στο γραφείο, όρισε εδώ νέο κωδικό admin και αποθήκευσε.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">
