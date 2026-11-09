@@ -726,3 +726,24 @@
     grid-template-columns: 1fr;
   }
 }
+
+.pg-login-forgot-wrap {
+  margin-top: 0.85rem;
+  text-align: center;
+}
+
+.pg-login-forgot {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6e6e73;
+  text-decoration: none;
+}
+
+.pg-login-forgot:hover {
+  color: #1d1d1f;
+  text-decoration: underline;
+}
+
+.pg-login--office-minimal .pg-login-forgot {
+  color: #86868b;
+}

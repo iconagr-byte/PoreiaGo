@@ -10,6 +10,7 @@ import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import AdminForgotPasswordPage from './pages/AdminForgotPasswordPage';
 import AdminResetPasswordPage from './pages/AdminResetPasswordPage';
 import SeatSelection from './pages/SeatSelection';
 import TripExtrasPage from './pages/TripExtrasPage';
@@ -190,6 +191,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/my-booking" element={<BookingLookupPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
             <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
