@@ -6,6 +6,7 @@ import {
   getSaasRoles,
   isImpersonating,
 } from '../../lib/saasJwt.js';
+import { resolveAccountUser } from '../../lib/admin/resolveAccountUser.js';
 import {
   getSaasTenantId,
   getSaasToken,
@@ -69,20 +70,23 @@ export default function AdminAccountInlinePanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [userId, setUserId] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
   const [name, setName] = useState('');
   const [savedName, setSavedName] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const email = getSaasUserEmail();
+  const sessionEmail = getSaasUserEmail();
   const tenantId = getSaasTenantId();
   const payload = decodeJwtPayload(getSaasToken());
   const jwtSub = payload?.sub ? String(payload.sub) : '';
   const expires = sessionExpiryLabel();
   const role = roleLabel(t);
   const isSuper = canAccessPlatformOperatorUi();
+  const impersonating = isImpersonating();
   const securityFocus = focus === 'security';
+  const displayEmail = accountEmail || sessionEmail;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -95,19 +99,27 @@ export default function AdminAccountInlinePanel({
       try {
         const list = await fetchPlatformUsers({ allOffices: isSuper });
         const users = Array.isArray(list) ? list : list?.users || [];
-        const me =
-          users.find((u) => String(u.id) === jwtSub) ||
-          users.find((u) => String(u.email || '').toLowerCase() === email.toLowerCase()) ||
-          null;
+        const me = resolveAccountUser(users, {
+          jwtSub,
+          email: sessionEmail,
+          impersonating,
+        });
         if (cancelled) return;
-        const nextName = String(me?.name || displayNameFromEmail(email) || '').trim();
-        setUserId(me?.id ? String(me.id) : jwtSub);
+        const nextEmail = String(me?.email || sessionEmail || '').trim();
+        const nextName = String(
+          me?.name || displayNameFromEmail(nextEmail || sessionEmail) || '',
+        ).trim();
+        // Never fall back to JWT sub while impersonating — that id is the
+        // SuperAdmin and PATCH /users/{id} 404s in the target office.
+        setUserId(me?.id ? String(me.id) : impersonating ? '' : jwtSub);
+        setAccountEmail(nextEmail);
         setName(nextName);
         setSavedName(nextName);
       } catch {
         if (!cancelled) {
-          const nextName = displayNameFromEmail(email);
-          setUserId(jwtSub);
+          const nextName = displayNameFromEmail(sessionEmail);
+          setUserId(impersonating ? '' : jwtSub);
+          setAccountEmail(sessionEmail || '');
           setName(nextName);
           setSavedName(nextName);
         }
@@ -118,16 +130,16 @@ export default function AdminAccountInlinePanel({
     return () => {
       cancelled = true;
     };
-  }, [open, email, jwtSub, isSuper, focus]);
+  }, [open, sessionEmail, jwtSub, isSuper, impersonating, focus]);
 
   if (!open) return null;
 
   const saveProfile = async () => {
     const nextName = name.trim();
     const pwd = password.trim();
-    const uid = userId || jwtSub;
+    const uid = userId || (!impersonating ? jwtSub : '');
     if (!uid) {
-      toast.error(t('security_reset_unavailable'));
+      toast.error(impersonating ? t('security_no_office_admin') : t('security_reset_unavailable'));
       return;
     }
     if (!securityFocus && nextName.length < 2) {
@@ -164,7 +176,7 @@ export default function AdminAccountInlinePanel({
       setSaasSession({
         accessToken: getSaasToken(),
         tenantId: getSaasTenantId(),
-        email,
+        email: sessionEmail,
       });
       toast.success(pwd ? t('account_saved_with_password') : t('account_saved'));
     } catch (err) {
@@ -175,15 +187,22 @@ export default function AdminAccountInlinePanel({
   };
 
   const requestPasswordReset = async () => {
-    if (!email) {
+    const uid = userId || (!impersonating ? jwtSub : '');
+    const resetEmail = displayEmail;
+    if (!resetEmail && !uid) {
       toast.error(t('security_no_email'));
       return;
     }
     setBusy(true);
     try {
-      const uid = userId || jwtSub;
-      if (isSuper) {
-        await sendAdminPasswordResetByEmail({ email, tenantId: tenantId || undefined });
+      if (impersonating) {
+        if (!uid) throw new Error(t('security_no_office_admin'));
+        await sendPlatformUserPasswordReset(uid);
+      } else if (isSuper) {
+        await sendAdminPasswordResetByEmail({
+          email: resetEmail,
+          tenantId: tenantId || undefined,
+        });
       } else if (uid) {
         await sendPlatformUserPasswordReset(uid);
       } else {
@@ -221,8 +240,13 @@ export default function AdminAccountInlinePanel({
           <>
             <div className="admin-acct-panel-card">
               <p className="admin-acct-panel-card-label">{t('security_signed_in')}</p>
-              <p className="admin-acct-panel-card-value">{email || t('signed_in_admin')}</p>
+              <p className="admin-acct-panel-card-value">
+                {displayEmail || t('signed_in_admin')}
+              </p>
               <p className="admin-acct-panel-card-meta">{role}</p>
+              {impersonating ? (
+                <p className="admin-acct-panel-card-meta">{t('security_impersonation_target')}</p>
+              ) : null}
               {expires ? (
                 <p className="admin-acct-panel-card-meta">
                   {t('security_session_until')}: {expires}
