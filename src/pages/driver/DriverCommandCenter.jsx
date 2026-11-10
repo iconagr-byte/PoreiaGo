@@ -187,9 +187,8 @@ export default function DriverCommandCenter() {
   ].join(' ');
 
   useEffect(() => {
-    if (!authenticated) {
-      clearDriverShiftLaunchState();
-    }
+    // Login / logout never inherits a previous shift — GPS starts only via button.
+    clearDriverShiftLaunchState();
   }, [authenticated]);
 
   const [onBreak, setOnBreak] = useState(false);
