@@ -10,6 +10,7 @@ from api.abandoned_public import router as abandoned_public_router
 from api.branding_public import router as branding_public_router
 from api.admin_bookings_router import router as admin_bookings_router
 from api.site_appearance_router import router as site_appearance_router
+from api.site_contact_router import router as site_contact_router
 from api.customer_auth import router as customer_auth_router
 from api.customer_bookings import router as customer_bookings_router
 from middleware.domain_tenant import DomainTenantMiddleware
@@ -22,19 +23,39 @@ from ticketing.demo_catalog import allow_demo_seeds, purge_seed_demo_catalog
 
 
 # Explicit origins required when allow_credentials=True (browsers reject "*").
+# Capacitor Wallet WebView uses https://localhost (Android) / capacitor://localhost (iOS).
 _DEFAULT_CORS_ORIGINS = (
     "https://www.poreiago.com,"
     "https://poreiago.com,"
+    "https://www.achilliotravel.com,"
+    "https://achilliotravel.com,"
     "http://localhost:5173,"
     "http://localhost:3000,"
     "http://127.0.0.1:5173,"
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000,"
+    "https://localhost,"
+    "http://localhost,"
+    "capacitor://localhost,"
+    "ionic://localhost"
+)
+
+
+_CAPACITOR_CORS_ORIGINS = (
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
 )
 
 
 def _cors_origins() -> list[str]:
     raw = (os.getenv("CORS_ORIGINS") or _DEFAULT_CORS_ORIGINS).strip()
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    # Always allow Capacitor Wallet WebView even if CORS_ORIGINS was set without them.
+    for origin in _CAPACITOR_CORS_ORIGINS:
+        if origin not in origins:
+            origins.append(origin)
+    return origins
 
 try:
     from api.bookings import router as bookings_router
@@ -280,14 +301,43 @@ async def lifespan(app: FastAPI):
             "PoreiaGo home driver rehome skipped: %s", exc
         )
     try:
+        from travel_platform.settings.drivers_store import repair_achillio_ops_drivers
+
+        repaired_ops = await repair_achillio_ops_drivers()
+        __import__("logging").getLogger("poreiago.startup").info(
+            "Achillio ops driver ensure: %s", repaired_ops
+        )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Achillio ops driver ensure skipped: %s", exc
+        )
+    try:
+        from travel_platform.settings.office_admin_bootstrap import (
+            repair_office_admin_bootstraps,
+        )
+
+        repaired_admins = await repair_office_admin_bootstraps()
+        __import__("logging").getLogger("poreiago.startup").info(
+            "Office admin bootstrap: %s", repaired_admins
+        )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Office admin bootstrap skipped: %s", exc
+        )
+    try:
         from app.core.database import AsyncSessionLocal
-        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+        from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 
         async with AsyncSessionLocal() as session:
-            synced = await sync_traefik_custom_domains_from_db(session)
-            if synced:
+            synced = await sync_edge_custom_domains_from_db(session)
+            domains = synced.get("domains") or []
+            if domains:
                 __import__("logging").getLogger("poreiago.startup").info(
-                    "Traefik custom domains synced: %s", ", ".join(synced)
+                    "Edge custom domains synced: %s (traefik=%s nginx_map=%s npm=%s)",
+                    ", ".join(domains),
+                    synced.get("traefik"),
+                    synced.get("nginx_map"),
+                    len(synced.get("npm") or []),
                 )
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
@@ -418,6 +468,7 @@ app.include_router(abandoned_public_router)
 app.include_router(branding_public_router)
 app.include_router(admin_bookings_router)
 app.include_router(site_appearance_router)
+app.include_router(site_contact_router)
 app.include_router(customer_auth_router)
 app.include_router(customer_bookings_router)
 try:

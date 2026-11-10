@@ -354,9 +354,12 @@ async def sync_account_imap(
         ),
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
 
     from .settings_store import record_sync_result
 
@@ -364,9 +367,10 @@ async def sync_account_imap(
     await record_sync_result(settings_id, error=err_text)
 
     return {
-        "ok": bool(messages) or not errors,
+        # Success when IMAP fetch worked (even if every message was already cached).
+        "ok": (not errors) or bool(messages),
         "email_settings_id": settings_id,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "error": ("; ".join(errors) if errors and not messages else None),
@@ -376,9 +380,10 @@ async def sync_account_imap(
 async def sync_imap_to_database_async(
     *,
     email_settings_id: str | None = None,
+    owner_key: str | None = None,
     batch_per_folder: int = DEFAULT_SYNC_BATCH,
 ) -> dict:
-    from .settings_store import get_settings, list_all_active_settings
+    from .settings_store import get_settings, list_all_active_settings, list_settings
 
     if email_settings_id:
         account = await get_settings(email_settings_id, with_password=True)
@@ -390,10 +395,27 @@ async def sync_imap_to_database_async(
                 "folders": {},
                 "errors": [],
             }
+        # Optional office seal when called from admin mailbox API.
+        if owner_key and str(account.get("owner_key") or "") != str(owner_key):
+            return {
+                "ok": False,
+                "error": "Ο λογαριασμός email δεν ανήκει σε αυτό το γραφείο",
+                "synced": 0,
+                "folders": {},
+                "errors": [],
+            }
         return await sync_account_imap(account, batch_per_folder=batch_per_folder)
 
-    # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
-    accounts = await list_all_active_settings()
+    # Admin UI: sync only this office. Background cron: all active accounts.
+    if owner_key:
+        accounts = await list_settings(
+            owner_key=str(owner_key),
+            active_only=True,
+            include_legacy_default=False,
+        )
+    else:
+        # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
+        accounts = await list_all_active_settings()
     if accounts:
         total = 0
         merged_errors: list[str] = []
@@ -445,12 +467,15 @@ async def sync_imap_to_database_async(
         None, lambda: _fetch_all_from_imap(cfg, batch_per_folder=batch_per_folder)
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
     return {
         "ok": True,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "legacy_env": True,

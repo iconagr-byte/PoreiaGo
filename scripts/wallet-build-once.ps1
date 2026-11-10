@@ -1,4 +1,4 @@
-﻿# ONE paste in PowerShell. Sets Java/SDK, builds APK, installs if emulator is up.
+﻿﻿# ONE paste in PowerShell. Sets Java/SDK, builds APK, installs if emulator is up.
 $ErrorActionPreference = "Stop"
 
 $repo = "C:\Users\User\poreiago"

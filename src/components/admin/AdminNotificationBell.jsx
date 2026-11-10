@@ -6,6 +6,7 @@ import {
 } from '../../lib/admin/notificationClickSound.js';
 import { useUiLang } from '../../hooks/useUiLang.js';
 import { getSaasTenantId } from '../../services/saasApi.js';
+import '../../styles/admin-header-icons.css';
 
 function formatWhen(iso, dateLocale) {
   if (!iso) return '';
@@ -24,10 +25,12 @@ function formatWhen(iso, dateLocale) {
 function iconFor(type) {
   const t = String(type || '').toLowerCase();
   if (t.includes('sos')) return 'emergency';
+  if (t.includes('booking') || t.includes('paid')) return 'confirmation_number';
   if (t.includes('chat') || t.includes('message')) return 'chat';
   if (t.includes('lost')) return 'support_agent';
   if (t.includes('online') || t.includes('shift')) return 'play_circle';
   if (t.includes('offline')) return 'stop_circle';
+  if (t.includes('route') || t.includes('deviation')) return 'alt_route';
   return 'notifications';
 }
 
@@ -72,7 +75,7 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className="relative p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-black/[0.04]"
+        className={`admin-hdr-icon${open ? ' is-open' : ''}`}
         aria-label={
           unreadCount > 0
             ? t('notifications_unread', { n: unreadCount })
@@ -88,11 +91,11 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
           });
         }}
       >
-        <span className="material-symbols-outlined">notifications</span>
+        <span className="material-symbols-outlined" aria-hidden>
+          notifications
+        </span>
         {unreadCount > 0 ? (
-          <span className="absolute top-1 right-1 min-w-[1.05rem] h-[1.05rem] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          <span className="admin-hdr-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
         ) : null}
       </button>
 

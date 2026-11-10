@@ -8,7 +8,6 @@ import {
   isUsableGoogleClientId,
   PRODUCTION_GOOGLE_CLIENT_ID,
 } from '../lib/googleClientId.js';
-import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 const GoogleAuthConfigContext = createContext({
   loading: true,
@@ -25,10 +24,12 @@ function resolveClientId(raw) {
   return isUsableGoogleClientId(clientId) ? clientId : '';
 }
 
-function nativeOrBuildFallback() {
+function preferredClientId() {
+  // Always prefer PoreiaGo Web client (same GCP project as Android OAuth).
+  // Build-time VITE_ / API may still briefly return the legacy Achillio id.
   return (
-    resolveClientId(BUILD_GOOGLE_CLIENT_ID) ||
-    (isNativeApp() ? resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) : '')
+    resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) ||
+    resolveClientId(BUILD_GOOGLE_CLIENT_ID)
   );
 }
 
@@ -37,7 +38,7 @@ function nativeOrBuildFallback() {
  * Wraps children in GoogleOAuthProvider when a real (non-placeholder) client id is available.
  */
 export default function GoogleAuthRoot({ children }) {
-  const buildId = nativeOrBuildFallback();
+  const buildId = preferredClientId();
   const [state, setState] = useState({
     loading: true,
     enabled: Boolean(buildId),
@@ -50,8 +51,9 @@ export default function GoogleAuthRoot({ children }) {
       try {
         const cfg = await fetchGoogleAuthConfig();
         if (cancelled) return;
+        // Prefer PoreiaGo Web client; API/build are fallbacks only.
         const clientId =
-          resolveClientId(cfg.client_id) || nativeOrBuildFallback();
+          preferredClientId() || resolveClientId(cfg.client_id);
         setState({
           loading: false,
           enabled: Boolean(clientId),
@@ -59,7 +61,7 @@ export default function GoogleAuthRoot({ children }) {
         });
       } catch {
         if (cancelled) return;
-        const clientId = nativeOrBuildFallback();
+        const clientId = preferredClientId();
         setState({
           loading: false,
           enabled: Boolean(clientId),

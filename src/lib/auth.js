@@ -1,4 +1,8 @@
 import { upsertCustomer } from './customers/customerStore.js';
+import {
+  rememberQuickLoginOnLogout,
+  syncQuickLoginVaultIfEnabled,
+} from './wallet/walletDeviceSecurity.js';
 import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
 
 export const ROLES = {
@@ -8,6 +12,8 @@ export const ROLES = {
 };
 
 const CUSTOMER_TOKEN_KEY = 'customer_access_token';
+const CUSTOMER_PHONE_KEY = 'userPhone';
+const CUSTOMER_ID_KEY = 'customerCustomerId';
 
 export function getUserRole() {
   if (typeof window === 'undefined') return null;
@@ -39,7 +45,9 @@ export function setCustomerToken(token) {
   else localStorage.removeItem(CUSTOMER_TOKEN_KEY);
 }
 
-/** Μόνο πελάτες — My Wallet / κρατήσεις / λογαριασμός */
+/** Μόνο πελάτες — My Wallet / κρατήσεις / λογαριασμός.
+ * Session lives in localStorage until logoutCustomer() (JWT ~7 days).
+ */
 export function loginAsCustomer(email, profile = {}, accessToken = null) {
   localStorage.removeItem('driverApiKey');
   localStorage.setItem('userRole', ROLES.CUSTOMER);
@@ -50,6 +58,12 @@ export function loginAsCustomer(email, profile = {}, accessToken = null) {
   else localStorage.removeItem('userPicture');
   if (profile.provider) localStorage.setItem('authProvider', profile.provider);
   else localStorage.removeItem('authProvider');
+  const phone = String(profile.phone || '').trim();
+  if (phone) localStorage.setItem(CUSTOMER_PHONE_KEY, phone);
+  else localStorage.removeItem(CUSTOMER_PHONE_KEY);
+  const cid = profile.customerId || profile.customer_id || null;
+  if (cid) localStorage.setItem(CUSTOMER_ID_KEY, String(cid));
+  else localStorage.removeItem(CUSTOMER_ID_KEY);
   if (accessToken) setCustomerToken(accessToken);
   else if (profile.access_token) setCustomerToken(profile.access_token);
 
@@ -63,12 +77,36 @@ export function loginAsCustomer(email, profile = {}, accessToken = null) {
     picture: profile.picture,
     phone: profile.phone,
     authProvider: profile.provider || 'email',
-    id: profile.customerId || profile.customer_id,
+    id: cid,
   });
+
+  // Keep Quick Login vault fresh when PIN unlock is enabled on this device.
+  try {
+    const token = accessToken || profile.access_token || getCustomerToken();
+    syncQuickLoginVaultIfEnabled(email, {
+      accessToken: token,
+      name: profile.name,
+      picture: profile.picture,
+      provider: profile.provider || 'email',
+      phone: profile.phone,
+      customerId: cid,
+      tenantId: tid,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getCustomerName() {
   return localStorage.getItem('userName');
+}
+
+export function getCustomerPhone() {
+  return localStorage.getItem(CUSTOMER_PHONE_KEY) || '';
+}
+
+export function getCustomerId() {
+  return localStorage.getItem(CUSTOMER_ID_KEY) || '';
 }
 
 export function getCustomerPicture() {
@@ -80,11 +118,20 @@ export function getAuthProvider() {
 }
 
 export function logoutCustomer() {
+  const email = localStorage.getItem('userEmail');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userEmail');
   localStorage.removeItem('userName');
   localStorage.removeItem('userPicture');
   localStorage.removeItem('authProvider');
+  localStorage.removeItem(CUSTOMER_PHONE_KEY);
+  localStorage.removeItem(CUSTOMER_ID_KEY);
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
   clearWalletTenantId();
+  // Leave device PIN vault so the next visit can unlock with Quick Login.
+  try {
+    rememberQuickLoginOnLogout(email);
+  } catch {
+    /* ignore */
+  }
 }

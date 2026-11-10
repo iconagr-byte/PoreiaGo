@@ -8,7 +8,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 from travel_platform.notifications.push_subscription_store import list_subscriptions_for_driver
-from travel_platform.notifications.web_push_service import send_push_to_subscription, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    push_configured,
+    send_push_to_subscription,
+)
 from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
 logger = logging.getLogger(__name__)
@@ -33,11 +37,9 @@ async def send_driver_shift_invite_push(
     qr_token: str | None = None,
     brand_label: str | None = None,
 ) -> dict[str, Any]:
-    from travel_platform.notifications.web_push_service import ensure_web_push_keys
-
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"ok": False, "skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"ok": False, "skipped": True, "reason": "push_not_configured"}
 
     if not auth_url and qr_token:
         auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())

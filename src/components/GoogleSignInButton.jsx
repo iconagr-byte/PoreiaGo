@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -208,9 +209,57 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
-    // Capacitor: skip One Tap prompt — show the official Google button immediately.
+    // Android/iOS: Credential Manager — never GIS inside WebView (origin_mismatch / disallowed_useragent).
     if (native) {
-      openFallback();
+      setBusy(true);
+      void (async () => {
+        try {
+          const idToken = await nativeGoogleIdToken(clientId);
+          handleCredential(idToken);
+        } catch (err) {
+          setBusy(false);
+          const msg = String(err?.message || err || '');
+          if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
+            return;
+          }
+          // Never navigate out of the Capacitor app (bridge opened Chrome white page).
+          if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
+            onError?.(
+              'Google Console: λάθος SHA-1 ή package στο Android OAuth client (ή ακόμα διαδίδεται). Τρέξε wallet-google-sha1.ps1, σύγκρινε με το Console, βάλε Test user αν είναι Testing, περίμενε έως μερικές ώρες, ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/not implemented|SocialLogin/i.test(msg)) {
+            onError?.(
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-go.ps1 (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
+          if (/CANNOT use scopes|modifying the main activity/i.test(msg)) {
+            onError?.(
+              'Χρειάζεται νέο Wallet build (χωρίς custom Google scopes). Τρέξε wallet-go.ps1 και ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/audience mismatch/i.test(msg)) {
+            onError?.(
+              'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (ή Actions → Set Google Client ID) και ξαναδοκίμασε σε ~2 λεπτά.',
+            );
+            return;
+          }
+          if (/No credentials available|NoCredential/i.test(msg)) {
+            onError?.(
+              'Δεν υπάρχει Google λογαριασμός στο emulator. Settings → Passwords & accounts → Add account → Google, μετά ξανά Σύνδεση με Google.',
+            );
+            return;
+          }
+          onError?.(
+            msg
+              ? `Google: ${msg}`
+              : 'Η σύνδεση με Google απέτυχε. Μείνε μέσα στο app Wallet (όχι Chrome) και δοκίμασε ξανά.',
+          );
+        }
+      })();
       return;
     }
     const g = window.google?.accounts?.id;
@@ -283,7 +332,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="flex justify-center py-2">
+            <div className="flex flex-col items-center gap-3 py-2">
               <GoogleLogin
                 onSuccess={(response) => {
                   if (!response.credential) {
@@ -294,7 +343,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 }}
                 onError={() => {
                   setBusy(false);
-                  onError?.('Η σύνδεση με Google απέτυχε');
+                  onError?.('Η σύνδεση με Google απέτυχε. Δοκιμάστε ξανά.');
                 }}
                 theme="outline"
                 size="large"

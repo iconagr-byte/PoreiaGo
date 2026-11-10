@@ -1,9 +1,13 @@
-# PoreiaGo Wallet — unified native app (buses + rent)
+# PoreiaGo Wallet — customer path inside the native app
 
-One My Wallet app for **λεωφορεία + ενοικιάσεις**.  
+> **Canonical native doc:** [`ANDROID-NATIVE.md`](./ANDROID-NATIVE.md)  
+> Package `com.poreiago.wallet` is now the **one** PoreiaGo Android app (driver + My Wallet + rent).  
+> This page covers customer wallet tenant sealing / Google Sign-In.
+
+One My Wallet surface for **λεωφορεία** (rent customers open `/rent/wallet` after role detection).  
 Office binding comes from the **customer account** (`wallet_tenant_id` + JWT `tenant_id`), not from a directory of offices.
 
-App id: `com.poreiago.wallet` · name: **PoreiaGo Wallet**
+App id: `com.poreiago.wallet` · name: **PoreiaGo** (display)
 
 ## How office isolation works
 
@@ -21,48 +25,170 @@ No office picker. No “scan QR to find office” as the main path.
 
 - One login → one sealed office
 - Tabs: tickets (bus) + rentals (when office has Rent) + account
-- Marketing site / admin / driver stay blocked in Capacitor
+- Marketing site / admin stay blocked in Capacitor; **driver** is reachable in the same app after driver login (`/driver`)
+- Native visual theme is separate (`src/styles/wallet-native-theme.css`, loaded only in Capacitor) — website `/wallet` keeps its own blue-card look
 - Google Sign-In always on login/register; native API → office host (`VITE_NATIVE_API_BASE` or `https://www.achilliotravel.com`)
+- API CORS must allow `https://localhost` / `capacitor://localhost` (Capacitor WebView origin) or login shows «σύνδεση με τον server απέτυχε»
+- Packaged app enables `CapacitorHttp` so native `fetch` bypasses WebView CORS until/while API CORS is deployed
 - Switching offices requires a different account (or logout + first bind elsewhere is blocked if home already set)
 
-## Windows rebuild
+## Windows rebuild (preferred)
 
-1. **Κλείσε** Android Studio τελείως.
-2. Άνοιξε emulator (home screen).
-3. Στο **PowerShell**:
+Rebuild native whenever Wallet UI/nav changes land on `main`. Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.11** (`versionCode` 11).
+
+**Always build from `main`.** Do not use old feature branches. `wallet-run.ps1` defaults to `-Branch main`.
+
+### Preferred path: `wallet-run.ps1` (not Studio Run)
+
+1. **Close** Android Studio (avoids Gradle cache fights).
+2. **Start a device** (or the script waits / fails with a clear message):
+   - Android Studio → **Device Manager** → ▶ on an AVD → wait for **home screen**, **or**
+   - USB phone with **USB debugging** on.
+3. Pull `main` and run:
 
 ```powershell
 cd C:\Users\User\poreiago
+git fetch origin main
+git checkout main
+git pull origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script: `git reset` στο branch με Google Sign-In (`cursor/wallet-google-auth-app-5ffb`) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+Optional:
 
-Πρέπει να εμφανίσει και: `OK: Google Sign-In present in packaged assets`.
-
-Πρέπει να εμφανίσει: `OK: new My Wallet login assets (no ticket/QR subtitle)` και μετά `DONE`.
-
-**Μην πατήσεις Run στο Studio** μετά — ξαναβάζει παλιό cache. Άνοιξε μόνο για να δεις logs αν χρειάζεται.
-
-## Android Studio Gradle (important)
-
-If Studio shows:
-`Plugin ... InternalProblems ... removed in Gradle 9.6.0`
-
-Studio is using **Gradle 9.6** instead of the project wrapper (**8.14.3**).
-
-Fix:
-1. Settings → Build, Execution, Deployment → Build Tools → **Gradle**
-2. **Use Gradle from** = `gradle-wrapper.properties` (not a local Gradle install)
-3. **Gradle JDK** = `jbr-21` (17 or 21 only)
-4. File → Sync Project with Gradle Files
-
-Or skip Studio Run and use:
 ```powershell
-cd C:\Users\User\poreiago; powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -WaitMinutes 5
 ```
 
-Gradle JDK must be **17 or 21** (not 25). Wrapper = **8.14.3**.
+What the script does: reset to **`main`** → wipe stale `dist`/assets → `npm install` + `cap:sync:packaged` → Gradle `assembleDebug` → uninstall → install → launch.
+
+**After DONE:** do **not** press Studio **Run** (reinstalls a stale/cached APK). Open Studio only for **Logcat / debug** on the already-running app.
+
+### If build OK but install fails: `Can't find service: package`
+
+APK built, `adb devices` shows `emulator-5554 device`, even `boot_completed=1`, but install dies with:
+
+```text
+adb.exe: failed to install ... cmd: Can't find service: package
+```
+
+The AVD is **half-booted** — PackageManager is not up yet. Fix:
+
+1. Close the emulator window  
+2. Device Manager → **Cold Boot Now** (or **Wipe Data**)  
+3. Wait for the Android **home screen**  
+4. Install without rebuilding:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+```
+
+`wallet-run.ps1` now waits for `cmd package list packages` before install and retries after an adb bounce.
+
+### If build OK but install hangs
+
+`adb devices` is empty **or** shows `emulator-5554   offline`, **or** Studio toast:
+
+> **Medium Phone is already running as process NNNNN**
+
+That toast means a zombie emulator still holds the AVD lock (Device Manager may still show ▶ Play). Clear it, then Cold Boot:
+
+```powershell
+cd C:\Users\User\poreiago
+# optional: -PidHint 38904  (use the PID from the Studio toast)
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-kill-emulator.ps1
+# Device Manager → Medium Phone → ▾ → Cold Boot Now → wait for HOME screen
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+```
+
+**Important:** `offline` is **not** ready. Only state `device` can install. Scripts wait for `device` + `sys.boot_completed=1`, and will try `adb kill-server` / relaunch the AVD if stuck offline.
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb devices
+# If you see "offline" for many minutes:
+& $adb kill-server; & $adb start-server; & $adb devices
+# Close emulator window -> Device Manager -> Cold Boot Now (or Wipe Data) -> wait for home screen
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+```
+
+**APK already built?** Install without rebuilding:
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+$apk = "C:\Users\User\poreiago\android\app\build\outputs\apk\debug\app-debug.apk"
+& $adb wait-for-device
+& $adb shell getprop sys.boot_completed   # expect: 1
+& $adb install -r $apk
+& $adb shell am start -n com.poreiago.wallet/com.poreiago.wallet.MainActivity
+```
+
+#### Stuck `emulator-5554 offline` (EN / EL)
+
+| EN | EL |
+|----|----|
+| `offline` ≠ ready; wait for `device` | Το `offline` **δεν** είναι έτοιμο· περιμένετε `device` |
+| Kill/restart adb, then Cold Boot | `adb kill-server` / `start-server`, μετά Cold Boot |
+| Wipe Data if Cold Boot fails | Wipe Data αν αποτύχει το Cold Boot |
+| Install with exact path above | Εγκατάσταση με την ακριβή διαδρομή APK παραπάνω |
+
+### Linux / CI (assets only)
+
+```bash
+npm ci
+npm run cap:sync:packaged
+cd android && ./gradlew assembleDebug
+```
+
+Expect: `OK: Google Sign-In present in packaged assets` then `DONE`.
+
+## Android Studio — when you need it
+
+Use Studio for **debugger / Logcat**. Prefer `wallet-run.ps1` for install.
+
+### Open the right folder
+
+1. File → **Close Project** (if repo root is open)
+2. File → **Open** → `C:\Users\User\poreiago\android` (**only** `android`, not `poreiago`)
+3. Wait for Gradle sync
+4. Settings → Build Tools → **Gradle**:
+   - **Use Gradle from** = `gradle-wrapper.properties` (**8.14.3**, not local 9.6)
+   - **Gradle JDK** = `jbr-21` (17 or 21 — **not 25**)
+5. Toolbar: pick a **device** (not «No Devices»)
+6. Optional: Run ▶ — or attach Logcat to the app already launched by `wallet-run.ps1`
+
+Prep helper (clears stale Run configs):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
+```
+
+### `Error running 'app'` / `Unknown error`
+
+Studio often shows that toast with **no details**. Usual causes for this project:
+
+| Cause | What to do |
+|-------|------------|
+| No device selected | Device Manager → ▶ AVD → wait home screen → pick it in toolbar |
+| Wrong/stale Run module | Run → Edit Configurations… → **app** → Module = `poreiago.app.main` → Apply |
+| Opened repo root | Close → Open folder `android\` only |
+| Gradle JDK 25 / Gradle 9.6 | Wrapper + `jbr-21` (see above) |
+| Empty `assets/public` | Run `wallet-run.ps1` or `wallet-studio-prep.ps1 -SyncFirst` first |
+| Studio Run after script | Skip Run; use Logcat on the installed app |
+
+Quick recovery (PowerShell):
+
+```powershell
+cd C:\Users\User\poreiago
+git fetch origin main; git checkout main; git pull origin main
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
+```
+
+Then Studio → Open `android\` → pick device → debug only.
+
+If Gradle says `InternalProblems ... removed in Gradle 9.6.0`: force **wrapper** (8.14.3), not a local Gradle install.
 
 ## Security checklist
 
@@ -72,4 +198,4 @@ Gradle JDK must be **17 or 21** (not 25). Wrapper = **8.14.3**.
 - [x] Client filters + storage namespace by office
 - [x] Offline last-pass namespaced by office; cleared on office switch / logout
 - [x] Cross-office Host/JWT mismatch → 403
-- [ ] Native FCM/APNs push (later)
+- [x] Native FCM push (see `docs/NATIVE-FCM-PUSH.md`; needs `google-services.json` + server credentials)

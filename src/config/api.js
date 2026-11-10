@@ -25,11 +25,36 @@ function resolveApiBase() {
       /Capacitor/i.test(String(navigator.userAgent || '')) ||
       (host === 'localhost' && (!port || port === '80' || port === '443'));
 
-    const markedWallet =
+    const markedApp =
       typeof document !== 'undefined' &&
-      document.documentElement?.getAttribute('data-poreiago-app') === 'wallet';
+      ['wallet', 'driver', 'app'].includes(
+        String(document.documentElement?.getAttribute('data-poreiago-app') || ''),
+      );
 
-    if (nativePlatform || markedWallet) {
+    const buildFlavor = String(import.meta.env.VITE_NATIVE_APP || '')
+      .trim()
+      .toLowerCase();
+
+    if (
+      nativePlatform ||
+      markedApp ||
+      buildFlavor === 'wallet' ||
+      buildFlavor === 'driver' ||
+      buildFlavor === 'app'
+    ) {
+      // Driver office seal (unified app or legacy driver package).
+      try {
+        const raw = localStorage.getItem('driver_native_office_seal');
+        if (raw) {
+          const seal = JSON.parse(raw);
+          const sealedHost = String(seal?.apiHost || '')
+            .trim()
+            .replace(/\/$/, '');
+          if (sealedHost) return sealedHost;
+        }
+      } catch {
+        /* ignore */
+      }
       const native =
         String(import.meta.env.VITE_NATIVE_API_BASE || '')
           .trim()
@@ -43,7 +68,14 @@ function resolveApiBase() {
   return '';
 }
 
+/** Prefer this — re-resolves after Capacitor / data-poreiago-app boot. */
+export function getApiBase() {
+  return resolveApiBase();
+}
+
+/** Snapshot at first import; native code should prefer getApiBase(). */
 export const API_BASE = resolveApiBase();
+
 export const DRIVER_API_KEY =
   import.meta.env.VITE_DRIVER_API_KEY || 'dev-driver-key';
 

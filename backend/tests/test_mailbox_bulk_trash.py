@@ -21,15 +21,32 @@ class BulkTrashSchemaTests(unittest.TestCase):
 class BulkTrashRouteTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_trash_counts_moved(self):
         from api.email_mailbox_router import bulk_trash_mailbox_messages
+        from types import SimpleNamespace
 
         async def fake_move(mid: str):
             if mid == "missing":
                 return None
             return {"id": mid, "folder": "Trash"}
 
-        with patch("api.email_mailbox_router.move_to_trash", new=AsyncMock(side_effect=fake_move)):
+        async def fake_get(mid: str):
+            if mid == "missing":
+                return None
+            return {"id": mid, "email_settings_id": "EMS-own", "folder": "Inbox"}
+
+        req = SimpleNamespace(state=SimpleNamespace(tenant_id="office-a"))
+        with patch(
+            "api.email_mailbox_router._owned_account_ids",
+            new=AsyncMock(return_value=["EMS-own"]),
+        ), patch(
+            "api.email_mailbox_router.mailbox_store.get_message",
+            new=AsyncMock(side_effect=fake_get),
+        ), patch(
+            "api.email_mailbox_router.move_to_trash",
+            new=AsyncMock(side_effect=fake_move),
+        ):
             result = await bulk_trash_mailbox_messages(
-                BulkTrashBody(ids=["1", "missing", "2"])
+                BulkTrashBody(ids=["1", "missing", "2"]),
+                req,
             )
         self.assertTrue(result["ok"])
         self.assertEqual(result["moved"], 2)

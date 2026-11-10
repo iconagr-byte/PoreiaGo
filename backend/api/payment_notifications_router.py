@@ -15,6 +15,7 @@ from ticketing.payment_confirmation_email import (
     EVENT_FISCAL_RECEIPT,
     EVENT_ONLINE_DEPOSIT,
     EVENT_ONLINE_FULL,
+    is_paid_success_booking,
     send_payment_confirmation_notifications,
 )
 
@@ -66,7 +67,18 @@ async def notify_payment_confirmation(body: PaymentNotificationRequest):
     if not body.booking.get("email"):
         raise HTTPException(status_code=400, detail="Booking email required")
     try:
-        return await send_payment_confirmation_notifications(body.booking, event=body.event)
+        return await send_payment_confirmation_notifications(
+            body.booking,
+            event=body.event,
+            require_office=is_paid_success_booking(body.booking)
+            or body.event
+            in {
+                EVENT_ONLINE_FULL,
+                EVENT_ONLINE_DEPOSIT,
+                EVENT_BANK_CONFIRMED,
+                EVENT_CASH_PAYMENT,
+            },
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

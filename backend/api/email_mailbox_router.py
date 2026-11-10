@@ -1,9 +1,14 @@
-"""REST API — Webmail mailbox (cached IMAP + SMTP actions)."""
+"""REST API — Webmail mailbox (cached IMAP + SMTP actions).
+
+SEAL: every read/write is scoped to the logged-in office's Email Hub accounts.
+Cross-tenant message lists (e.g. Achillio mail visible on PoreiaGo) are forbidden.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from api.request_tenant import admin_tenant_id
 from email_client import store as mailbox_store
 from email_client.constants import MAILBOX_FOLDERS
 from email_client.imap_sync import sync_imap_to_database_async
@@ -29,21 +34,91 @@ from email_client.schemas import (
     ReplyBody,
     SubscriberOut,
 )
+from email_client.settings_store import list_settings
 
 router = APIRouter(tags=["Email Mailbox"])
 
 
+def _owner_key(request: Request) -> str:
+    return f"tenant:{admin_tenant_id(request)}"
+
+
+async def _owned_account_ids(request: Request) -> list[str]:
+    rows = await list_settings(
+        owner_key=_owner_key(request),
+        active_only=False,
+        include_legacy_default=False,
+    )
+    return [str(r["id"]) for r in rows if r.get("id")]
+
+
+async def _resolve_account_ids(
+    request: Request,
+    email_settings_id: str | None,
+) -> list[str]:
+    """Return the account id(s) this office may see. Empty = empty inbox (never all tenants)."""
+    owned = await _owned_account_ids(request)
+    needle = str(email_settings_id or "").strip()
+    if needle:
+        if needle not in owned:
+            raise HTTPException(status_code=404, detail="Ο λογαριασμός email δεν βρέθηκε")
+        return [needle]
+    return owned
+
+
+async def _require_owned_message(message_id: str, request: Request) -> dict:
+    msg = await mailbox_store.get_message(message_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    owned = await _owned_account_ids(request)
+    sid = str(msg.get("email_settings_id") or "").strip()
+    if not sid or sid not in owned:
+        # Do not reveal that the message exists under another office.
+        raise HTTPException(status_code=404, detail="Message not found")
+    return msg
+
+
+def _message_out(row: dict) -> EmailMessageOut:
+    payload = {k: row[k] for k in EmailMessageOut.model_fields if k in row}
+    if payload.get("body_html") is None:
+        payload["body_html"] = ""
+    if payload.get("subject") is None:
+        payload["subject"] = ""
+    if payload.get("sender") is None:
+        payload["sender"] = ""
+    if payload.get("recipient") is None:
+        payload["recipient"] = ""
+    if not payload.get("date"):
+        payload["date"] = ""
+    return EmailMessageOut(**payload)
+
+
 @router.post("/api/mailbox/sync", response_model=ImapSyncResult)
-async def trigger_imap_sync(email_settings_id: str | None = Query(default=None)):
+async def trigger_imap_sync(
+    request: Request,
+    email_settings_id: str | None = Query(default=None),
+):
     try:
         from email_client.store import init_email_client_tables
 
         await init_email_client_tables()
     except Exception:
         pass
+    scope = await _resolve_account_ids(request, email_settings_id)
+    if not scope:
+        return ImapSyncResult(
+            ok=False,
+            synced=0,
+            folders={},
+            errors=[],
+            error="Δεν υπάρχουν λογαριασμοί email — προσθέστε από Ρυθμίσεις Email",
+        )
     try:
-        result = await sync_imap_to_database_async(email_settings_id=email_settings_id)
-        # Ensure response matches schema even when sync returns sparse dicts.
+        # One account: sync that row. Multiple: sync only this office's accounts.
+        if len(scope) == 1:
+            result = await sync_imap_to_database_async(email_settings_id=scope[0])
+        else:
+            result = await sync_imap_to_database_async(owner_key=_owner_key(request))
         return ImapSyncResult(
             ok=bool(result.get("ok")),
             synced=int(result.get("synced") or 0),
@@ -59,15 +134,19 @@ async def trigger_imap_sync(email_settings_id: str | None = Query(default=None))
 
 
 @router.get("/api/mailbox/folders", response_model=FolderCounts)
-async def mailbox_folders(email_settings_id: str | None = Query(default=None)):
+async def mailbox_folders(
+    request: Request,
+    email_settings_id: str | None = Query(default=None),
+):
     try:
         from email_client.store import init_email_client_tables
 
         await init_email_client_tables()
     except Exception:
         pass
+    scope = await _resolve_account_ids(request, email_settings_id)
     try:
-        counts = await mailbox_store.folder_unread_counts(email_settings_id=email_settings_id)
+        counts = await mailbox_store.folder_unread_counts(email_settings_ids=scope)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Mailbox: {exc}") from exc
     folders = []
@@ -81,6 +160,7 @@ async def mailbox_folders(email_settings_id: str | None = Query(default=None)):
 
 @router.get("/api/mailbox/messages", response_model=list[EmailMessageOut])
 async def list_mailbox_messages(
+    request: Request,
     folder: str = "Inbox",
     email_settings_id: str | None = Query(default=None),
     limit: int = Query(50, le=200),
@@ -89,44 +169,37 @@ async def list_mailbox_messages(
 ):
     if folder not in MAILBOX_FOLDERS:
         raise HTTPException(status_code=400, detail="Invalid folder")
+    scope = await _resolve_account_ids(request, email_settings_id)
     try:
         rows = await mailbox_store.list_messages(
             folder=folder,
-            email_settings_id=email_settings_id,
+            email_settings_ids=scope,
             limit=limit,
             offset=offset,
             search=search,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Mailbox: {exc}") from exc
-    out = []
-    for r in rows:
-        payload = {k: r[k] for k in EmailMessageOut.model_fields if k in r}
-        if payload.get("body_html") is None:
-            payload["body_html"] = ""
-        if payload.get("subject") is None:
-            payload["subject"] = ""
-        if payload.get("sender") is None:
-            payload["sender"] = ""
-        if payload.get("recipient") is None:
-            payload["recipient"] = ""
-        if not payload.get("date"):
-            payload["date"] = ""
-        out.append(EmailMessageOut(**payload))
-    return out
+    return [_message_out(r) for r in rows]
 
 
 @router.post("/api/mailbox/messages/bulk-trash")
-async def bulk_trash_mailbox_messages(body: BulkTrashBody):
+async def bulk_trash_mailbox_messages(body: BulkTrashBody, request: Request):
     """Move many messages to Trash in one request (UI multi-select)."""
     ids = [str(i).strip() for i in (body.ids or []) if str(i).strip()]
     if not ids:
         raise HTTPException(status_code=400, detail="Δεν επιλέχθηκαν μηνύματα")
     if len(ids) > 200:
         raise HTTPException(status_code=400, detail="Μέχρι 200 μηνύματα ανά ενέργεια")
+    owned = await _owned_account_ids(request)
     moved = 0
     missing: list[str] = []
     for mid in ids:
+        msg = await mailbox_store.get_message(mid)
+        sid = str((msg or {}).get("email_settings_id") or "").strip()
+        if not msg or not sid or sid not in owned:
+            missing.append(mid)
+            continue
         updated = await move_to_trash(mid)
         if updated:
             moved += 1
@@ -136,15 +209,36 @@ async def bulk_trash_mailbox_messages(body: BulkTrashBody):
 
 
 @router.get("/api/mailbox/messages/{message_id}", response_model=EmailMessageDetail)
-async def get_mailbox_message(message_id: str):
-    msg = await mailbox_store.get_message(message_id)
-    if not msg:
-        raise HTTPException(status_code=404, detail="Message not found")
+async def get_mailbox_message(message_id: str, request: Request):
+    msg = await _require_owned_message(message_id, request)
     if not msg["is_read"]:
         await mailbox_store.update_message(message_id, {"is_read": True})
-        msg = await mailbox_store.get_message(message_id)
-    if not msg:
-        raise HTTPException(status_code=404, detail="Message not found")
+        msg = await _require_owned_message(message_id, request)
+        # Push \\Seen to IMAP so the 5s poll does not revive the unread blue dot.
+        try:
+            import asyncio
+
+            from email_client.dynamic_mailer import settings_to_imap_config
+            from email_client.imap_trash import imap_mark_message_seen
+            from email_client.settings_store import get_settings_for_send
+
+            sid = str(msg.get("email_settings_id") or "").strip()
+            if sid:
+                account = await get_settings_for_send(sid)
+                cfg = settings_to_imap_config(account) if account else None
+                if cfg:
+
+                    def _mark():
+                        return imap_mark_message_seen(
+                            cfg,
+                            message_id=str(msg.get("message_id") or ""),
+                            local_folder=str(msg.get("folder") or "Inbox"),
+                            imap_uid=str(msg.get("imap_uid") or "") or None,
+                        )
+
+                    asyncio.create_task(asyncio.to_thread(_mark))
+        except Exception:
+            pass
     for key in ("body_html", "subject", "sender", "recipient", "date"):
         if msg.get(key) is None:
             msg[key] = ""
@@ -152,16 +246,18 @@ async def get_mailbox_message(message_id: str):
 
 
 @router.patch("/api/mailbox/messages/{message_id}", response_model=EmailMessageOut)
-async def patch_mailbox_message(message_id: str, body: MessagePatch):
+async def patch_mailbox_message(message_id: str, body: MessagePatch, request: Request):
+    await _require_owned_message(message_id, request)
     patch = body.model_dump(exclude_unset=True)
     updated = await mailbox_store.update_message(message_id, patch)
     if not updated:
         raise HTTPException(status_code=404, detail="Message not found")
-    return EmailMessageOut(**{k: updated[k] for k in EmailMessageOut.model_fields})
+    return _message_out(updated)
 
 
 @router.delete("/api/mailbox/messages/{message_id}")
-async def delete_mailbox_message(message_id: str):
+async def delete_mailbox_message(message_id: str, request: Request):
+    await _require_owned_message(message_id, request)
     updated = await move_to_trash(message_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -169,7 +265,8 @@ async def delete_mailbox_message(message_id: str):
 
 
 @router.post("/api/mailbox/messages/{message_id}/reply")
-async def reply_mailbox_message(message_id: str, body: ReplyBody):
+async def reply_mailbox_message(message_id: str, body: ReplyBody, request: Request):
+    await _require_owned_message(message_id, request)
     try:
         return await reply_to_message(message_id, body_html=body.body_html, subject=body.subject)
     except ValueError as exc:
@@ -177,7 +274,8 @@ async def reply_mailbox_message(message_id: str, body: ReplyBody):
 
 
 @router.post("/api/mailbox/messages/{message_id}/forward")
-async def forward_mailbox_message(message_id: str, body: ForwardBody):
+async def forward_mailbox_message(message_id: str, body: ForwardBody, request: Request):
+    await _require_owned_message(message_id, request)
     try:
         return await forward_message(message_id, to_addr=body.to, body_html=body.body_html)
     except ValueError as exc:
@@ -185,22 +283,34 @@ async def forward_mailbox_message(message_id: str, body: ForwardBody):
 
 
 @router.get("/api/mailbox/messages/{message_id}/customer", response_model=CustomerCard | None)
-async def mailbox_message_customer(message_id: str):
+async def mailbox_message_customer(message_id: str, request: Request):
+    await _require_owned_message(message_id, request)
     return await lookup_customer_for_message(message_id)
 
 
 @router.post("/api/mailbox/compose")
 async def compose_send(
     body: ComposeBody,
+    request: Request,
     email_settings_id: str | None = Query(default=None),
 ):
+    scope = await _resolve_account_ids(request, email_settings_id)
+    if not scope:
+        raise HTTPException(
+            status_code=400,
+            detail="Προσθέστε λογαριασμό email στις Ρυθμίσεις Email πριν την αποστολή",
+        )
+    send_id = scope[0]
+    # Prefer explicit account when provided / when multiple exist use first owned.
+    if email_settings_id and str(email_settings_id).strip() in scope:
+        send_id = str(email_settings_id).strip()
     try:
         att = [a.model_dump() for a in body.attachments]
         return await send_compose(
             to_addr=body.to,
             subject=body.subject,
             body_html=body.body_html,
-            email_settings_id=email_settings_id,
+            email_settings_id=send_id,
             cc=body.cc,
             bcc=body.bcc,
             priority=body.priority,
@@ -214,13 +324,22 @@ async def compose_send(
 @router.post("/api/mailbox/drafts", response_model=EmailMessageOut)
 async def save_draft(
     body: DraftBody,
+    request: Request,
     email_settings_id: str | None = Query(default=None),
 ):
+    scope = await _resolve_account_ids(request, email_settings_id)
+    if not scope:
+        raise HTTPException(
+            status_code=400,
+            detail="Προσθέστε λογαριασμό email στις Ρυθμίσεις Email",
+        )
     payload = body.model_dump()
-    if email_settings_id and not payload.get("email_settings_id"):
-        payload["email_settings_id"] = email_settings_id
+    sid = str(email_settings_id or payload.get("email_settings_id") or "").strip()
+    if sid and sid not in scope:
+        raise HTTPException(status_code=404, detail="Ο λογαριασμός email δεν βρέθηκε")
+    payload["email_settings_id"] = sid or scope[0]
     saved = await save_compose_draft(payload)
-    return EmailMessageOut(**{k: saved[k] for k in EmailMessageOut.model_fields})
+    return _message_out(saved)
 
 
 @router.get("/api/mailbox/subscribers", response_model=list[SubscriberOut])
