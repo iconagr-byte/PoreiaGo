@@ -167,10 +167,12 @@ export async function syncAllLocalTrips() {
   const { loadTrips, mergeServerTripsIntoStore } = await import(
     '../lib/trips/tripStore.js'
   );
-  // Never replace the public catalog with a partial local list.
+  // Reconcile first so deleted-elsewhere ghosts are not pushed back to the catalog.
   try {
     const remote = await fetchOfficeTripCatalog();
-    if (remote.length) mergeServerTripsIntoStore(remote);
+    if (Array.isArray(remote)) {
+      mergeServerTripsIntoStore(remote, { pruneMissing: true });
+    }
   } catch (err) {
     console.warn('[trips-sync] pre-sync hydrate failed', err);
   }
