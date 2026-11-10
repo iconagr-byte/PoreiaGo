@@ -1,5 +1,6 @@
-import { API_BASE } from '../config/api.js';
-import { getCustomerToken, setCustomerToken } from '../lib/auth.js';
+import { getApiBase } from '../config/api.js';
+import { getCustomerToken, loginAsCustomer, setCustomerToken } from '../lib/auth.js';
+import { setWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 function parseError(data) {
   const detail = data?.detail;
@@ -19,14 +20,14 @@ export function customerAuthHeaders() {
 async function postJson(path, body, auth = false) {
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${getApiBase()}${path}`, {
       method: 'POST',
       headers: auth ? customerAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   } catch {
     throw new Error(
-      'Ο server δεν απαντά (port 8000). Ξεκινήστε το backend: cd backend && py -3 -m uvicorn main:app --reload --port 8000',
+      'Δεν υπάρχει σύνδεση με τον server. Ελέγξτε το δίκτυο ή δοκιμάστε σε λίγο.',
     );
   }
   const data = await res.json().catch(() => ({}));
@@ -40,8 +41,11 @@ async function postJson(path, body, auth = false) {
 }
 
 export function persistCustomerSession(profile) {
-  if (profile.access_token) {
+  if (profile?.access_token) {
     setCustomerToken(profile.access_token);
+  }
+  if (profile?.tenant_id) {
+    setWalletTenantId(profile.tenant_id);
   }
   return profile;
 }
@@ -57,7 +61,7 @@ export async function loginCustomer({ email, password }) {
 }
 
 export async function fetchCustomerMe() {
-  const res = await fetch(`${API_BASE}/api/auth/me`, { headers: customerAuthHeaders() });
+  const res = await fetch(`${getApiBase()}/api/auth/me`, { headers: customerAuthHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(parseError(data));
   return data;
@@ -69,6 +73,19 @@ export async function changeCustomerPasswordApi({ currentPassword, newPassword }
     { current_password: currentPassword, new_password: newPassword },
     true,
   );
+}
+
+export async function changeCustomerEmailApi({ newEmail, currentPassword }) {
+  const data = await postJson(
+    '/api/auth/change-email',
+    { new_email: newEmail, current_password: currentPassword },
+    true,
+  );
+  persistCustomerSession(data);
+  if (data?.email) {
+    loginAsCustomer(data.email, data, data.access_token || null);
+  }
+  return data;
 }
 
 export async function forgotCustomerPassword(email) {
@@ -83,6 +100,23 @@ export async function resetCustomerPassword({ token, newPassword }) {
   return persistCustomerSession(data);
 }
 
+/** Phase B — exchange email magic-link token for My Wallet JWT. */
+export async function consumeWalletMagic(token) {
+  const data = await postJson('/api/auth/wallet-magic/consume', { token });
+  return persistCustomerSession(data);
+}
+
+/** Optional: email a fresh magic link (always returns ok). */
+export async function issueWalletMagic({ email, bookingId, name, phone, sendEmail = true }) {
+  return postJson('/api/auth/wallet-magic/issue', {
+    email,
+    booking_id: bookingId,
+    name: name || '',
+    phone: phone || '',
+    send_email: sendEmail,
+  });
+}
+
 /**
  * @param {string} idToken — Google credential JWT
  */
@@ -91,15 +125,38 @@ export async function verifyGoogleLogin(idToken) {
   return persistCustomerSession(data);
 }
 
+/** Build-time fallback — prefer runtime `/api/auth/google/config`. */
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+/** @deprecated Prefer useGoogleAuthConfig() — build-time only. */
 export function isGoogleAuthConfigured() {
   return Boolean(GOOGLE_CLIENT_ID);
 }
 
+/**
+ * Public Google GIS config from the API (enabled + client_id).
+ * Safe to call from the browser — client id is not a secret.
+ */
+export async function fetchGoogleAuthConfig() {
+  try {
+    const res = await fetch(`${getApiBase()}/api/auth/google/config`, { method: 'GET' });
+    if (!res.ok) {
+      return { enabled: Boolean(GOOGLE_CLIENT_ID), client_id: GOOGLE_CLIENT_ID || null };
+    }
+    const data = await res.json().catch(() => ({}));
+    const clientId = String(data.client_id || '').trim();
+    return {
+      enabled: Boolean(data.enabled && clientId),
+      client_id: clientId || null,
+    };
+  } catch {
+    return { enabled: Boolean(GOOGLE_CLIENT_ID), client_id: GOOGLE_CLIENT_ID || null };
+  }
+}
+
 export async function isCustomerAuthBackendAvailable() {
   try {
-    const res = await fetch(`${API_BASE}/health`, { method: 'GET' });
+    const res = await fetch(`${getApiBase()}/health`, { method: 'GET' });
     return res.ok;
   } catch {
     return false;
