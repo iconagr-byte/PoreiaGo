@@ -10,7 +10,7 @@ import {
   normalizeIncludedDefaults,
 } from '../../../lib/rental/rentBookingExtras.js';
 import {
-  fetchSiteAppearance,
+  fetchAdminSiteAppearance,
   updateSiteAppearance,
 } from '../../../services/siteAppearanceApi.js';
 
@@ -62,7 +62,7 @@ export default function RentCoverageExtrasEditor() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchSiteAppearance();
+      const data = await fetchAdminSiteAppearance();
       const nextOpts = normalizeCoverageOptions(data?.rent_coverage_options);
       const nextInc = normalizeIncludedDefaults(data?.rent_included_defaults);
       const nextUpsell = String(data?.rent_upsell_coverage_id || '').trim();

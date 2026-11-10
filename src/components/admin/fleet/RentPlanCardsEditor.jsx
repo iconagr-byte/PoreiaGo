@@ -350,8 +350,9 @@ export default function RentPlanCardsEditor() {
       setAddon(a);
       setSavedSnapshot(serializeSnapshot(saved.sectionTitle, s, a));
       toast.success(
-        `Αποθηκεύτηκε · ${saved.standalone.name} €${saved.standalone.monthlyEur}/μήνα`,
+        `Αποθηκεύτηκε · ${saved.standalone.name} €${saved.standalone.monthlyEur}/μήνα — ενημερώνονται /grafeia & hero`,
       );
+      window.dispatchEvent(new Event('rent-plan-catalog-changed'));
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
     } finally {

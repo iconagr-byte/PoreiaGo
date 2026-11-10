@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlparse
 
 from travel_platform.notifications.push_subscription_store import list_subscriptions_for_driver
-from travel_platform.notifications.web_push_service import send_push_to_subscription, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    push_configured,
+    send_push_to_subscription,
+)
 from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
 logger = logging.getLogger(__name__)
@@ -30,9 +35,11 @@ async def send_driver_shift_invite_push(
     trip_title: str | None = None,
     auth_url: str | None = None,
     qr_token: str | None = None,
+    brand_label: str | None = None,
 ) -> dict[str, Any]:
-    if not web_push_configured():
-        return {"ok": False, "skipped": True, "reason": "vapid_not_configured"}
+    ensure_web_push_keys()
+    if not push_configured():
+        return {"ok": False, "skipped": True, "reason": "push_not_configured"}
 
     if not auth_url and qr_token:
         auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())
@@ -42,18 +49,22 @@ async def send_driver_shift_invite_push(
     click_url = _relative_driver_url(auth_url)
     title = trip_title.strip() if trip_title else f"Εκδρομή #{trip_id}"
     body = (message or "").strip() or f"{title} — πάτα για να ανοίξεις τη βάρδια"
+    brand = (brand_label or "").strip() or "Γραφείο"
 
     payload = {
-        "title": "Άνοιξε βάρδια · PoreiaGo",
+        "title": f"Άνοιξε βάρδια · {brand}",
         "body": body,
         "url": click_url,
         "tag": f"driver-invite-{tenant_id}-{trip_id}",
+        "renotify": True,
+        "requireInteraction": True,
         "data": {
             "type": "driver_shift_invite",
             "tenant_id": tenant_id,
             "trip_id": trip_id,
             "driver_id": driver_id,
             "auth_url": auth_url,
+            "createdAt": int(time.time() * 1000),
         },
     }
 

@@ -14,7 +14,12 @@ import {
   selectedExtrasLabels,
   visibleCoverageOptions,
 } from '../../lib/rental/rentBookingExtras.js';
-import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import {
+  navigateToRentDateSearch,
+  readRentBookingPrefs,
+  rentTripSearchReady,
+  writeRentBookingPrefs,
+} from '../../lib/rental/rentBookingSearch.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
@@ -69,8 +74,19 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
     });
   };
 
-  const goEditTrip = () => navigate('/rent#rent-guest-search');
+  const goEditTrip = () =>
+    navigateToRentDateSearch(navigate, {
+      message: 'Μπορείς να αλλάξεις ημερομηνίες παραλαβής και επιστροφής εδώ.',
+    });
   const goChangeVehicle = () => navigate('/rent#rent-guest-fleet');
+
+  useEffect(() => {
+    if (rentTripSearchReady(prefs)) return;
+    navigateToRentDateSearch(navigate, {
+      replace: true,
+      message: 'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις την κράτηση.',
+    });
+  }, [navigate, prefs]);
 
   const onNext = () => {
     if (!vehicle?.id) {
@@ -78,9 +94,10 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
       navigate('/rent#rent-guest-fleet');
       return;
     }
-    if (!prefs.start_time || !prefs.end_time || !prefs.pickup_location) {
-      toast.error('Συμπλήρωσε παραλαβή και ημερομηνίες.');
-      navigate('/rent#rent-guest-search');
+    if (!rentTripSearchReady(prefs)) {
+      navigateToRentDateSearch(navigate, {
+        message: 'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.',
+      });
       return;
     }
     writeRentBookingPrefs({
@@ -95,9 +112,9 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
   useEffect(() => {
     if (resumed.current) return;
     const p = readRentBookingPrefs();
-    if (p.wizard_pending_confirm && getCustomerToken() && p.wizard_step === 'details') {
+    if (p.wizard_pending_confirm && getCustomerToken() && (p.wizard_step === 'payment' || p.wizard_step === 'details')) {
       resumed.current = true;
-      navigate('/rent/book/details', { replace: true });
+      navigate(p.wizard_step === 'payment' ? '/rent/book/payment' : '/rent/book/details', { replace: true });
     }
   }, [navigate]);
 

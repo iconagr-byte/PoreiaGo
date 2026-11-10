@@ -10,6 +10,7 @@ export const RENT_BOOKING_STEPS = [
   { id: 'vehicle', label: 'Επιλογή οχήματος', short: '2' },
   { id: 'services', label: 'Υπηρεσίες', short: '3' },
   { id: 'details', label: 'Συμπληρώνεις στοιχεία', short: '4' },
+  { id: 'payment', label: 'Πληρωμή', short: '5' },
 ];
 
 /** Coverage / add-on catalog — teal brand, not Hertz yellow clone. */

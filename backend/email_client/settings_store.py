@@ -189,16 +189,11 @@ async def list_settings(
     q += " ORDER BY created_at ASC"
     cur = await db.execute(q, params)
     rows = [_row_settings(r) for r in await cur.fetchall()]
-    # Adopt legacy owner_key=default rows into the logged-in office once.
+    # SEAL: never auto-claim owner_key=default into the logged-in office.
+    # First office to open Email settings used to steal IMAP/SMTP from another
+    # tenant. Legacy rows stay readable only via explicit claim_legacy_owner().
     if include_legacy_default and owner_key != "default":
-        for row in rows:
-            if row.get("owner_key") == "default":
-                await db.execute(
-                    "UPDATE email_settings SET owner_key = ?, updated_at = ? WHERE id = ?",
-                    (owner_key, _now(), row["id"]),
-                )
-                row["owner_key"] = owner_key
-        await db.commit()
+        rows = [r for r in rows if r.get("owner_key") == owner_key]
     return rows
 
 
@@ -302,10 +297,18 @@ async def update_settings(settings_id: str, patch: dict) -> dict | None:
         return None
     password = patch.get("mail_password")
     enc = None
-    if password is not None:
-        enc = encrypt_password(password) if password else existing.get("mail_password_enc", "")
-
     db = get_db()
+    if password is not None:
+        if password:
+            enc = encrypt_password(password)
+        else:
+            # Keep existing ciphertext — row dict from get_settings has no mail_password_enc.
+            cur = await db.execute(
+                "SELECT mail_password_enc FROM email_settings WHERE id = ?",
+                (settings_id,),
+            )
+            row = await cur.fetchone()
+            enc = (row["mail_password_enc"] if row else "") or ""
     fields = {
         "label": patch.get("label", existing["label"]),
         "email_address": patch.get("email_address", existing["email_address"]),

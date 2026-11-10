@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchPlatformSettings } from '../services/platformApi.js';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import AchillioLogo from './AchillioLogo.jsx';
 
 const BYPASS_PREFIXES = ['/admin', '/driver', '/wallet', '/login', '/my-booking', '/rent/my-booking', '/rent/login', '/ticket'];
@@ -14,7 +15,8 @@ export default function MaintenanceGate({ children }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetchPlatformSettings()
+    // Marketing host: never attach office JWT for this probe (avoids 401 → admin login).
+    fetchPlatformSettings({ preferPublic: isPlatformMarketingHost() })
       .then((s) => setMaintenance(Boolean(s.maintenance_mode)))
       .catch(() => setMaintenance(false))
       .finally(() => setLoaded(true));

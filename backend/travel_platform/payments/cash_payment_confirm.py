@@ -22,12 +22,24 @@ CHANNEL_LABELS = {
 }
 
 
+def _parse_money(value: Any, default: float = 0.0) -> float:
+    if value is None or value == "":
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace("€", "").replace(" ", "").replace(",", ".")
+    try:
+        return float(text)
+    except ValueError:
+        return default
+
+
 def _balance_due(booking: dict[str, Any]) -> float:
-    total = float(booking.get("price") or booking.get("total_eur") or 0)
-    paid = float(booking.get("amountPaid") or booking.get("amount_paid") or 0)
+    total = _parse_money(booking.get("price") or booking.get("total_eur") or 0)
+    paid = _parse_money(booking.get("amountPaid") or booking.get("amount_paid") or 0)
     explicit = booking.get("balanceDue")
-    if explicit is not None:
-        return round(max(float(explicit), 0.0), 2)
+    if explicit is not None and explicit != "":
+        return round(max(_parse_money(explicit), 0.0), 2)
     return round(max(total - paid, 0.0), 2)
 
 
@@ -44,12 +56,12 @@ def validate_cash_payment_request(booking: dict[str, Any], body: dict[str, Any])
     amount = body.get("amount")
     if amount is None:
         raise ValueError("amount required")
-    amount_f = round(float(amount), 2)
+    amount_f = round(_parse_money(amount, default=-1.0), 2)
     if amount_f <= 0:
         raise ValueError("amount must be positive")
 
     balance = _balance_due(booking)
-    total = round(float(booking.get("price") or 0), 2)
+    total = round(_parse_money(booking.get("price") or 0), 2)
     max_allowed = balance if balance > 0 else total
     if max_allowed <= 0 and amount_f > total:
         raise ValueError("Η κράτηση φαίνεται ήδη εξοφλημένη")

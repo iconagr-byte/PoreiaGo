@@ -10,9 +10,17 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.cors import CORSMiddleware
 
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("ADMIN_AUTH_DISABLED", "0")
+os.environ["ENVIRONMENT"] = "test"
+os.environ["ADMIN_AUTH_DISABLED"] = "0"
 os.environ.setdefault("AUTH_JWT_SECRET", "test-security-jwt-secret-32chars!!")
+
+try:
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+except Exception:
+    pass
+
 
 
 def _build_app() -> FastAPI:
@@ -36,6 +44,14 @@ def _build_app() -> FastAPI:
 
 class EmailApiAuthTests(unittest.TestCase):
     def setUp(self):
+        os.environ["ENVIRONMENT"] = "test"
+        os.environ["ADMIN_AUTH_DISABLED"] = "0"
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
         self.client = TestClient(_build_app())
 
     def test_email_settings_requires_bearer(self):
@@ -87,6 +103,25 @@ class AdminAuthDisabledProdGuardTests(unittest.TestCase):
             self.assertFalse(_admin_auth_disabled_allowed())
         with patch.dict(os.environ, {"ENVIRONMENT": "development"}, clear=False):
             self.assertTrue(_admin_auth_disabled_allowed())
+
+
+class ProductionGuardIntegrationTests(unittest.TestCase):
+    def test_boot_guard_raises_on_weak_prod(self):
+        from app.core.production_guard import assert_production_safe_or_raise
+
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "AUTH_JWT_SECRET": "dev-jwt",
+                "TICKET_JWT_SECRET": "short",
+                "TELEMETRY_DEVICE_KEYS": "",
+                "DATABASE_URL": "postgresql+asyncpg://u:x@db/x",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                assert_production_safe_or_raise()
 
 
 if __name__ == "__main__":
