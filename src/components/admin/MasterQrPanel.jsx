@@ -3,7 +3,7 @@ import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { loadTrips, getTripById } from '../../lib/trips/tripStore.js';
 import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers, notifyDriverShiftPush } from '../../services/platformApi.js';
-import { syncTripsToPostgres } from '../../services/tripsSyncApi.js';
+import { syncTripsToPostgres, hydrateTripsFromServer } from '../../services/tripsSyncApi.js';
 import BusPwaInstallGuide from './BusPwaInstallGuide.jsx';
 
 const fieldClass =
@@ -20,14 +20,26 @@ export default function MasterQrPanel({ compact = false }) {
   const [driversLoading, setDriversLoading] = useState(true);
 
   useEffect(() => {
-    const all = loadTrips();
-    setTrips(all);
-    const initialId = all.length ? String(all[0].id) : '';
-    if (initialId) setTripId((prev) => prev || initialId);
-    // Background only — never block driver list / QR issue on full trip sync.
-    if (all.length) {
-      syncTripsToPostgres(all).catch(() => {});
-    }
+    let cancelled = false;
+    const apply = (all) => {
+      if (cancelled) return;
+      setTrips(all);
+      const initialId = all.length ? String(all[0].id) : '';
+      if (initialId) setTripId((prev) => prev || initialId);
+      // Background only — never block driver list / QR issue on full trip sync.
+      if (all.length) {
+        syncTripsToPostgres(all).catch(() => {});
+      }
+    };
+    apply(loadTrips());
+    hydrateTripsFromServer()
+      .then((result) => {
+        if (result?.trips?.length) apply(result.trips);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

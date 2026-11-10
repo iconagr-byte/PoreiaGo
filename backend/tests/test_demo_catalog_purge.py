@@ -41,6 +41,9 @@ class DemoCatalogContractTests(unittest.TestCase):
         js = (ROOT / "src" / "lib" / "admin" / "demoCatalog.js").read_text(encoding="utf-8")
         self.assertIn("stripDemoTrips", js)
         self.assertIn("stripDemoBookings", js)
+        # Achillio seed trip bookings must not be wiped by marketing-title filter.
+        self.assertIn("OFFICE_SEED_TRIP_IDS", js)
+        self.assertIn("office-seed trips reuse", js)
         store = (ROOT / "src" / "lib" / "trips" / "tripStore.js").read_text(encoding="utf-8")
         self.assertIn("stripDemoTrips", store)
         bookings = (ROOT / "src" / "lib" / "ticketing" / "bookingStore.js").read_text(

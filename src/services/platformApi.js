@@ -52,8 +52,10 @@ async function parseError(res) {
   let detail = err.detail ?? res.statusText ?? 'Request failed';
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
-  } else if (typeof detail === 'object') {
-    detail = JSON.stringify(detail);
+  } else if (typeof detail === 'object' && detail !== null) {
+    const e = new Error(detail.message || JSON.stringify(detail));
+    e.detail = detail;
+    throw e;
   }
   throw new Error(String(detail));
 }
@@ -236,9 +238,10 @@ async function updatePlatformSettingsLegacy(body) {
   return { data: body, source: 'local' };
 }
 
-export async function fetchPlatformUsers() {
+export async function fetchPlatformUsers({ allOffices = false } = {}) {
   try {
-    const res = await adminFetch('/api/admin/platform/users');
+    const q = allOffices ? '?all_offices=1' : '';
+    const res = await adminFetch(`/api/admin/platform/users${q}`);
     if (res.ok) return res.json();
   } catch {
     /* offline */
@@ -288,6 +291,58 @@ export async function deletePlatformUser(userId) {
   if (!res.ok && res.status !== 204) await parseError(res);
 }
 
+/** Superadmin / office admin: email a password-reset link for a backoffice user. */
+export async function sendPlatformUserPasswordReset(userId) {
+  const res = await adminFetch(`/api/admin/platform/users/${userId}/send-password-reset`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Platform superadmin: send reset by email (optional tenant scope). */
+export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
+  const res = await adminFetch('/api/admin/platform/password-reset/send', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: request admin password-reset email from /admin/login (no session). */
+export async function requestAdminPasswordReset({ email, host } = {}) {
+  const officeHost =
+    String(host || (typeof window !== 'undefined' ? window.location.hostname : '') || '')
+      .trim()
+      .toLowerCase();
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      ...(officeHost ? { host: officeHost } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: confirm admin password reset with emailed token. */
+export async function confirmAdminPasswordReset({ token, newPassword }) {
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function fetchBackups() {
   try {
     const res = await adminFetch('/api/admin/platform/backups');
@@ -298,8 +353,21 @@ export async function fetchBackups() {
   return [];
 }
 
-export async function createBackup() {
-  const res = await adminFetch('/api/admin/platform/backups', { method: 'POST' });
+/**
+ * @param {{ scope?: 'platform'|'office'|'database', tenantId?: string, clientExtras?: object }} [opts]
+ */
+export async function createBackup(opts = {}) {
+  const scope = opts.scope || 'platform';
+  const body = {
+    scope,
+    tenant_id: opts.tenantId || null,
+    client_extras: opts.clientExtras || null,
+  };
+  const res = await adminFetch('/api/admin/platform/backups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -326,7 +394,7 @@ export async function downloadBackupFile(backupId, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `backup-${backupId}.json`;
+  link.download = filename || `backup-${backupId}`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -1136,4 +1204,36 @@ function getMockUsers() {
       created_at: new Date().toISOString(),
     },
   ];
+}
+
+export const DEFAULT_TRIP_REMINDER = {
+  enabled: true,
+  days_before: 3,
+  send_hour: 9,
+  subject: 'Η εκδρομή σου πλησιάζει · {trip}',
+  headline: 'Σε {days} μέρες φεύγεις',
+  body:
+    'Υπενθύμιση για την επερχόμενη εκδρομή σου. Έλεγξε ώρα και θέσεις — το εισιτήριό σου είναι στο My Wallet.',
+};
+
+export async function fetchTripReminderSettings() {
+  const res = await adminFetch('/api/admin/platform/trip-reminder');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία φόρτωσης υπενθύμισης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}
+
+export async function updateTripReminderSettings(patch) {
+  const res = await adminFetch('/api/admin/platform/trip-reminder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία αποθήκευσης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
 }

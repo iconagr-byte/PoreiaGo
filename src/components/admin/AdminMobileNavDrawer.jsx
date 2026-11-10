@@ -12,8 +12,11 @@ export default function AdminMobileNavDrawer({
   settingsSubTab,
   fleetOpsSubTab,
   fleetRentalTab,
+  customerServiceScope,
   onTabChange,
   onSettingsSubTabChange,
+  onSettingsHubFocus,
+  onBusesHubFocus,
   onFleetOpsSubTabChange,
   onFleetRentalTabChange,
   onEmailClick,
@@ -88,8 +91,11 @@ export default function AdminMobileNavDrawer({
           settingsSubTab={settingsSubTab}
           fleetOpsSubTab={fleetOpsSubTab}
           fleetRentalTab={fleetRentalTab}
+          customerServiceScope={customerServiceScope}
           onTabChange={go(onTabChange)}
           onSettingsSubTabChange={onSettingsSubTabChange}
+          onSettingsHubFocus={go(onSettingsHubFocus)}
+          onBusesHubFocus={go(onBusesHubFocus)}
           onFleetOpsSubTabChange={onFleetOpsSubTabChange}
           onFleetRentalTabChange={onFleetRentalTabChange}
           onEmailClick={go(onEmailClick)}

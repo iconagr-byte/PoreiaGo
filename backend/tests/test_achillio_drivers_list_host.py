@@ -53,7 +53,7 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(claim)
 
     async def test_achillio_jwt_on_poreiago_remaps_to_platform(self):
-        """SEAL: Achillio JWT on poreiago.com never lists/deletes Achillio drivers."""
+        """Achillio JWT on poreiago.com lists PoreiaGo platform drivers (Achilleas)."""
         achillio = str(uuid4())
         platform = str(uuid4())
         req = SimpleNamespace(
@@ -61,16 +61,62 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
             state=SimpleNamespace(tenant_id=achillio),
         )
         with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=True)):
-            with patch.object(ap, "_request_is_platform_host", return_value=True):
-                with patch.object(ap, "_request_is_impersonating", return_value=False):
-                    with patch(
-                        "travel_platform.settings.office_host_guard.resolve_poreiago_platform_tenant_id",
-                        new=AsyncMock(return_value=platform),
-                    ):
-                        tid, include, claim = await ap._drivers_list_tenant_id(req)
+            with patch.object(ap, "_tenant_is_poreiago_platform", new=AsyncMock(return_value=False)):
+                with patch.object(ap, "_request_is_platform_host", return_value=True):
+                    with patch.object(ap, "_request_is_impersonating", return_value=False):
+                        with patch(
+                            "middleware.domain_tenant._request_host",
+                            return_value="www.poreiago.com",
+                        ):
+                            with patch(
+                                "travel_platform.settings.office_host_guard.host_is_shared_api",
+                                return_value=False,
+                            ):
+                                with patch(
+                                    "travel_platform.settings.office_host_guard.host_is_platform_marketing",
+                                    return_value=True,
+                                ):
+                                    with patch(
+                                        "travel_platform.settings.office_host_guard.resolve_poreiago_platform_tenant_id",
+                                        new=AsyncMock(return_value=platform),
+                                    ):
+                                        tid, include, claim = await ap._drivers_list_tenant_id(req)
 
         self.assertEqual(tid, platform)
         self.assertNotEqual(tid, achillio)
+        self.assertFalse(include)
+        self.assertFalse(claim)
+
+    async def test_demo_jwt_on_poreiago_remaps_to_platform(self):
+        """DEMO JWT on www.poreiago.com must see Achilleas (platform drivers)."""
+        platform = str(uuid4())
+        req = SimpleNamespace(
+            headers={"host": "www.poreiago.com"},
+            state=SimpleNamespace(tenant_id=ap.DEMO_TENANT_ID),
+        )
+        with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=False)):
+            with patch.object(ap, "_tenant_is_poreiago_platform", new=AsyncMock(return_value=False)):
+                with patch.object(ap, "_request_is_platform_host", return_value=True):
+                    with patch.object(ap, "_request_is_impersonating", return_value=False):
+                        with patch(
+                            "middleware.domain_tenant._request_host",
+                            return_value="www.poreiago.com",
+                        ):
+                            with patch(
+                                "travel_platform.settings.office_host_guard.host_is_shared_api",
+                                return_value=False,
+                            ):
+                                with patch(
+                                    "travel_platform.settings.office_host_guard.host_is_platform_marketing",
+                                    return_value=True,
+                                ):
+                                    with patch(
+                                        "travel_platform.settings.office_host_guard.resolve_poreiago_platform_tenant_id",
+                                        new=AsyncMock(return_value=platform),
+                                    ):
+                                        tid, include, claim = await ap._drivers_list_tenant_id(req)
+
+        self.assertEqual(tid, platform)
         self.assertFalse(include)
         self.assertFalse(claim)
 
@@ -111,7 +157,7 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(include)
         self.assertFalse(claim)
 
-    async def test_fail_closed_when_not_achillio(self):
+    async def test_customer_office_jwt_not_swallowed_on_poreiago(self):
         other = str(uuid4())
         platform = str(uuid4())
         req = SimpleNamespace(
@@ -119,11 +165,26 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
             state=SimpleNamespace(tenant_id=other),
         )
         with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=False)):
-            with patch(
-                "travel_platform.operations.master_qr_bridge.resolve_platform_tenant_id",
-                new=AsyncMock(return_value=platform),
-            ):
-                tid, include, claim = await ap._drivers_list_tenant_id(req)
+            with patch.object(ap, "_tenant_is_poreiago_platform", new=AsyncMock(return_value=False)):
+                with patch.object(ap, "_request_is_platform_host", return_value=True):
+                    with patch.object(ap, "_request_is_impersonating", return_value=False):
+                        with patch(
+                            "middleware.domain_tenant._request_host",
+                            return_value="www.poreiago.com",
+                        ):
+                            with patch(
+                                "travel_platform.settings.office_host_guard.host_is_shared_api",
+                                return_value=False,
+                            ):
+                                with patch(
+                                    "travel_platform.settings.office_host_guard.host_is_platform_marketing",
+                                    return_value=True,
+                                ):
+                                    with patch(
+                                        "travel_platform.settings.office_host_guard.resolve_poreiago_platform_tenant_id",
+                                        new=AsyncMock(return_value=platform),
+                                    ):
+                                        tid, include, claim = await ap._drivers_list_tenant_id(req)
 
         self.assertEqual(tid, other)
         self.assertFalse(include)

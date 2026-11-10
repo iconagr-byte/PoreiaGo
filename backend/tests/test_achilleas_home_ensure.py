@@ -1,4 +1,4 @@
-"""Achilleas home email must stay on Achillio — force rehome + recreate if missing."""
+"""Achilleas home email must stay on PoreiaGo platform — force rehome + recreate if missing."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from travel_platform.settings import drivers_store as store
 OFFICE_POREIAGO = "11111111-1111-4111-8111-111111111111"
 OFFICE_ACHILLIO = "22222222-2222-4222-8222-222222222222"
 HOME_EMAIL = "axilleas0@yahoo.gr"
+HOME_PASSWORD = "Dimtsa@1234"
 
 
 class AchilleasHomeEnsureTests(unittest.TestCase):
@@ -28,17 +29,20 @@ class AchilleasHomeEnsureTests(unittest.TestCase):
         self._tmpdir.cleanup()
 
     def test_ensure_creates_when_missing(self):
-        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_ACHILLIO)
+        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_POREIAGO)
         self.assertTrue(result["ok"])
         self.assertEqual(result["action"], "created")
         rows = store.find_drivers_by_email(HOME_EMAIL)
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0].tenant_id, OFFICE_ACHILLIO)
+        self.assertEqual(rows[0].tenant_id, OFFICE_POREIAGO)
         self.assertEqual(rows[0].name, "Αχιλλέας Χαραλαμπίδης")
-        listed = store.list_drivers_for_office(OFFICE_ACHILLIO)
+        listed = store.list_drivers_for_office(OFFICE_POREIAGO)
         self.assertEqual([d.email for d in listed], [HOME_EMAIL])
+        self.assertIsNotNone(
+            store.authenticate_driver(HOME_EMAIL, HOME_PASSWORD, tenant_id=OFFICE_POREIAGO)
+        )
 
-    def test_ensure_pulls_back_from_poreiago(self):
+    def test_ensure_pulls_back_from_achillio_and_resets_password(self):
         stranded = store.create_driver(
             {
                 "name": "Αχιλλέας Χαραλαμπίδης",
@@ -46,19 +50,26 @@ class AchilleasHomeEnsureTests(unittest.TestCase):
                 "email": HOME_EMAIL,
                 "password": "BusPass99",
                 "status": "active",
-                "tenant_id": OFFICE_POREIAGO,
+                "tenant_id": OFFICE_ACHILLIO,
             }
         )
-        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_ACHILLIO)
+        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_POREIAGO)
         self.assertTrue(result["ok"])
         self.assertEqual(result["action"], "rehomed")
+        self.assertTrue(result.get("password_reset"))
         store.reset_drivers_cache()
         again = store.get_driver(stranded.id)
-        self.assertEqual(again.tenant_id, OFFICE_ACHILLIO)
-        self.assertEqual(store.list_drivers_for_office(OFFICE_POREIAGO), [])
+        self.assertEqual(again.tenant_id, OFFICE_POREIAGO)
+        self.assertEqual(store.list_drivers_for_office(OFFICE_ACHILLIO), [])
         self.assertEqual(
-            [d.id for d in store.list_drivers_for_office(OFFICE_ACHILLIO)],
+            [d.id for d in store.list_drivers_for_office(OFFICE_POREIAGO)],
             [stranded.id],
+        )
+        self.assertIsNotNone(
+            store.authenticate_driver(HOME_EMAIL, HOME_PASSWORD, tenant_id=OFFICE_POREIAGO)
+        )
+        self.assertIsNone(
+            store.authenticate_driver(HOME_EMAIL, "BusPass99", tenant_id=OFFICE_POREIAGO)
         )
 
     def test_default_rehome_still_refuses_unrelated_office_steal(self):
