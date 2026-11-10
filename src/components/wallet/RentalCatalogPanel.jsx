@@ -796,8 +796,7 @@ export default function RentalCatalogPanel({
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
           <p className="rent-cancel-policy">
-            Δωρεάν ακύρωση έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή — εφαρμόζεται αυτόματα στην
-            εφαρμογή. Μετά επικοινωνήστε με το γραφείο.
+            Δωρεάν ακύρωση έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
           </p>
         </form>
       </section>
@@ -1115,6 +1114,14 @@ export default function RentalCatalogPanel({
                       </button>
                     ) : b.rental_status === 'CONFIRMED' ? (
                       <span className="wallet-chip wallet-chip-muted">Ακύρωση μόνο μέσω γραφείου</span>
+                    ) : null}
+                    {b.contract_accepted ? (
+                      <p className="rent-wallet-contract-ok">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          draw
+                        </span>
+                        Σύμβαση υπογεγραμμένη
+                      </p>
                     ) : null}
                   </div>
                 </div>

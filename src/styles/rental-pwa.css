@@ -4815,6 +4815,7 @@
   color: var(--rent-teal, #0a7a6c);
 }
 
+
 .rent-picked-vehicle {
   display: grid;
   grid-template-columns: auto 1fr auto;
