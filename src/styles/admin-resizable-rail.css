@@ -1,0 +1,167 @@
+/* Draggable + sticky + collapsible admin hub left rails */
+
+.admin-resizable-rail {
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail {
+    width: var(--admin-rail-width, 20rem);
+    max-width: min(var(--admin-rail-width, 20rem), 48vw);
+  }
+
+  /* Stay put while the main canvas scrolls */
+  .admin-resizable-rail--sticky {
+    position: sticky;
+    top: 0.75rem;
+    align-self: flex-start;
+    max-height: calc(100vh - 1.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    z-index: 5;
+  }
+
+  .admin-resizable-rail--collapsed {
+    width: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transform: translateX(-4px);
+  }
+}
+
+.admin-resizable-rail-inner {
+  height: 100%;
+}
+
+/* Room for the top-right collapse control */
+@media (min-width: 1024px) {
+  .admin-resizable-rail--collapsible .admin-resizable-rail-inner > :first-child {
+    padding-right: 2.75rem;
+  }
+}
+
+.admin-resizable-rail-collapse {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail-collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    z-index: 6;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.65rem;
+    background: #fff;
+    color: #475569;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .admin-resizable-rail-collapse:hover {
+    background: #f5f5f7;
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.14);
+  }
+}
+
+.admin-resizable-rail-expand {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: sticky;
+    top: 0.75rem;
+    align-self: flex-start;
+    z-index: 6;
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    background: #fff;
+    color: #1d1d1f;
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .admin-resizable-rail-expand:hover {
+    background: #f5f5f7;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  }
+
+  .admin-resizable-rail-expand__label {
+    line-height: 1;
+  }
+}
+
+.admin-resizable-rail-handle {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    right: -0.55rem;
+    z-index: 4;
+    width: 0.9rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .admin-resizable-rail-grip {
+    width: 0.28rem;
+    height: min(4.5rem, 40%);
+    min-height: 2.75rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+    transition: background 0.15s ease, height 0.15s ease, transform 0.15s ease;
+  }
+
+  .admin-resizable-rail-handle:hover .admin-resizable-rail-grip,
+  .admin-resizable-rail-handle:focus-visible .admin-resizable-rail-grip {
+    background: rgba(14, 165, 233, 0.85);
+    height: min(5.5rem, 48%);
+    transform: scaleX(1.15);
+  }
+
+  .admin-resizable-rail-handle:active .admin-resizable-rail-grip {
+    background: rgba(2, 132, 199, 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-resizable-rail-grip {
+    transition: none;
+  }
+}

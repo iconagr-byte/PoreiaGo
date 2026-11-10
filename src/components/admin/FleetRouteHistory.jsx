@@ -26,7 +26,7 @@ export default function FleetRouteHistory() {
             tab === 'playback' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'
           }`}
         >
-          Αναπαραγωγή
+          Είσοδος / έξοδος
         </button>
         <button
           type="button"

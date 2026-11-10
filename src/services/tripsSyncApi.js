@@ -26,6 +26,9 @@ function tripToPayload(trip) {
     featured: Boolean(trip.featured),
     description: trip.description || '',
     image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : [],
     hook: trip.hook || '',
     durationLabel: trip.durationLabel || '',
     badge: trip.badge || '',
@@ -53,10 +56,11 @@ async function parseAdminError(res) {
  * @param {object[]} trips
  * @returns {Promise<{ synced: number, skipped: number, postgres_available: boolean }>}
  */
-export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = false } = {}) {
+export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = false, pruneMissing = false } = {}) {
   const payload = {
     tenant_id: tenantId || getSaasTenantId() || undefined,
     replace_catalog: Boolean(replaceCatalog),
+    prune_missing: Boolean(pruneMissing),
     trips: (trips || []).map(tripToPayload),
   };
 
@@ -67,6 +71,7 @@ export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = fa
         body: JSON.stringify({
           trips: payload.trips,
           replace_catalog: payload.replace_catalog,
+          prune_missing: payload.prune_missing,
         }),
       });
     } catch (err) {
@@ -91,7 +96,85 @@ export function syncTripToPostgres(trip) {
 }
 
 /** Sync every trip from tripStore (admin panels) — replaces public catalog. */
+export async function fetchOfficeTripCatalog() {
+  if (getSaasToken()) {
+    try {
+      const data = await saasFetch('/api/v1/operations/trips');
+      if (Array.isArray(data?.trips)) return data.trips;
+      if (Array.isArray(data)) return data;
+    } catch (err) {
+      console.warn('[trips-sync] catalog fetch via SaaS failed', err);
+    }
+  }
+  const res = await adminFetch('/api/admin/platform/trips', { method: 'GET' });
+  if (!res.ok) await parseAdminError(res);
+  const data = await res.json();
+  if (Array.isArray(data?.trips)) return data.trips;
+  return Array.isArray(data) ? data : [];
+}
+
+/** Hydrate local trip list from durable server catalog (+ Postgres titles).
+ * Also merges public /api/site/trips so storefront-seeded office trips
+ * (e.g. Achillio 91001–91003) always appear in Διαχείριση Εκδρομών.
+ */
+export async function hydrateTripsFromServer() {
+  const { mergeServerTripsIntoStore } = await import('../lib/trips/tripStore.js');
+  let rows = [];
+  let catalogOk = false;
+  try {
+    rows = await fetchOfficeTripCatalog();
+    catalogOk = Array.isArray(rows);
+  } catch (err) {
+    console.warn('[trips-sync] admin catalog fetch failed', err);
+    rows = [];
+  }
+
+  try {
+    const { fetchPublicOfficeTrips } = await import('./officeTripsApi.js');
+    const pub = await fetchPublicOfficeTrips();
+    if (Array.isArray(pub) && pub.length) {
+      const byId = new Map();
+      for (const row of rows || []) {
+        const id = Number(row?.id);
+        if (Number.isFinite(id) && id > 0) byId.set(id, row);
+      }
+      for (const row of pub) {
+        const id = Number(row?.id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        const prev = byId.get(id) || {};
+        byId.set(id, {
+          ...prev,
+          ...row,
+          officeSeed: Boolean(row.officeSeed || row.office_seed || prev.officeSeed),
+          catalogSource:
+            row.catalogSource ||
+            row.catalog_source ||
+            prev.catalogSource ||
+            (Number.isFinite(id) && id >= 91001 && id <= 91099 ? 'office_seed' : ''),
+        });
+      }
+      rows = [...byId.values()];
+    }
+  } catch (err) {
+    console.warn('[trips-sync] public catalog merge failed', err);
+  }
+
+  // Only prune when the durable office catalog loaded — never wipe on network failure.
+  return mergeServerTripsIntoStore(rows, { pruneMissing: catalogOk });
+}
+
 export async function syncAllLocalTrips() {
-  const { loadTrips } = await import('../lib/trips/tripStore.js');
-  return syncTripsToPostgres(loadTrips(), { replaceCatalog: true });
+  const { loadTrips, mergeServerTripsIntoStore } = await import(
+    '../lib/trips/tripStore.js'
+  );
+  // Reconcile first so deleted-elsewhere ghosts are not pushed back to the catalog.
+  try {
+    const remote = await fetchOfficeTripCatalog();
+    if (Array.isArray(remote)) {
+      mergeServerTripsIntoStore(remote, { pruneMissing: true });
+    }
+  } catch (err) {
+    console.warn('[trips-sync] pre-sync hydrate failed', err);
+  }
+  return syncTripsToPostgres(loadTrips(), { replaceCatalog: true, pruneMissing: false });
 }
