@@ -407,8 +407,14 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
-          const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
-          if (normalized) map[id] = normalized;
+          const prior = map[id] || prev[id];
+          const normalized = normalizeVehicle(row, id, prior);
+          if (!normalized) return;
+          // HTTP poll historically omitted boarding — keep last known snapshot.
+          if (!normalized.boarding && prior?.boarding) {
+            normalized.boarding = prior.boarding;
+          }
+          map[id] = normalized;
         });
         const deduped = dedupeVehiclesByPlate(map);
         vehicleCountRef.current = Object.keys(deduped).length;
@@ -580,6 +586,44 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
               vehicleCountRef.current = Object.keys(next).length;
               return next;
             });
+            return;
+          }
+          if (msg.type === 'boarding_update') {
+            setVehicles((prev) => {
+              const next = { ...prev };
+              let changed = false;
+              const tripKey = msg.trip_id != null ? String(msg.trip_id) : null;
+              Object.keys(next).forEach((id) => {
+                const v = next[id];
+                const sameTrip = tripKey && String(v.trip_id) === tripKey;
+                const listed =
+                  Array.isArray(msg.vehicle_ids) &&
+                  msg.vehicle_ids.some((vid) => String(vid) === String(v.vehicle_id || id));
+                if (!sameTrip && !listed) return;
+                next[id] = {
+                  ...v,
+                  boarding: msg.boarding ?? v.boarding,
+                  timestamp: msg.timestamp || v.timestamp,
+                };
+                changed = true;
+              });
+              return changed ? next : prev;
+            });
+            try {
+              window.dispatchEvent(
+                new CustomEvent('office-boarding-updated', {
+                  detail: {
+                    tripId: msg.trip_id,
+                    bookingId: msg.booking_id,
+                    saasBookingId: msg.saas_booking_id,
+                    passengerName: msg.passenger_name,
+                    boarding: msg.boarding,
+                  },
+                }),
+              );
+            } catch {
+              /* ignore */
+            }
             return;
           }
           if (msg.type === 'fleet_driver_offline') {

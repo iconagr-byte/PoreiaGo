@@ -1,6 +1,5 @@
 import os
 from contextlib import asynccontextmanager
-from typing import List
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -570,25 +569,6 @@ if email_retry_router:
     app.include_router(email_retry_router)
 
 
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-
-manager = ConnectionManager()
-
-
 @app.websocket("/ws/admin/boarding/{trip_id}")
 async def boarding_ws(websocket: WebSocket, trip_id: int):
     """Push manifest refresh to driver tablets — requires admin/driver JWT (?token=)."""
@@ -610,9 +590,11 @@ async def boarding_ws(websocket: WebSocket, trip_id: int):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            msg = await websocket.receive_text()
+            if msg.strip().lower() == "ping":
+                await websocket.send_text('{"type":"pong"}')
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        boarding_manager.disconnect(trip_id, websocket)
 
 
 @app.get("/health")
