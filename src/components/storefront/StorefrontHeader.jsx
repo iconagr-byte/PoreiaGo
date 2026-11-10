@@ -1,41 +1,64 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import CustomerLoginModal from '../auth/CustomerLoginModal.jsx';
+import StorefrontAccountMenu from './StorefrontAccountMenu.jsx';
 import StorefrontBrand from './StorefrontBrand.jsx';
+import {
+  PreviewBuilderControl,
+  usePreviewDesignMode,
+} from './preview/PreviewDesignMode.jsx';
+import '../../styles/storefront-header.css';
+
+const HEADER_INNER =
+  'sf-header-inner max-w-container-max mx-auto px-3 sm:px-4 md:px-margin-desktop h-16 md:h-20 flex items-center justify-between gap-2 sm:gap-3 md:gap-4 min-w-0';
 
 const HEADER_STYLES = {
   glass_dark: {
-    wrap: 'fixed top-0 w-full z-50 border-b border-white/10 bg-slate-950/40 backdrop-blur-lg',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-20 flex items-center justify-between gap-4',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 border-b transition-[background-color,border-color,box-shadow] duration-300',
+    wrapTop: 'border-white/10 bg-slate-950/35 backdrop-blur-lg',
+    wrapScrolled: 'border-white/15 bg-slate-950/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.25)]',
+    inner: HEADER_INNER,
     variant: 'dark',
-    demoOffset: 'top-20',
+    demoOffset: 'top-16 md:top-20',
   },
   solid_light: {
-    wrap: 'fixed top-0 w-full z-50 border-b border-black/[0.06] bg-white/95 backdrop-blur-md shadow-sm',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-20 flex items-center justify-between gap-4',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 border-b transition-[background-color,box-shadow] duration-300',
+    wrapTop: 'border-black/[0.06] bg-white/95 backdrop-blur-md',
+    wrapScrolled: 'border-black/[0.08] bg-white shadow-md',
+    inner: HEADER_INNER,
     variant: 'light',
-    demoOffset: 'top-20',
+    demoOffset: 'top-16 md:top-20',
   },
   transparent_minimal: {
-    wrap: 'fixed top-0 w-full z-50 bg-transparent',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-16 flex items-center justify-between gap-4',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 transition-[background-color,border-color] duration-300 border-b',
+    wrapTop: 'border-transparent bg-transparent',
+    wrapScrolled: 'border-white/10 bg-slate-950/80 backdrop-blur-xl',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-16'),
     variant: 'dark',
     demoOffset: 'top-16',
   },
   bordered_elegant: {
-    wrap: 'fixed top-0 w-full z-50 bg-white border-b-2 border-slate-200',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-[72px] flex items-center justify-between gap-4',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 bg-white border-b-2 border-slate-200',
+    wrapTop: '',
+    wrapScrolled: 'shadow-sm',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-[72px]'),
     variant: 'light',
     demoOffset: 'top-[72px]',
   },
   floating_pill: {
-    wrap: 'fixed top-4 left-0 right-0 z-50 px-4 md:px-8 pointer-events-none',
+    wrap: 'sf-header-shell fixed top-4 left-0 right-0 z-50 px-3 sm:px-4 md:px-8 pointer-events-none',
+    wrapTop: '',
+    wrapScrolled: '',
     inner:
-      'max-w-3xl mx-auto h-14 px-6 flex items-center justify-between gap-4 rounded-full bg-white/90 backdrop-blur-xl shadow-lg border border-black/[0.06] pointer-events-auto',
+      'sf-header-inner max-w-3xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 rounded-full bg-white/90 backdrop-blur-xl shadow-lg border border-black/[0.06] pointer-events-auto min-w-0',
     variant: 'light',
     demoOffset: 'top-24',
   },
   gradient_bar: {
-    wrap: 'fixed top-0 w-full z-50 bg-gradient-to-r from-indigo-600 via-violet-600 to-sky-500 shadow-lg',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-16 flex items-center justify-between gap-4',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-sky-900 shadow-lg',
+    wrapTop: '',
+    wrapScrolled: '',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-16'),
     variant: 'dark',
     demoOffset: 'top-16',
   },
@@ -45,36 +68,273 @@ export function getHeaderDemoOffset(templateId) {
   return HEADER_STYLES[templateId]?.demoOffset || HEADER_STYLES.glass_dark.demoOffset;
 }
 
-export default function StorefrontHeader({ siteAppearance, templateId = 'glass_dark' }) {
+function phoneHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : '';
+}
+
+export default function StorefrontHeader({
+  siteAppearance,
+  templateId = 'glass_dark',
+  tripsEnabled = true,
+  rentEnabled = false,
+}) {
   const style = HEADER_STYLES[templateId] || HEADER_STYLES.glass_dark;
   const isDark = style.variant === 'dark';
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+
+  const phone = String(siteAppearance?.footer_contact_phone || '').trim();
+  const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
+  const tel = phoneHref(phone);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
   const navLink = isDark
-    ? 'text-sm font-bold text-white/75 hover:text-white transition-colors'
-    : 'text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors';
-  const officeLink = isDark
-    ? 'inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white transition-colors'
-    : 'inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-black/[0.06] hover:text-slate-800 transition-colors';
+    ? 'text-sm font-semibold text-white/80 hover:text-white transition-colors'
+    : 'text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors';
+
+  const phoneLink = isDark
+    ? 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white transition-colors'
+    : 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors';
+
+  const menuBtn = isDark
+    ? 'sf-header-menu-btn md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white'
+    : 'sf-header-menu-btn md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.1] bg-black/[0.04] text-slate-800';
+
+  const preview = usePreviewDesignMode();
+  const previewFocused =
+    preview?.enabled &&
+    (preview.focusedSection === 'header' ||
+      preview.focusedSection === 'branding' ||
+      preview.openSection === 'header');
+  const wrapClass = [
+    style.wrap,
+    scrolled ? style.wrapScrolled : style.wrapTop,
+    preview?.enabled ? 'sf-preview-section' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const closeMenu = () => setMenuOpen(false);
+
+  const openLogin = () => {
+    setMenuOpen(false);
+    setLoginOpen(true);
+  };
 
   return (
-    <header className={style.wrap}>
+    <header
+      id="header"
+      className={wrapClass}
+      data-pdw-editable={preview?.enabled ? 'header' : undefined}
+      data-pdw-focused={previewFocused ? '1' : undefined}
+      onClick={(e) => {
+        if (!preview?.enabled) return;
+        if (e.target.closest?.('a, button, input, select, textarea, label, [role="dialog"]')) {
+          return;
+        }
+        preview.selectSection('header');
+      }}
+    >
+      {preview?.enabled ? (
+        <div className="sf-preview-section__bar">
+          <span className="sf-preview-section__bar-label">Header</span>
+          <PreviewBuilderControl
+            sectionId="header"
+            label="Header"
+            variant="bar"
+            instanceId="header-bar"
+          />
+        </div>
+      ) : null}
       <div className={style.inner}>
         <StorefrontBrand siteAppearance={siteAppearance} variant={style.variant} />
-        {/* Office public site — no platform back-link */}
-        <nav className="flex items-center gap-3 sm:gap-4" aria-label="Κύριο μενού">
-          <a href="#search-results" className={`hidden sm:inline ${navLink}`}>
-            Εκδρομές
-          </a>
-          <Link to="/my-booking" className={navLink}>
-            Η κράτησή μου
+
+        <nav className="hidden md:flex items-center gap-4 lg:gap-5" aria-label="Κύριο μενού">
+          {tripsEnabled ? (
+            <a href="#search-results" className={navLink}>
+              Εκδρομές
+            </a>
+          ) : null}
+          {rentEnabled ? (
+            <Link to="/rent" className={navLink}>
+              Rent
+            </Link>
+          ) : null}
+          {rentEnabled ? (
+            <a href="#rent-services" className={navLink}>
+              Υπηρεσίες
+            </a>
+          ) : null}
+          {showFleet ? (
+            <a href="#our-fleet" className={navLink}>
+              Στόλος
+            </a>
+          ) : null}
+          <Link to="/contact" className={navLink}>
+            Επικοινωνία
           </Link>
-          <Link to="/admin/login" className={officeLink} title="Σύνδεση για το γραφείο">
-            <span className="material-symbols-outlined text-[16px]" aria-hidden>
-              admin_panel_settings
-            </span>
-            Σύνδεση γραφείου
-          </Link>
+          {tripsEnabled ? (
+            <Link to="/my-booking" className={navLink}>
+              Η κράτησή μου
+            </Link>
+          ) : null}
+          {tel ? (
+            <a href={tel} className={phoneLink} aria-label={`Τηλέφωνο ${phone}`}>
+              <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                call
+              </span>
+              <span className="tabular-nums tracking-tight">{phone}</span>
+            </a>
+          ) : null}
+          <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
         </nav>
+
+        <div className="sf-header-actions flex md:hidden items-center">
+          <StorefrontAccountMenu isDark={isDark} compact onOpenLogin={openLogin} />
+          <button
+            type="button"
+            className={menuBtn}
+            aria-expanded={menuOpen}
+            aria-controls="storefront-mobile-menu"
+            aria-label={menuOpen ? 'Κλείσιμο μενού' : 'Άνοιγμα μενού'}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden>
+              {menuOpen ? 'close' : 'menu'}
+            </span>
+          </button>
+        </div>
       </div>
+
+      {menuOpen ? (
+        <div
+          id="storefront-mobile-menu"
+          className={`md:hidden border-t ${
+            isDark ? 'border-white/10 bg-slate-950/95 text-white' : 'border-black/[0.06] bg-white text-slate-900'
+          }`}
+        >
+          <nav
+            className="sf-header-mobile-nav max-w-container-max mx-auto px-3 sm:px-4 md:px-margin-desktop py-4 flex flex-col gap-1"
+            aria-label="Μενού κινητού"
+          >
+            {tripsEnabled ? (
+              <a
+                href="#search-results"
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  map
+                </span>
+                Εκδρομές
+              </a>
+            ) : null}
+            {tripsEnabled ? (
+              <Link
+                to="/my-booking"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  confirmation_number
+                </span>
+                Η κράτησή μου
+              </Link>
+            ) : null}
+            <Link
+              to="/contact"
+              onClick={closeMenu}
+              className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                mail
+              </span>
+              Επικοινωνία
+            </Link>
+            {rentEnabled ? (
+              <Link
+                to="/rent"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_car
+                </span>
+                Rent
+              </Link>
+            ) : null}
+            {rentEnabled ? (
+              <a
+                href="#rent-services"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  verified_user
+                </span>
+                Υπηρεσίες
+              </a>
+            ) : null}
+            {showFleet ? (
+              <a
+                href="#our-fleet"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_bus
+                </span>
+                Στόλος
+              </a>
+            ) : null}
+            {tel ? (
+              <a
+                href={tel}
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  call
+                </span>
+                {phone}
+              </a>
+            ) : null}
+            <div className="px-1 pt-2 pb-1">
+              <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
+            </div>
+          </nav>
+        </div>
+      ) : null}
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => {
+          window.dispatchEvent(new Event('focus'));
+        }}
+        registerFrom="/"
+      />
     </header>
   );
 }

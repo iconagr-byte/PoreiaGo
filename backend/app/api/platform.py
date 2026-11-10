@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.api.schemas import (
     AuditLogListResponse,
@@ -36,7 +39,19 @@ router.include_router(olympus_tls_router)
 
 
 def _tenant_model(data: dict) -> PlatformTenantSummary:
-    return PlatformTenantSummary(**data)
+    payload = dict(data or {})
+    slug = str(payload.get("slug") or "office").strip() or "office"
+    payload["slug"] = slug
+    payload["legal_name"] = str(payload.get("legal_name") or "").strip() or slug
+    payload["subdomain"] = str(payload.get("subdomain") or "").strip() or slug
+    payload["plan"] = str(payload.get("plan") or "starter")
+    payload["is_active"] = bool(payload.get("is_active", True))
+    payload.setdefault("domain_in_registry", bool(payload.get("custom_domain")))
+    try:
+        return PlatformTenantSummary(**payload)
+    except Exception as exc:
+        # Never 500 the whole list because one row fails validation.
+        raise ValueError(f"Invalid tenant payload for {slug}: {exc}") from exc
 
 
 @router.get("/health", response_model=PlatformHealthResponse)
@@ -53,9 +68,33 @@ async def platform_overview(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
-    data = await PlatformAdminService(db).overview()
-    data["billing"] = BillingAnalyticsResponse(**data["billing"])
-    return PlatformOverviewResponse(**data)
+    try:
+        data = await PlatformAdminService(db).overview()
+        try:
+            data["billing"] = BillingAnalyticsResponse(**(data.get("billing") or {}))
+        except Exception:
+            data["billing"] = BillingAnalyticsResponse(
+                mrr_cents=0,
+                mrr_eur=0.0,
+                total_tenants=0,
+                active_tenants=0,
+                trial_tenants=0,
+                past_due_tenants=0,
+                churn_rate_hint=0.0,
+            )
+        return PlatformOverviewResponse(
+            health_status=str(data.get("health_status") or "unknown"),
+            billing=data["billing"],
+            total_users=int(data.get("total_users") or 0),
+            total_bookings=int(data.get("total_bookings") or 0),
+            recent_tenants=list(data.get("recent_tenants") or []),
+        )
+    except Exception as exc:
+        # Soft-fail — Super Admin UI must still open.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Platform overview unavailable: {exc}",
+        ) from exc
 
 
 @router.get("/billing/analytics", response_model=BillingAnalyticsResponse)
@@ -93,20 +132,32 @@ async def list_tenants(
         status_enum = SubscriptionStatus(subscription_status) if subscription_status else None
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    items, total = await PlatformAdminService(db).list_tenants(
-        offset=offset,
-        limit=limit,
-        q=q,
-        is_active=is_active,
-        plan=plan_enum,
-        subscription_status=status_enum,
-    )
-    return PlatformTenantListResponse(
-        items=[_tenant_model(i) for i in items],
-        total=total,
-        offset=offset,
-        limit=limit,
-    )
+    try:
+        items, total = await PlatformAdminService(db).list_tenants(
+            offset=offset,
+            limit=limit,
+            q=q,
+            is_active=is_active,
+            plan=plan_enum,
+            subscription_status=status_enum,
+        )
+        safe_items: list[PlatformTenantSummary] = []
+        for row in items:
+            try:
+                safe_items.append(_tenant_model(row))
+            except Exception:
+                continue
+        return PlatformTenantListResponse(
+            items=safe_items,
+            total=total,
+            offset=offset,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Tenant list unavailable: {exc}",
+        ) from exc
 
 
 @router.get("/tenants/{tenant_id}", response_model=PlatformTenantSummary)
@@ -127,25 +178,70 @@ async def create_tenant(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
+    svc = PlatformAdminService(db)
     try:
-        tenant, admin = await PlatformAdminService(db).provision_tenant(
+        plan = TenantPlan(str(body.plan or "starter").strip().lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Μη έγκυρο πλάνο — starter / professional / enterprise / rent",
+        ) from exc
+    try:
+        tenant, admin = await svc.provision_tenant(
             slug=body.slug,
             legal_name=body.legal_name,
             subdomain=body.subdomain,
-            plan=TenantPlan(body.plan),
+            plan=plan,
             admin_email=body.admin_email,
             admin_password=body.admin_password,
             admin_full_name=body.admin_full_name,
             vat_number=body.vat_number,
+            service_mode=body.service_mode,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("provision_tenant failed slug=%s", body.slug)
+        # Surface unique / constraint failures as 400 instead of opaque 500.
+        msg = str(exc).lower()
+        if "unique" in msg or "duplicate" in msg or "already exists" in msg:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Slug, subdomain ή email υπάρχει ήδη",
+            ) from exc
+        # Keep a short actionable hint for Contabo schema quirks (name/plan).
+        hint = str(exc).replace("\n", " ").strip()
+        if len(hint) > 180:
+            hint = hint[:177] + "…"
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Αποτυχία δημιουργίας γραφείου ({type(exc).__name__}): {hint}",
+        ) from exc
 
-    detail = await PlatformAdminService(db).get_tenant(tenant.id)
-    return PlatformTenantCreateResponse(
-        tenant=_tenant_model(detail or {}),
-        admin_user_id=admin.id,
-    )
+    # Prefer in-memory summary so a follow-up read cannot poison the txn.
+    try:
+        detail = svc._tenant_detail(tenant, include_counts=True, subscription=None)
+        detail["user_count"] = 1
+        detail["booking_count"] = 0
+        detail.setdefault("domain_in_registry", False)
+    except Exception:
+        logger.exception("create_tenant summary fallback for %s", tenant.id)
+        detail = {
+            "id": tenant.id,
+            "slug": tenant.slug,
+            "legal_name": tenant.legal_name,
+            "subdomain": tenant.subdomain,
+            "plan": tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan),
+            "is_active": True,
+            "user_count": 1,
+            "booking_count": 0,
+            "domain_in_registry": False,
+        }
+    try:
+        summary = _tenant_model(detail)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    return PlatformTenantCreateResponse(tenant=summary, admin_user_id=admin.id)
 
 
 @router.patch("/tenants/{tenant_id}", response_model=PlatformTenantSummary)
@@ -167,15 +263,17 @@ async def update_tenant(
             contact_email=body.contact_email,
             contact_phone=body.contact_phone,
             admin_notes=body.admin_notes,
+            admin_password=body.admin_password,
+            admin_email=str(body.admin_email) if body.admin_email else None,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     try:
-        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+        from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 
-        await sync_traefik_custom_domains_from_db(db)
+        await sync_edge_custom_domains_from_db(db)
     except Exception:
         pass
     data = await PlatformAdminService(db).get_tenant(tenant_id)
@@ -206,6 +304,28 @@ async def reactivate_tenant(
     return {"reactivated": True, "tenant_id": str(tenant_id)}
 
 
+@router.delete("/tenants/{tenant_id}")
+async def delete_tenant(
+    tenant_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """Permanently delete an office. Blocked for PoreiaGo / Achillio platform desks."""
+    try:
+        result = await PlatformAdminService(db).delete_tenant(tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not result.get("ok"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    try:
+        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+
+        await sync_traefik_custom_domains_from_db(db)
+    except Exception:
+        pass
+    return {"deleted": True, **result}
+
+
 @router.post("/tenants/{tenant_id}/impersonate", response_model=TokenResponse)
 async def impersonate_tenant(
     tenant_id: UUID,
@@ -214,12 +334,16 @@ async def impersonate_tenant(
     superadmin_id: Annotated[UUID, Depends(get_current_user_id)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
-    """SuperAdmin masquerade — short-lived JWT scoped to target tenant."""
+    """SuperAdmin masquerade — short-lived JWT scoped to target tenant.
+
+    Avoids heavy ``get_tenant`` (counts/RLS) after the token is minted —
+    that path can rollback the session and surface as bare 500 on Contabo.
+    """
     service = ImpersonationService(db)
     email = await service.resolve_superadmin_email(superadmin_id)
     client_ip = await get_client_ip(request)
     try:
-        token = await service.start_impersonation(
+        token, tenant_slug = await service.start_impersonation(
             superadmin_id=superadmin_id,
             superadmin_email=email,
             target_tenant_id=tenant_id,
@@ -227,14 +351,17 @@ async def impersonate_tenant(
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("impersonate failed for tenant=%s", tenant_id)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Αποτυχία ανοίγματος γραφείου: {type(exc).__name__}",
+        ) from exc
 
-    tenant = await PlatformAdminService(db).get_tenant(tenant_id)
-    if not tenant:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     return TokenResponse(
         access_token=token,
         tenant_id=tenant_id,
-        tenant_slug=tenant.get("slug"),
+        tenant_slug=tenant_slug or None,
         roles=["tenant_admin"],
     )
 
@@ -261,3 +388,30 @@ async def platform_tenant_audit(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/integrations")
+async def get_platform_integrations(
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """Super-admin only — readiness flags, never plaintext secrets."""
+    from travel_platform.integrations.secrets_store import public_status
+
+    return public_status()
+
+
+@router.put("/integrations")
+async def upsert_platform_integrations(
+    body: dict,
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """
+    Super-admin only — save Aviationstack / Twilio keys (encrypted at rest).
+    Empty fields keep existing values. Pass clear_fields to wipe.
+    """
+    from travel_platform.integrations.secrets_store import public_status, save_secrets
+
+    payload = body or {}
+    clear_fields = payload.get("clear_fields") if isinstance(payload.get("clear_fields"), list) else []
+    save_secrets(payload, clear_fields=clear_fields)
+    return public_status()

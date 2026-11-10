@@ -1,0 +1,56 @@
+name: Ensure platform wildcard DNS
+
+# PoreiaGo owns *.poreiago.com so every office subdomain resolves automatically.
+# Customers never configure DNS for platform hosts — only optional custom domains.
+#
+# Secrets (platform):
+#   GCP_PROJECT_ID, GCP_DNS_ZONE, GCP_SA_JSON  (Cloud DNS dns.admin SA)
+# Optional:
+#   PLATFORM_WILDCARD_IP (default 169.58.199.186 Contabo)
+# Also runs on Contabo during Deploy VPS via ensure-platform-wildcard-dns.sh
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'deploy/scripts/ensure-platform-wildcard-dns.sh'
+      - '.github/workflows/ensure-platform-wildcard-dns.yml'
+
+jobs:
+  upsert-wildcard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Google Cloud SDK
+        run: |
+          set -euo pipefail
+          curl -fsSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz \
+            | tar -xz -C /tmp
+          /tmp/google-cloud-sdk/install.sh --quiet --path-update false
+          echo "/tmp/google-cloud-sdk/bin" >> "$GITHUB_PATH"
+      - name: Upsert *.poreiago.com A record
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_DNS_ZONE: ${{ secrets.GCP_DNS_ZONE }}
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          PLATFORM_DOMAIN: poreiago.com
+          PLATFORM_WILDCARD_IP: ${{ secrets.PLATFORM_WILDCARD_IP }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLATFORM_WILDCARD_IP:-}" ]; then
+            export PLATFORM_WILDCARD_IP=169.58.199.186
+          fi
+          if [ -z "${GCP_SA_JSON:-}" ] || [ -z "${GCP_PROJECT_ID:-}" ] || [ -z "${GCP_DNS_ZONE:-}" ]; then
+            echo "Missing GCP_PROJECT_ID / GCP_DNS_ZONE / GCP_SA_JSON — cannot upsert from Actions."
+            echo "Add those repo secrets once (platform owner), then re-run this workflow."
+            echo "Meanwhile Contabo deploy still runs ensure-platform-wildcard-dns.sh if .env.prod has the same keys."
+            exit 0
+          fi
+          chmod +x deploy/scripts/ensure-platform-wildcard-dns.sh
+          bash deploy/scripts/ensure-platform-wildcard-dns.sh
+      - name: Verify random office label resolves
+        run: |
+          set -euo pipefail
+          dig +short @8.8.8.8 office-dns-probe.poreiago.com A || true
+          dig +short @8.8.8.8 dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com A || true

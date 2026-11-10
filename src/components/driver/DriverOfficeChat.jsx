@@ -1,5 +1,6 @@
 /**
  * Driver PWA — chat with office.
+ * Unread is surfaced via header/nav badge (no toast spam).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ import {
 import '../../styles/office-chat.css';
 
 const POLL_MS = 5000;
+const NEAR_BOTTOM_PX = 80;
 
 function initials(name) {
   return (name || 'Γ')
@@ -27,41 +29,79 @@ function initials(name) {
     .toUpperCase();
 }
 
-export default function DriverOfficeChat() {
+function messageSignature(rows) {
+  if (!Array.isArray(rows) || !rows.length) return '0';
+  const last = rows[rows.length - 1];
+  return `${rows.length}:${last?.id || ''}:${last?.read_at || ''}:${last?.delivered_at || ''}`;
+}
+
+export default function DriverOfficeChat({ isActive = false, onUnreadChange } = {}) {
   const [messages, setMessages] = useState([]);
   const [unread, setUnread] = useState(0);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const threadRef = useRef(null);
   const bottomRef = useRef(null);
   const seenIdsRef = useRef(new Set());
+  const signatureRef = useRef('');
+  const stickToBottomRef = useRef(true);
+  const isActiveRef = useRef(isActive);
+  const onUnreadChangeRef = useRef(onUnreadChange);
+  isActiveRef.current = isActive;
+  onUnreadChangeRef.current = onUnreadChange;
 
-  const scrollBottom = () => {
-    window.requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    });
+  const publishUnread = useCallback((n) => {
+    const count = Math.max(0, Number(n) || 0);
+    setUnread(count);
+    onUnreadChangeRef.current?.(count);
+  }, []);
+
+  const isNearBottom = () => {
+    const el = threadRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+  };
+
+  const scrollThreadBottom = ({ force = false } = {}) => {
+    if (!force && !stickToBottomRef.current) return;
+    const el = threadRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  };
+
+  const onThreadScroll = () => {
+    stickToBottomRef.current = isNearBottom();
   };
 
   const load = useCallback(async ({ silent = false } = {}) => {
     try {
       const data = await fetchDriverChatMessages();
       const rows = Array.isArray(data.messages) ? data.messages : [];
+      const nextSig = messageSignature(rows);
+      const changed = nextSig !== signatureRef.current;
+      signatureRef.current = nextSig;
+
       setMessages(rows);
-      setUnread(Number(data.unread || 0));
-      if (!silent) setLoading(false);
       for (const m of rows) {
-        if (m.sender === 'office' && m.id && !seenIdsRef.current.has(m.id)) {
-          if (seenIdsRef.current.size > 0) {
-            toast('Νέο μήνυμα από το γραφείο', { icon: '💬', id: `chat-${m.id}` });
-          }
-          seenIdsRef.current.add(m.id);
-        } else if (m.id) {
-          seenIdsRef.current.add(m.id);
-        }
+        if (m?.id) seenIdsRef.current.add(m.id);
       }
-      scrollBottom();
-      if (Number(data.unread || 0) > 0) {
-        markDriverChatRead().catch(() => {});
+
+      const serverUnread = Math.max(0, Number(data.unread || 0));
+      if (isActiveRef.current && serverUnread > 0) {
+        // Viewing chat — clear server unread; badge goes to zero.
+        markDriverChatRead()
+          .then(() => publishUnread(0))
+          .catch(() => publishUnread(serverUnread));
+      } else {
+        publishUnread(serverUnread);
+      }
+
+      if (!silent) setLoading(false);
+
+      if (isActiveRef.current && (!silent || changed)) {
+        stickToBottomRef.current = true;
+        window.requestAnimationFrame(() => scrollThreadBottom({ force: !silent }));
       }
     } catch (err) {
       if (!silent) {
@@ -69,7 +109,7 @@ export default function DriverOfficeChat() {
         toast.error(err.message || 'Αποτυχία chat');
       }
     }
-  }, []);
+  }, [publishUnread]);
 
   useEffect(() => {
     load();
@@ -77,18 +117,36 @@ export default function DriverOfficeChat() {
     return () => window.clearInterval(id);
   }, [load]);
 
+  // Opening the chat tab marks messages read immediately.
+  useEffect(() => {
+    if (!isActive || unread <= 0) return undefined;
+    let cancelled = false;
+    markDriverChatRead()
+      .then(() => {
+        if (!cancelled) publishUnread(0);
+      })
+      .catch(() => {});
+    stickToBottomRef.current = true;
+    window.requestAnimationFrame(() => scrollThreadBottom({ force: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, unread, publishUnread]);
+
   const send = async (e) => {
     e.preventDefault();
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
+    stickToBottomRef.current = true;
     try {
       const res = await sendDriverChatMessage(body);
       setText('');
       if (res?.message) {
         setMessages((prev) => [...prev, res.message]);
         seenIdsRef.current.add(res.message.id);
-        scrollBottom();
+        signatureRef.current = messageSignature([...(messages || []), res.message]);
+        window.requestAnimationFrame(() => scrollThreadBottom({ force: true }));
       } else {
         await load({ silent: true });
       }
@@ -102,8 +160,8 @@ export default function DriverOfficeChat() {
   const lastMineId = [...messages].reverse().find((m) => m.sender === 'driver')?.id;
 
   return (
-    <div className="driver-stack office-chat">
-      <div className="office-chat-shell rounded-[1.35rem] min-h-[60vh]">
+    <div className="driver-stack office-chat office-chat--focus">
+      <div className="office-chat-shell office-chat-shell--fill rounded-[1.35rem]">
         <div className="office-chat-header">
           <div className="office-chat-header-main">
             <span className="office-chat-avatar" aria-hidden>
@@ -117,7 +175,11 @@ export default function DriverOfficeChat() {
           {unread > 0 ? <span className="office-chat-unread">{unread}</span> : null}
         </div>
 
-        <div className="office-chat-thread min-h-[40vh] max-h-[55vh]">
+        <div
+          ref={threadRef}
+          className="office-chat-thread office-chat-thread--fill"
+          onScroll={onThreadScroll}
+        >
           {loading ? (
             <p className="office-chat-loading">Φόρτωση…</p>
           ) : messages.length === 0 ? (

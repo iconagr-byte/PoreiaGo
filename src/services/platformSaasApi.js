@@ -1,4 +1,10 @@
 import { getSaasToken, saasFetch } from './saasApi.js';
+import {
+  formatPlatformTenantLabel,
+  normalizePlatformTenantList,
+} from '../lib/platform/tenantOptions.js';
+
+export { formatPlatformTenantLabel, normalizePlatformTenantList };
 
 export async function fetchPlatformOverview() {
   return saasFetch('/api/v1/platform/overview');
@@ -16,6 +22,12 @@ export async function fetchPlatformTenants({ offset = 0, limit = 50, q, isActive
   }
   if (plan) params.set('plan', plan);
   return saasFetch(`/api/v1/platform/tenants?${params}`);
+}
+
+/** Convenience: list tenants already unwrapped + id-deduped for select UIs. */
+export async function fetchPlatformTenantOptions(opts = {}) {
+  const payload = await fetchPlatformTenants(opts);
+  return normalizePlatformTenantList(payload);
 }
 
 export async function createPlatformTenant(body) {
@@ -41,12 +53,22 @@ export async function validatePlatformDomain(domain) {
   return saasFetch(`/api/v1/platform/tls/validate-domain?${q}`);
 }
 
+/** Registry + live DNS (www CNAME / apex A) for any office custom domain. */
+export async function checkPlatformDomainDns(domain) {
+  const q = new URLSearchParams({ domain: String(domain || '').trim().toLowerCase() });
+  return saasFetch(`/api/v1/platform/tls/dns-check?${q}`);
+}
+
 export async function suspendPlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/suspend`, { method: 'POST' });
 }
 
 export async function reactivatePlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/reactivate`, { method: 'POST' });
+}
+
+export async function deletePlatformTenant(tenantId) {
+  return saasFetch(`/api/v1/platform/tenants/${tenantId}`, { method: 'DELETE' });
 }
 
 export async function impersonatePlatformTenant(tenantId) {
@@ -63,4 +85,15 @@ export async function reportPlatformUsageAll(stripeOnly = true) {
 export async function fetchTenantAuditLogs(tenantId, { offset = 0, limit = 50 } = {}) {
   const q = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/audit?${q}`);
+}
+
+export async function fetchPlatformIntegrations() {
+  return saasFetch('/api/v1/platform/integrations');
+}
+
+export async function updatePlatformIntegrations(body) {
+  return saasFetch('/api/v1/platform/integrations', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
 }
