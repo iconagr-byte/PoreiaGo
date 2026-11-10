@@ -21,11 +21,100 @@
   max-width: 72rem;
   margin: 0 auto;
   padding: 0 1rem;
-  height: 72px;
+  height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+/* PoreiaGo wordmark — larger brand signal in header / login */
+.pg-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  line-height: 1;
+}
+
+.pg-brand-mark {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+}
+
+.pg-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.pg-brand-name {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+}
+
+.pg-brand-go {
+  font-weight: 800;
+}
+
+.pg-brand-line {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-brand--light {
+  color: #0ea5e9;
+}
+
+.pg-brand--light .pg-brand-name {
+  color: #1e293b;
+}
+
+.pg-brand--light .pg-brand-go {
+  color: #0ea5e9;
+}
+
+.pg-brand--light .pg-brand-line {
+  color: #64748b;
+}
+
+.pg-brand--dark {
+  color: #38bdf8;
+}
+
+.pg-brand--dark .pg-brand-name {
+  color: #f8fafc;
+}
+
+.pg-brand--dark .pg-brand-go {
+  color: #38bdf8;
+}
+
+.pg-brand--dark .pg-brand-line {
+  color: rgba(248, 250, 252, 0.55);
+}
+
+@media (min-width: 768px) {
+  .pg-brand-mark {
+    width: 3.15rem;
+    height: 3.15rem;
+  }
+
+  .pg-brand-name {
+    font-size: 1.75rem;
+  }
+
+  .pg-brand-line {
+    font-size: 0.78rem;
+  }
 }
 
 @media (min-width: 768px) {
@@ -306,7 +395,7 @@
 .pm-mobile {
   border-top: 1px solid var(--pm-line);
   background: rgba(2, 6, 23, 0.97);
-  max-height: calc(100dvh - 72px);
+  max-height: calc(100dvh - 84px);
   overflow-y: auto;
   animation: pmDropIn 0.18s ease both;
 }
