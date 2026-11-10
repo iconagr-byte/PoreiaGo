@@ -11,6 +11,7 @@ import {
 import { getSaasToken, clearSaasSession } from '../../services/saasApi.js';
 import { isSaasTokenExpired } from '../../lib/saasJwt.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import PasswordField from '../../components/PasswordField.jsx';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -161,7 +162,7 @@ export default function DriverFormPage() {
       photo_url: form.photo_url.trim() || null,
       salary_per_km: Number.isFinite(salaryKm) ? salaryKm : 0.45,
       salary_per_trip: Number.isFinite(salaryTrip) ? salaryTrip : 25,
-      hiring_date: form.hiring_date.trim() || null,
+      hiring_date: form.hiring_date || null,
     };
     if (form.password) body.password = form.password;
 
@@ -174,16 +175,18 @@ export default function DriverFormPage() {
       } else {
         const created = await createFleetDriver(body);
         if (!created?.id) {
-          throw new Error('Η αποθήκευση δεν επέστρεψε id οδηγού');
+          throw new Error('Ο λογαριασμός δεν δημιουργήθηκε — δοκιμάστε ξανά');
         }
-        toast.success('Ο λογαριασμός αποθηκεύτηκε');
-        // Seed the list with the created row so it is visible immediately.
-        navigate('/admin?tab=drivers', {
-          state: { activeTab: 'drivers', createdDriver: created },
-        });
+        toast.success('Ο λογαριασμός δημιουργήθηκε');
+        navigate(`/admin/drivers/${created.id}`);
       }
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία αποθήκευσης');
+      const raw = String(err?.message || '').trim();
+      const msg =
+        !raw || /failed to fetch|networkerror|load failed/i.test(raw)
+          ? 'Αποτυχία αποθήκευσης — ελέγξτε σύνδεση / συνδεθείτε ξανά στο γραφείο'
+          : raw;
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSaving(false);
     }
@@ -191,7 +194,7 @@ export default function DriverFormPage() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    save();
+    void save();
   };
 
   const header = (
@@ -228,8 +231,8 @@ export default function DriverFormPage() {
   const actions = (
     <div className="flex gap-3">
       <button
-        type="button"
-        onClick={save}
+        type="submit"
+        form="driver-account-form"
         disabled={saving}
         className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-60"
       >
@@ -302,32 +305,30 @@ export default function DriverFormPage() {
           </label>
 
           <div className="grid grid-cols-1 gap-4">
-            <label className="block text-sm">
-              <span className="font-bold text-gray-800">
-                Κωδικός εφαρμογής{!isEdit ? ' *' : ' (κενό = χωρίς αλλαγή)'}
-              </span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                minLength={4}
-                placeholder="τουλάχιστον 4 χαρακτήρες"
-                value={form.password}
-                onChange={setField('password')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-800">Επιβεβαίωση κωδικού</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                minLength={4}
-                placeholder="Επαναλάβετε τον κωδικό"
-                value={form.password_confirm}
-                onChange={setField('password_confirm')}
-                className={inputClass}
-              />
-            </label>
+            <PasswordField
+              id="driver-app-password"
+              label={`Κωδικός εφαρμογής${!isEdit ? ' *' : ' (κενό = χωρίς αλλαγή)'}`}
+              labelClassName="font-bold text-gray-800 text-sm"
+              autoComplete="new-password"
+              minLength={4}
+              required={!isEdit}
+              placeholder="τουλάχιστον 4 χαρακτήρες"
+              value={form.password}
+              onChange={setField('password')}
+              inputClassName={inputClass}
+            />
+            <PasswordField
+              id="driver-app-password-confirm"
+              label="Επιβεβαίωση κωδικού"
+              labelClassName="font-bold text-gray-800 text-sm"
+              autoComplete="new-password"
+              minLength={4}
+              required={!isEdit}
+              placeholder="Επαναλάβετε τον κωδικό"
+              value={form.password_confirm}
+              onChange={setField('password_confirm')}
+              inputClassName={inputClass}
+            />
           </div>
         </section>
 
@@ -383,26 +384,6 @@ export default function DriverFormPage() {
                 type="date"
                 value={form.license_expires_at}
                 onChange={setField('license_expires_at')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">€/km</span>
-              <input
-                type="number"
-                step="0.01"
-                value={form.salary_per_km}
-                onChange={setField('salary_per_km')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">€/εκδρομή</span>
-              <input
-                type="number"
-                step="0.01"
-                value={form.salary_per_trip}
-                onChange={setField('salary_per_trip')}
                 className={inputClass}
               />
             </label>

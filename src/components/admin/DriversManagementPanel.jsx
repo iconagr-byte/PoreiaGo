@@ -61,34 +61,58 @@ export default function DriversManagementPanel() {
     });
   }, [drivers, query]);
 
-  const load = useCallback(async ({ soft = false } = {}) => {
-    if (!soft) setLoading(true);
+  const load = useCallback(async ({ quiet } = {}) => {
+    setLoading(true);
     setLoadError('');
     try {
       const rows = await fetchFleetDrivers(filter || undefined);
-      const list = Array.isArray(rows) ? rows : [];
-      const pending = pendingCreatedRef.current;
-      if (pending?.id && !list.some((d) => d.id === pending.id)) {
-        setDrivers([pending, ...list]);
-      } else {
-        setDrivers(list);
-        if (pending?.id) pendingCreatedRef.current = null;
-      }
+      setDrivers(Array.isArray(rows) ? rows : []);
+      setLoadError('');
     } catch (err) {
-      if (!soft) {
-        const pending = pendingCreatedRef.current;
-        setDrivers(pending?.id ? [pending] : []);
-      }
-      setLoadError(err.message || 'Αποτυχία φόρτωσης οδηγών');
-      toast.error(err.message || 'Αποτυχία φόρτωσης οδηγών');
+      // Keep last good rows when a deploy bounce hits — empty wipe hides Achilleas.
+      const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+      setLoadError(msg);
+      if (!quiet) toast.error(msg);
     } finally {
       if (!soft) setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    let retryTimer;
+    const attempt = async (isRetry) => {
+      if (!isRetry) {
+        setLoading(true);
+        setLoadError('');
+      }
+      try {
+        const rows = await fetchFleetDrivers(filter || undefined);
+        if (cancelled) return;
+        setDrivers(Array.isArray(rows) ? rows : []);
+        setLoadError('');
+        setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        if (!isRetry) {
+          // Quiet first failure — often mid-deploy. Retry before showing error.
+          retryTimer = window.setTimeout(() => {
+            void attempt(true);
+          }, 1200);
+          return;
+        }
+        const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+        setLoadError(msg);
+        toast.error(msg);
+        setLoading(false);
+      }
+    };
+    void attempt(false);
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [filter]);
 
   useEffect(() => {
     const created = location.state?.createdDriver;
@@ -131,7 +155,8 @@ export default function DriversManagementPanel() {
             Λογαριασμοί οδηγών
           </h3>
           <p className="mt-1 text-[14px] text-zinc-500 tracking-tight max-w-lg">
-            Email και κωδικός για είσοδο στο /driver.
+            Email και κωδικός για είσοδο στο /driver. Ο Αχιλλέας ανήκει στο PoreiaGo —
+            αν η λίστα είναι άδεια, κάντε ανανέωση μετά το deploy.
           </p>
         </div>
         <button
