@@ -751,6 +751,13 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           </button>
           <button
             type="button"
+            onClick={downloadEmailSettingsEnvTemplate}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
+          >
+            Πρότυπο .env
+          </button>
+          <button
+            type="button"
             onClick={startNew}
             className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md font-semibold text-on-surface hover:bg-surface-container-low"
           >
