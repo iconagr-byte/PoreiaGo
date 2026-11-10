@@ -15,6 +15,10 @@ import {
 import { clearNativeRoleHome } from '../lib/capacitor/nativeRoleHome.js';
 import { clearPreferRentLookup } from '../lib/rental/preferRentLookup.js';
 import {
+  clearNativeRentDemo,
+  isNativeRentDemo,
+} from '../lib/rental/nativeRentDemo.js';
+import {
   clearWalletFocusBooking,
   getWalletClaim,
   peekWalletFocusBooking,
@@ -152,7 +156,11 @@ function WalletAuthGate() {
     logoutCustomer();
   }
 
+  // Native rent demo: soft local session opens My Wallet → Ενοικιάσεις.
   if (isCustomer() && getCustomerToken()) {
+    return <WalletAuthenticatedApp />;
+  }
+  if (isNativeApp() && isNativeRentDemo()) {
     return <WalletAuthenticatedApp />;
   }
 
@@ -453,6 +461,7 @@ function WalletAuthenticatedApp() {
     clearNativeRoleHome();
     try {
       clearPreferRentLookup();
+      clearNativeRentDemo();
     } catch {
       /* ignore */
     }
@@ -1129,17 +1138,27 @@ function WalletAuthenticatedApp() {
                 brandLabel={brandLabel}
                 passengerName={profile.name}
                 highlightBookingId={highlightRentalBookingId}
-                onBookVehicle={() => navigate('/rent')}
+                onBookVehicle={() => {
+                  // Stay inside My Wallet; catalog is on this same rentals tab.
+                  const el = document.getElementById('wallet-rent-catalog');
+                  if (el && typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
               />
             </section>
-            <section className="wallet-panel">
+            <section id="wallet-rent-catalog" className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
                   <span className="material-symbols-outlined">garage</span>
                 </span>
                 <div>
                   <h2>Κατάλογος οχημάτων</h2>
-                  <p>Διαθεσιμότητα και νέα κράτηση από το γραφείο σας.</p>
+                  <p>
+                    {isNativeRentDemo()
+                      ? 'Demo στόλος — χωρίς πραγματικό γραφείο.'
+                      : 'Διαθεσιμότητα και νέα κράτηση από το γραφείο σας.'}
+                  </p>
                 </div>
               </div>
             </section>

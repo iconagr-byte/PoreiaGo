@@ -6,8 +6,17 @@ import {
   NATIVE_RENT_DEMO_KEY,
   clearNativeRentDemo,
   enableNativeRentDemo,
+  enterNativeRentDemoWallet,
   isNativeRentDemo,
 } from './nativeRentDemo.js';
+
+vi.mock('../auth.js', () => ({
+  loginAsCustomer: vi.fn(),
+}));
+
+vi.mock('../wallet/walletTenantSeal.js', () => ({
+  clearWalletTenantId: vi.fn(),
+}));
 
 describe('nativeRentDemo', () => {
   beforeEach(() => {
@@ -25,6 +34,7 @@ describe('nativeRentDemo', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it('toggles demo flag', () => {
@@ -34,5 +44,12 @@ describe('nativeRentDemo', () => {
     expect(sessionStorage.getItem(NATIVE_RENT_DEMO_KEY)).toBe('1');
     clearNativeRentDemo();
     expect(isNativeRentDemo()).toBe(false);
+  });
+
+  it('enterNativeRentDemoWallet enables flag and soft-login', async () => {
+    const { loginAsCustomer } = await import('../auth.js');
+    enterNativeRentDemoWallet();
+    expect(isNativeRentDemo()).toBe(true);
+    expect(loginAsCustomer).toHaveBeenCalled();
   });
 });
