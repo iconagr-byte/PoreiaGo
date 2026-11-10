@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import re
 import threading
 import unicodedata
 from copy import deepcopy
@@ -308,15 +309,8 @@ def demo_rental_fleet_allowed() -> bool:
     return env not in ("production", "prod")
 
 
-def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
-    """
-    Seed 3 επιβατικά + 3 van when the tenant has no rental vehicles yet.
-    Idempotent — skips if any vehicle already exists for the tenant.
-    Disabled in production (set RENT_DEMO_FLEET=true only for explicit demos).
-    Returns number of vehicles inserted.
-    """
-    if not demo_rental_fleet_allowed():
-        return 0
+def purge_demo_rental_fleet(tenant_id: str | None = None) -> dict[str, int]:
+    """Remove legacy demo rental rows for a tenant (no longer seeded)."""
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
@@ -348,6 +342,8 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
 
 def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
     """Deprecated no-op — demo rent fleet is no longer seeded."""
+    if not demo_rental_fleet_allowed():
+        return 0
     purge_demo_rental_fleet(tenant_id)
     return 0
 
@@ -458,6 +454,23 @@ EXTRA_DAILY_RATES = {
     "gps_pack": 5.0,
     "young_driver": 15.0,
 }
+
+# Flat (one-time) extras — not multiplied by days.
+EXTRA_FLAT_RATES = {
+    "airport_pickup": 25.0,
+}
+
+EXTRA_LABELS = {
+    "extra_insurance": "Extra insurance",
+    "scdw": "Super CDW",
+    "child_seat": "Child seat",
+    "gps_pack": "GPS pack",
+    "young_driver": "Young driver (<25)",
+    "airport_pickup": "Airport pickup",
+}
+
+_AIRPORT_TOKENS = ("αεροδρ", "airport", "ath", "skb")
+_AFM_RE = re.compile(r"^\d{9}$")
 
 
 def _now() -> str:

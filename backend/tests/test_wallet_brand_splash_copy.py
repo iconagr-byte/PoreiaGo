@@ -1,4 +1,4 @@
-"""Wallet brand splash is generic: PoreiaGo wordmark only (no marketing copy)."""
+"""Native wallet splash: office logo+name when sealed, else PoreiaGo wordmark."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ SPLASH_JSX = ROOT / "src" / "components" / "wallet" / "WalletBrandSplash.jsx"
 
 
 class WalletBrandSplashCopyTests(unittest.TestCase):
-    def test_brand_only_no_greek_marketing(self):
+    def test_brand_constant_still_poreiago_fallback(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
         self.assertIn("PoreiaGo", text)
         self.assertIn("WALLET_SPLASH_BRAND", text)
@@ -21,10 +21,13 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         self.assertNotIn("WALLET_SPLASH_HOOK", text)
         self.assertNotIn("WALLET_SPLASH_SUPPORT", text)
 
-    def test_component_renders_wordmark_only(self):
+    def test_component_loads_office_logo_and_name(self):
         jsx = SPLASH_JSX.read_text(encoding="utf-8")
+        self.assertIn("resolveOfficeSplashBrand", jsx)
+        self.assertIn("pg-wallet-splash-office-name", jsx)
+        self.assertIn("pg-wallet-splash-logo", jsx)
+        self.assertIn("getWalletTenantId", jsx)
         self.assertIn("pg-wallet-splash-wordmark", jsx)
-        self.assertNotIn("pg-wallet-splash-hook", jsx)
         self.assertNotIn("Αγγίξτε για συνέχεια", jsx)
 
     def test_not_b2b_office_platform_line(self):

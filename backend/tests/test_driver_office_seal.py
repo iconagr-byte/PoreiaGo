@@ -42,7 +42,7 @@ class DriverOfficeSealTests(unittest.TestCase):
         self._create(email="shared@example.com", tenant_id=OFFICE_A)
         with self.assertRaises(ValueError) as ctx:
             self._create(email="shared@example.com", tenant_id=OFFICE_B)
-        self.assertIn("άλλου γραφείου", str(ctx.exception))
+        self.assertIn("άλλο γραφείο", str(ctx.exception))
 
     def test_list_never_claims_demo_orphans(self):
         orphan = store.create_driver(
