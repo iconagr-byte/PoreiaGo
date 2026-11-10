@@ -933,6 +933,20 @@ async def driver_shift_start(session_payload: dict = Depends(require_driver_sess
     )
     was_offline = on_driver_connected(session_payload, connection_id)
 
+    driver_id = str(session_payload.get("sub") or session_payload.get("driver_id") or "")
+    trip_id = session_payload.get("trip_id")
+    try:
+        from travel_platform.settings.driver_activity_store import record_shift_start
+
+        record_shift_start(
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            trip_id=int(trip_id) if trip_id is not None else None,
+            meta={"reason": "shift_start"},
+        )
+    except Exception:
+        pass
+
     notify_result: dict = {"skipped": True}
     try:
         notify_result = await notify_driver_shift(
