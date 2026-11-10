@@ -676,12 +676,11 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  max-width: min(11rem, 46vw);
+  max-width: min(15rem, 58vw);
 }
 
-.wallet-app--phone .wallet-topbar-brand,
-.wallet-app--phone .wallet-topbar-brand img.office-brand-mark__logo--compact {
-  max-width: min(9.5rem, 42vw);
+.wallet-app--phone .wallet-topbar-brand {
+  max-width: min(14.5rem, 56vw);
 }
 
 .wallet-app--phone .wallet-topbar-brand img {
@@ -689,6 +688,12 @@
   height: 36px;
   width: auto;
   max-width: min(140px, 44vw);
+}
+
+.wallet-app--phone .wallet-topbar-brand img.office-brand-mark__logo--with-name {
+  max-height: 28px;
+  height: 28px;
+  max-width: min(72px, 28vw);
 }
 
 .wallet-more-trip-list {

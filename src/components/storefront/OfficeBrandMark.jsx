@@ -146,27 +146,45 @@ export default function OfficeBrandMark({
     resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
     { compact: useCompact },
   );
-  // On a phone top bar, logo alone is enough — name next to a big mark overflows.
-  const showName = brand.showName && !(useCompact && logoSrc);
+  // Respect admin «εμφάνιση ονόματος» (default on). Compact wallet used to hide
+  // the name whenever a logo image existed — customers only saw an icon mark.
+  const nameOptOut = appearance.logo_show_name === false;
+  const showName =
+    !nameOptOut &&
+    Boolean(label) &&
+    label !== 'Γραφείο' &&
+    label !== 'PoreiaGo';
+
+  const compactLogoStyle =
+    useCompact && showName
+      ? {
+          ...logoStyle,
+          height: '28px',
+          maxHeight: '28px',
+          maxWidth: '72px',
+        }
+      : logoStyle;
 
   const inner = logoSrc ? (
     <span
-      className={`inline-flex items-center ${useCompact ? 'gap-1.5' : 'gap-2'} ${className}`}
+      className={`inline-flex items-center min-w-0 ${useCompact ? 'gap-1.5' : 'gap-2'} ${className}`}
     >
       <img
         src={logoSrc}
         alt={label || 'Logo'}
-        style={logoStyle}
-        className={`object-contain${useCompact ? ' office-brand-mark__logo--compact' : ''}`}
+        style={compactLogoStyle}
+        className={`object-contain shrink-0${useCompact ? ' office-brand-mark__logo--compact' : ''}${
+          useCompact && showName ? ' office-brand-mark__logo--with-name' : ''
+        }`}
         onError={() => setImgBroken(true)}
       />
       {showName && (
         <span
-          className={`font-bold tracking-tight truncate ${
-            useCompact ? 'text-sm max-w-[7.5rem]' : 'text-base'
+          className={`font-bold tracking-tight truncate min-w-0 ${
+            useCompact ? 'text-[0.8125rem] leading-tight max-w-[9.5rem]' : 'text-base'
           } ${isDark ? 'text-white' : 'text-slate-900'}`}
         >
-          {brand.displayName || brand.name}
+          {label}
         </span>
       )}
     </span>
