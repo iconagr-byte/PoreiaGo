@@ -47,6 +47,7 @@ const EMPTY = {
   client_phone: '',
   client_afm: '',
   extra_insurance: false,
+  scdw: false,
   child_seat: false,
   gps_pack: false,
   airport_pickup: false,
@@ -543,6 +544,7 @@ export default function RentalCatalogPanel({
   })();
   const extrasTotal =
     (form.extra_insurance ? 12 * nights : 0) +
+    (form.scdw ? 8 * nights : 0) +
     (form.child_seat ? 7 * nights : 0) +
     (form.gps_pack ? 5 * nights : 0) +
     (form.young_driver ? 15 * nights : 0) +
@@ -770,7 +772,15 @@ export default function RentalCatalogPanel({
                   checked={form.extra_insurance}
                   onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
                 />
-                Extra insurance (+€12/ημέρα)
+                {t('cdw_extra', lang)} (+€12/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.scdw}
+                  onChange={(e) => setForm((f) => ({ ...f, scdw: e.target.checked }))}
+                />
+                {t('scdw_extra', lang)} (+€8/ημέρα)
               </label>
               <label>
                 <input

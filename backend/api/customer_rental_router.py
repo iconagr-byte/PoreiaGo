@@ -92,6 +92,7 @@ async def _require_rent_module(request: Request, account: dict | None = None) ->
 
 class CustomerBookingExtras(BaseModel):
     extra_insurance: bool = False
+    scdw: bool = False
     child_seat: bool = False
     gps_pack: bool = False
     airport_pickup: bool = False
@@ -655,8 +656,196 @@ async def customer_create_inspection(
                 "photo_urls": body.photo_urls,
                 "signature_url": body.signature_url,
                 "inspector_name": (account.get("name") or account["email"].split("@")[0]).strip(),
+                "checklist": body.checklist.model_dump() if body.checklist else None,
+                "require_pickup_checklist": itype == "PICKUP_CHECK",
             },
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return insp
+
+
+@router.post("/bookings/{booking_id}/sos")
+async def rental_booking_sos(
+    booking_id: str,
+    body: SosBody,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    try:
+        row = store.record_booking_sos(
+            tid,
+            booking_id,
+            email=account["email"],
+            lat=body.lat,
+            lng=body.lng,
+            accuracy=body.accuracy,
+            note=body.note,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        if "δικαίωμα" in msg:
+            raise HTTPException(status_code=403, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+
+    sos = row.get("last_sos") or {}
+    try:
+        from travel_platform.notifications.rental_sos_push import notify_rental_sos_to_office
+
+        await notify_rental_sos_to_office(row, sos)
+    except Exception:
+        pass
+
+    try:
+        from travel_platform.telemetry.fleet_pubsub import publish_fleet_alert
+
+        await publish_fleet_alert(
+            {
+                "alert_type": "RENTAL_SOS",
+                "severity": "critical",
+                "tenant_id": tid,
+                "booking_id": booking_id,
+                "lat": body.lat,
+                "lng": body.lng,
+                "message": body.note or "SOS από πελάτη ενοικίασης",
+                "client_name": row.get("client_name"),
+                "vehicle_plate": row.get("vehicle_plate"),
+            }
+        )
+    except Exception:
+        pass
+
+    return {"ok": True, "last_sos": sos, "booking": _public_booking(row)}
+
+
+@router.post("/bookings/{booking_id}/location")
+async def rental_booking_location(
+    booking_id: str,
+    body: LocationBody,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    try:
+        row = store.update_booking_live_location(
+            tid,
+            booking_id,
+            email=account["email"],
+            lat=body.lat,
+            lng=body.lng,
+            accuracy=body.accuracy,
+            require_owner=True,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        if "δικαίωμα" in msg:
+            raise HTTPException(status_code=403, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "last_share_location": row.get("last_share_location")}
+
+
+@router.post("/bookings/{booking_id}/share-link")
+async def rental_booking_share_link(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+
+    from travel_platform.telemetry.passenger_track_links import public_frontend_base
+    from travel_platform.telemetry.rental_share_token import (
+        DEFAULT_TTL_HOURS,
+        create_rental_share_token,
+        rental_share_expires_at,
+    )
+
+    token = create_rental_share_token(booking_id=booking_id, tenant_id=tid)
+    expires_at = rental_share_expires_at(DEFAULT_TTL_HOURS)
+    path = f"/track/rental/{booking_id}?token={token}"
+    url = f"{public_frontend_base()}{path}"
+    return {
+        "url": url,
+        "path": path,
+        "token": token,
+        "expires_at": expires_at,
+        "expires_hours": DEFAULT_TTL_HOURS,
+    }
+
+
+def _share_summary(booking: dict) -> dict:
+    loc = booking.get("last_share_location") or booking.get("last_sos")
+    return {
+        "booking_id": booking.get("id"),
+        "vehicle_model": booking.get("vehicle_model"),
+        "vehicle_plate": booking.get("vehicle_plate"),
+        "rental_status": booking.get("rental_status"),
+        "start_time": booking.get("start_time"),
+        "end_time": booking.get("end_time"),
+        "pickup_location": booking.get("pickup_location"),
+        "dropoff_location": booking.get("dropoff_location"),
+        "client_name": booking.get("client_name"),
+        "last_known_location": loc,
+        "last_sos": booking.get("last_sos"),
+        "last_share_location": booking.get("last_share_location"),
+    }
+
+
+@router.get("/share/{token}")
+async def rental_share_public(token: str):
+    import jwt
+
+    from travel_platform.telemetry.rental_share_token import verify_rental_share_token
+
+    try:
+        payload = verify_rental_share_token(token)
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=410, detail="Ο σύνδεσμος κοινοποίησης έληξε") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=403, detail="Μη έγκυρος σύνδεσμος") from exc
+
+    tid = str(payload.get("tenant_id"))
+    bid = str(payload.get("booking_id"))
+    row = store.get_booking(tid, bid)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    return _share_summary(row)
+
+
+@router.post("/share/{token}/location")
+async def rental_share_update_location(token: str, body: LocationBody):
+    import jwt
+
+    from travel_platform.telemetry.rental_share_token import verify_rental_share_token
+
+    try:
+        payload = verify_rental_share_token(token)
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=410, detail="Ο σύνδεσμος κοινοποίησης έληξε") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=403, detail="Μη έγκυρος σύνδεσμος") from exc
+
+    tid = str(payload.get("tenant_id"))
+    bid = str(payload.get("booking_id"))
+    try:
+        row = store.update_booking_live_location(
+            tid,
+            bid,
+            lat=body.lat,
+            lng=body.lng,
+            accuracy=body.accuracy,
+            require_owner=False,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "last_share_location": row.get("last_share_location")}
