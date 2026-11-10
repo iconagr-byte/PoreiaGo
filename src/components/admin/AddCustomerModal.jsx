@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { upsertCustomer } from '../../lib/customers/customerStore.js';
+import { saveCustomerToServer } from '../../lib/customers/customerStore.js';
 
 const TIER_OPTIONS = [
   { id: 'Silver', label: 'Silver', hint: 'Βασικό' },
@@ -69,7 +69,13 @@ function formFromCustomer(customer) {
 }
 
 /** Modal — δημιουργία / επεξεργασία πελάτη στο πελατολόγιο. */
-export default function AddCustomerModal({ open, onClose, onCreated, customer = null }) {
+export default function AddCustomerModal({
+  open,
+  onClose,
+  onCreated,
+  customer = null,
+  serviceScope = 'buses',
+}) {
   const [form, setForm] = useState(EMPTY);
   const [tagDraft, setTagDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -101,8 +107,9 @@ export default function AddCustomerModal({ open, onClose, onCreated, customer = 
 
   const removeTag = (value) => patch({ tags: form.tags.filter((t) => t !== value) });
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const cleanEmail = form.email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       toast.error('Συμπληρώστε έγκυρο email');
@@ -116,7 +123,7 @@ export default function AddCustomerModal({ open, onClose, onCreated, customer = 
     }
     setBusy(true);
     try {
-      const row = upsertCustomer({
+      const row = await saveCustomerToServer({
         id: customer?.id,
         name: form.name.trim() || cleanEmail.split('@')[0],
         email: cleanEmail,
@@ -128,6 +135,7 @@ export default function AddCustomerModal({ open, onClose, onCreated, customer = 
         notes: form.notes.trim(),
         tier: form.tier,
         source: form.source,
+        serviceScope: customer?.serviceScope || serviceScope,
         marketingOptIn: form.marketingOptIn,
         tags: form.tags,
       });
@@ -139,7 +147,7 @@ export default function AddCustomerModal({ open, onClose, onCreated, customer = 
       onCreated?.(row);
       onClose?.();
     } catch (err) {
-      toast.error(err?.message || 'Αποτυχία');
+      toast.error(err?.message || 'Αποτυχία αποθήκευσης στον server');
     } finally {
       setBusy(false);
     }

@@ -140,7 +140,14 @@ export default function ContractsPanel({
         setInterval(subscription.interval);
       }
     } catch (e) {
-      toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
+      const raw = String(e?.message || '').trim();
+      const friendly =
+        !raw ||
+        /^internal server error$/i.test(raw) ||
+        /^request failed$/i.test(raw)
+          ? 'Αποτυχία φόρτωσης συνδρομής γραφείου. Δοκιμάστε Ανανέωση.'
+          : raw;
+      toast.error(friendly);
       setSub(null);
     } finally {
       setLoading(false);
@@ -315,8 +322,8 @@ export default function ContractsPanel({
           <div className="flex flex-wrap items-center gap-2">
             {demoMode && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
-                <span className="material-symbols-outlined text-[16px]">science</span>
-                Demo · {trialDays}η δοκιμή
+                <span className="material-symbols-outlined text-[16px]">timelapse</span>
+                Δοκιμή · {trialDays}η
               </span>
             )}
             {rentEnabled && (
@@ -379,7 +386,7 @@ export default function ContractsPanel({
       </div>
 
       <div className="p-6 space-y-5">
-        <AgencyPlanCatalogEditor compact />
+        <AgencyPlanCatalogEditor />
         <RentPlanCardsEditor />
 
         {loading ? (
@@ -395,7 +402,9 @@ export default function ContractsPanel({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο λεωφορείων</p>
-                <p className="text-xs text-slate-500 mt-0.5">Ετήσιο = 2 μήνες δώρο</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Τα features εμφανίζονται από την παραμετροποίηση πάνω · Ετήσιο = 2 μήνες δώρο
+                </p>
               </div>
               <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
                 {Object.values(BILLING_INTERVALS).map((opt) => (
@@ -667,7 +676,7 @@ export default function ContractsPanel({
                   >
                     {sameTrialPlan
                       ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
-                      : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
+                      : `Ξεκινήστε δοκιμή ${trialDays} ημερών`}
                   </button>
                 )}
                 {checkoutReady && billingConfig?.portal_ready && (

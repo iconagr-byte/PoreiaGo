@@ -309,28 +309,26 @@ export default function DriverFormPage() {
             <PasswordField
               id="driver-app-password"
               label={`Κωδικός εφαρμογής${!isEdit ? ' *' : ' (κενό = χωρίς αλλαγή)'}`}
+              labelClassName="font-bold text-gray-800 text-sm"
               autoComplete="new-password"
               minLength={4}
-              required={false}
+              required={!isEdit}
               placeholder="τουλάχιστον 4 χαρακτήρες"
               value={form.password}
               onChange={setField('password')}
               inputClassName={inputClass}
-              labelClassName="block text-sm font-bold text-gray-800"
-              className="block text-sm"
             />
             <PasswordField
               id="driver-app-password-confirm"
               label="Επιβεβαίωση κωδικού"
+              labelClassName="font-bold text-gray-800 text-sm"
               autoComplete="new-password"
               minLength={4}
-              required={false}
+              required={!isEdit}
               placeholder="Επαναλάβετε τον κωδικό"
               value={form.password_confirm}
               onChange={setField('password_confirm')}
               inputClassName={inputClass}
-              labelClassName="block text-sm font-bold text-gray-800"
-              className="block text-sm"
             />
           </div>
         </section>
