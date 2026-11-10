@@ -133,11 +133,15 @@ async def dev_login(request: Request, body: LoginRequest):
 def _browser_office_host(request: Request) -> str:
     """
     When the SPA calls the shared API (api.poreiago.com), Host is the API — not the
-    office page. Prefer Origin / Referer so Achillio Travel login from
-    www.achilliotravel.com still forces the Achillio office JWT.
+    office page. Prefer X-Office-Host / Origin / Referer so office subdomain login
+    (e.g. acme.poreiago.com) and Achillio Travel still force the correct JWT.
     """
     from middleware.domain_tenant import _request_host
     from travel_platform.settings.office_host_guard import host_is_shared_api
+
+    explicit = (request.headers.get("x-office-host") or "").strip().lower().split(":")[0]
+    if explicit and "." in explicit and not host_is_shared_api(explicit):
+        return explicit
 
     host = _request_host(request)
     if not host_is_shared_api(host):
@@ -219,15 +223,19 @@ async def login(request: Request, body: LoginRequest):
             await db.commit()
         except ValueError as exc:
             await db.rollback()
+            raw = str(exc).strip() or "Λάθος email ή κωδικός"
+            # Keep Greek UX for generic auth failures from AuthService.
+            if raw.lower() in {"invalid credentials", "unauthorized"}:
+                raw = "Λάθος email ή κωδικός"
             record_login_from_request(
                 request,
                 actor_type="admin",
                 identity=email,
                 success=False,
                 method="password",
-                detail=str(exc),
+                detail=raw,
             )
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=raw) from exc
         role_values = [r for r in (user.roles or []) if r in {e.value for e in UserRole}]
         record_login_from_request(
             request,

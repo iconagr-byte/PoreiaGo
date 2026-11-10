@@ -58,6 +58,10 @@ class PlatformUserResponse(BaseModel):
     is_active: bool
     last_login_at: datetime | None = None
     created_at: datetime
+    # Present when listing across offices (superadmin all_offices=1).
+    tenant_id: str | None = None
+    tenant_name: str | None = None
+    tenant_slug: str | None = None
 
 
 class PlatformUserCreate(BaseModel):
@@ -86,6 +90,14 @@ class AdminPasswordResetSendByEmail(BaseModel):
         None,
         description="Optional tenant UUID when the same email exists in multiple offices",
     )
+
+
+class AdminPasswordResetRequestPublic(BaseModel):
+    """Public forgot-password from /admin/login (no session)."""
+
+    email: EmailStr
+    # Browser office host (API Host is often api.*) — scopes reset to that tenant.
+    host: str | None = Field(None, max_length=255)
 
 
 class AdminPasswordResetConfirm(BaseModel):

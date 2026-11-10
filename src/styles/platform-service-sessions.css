@@ -13,8 +13,28 @@
 }
 
 .pg-session--buses {
+  position: relative;
+  overflow: hidden;
+  /* Match Apple contracts stage fill so the page reads as one surface. */
   background: #f5f5f7;
-  color: var(--pg-session-ink);
+  color: #1d1d1f;
+}
+
+.pg-buses-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-buses-atmosphere-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 50% 36% at 50% 0%, rgba(0, 0, 0, 0.03), transparent 65%);
+}
+
+.pg-buses-atmosphere-grid {
+  display: none;
 }
 
 .pg-session--rent {
@@ -47,7 +67,7 @@
 }
 
 .pg-session--buses .pg-session-kicker {
-  color: var(--pg-session-sky);
+  color: #0071e3;
 }
 
 .pg-session--rent .pg-session-kicker {
@@ -63,7 +83,9 @@
 }
 
 .pg-session--buses .pg-session-hook {
-  color: #0f172a;
+  color: #1d1d1f;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .pg-session--rent .pg-session-hook {
@@ -78,7 +100,7 @@
 }
 
 .pg-session--buses .pg-session-support {
-  color: var(--pg-session-muted);
+  color: #86868b;
 }
 
 .pg-session--rent .pg-session-support {
@@ -105,7 +127,7 @@
 }
 
 .pg-session--buses .pg-session-points li {
-  color: #334155;
+  color: #424245;
 }
 
 .pg-session--rent .pg-session-points li {
@@ -117,7 +139,137 @@
 }
 
 .pg-session--buses .pg-session-points .material-symbols-outlined {
-  color: var(--pg-session-sky);
+  color: #0071e3;
+}
+
+/* Buses journey — sell / board / run (no card chrome) */
+.pg-session-intro--buses {
+  position: relative;
+  z-index: 1;
+  max-width: 64rem;
+}
+
+.pg-session--buses .pg-session-hook {
+  font-size: clamp(2rem, 4.6vw, 3.15rem);
+  letter-spacing: -0.035em;
+}
+
+.pg-buses-hook-accent {
+  font-style: normal;
+  color: #0071e3;
+}
+
+.pg-session--buses .pg-session-support {
+  max-width: 38rem;
+  font-size: clamp(1.02rem, 2vw, 1.15rem);
+}
+
+.pg-buses-journey {
+  display: grid;
+  gap: 1.75rem;
+  margin: 0 auto 2.1rem;
+  padding: 1.75rem 0 0.25rem;
+  text-align: left;
+  max-width: 58rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+@media (min-width: 860px) {
+  .pg-buses-journey {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    padding-top: 2rem;
+  }
+
+  .pg-buses-journey-col + .pg-buses-journey-col {
+    padding-left: 1.6rem;
+    margin-left: 0.35rem;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+  }
+}
+
+.pg-buses-journey-col {
+  animation: pgBusesRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-col-delay, 0ms);
+}
+
+.pg-buses-journey-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0 0 1.1rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0071e3;
+}
+
+.pg-buses-journey-label span {
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 113, 227, 0.45);
+}
+
+.pg-buses-journey-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.15rem;
+}
+
+.pg-buses-journey-col li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.pg-buses-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.85rem;
+  font-size: 1.2rem !important;
+  color: #0071e3;
+  background: rgba(0, 113, 227, 0.08);
+  border: 1px solid rgba(0, 113, 227, 0.14);
+}
+
+.pg-buses-journey-col strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.pg-buses-journey-col li > div > span {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.pg-buses-rise {
+  animation: pgBusesRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
+@keyframes pgBusesRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .pg-session--rent .pg-session-points .material-symbols-outlined {
@@ -259,9 +411,790 @@
   color: rgba(236, 254, 255, 0.55);
 }
 
+/* ——— My Wallet session (buses homepage) ——— */
+
+.pg-session--wallet {
+  --pg-wallet-ink: #0a2540;
+  --pg-wallet-sky: #0284c7;
+  position: relative;
+  overflow: hidden;
+  /* Same shell as hub hero: white + soft edge glow + peach→cyan ribbon */
+  background:
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: var(--pg-wallet-ink);
+  border-block: 1px solid rgba(10, 37, 64, 0.06);
+}
+
+.pg-wallet-wave {
+  position: absolute;
+  top: 8%;
+  right: -6%;
+  bottom: 4%;
+  left: 42%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
+  );
+  filter: blur(0.5px);
+  transform: rotate(-8deg) scale(1.05);
+  animation: pgWalletWave 16s ease-in-out infinite alternate;
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.18);
+}
+
+.pg-wallet-wave--soft {
+  top: 18%;
+  right: 8%;
+  bottom: 18%;
+  left: 52%;
+  opacity: 0.35;
+  filter: blur(36px);
+  box-shadow: none;
+  animation-duration: 22s;
+  animation-direction: alternate-reverse;
+}
+
+.pg-wallet-orbit {
+  position: absolute;
+  left: 78%;
+  top: 46%;
+  width: 24rem;
+  height: 24rem;
+  margin: -12rem 0 0 -12rem;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 165, 233, 0.1);
+  animation: pgWalletSpin 36s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-wallet-orbit--slow {
+  width: 32rem;
+  height: 32rem;
+  margin: -16rem 0 0 -16rem;
+  border-color: rgba(14, 165, 233, 0.06);
+  animation-duration: 52s;
+  animation-direction: reverse;
+}
+
+@keyframes pgWalletWave {
+  from {
+    transform: rotate(-8deg) scale(1.05) translate3d(0, 0, 0);
+  }
+  to {
+    transform: rotate(-5deg) scale(1.08) translate3d(-1.5%, 1%, 0);
+  }
+}
+
+@keyframes pgWalletSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .pg-wallet-wave {
+    left: 8%;
+    right: -12%;
+    top: auto;
+    bottom: -8%;
+    height: 42%;
+    opacity: 0.55;
+  }
+
+  .pg-wallet-wave--soft,
+  .pg-wallet-orbit,
+  .pg-wallet-orbit--slow {
+    display: none;
+  }
+}
+
+.pg-wallet-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+  display: grid;
+  gap: 2.75rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .pg-wallet-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 3rem;
+    padding: 5rem 2rem 5.25rem;
+  }
+}
+
+.pg-session-intro--wallet {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.pg-wallet-glass {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.pg-session--wallet .pg-session-kicker {
+  color: #0284c7;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+}
+
+.pg-session--wallet .pg-session-hook {
+  color: var(--pg-wallet-ink);
+  font-size: clamp(1.95rem, 4.2vw, 2.95rem);
+  max-width: 16ch;
+  letter-spacing: -0.04em;
+}
+
+.pg-wallet-hook-accent {
+  font-style: normal;
+  background: linear-gradient(105deg, #0284c7 0%, #0ea5e9 55%, #0891b2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pg-session--wallet .pg-session-support {
+  margin: 0 0 1.6rem;
+  max-width: 34rem;
+  color: #475569;
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
+}
+
+.pg-wallet-points {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.pg-wallet-points li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(10, 37, 64, 0.08);
+}
+
+.pg-wallet-points li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pg-wallet-points strong {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pg-wallet-ink);
+  line-height: 1.25;
+}
+
+.pg-wallet-points li > span {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.pg-session-cta--wallet {
+  background: #0a2540;
+  color: #fff;
+}
+
+.pg-session-cta--wallet:hover {
+  background: #133556;
+}
+
+.pg-wallet-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.pg-wallet-phone {
+  width: min(100%, 280px);
+  filter: drop-shadow(0 22px 40px rgba(10, 37, 64, 0.16));
+}
+
+.pg-wallet-phone-bezel {
+  position: relative;
+  border-radius: 2rem;
+  padding: 0.55rem;
+  background: linear-gradient(160deg, #334155 0%, #0f172a 55%, #020617 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pg-wallet-phone-notch {
+  position: absolute;
+  top: 0.85rem;
+  left: 50%;
+  width: 5.5rem;
+  height: 0.55rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #020617;
+  z-index: 2;
+}
+
+.pg-wallet-phone-screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.55rem;
+  min-height: 28rem;
+  padding: 1.65rem 1rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(14, 165, 233, 0.28), transparent 60%),
+    linear-gradient(180deg, #0b1729 0%, #102a44 100%);
+}
+
+.pg-wallet-phone-kicker {
+  margin: 0 0 1.15rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+.pg-wallet-pass-stack {
+  position: relative;
+  height: 22.5rem;
+}
+
+.pg-wallet-pass {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.95rem 1rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.pg-wallet-pass--back {
+  top: 0.2rem;
+  transform: scale(0.94) translateY(0);
+  opacity: 0.55;
+  background: rgba(15, 23, 42, 0.75);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+}
+
+.pg-wallet-pass--rent {
+  background: linear-gradient(160deg, rgba(15, 118, 110, 0.92), rgba(4, 47, 46, 0.95));
+  border-color: rgba(94, 234, 212, 0.35);
+  opacity: 0.88;
+}
+
+.pg-wallet-pass--rent .pg-wallet-pass-route {
+  color: #ecfdf5;
+}
+
+.pg-wallet-pass--rent .pg-wallet-pass-meta {
+  color: rgba(167, 243, 208, 0.9);
+}
+
+.pg-wallet-pass--mid {
+  top: 2.35rem;
+  transform: scale(0.97);
+  opacity: 0.78;
+  background: rgba(15, 23, 42, 0.88);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+  animation-delay: 0.35s;
+}
+
+.pg-wallet-pass--front {
+  top: 4.6rem;
+  background: linear-gradient(165deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.35);
+  animation: pgWalletPassFloat 5.5s ease-in-out infinite;
+  animation-delay: 0.7s;
+}
+
+@keyframes pgWalletPassFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.pg-wallet-pass--back {
+  animation-name: pgWalletPassFloatBack;
+}
+
+.pg-wallet-pass--mid {
+  animation-name: pgWalletPassFloatMid;
+}
+
+@keyframes pgWalletPassFloatBack {
+  0%,
+  100% {
+    transform: scale(0.94) translateY(0);
+  }
+  50% {
+    transform: scale(0.94) translateY(-5px);
+  }
+}
+
+@keyframes pgWalletPassFloatMid {
+  0%,
+  100% {
+    transform: scale(0.97) translateY(0);
+  }
+  50% {
+    transform: scale(0.97) translateY(-5px);
+  }
+}
+
+.pg-wallet-pass-route,
+.pg-wallet-pass-meta {
+  display: block;
+}
+
+.pg-wallet-pass-route {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.pg-wallet-pass-meta {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.pg-wallet-pass-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.pg-wallet-pass-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0369a1;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+.pg-wallet-pass-top .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: #0284c7;
+}
+
+.pg-wallet-pass-route-lg {
+  margin: 0 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #0f172a;
+}
+
+.pg-wallet-pass-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.pg-wallet-pass-qr {
+  display: block;
+  width: 5.25rem;
+  height: 5.25rem;
+  margin: 0 auto;
+  padding: 0.35rem;
+  box-sizing: border-box;
+  border-radius: 0.75rem;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  shape-rendering: crispEdges;
+}
+
+.pg-wallet-rise {
+  animation: pgBusesRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
+/* ——— Rent digital contracts session (/rent) ——— */
+
+.pg-session--rent-contracts {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: 100%;
+  opacity: 1;
+  scroll-margin-top: 5.75rem;
+  /* Match Rent showcase hero wash */
+  background:
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(13, 148, 136, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(14, 165, 233, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: #0a2540;
+}
+
+/* Guest /rent: sit between fleet and landing bands, edge-to-edge inside the app. */
+.rent-home > .pg-session--rent-contracts {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.pg-rent-contracts-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-rent-contracts-atmosphere-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 48%);
+}
+
+.pg-rent-contracts-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(48px);
+  opacity: 0.55;
+  animation: pgWalletOrb 11s ease-in-out infinite alternate;
+}
+
+.pg-rent-contracts-orb--a {
+  width: 16rem;
+  height: 16rem;
+  top: -3rem;
+  right: 10%;
+  background: rgba(13, 148, 136, 0.16);
+}
+
+.pg-rent-contracts-orb--b {
+  width: 13rem;
+  height: 13rem;
+  bottom: 8%;
+  left: 6%;
+  background: rgba(14, 165, 233, 0.12);
+  animation-delay: -3.5s;
+}
+
+.pg-rent-contracts-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+  display: grid;
+  gap: 2.75rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .pg-rent-contracts-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 3rem;
+    padding: 5rem 2rem 5.25rem;
+  }
+}
+
+.pg-session-intro--rent-contracts {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.pg-session--rent-contracts .pg-session-kicker {
+  color: #0d9488;
+}
+
+.pg-session--rent-contracts .pg-session-hook {
+  color: #0a2540;
+  font-size: clamp(1.85rem, 4.2vw, 2.85rem);
+  max-width: 16ch;
+}
+
+.pg-rent-contracts-hook-accent {
+  font-style: normal;
+  background: linear-gradient(100deg, #0f766e 0%, #0ea5e9 55%, #0891b2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pg-session--rent-contracts .pg-session-support {
+  margin: 0 0 1.6rem;
+  max-width: 34rem;
+  color: #425466;
+}
+
+.pg-rent-contracts-points {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.pg-rent-contracts-points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.pg-rent-contracts-point-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.9rem;
+  font-size: 1.2rem !important;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+}
+
+.pg-rent-contracts-points strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0a2540;
+  line-height: 1.25;
+}
+
+.pg-rent-contracts-points li > div > span {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.pg-session-cta--rent-contracts {
+  background: #0f766e;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.28);
+}
+
+.pg-session-cta--rent-contracts:hover {
+  background: #0d9488;
+}
+
+.pg-rent-contracts-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.pg-rent-contracts-doc {
+  position: relative;
+  width: min(100%, 320px);
+  border-radius: 1.5rem;
+  padding: 1.35rem 1.25rem 1.3rem;
+  background: linear-gradient(165deg, #ffffff 0%, #f0fdfa 55%, #e6fffa 100%);
+  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(15, 23, 42, 0.1),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+  animation: pgRentContractsDocFloat 6s ease-in-out infinite;
+}
+
+@keyframes pgRentContractsDocFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.4deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+.pg-rent-contracts-doc-seal {
+  position: absolute;
+  top: -0.85rem;
+  right: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #14b8a6, #0f766e);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.35);
+}
+
+.pg-rent-contracts-doc-seal .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+.pg-rent-contracts-doc-head {
+  margin-bottom: 1.1rem;
+  padding-right: 2rem;
+}
+
+.pg-rent-contracts-doc-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.pg-rent-contracts-doc-plate {
+  margin: 0.35rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #042f2e;
+}
+
+.pg-rent-contracts-doc-terms {
+  list-style: none;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.pg-rent-contracts-doc-terms li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #134e4a;
+}
+
+.pg-rent-contracts-doc-terms .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #0d9488;
+}
+
+.pg-rent-contracts-doc-sign {
+  border-top: 1px dashed rgba(15, 118, 110, 0.28);
+  padding-top: 0.9rem;
+}
+
+.pg-rent-contracts-doc-sign-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pg-rent-contracts-doc-ink {
+  color: #0f766e;
+  min-height: 2.75rem;
+}
+
+.pg-rent-contracts-ink-path {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: pgRentContractsInk 2.8s ease-in-out 0.4s infinite alternate;
+}
+
+@keyframes pgRentContractsInk {
+  from {
+    stroke-dashoffset: 220;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pg-rent-contracts-doc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f766e;
+  background: rgba(13, 148, 136, 0.12);
+}
+
+.pg-rent-contracts-doc-status .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.pg-rent-contracts-rise {
+  opacity: 1;
+  animation: pgBusesRise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pg-rise-delay, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pg-session-cta:hover,
   .pg-session-rent-card:hover {
     transform: none;
+  }
+
+  .pg-buses-rise,
+  .pg-buses-journey-col,
+  .pg-wallet-rise,
+  .pg-wallet-wave,
+  .pg-wallet-orbit,
+  .pg-wallet-pass--back,
+  .pg-wallet-pass--mid,
+  .pg-wallet-pass--front,
+  .pg-rent-contracts-rise,
+  .pg-rent-contracts-orb,
+  .pg-rent-contracts-doc,
+  .pg-rent-contracts-ink-path {
+    animation: none !important;
+  }
+
+  .pg-rent-contracts-ink-path {
+    stroke-dashoffset: 0;
   }
 }

@@ -10,6 +10,8 @@ import {
   settingsTabsForRole,
 } from '../../lib/admin/settingsTabs.js';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
+import { useUiLang } from '../../hooks/useUiLang.js';
+import { tAdmin } from '../../lib/i18n/t.js';
 
 /** Preferred office card order (Σχεδιασμός first). */
 const OFFICE_CARD_ORDER = [
@@ -23,22 +25,6 @@ const OFFICE_CARD_ORDER = [
   'users',
   'logins',
 ];
-
-const TAB_HINTS = {
-  platform: 'Επωνυμία, locale, abandoned recovery, δυναμική τιμολόγηση και θέσεις',
-  payments: 'Τρόποι πληρωμής, προκαταβολή και τραπεζικοί λογαριασμοί',
-  fiscal: 'ΑΑΔΕ / myDATA και φορολογικές ρυθμίσεις',
-  contracts: 'Πλάνο συνδρομής και συμβόλαιο γραφείου',
-  compliance: 'GDPR, audit trail και δικαιώματα υποκειμένων',
-  homepage: 'Σχεδιασμός σελίδας — θέμα, hero και κάρτες',
-  domain: 'Domain ιστοσελίδας, επωνυμία, χρώμα και λογότυπο',
-  users: 'Λογαριασμοί διαχειριστών του γραφείου',
-  logins: 'Ιστορικό συνδέσεων και audit εισόδου',
-  tenants: 'Διαχείριση γραφείων / tenants της πλατφόρμας',
-  saas_infra: 'Υποδομή SaaS και σύνδεση υπηρεσιών',
-  backup: 'Αντίγραφα ασφαλείας και επαναφορά',
-  growth: 'Partner webhooks και growth εργαλεία',
-};
 
 function sortOfficeTabs(tabs) {
   const rank = new Map(OFFICE_CARD_ORDER.map((id, i) => [id, i]));
@@ -58,9 +44,12 @@ export default function SettingsHub({
   contractPrefs,
   officeMode = 'trips_only',
 }) {
+  const { t, lang } = useUiLang();
   const superAdmin = isSaasSuperAdmin();
   const tabs = settingsTabsForRole(superAdmin, officeMode);
   const defaultTab = superAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
+  const labelFor = (tabItem) => tAdmin('settings', tabItem.id, tabItem.label);
+  const hintFor = (id, fallback = '') => tAdmin('hint', id, fallback);
 
   const [tab, setTab] = useState(() =>
     sanitizeSettingsSubTab(initialTab, superAdmin, officeMode),
@@ -97,28 +86,24 @@ export default function SettingsHub({
   };
 
   const grouped = useMemo(() => {
-    const office = sortOfficeTabs(tabs.filter((t) => t.section === 'office'));
-    const platform = tabs.filter((t) => t.section === 'platform');
+    const office = sortOfficeTabs(tabs.filter((tabItem) => tabItem.section === 'office'));
+    const platform = tabs.filter((tabItem) => tabItem.section === 'platform');
     if (!superAdmin) {
-      return [{ id: 'office', label: 'Ρυθμίσεις γραφείου', items: office }];
+      return [{ id: 'office', label: t('section_office'), items: office }];
     }
     return PLATFORM_NAV_SECTIONS.map((section) => ({
       ...section,
+      label: tAdmin('section', section.id, section.label),
       items: section.id === 'office' ? office : platform,
     })).filter((s) => s.items.length > 0);
-  }, [tabs, superAdmin]);
+  }, [tabs, superAdmin, lang, t]);
 
-  const homepageHint =
-    officeMode === 'rent_only'
-      ? 'Σχεδιασμός σελίδας /rent — από το συμβόλαιο Ενοικιάσεις'
-      : officeMode === 'both'
-        ? 'Διάλεξε Λεωφορεία ή Ενοικιάσεις και σχεδίασε τη σελίδα'
-        : 'Σχεδιασμός αρχικής εκδρομών — θέμα, hero και κάρτες';
+  const homepageHint = hintFor('homepage');
 
   const tabHint =
     tab === 'homepage'
       ? homepageHint
-      : TAB_HINTS[tab] || 'Επιλέξτε ενότητα από τις κάρτες αριστερά';
+      : hintFor(tab) || (lang === 'en' ? 'Pick a section from the cards on the left' : 'Επιλέξτε ενότητα από τις κάρτες αριστερά');
 
   return (
     <div id="settings-hub-top" className="settings-hub w-full scroll-mt-4">
@@ -135,32 +120,36 @@ export default function SettingsHub({
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-3.5">
             <div className="px-1.5 pt-0.5">
               <p className="text-xs font-bold uppercase tracking-wide text-violet-700/80">
-                Ρυθμίσεις
+                {t('settings')}
               </p>
               <p className="text-base font-bold text-on-surface mt-0.5">
-                {superAdmin ? 'Πλατφόρμα & γραφείο' : 'Γραφείο'}
+                {superAdmin
+                  ? lang === 'en'
+                    ? 'Platform & office'
+                    : 'Πλατφόρμα & γραφείο'
+                  : t('hub_settings_kicker')}
               </p>
             </div>
 
             {/* Mobile: horizontal chips */}
             <div className="flex lg:hidden gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
-              {tabs.map((t) => {
-                const active = t.id === tab;
+              {tabs.map((tabItem) => {
+                const active = tabItem.id === tab;
                 return (
                   <button
-                    key={t.id}
+                    key={tabItem.id}
                     type="button"
-                    onClick={() => selectTab(t.id)}
+                    onClick={() => selectTab(tabItem.id)}
                     className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold border transition ${
                       active
-                        ? t.section === 'platform'
+                        ? tabItem.section === 'platform'
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-violet-700 text-white border-violet-700'
                         : 'bg-white text-on-surface-variant border-black/[0.08]'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[16px]">{t.icon}</span>
-                    {t.label}
+                    <span className="material-symbols-outlined text-[16px]">{tabItem.icon}</span>
+                    {labelFor(tabItem)}
                   </button>
                 );
               })}
@@ -192,14 +181,14 @@ export default function SettingsHub({
 
                     {isPlatform ? (
                       <ul className="grid grid-cols-2 gap-1.5">
-                        {section.items.map((t) => {
-                          const active = t.id === tab;
+                        {section.items.map((tabItem) => {
+                          const active = tabItem.id === tab;
                           return (
-                            <li key={t.id}>
+                            <li key={tabItem.id}>
                               <button
                                 type="button"
-                                onClick={() => selectTab(t.id)}
-                                title={TAB_HINTS[t.id] || t.label}
+                                onClick={() => selectTab(tabItem.id)}
+                                title={hintFor(tabItem.id, tabItem.label)}
                                 className={`settings-hub-micro w-full flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition ${
                                   active
                                     ? 'border-indigo-300 bg-white shadow-sm ring-1 ring-indigo-200/60'
@@ -217,7 +206,7 @@ export default function SettingsHub({
                                     className="material-symbols-outlined text-[17px]"
                                     style={{ fontVariationSettings: "'FILL' 1" }}
                                   >
-                                    {t.icon}
+                                    {tabItem.icon}
                                   </span>
                                 </span>
                                 <span
@@ -225,7 +214,7 @@ export default function SettingsHub({
                                     active ? 'text-indigo-950' : 'text-slate-700'
                                   }`}
                                 >
-                                  {t.label}
+                                  {labelFor(tabItem)}
                                 </span>
                               </button>
                             </li>
@@ -234,15 +223,17 @@ export default function SettingsHub({
                       </ul>
                     ) : (
                       <ul className="space-y-1">
-                        {section.items.map((t) => {
-                          const active = t.id === tab;
+                        {section.items.map((tabItem) => {
+                          const active = tabItem.id === tab;
                           return (
-                            <li key={t.id}>
+                            <li key={tabItem.id}>
                               <button
                                 type="button"
-                                onClick={() => selectTab(t.id)}
+                                onClick={() => selectTab(tabItem.id)}
                                 title={
-                                  t.id === 'homepage' ? homepageHint : TAB_HINTS[t.id] || t.label
+                                  tabItem.id === 'homepage'
+                                    ? homepageHint
+                                    : hintFor(tabItem.id, tabItem.label)
                                 }
                                 className={`w-full text-left flex items-center gap-2.5 rounded-xl border px-2.5 py-2 transition ${
                                   active
@@ -261,7 +252,7 @@ export default function SettingsHub({
                                     className="material-symbols-outlined text-[15px]"
                                     style={{ fontVariationSettings: "'FILL' 1" }}
                                   >
-                                    {t.icon}
+                                    {tabItem.icon}
                                   </span>
                                 </span>
                                 <span
@@ -269,7 +260,7 @@ export default function SettingsHub({
                                     active ? 'text-violet-950' : 'text-on-surface'
                                   }`}
                                 >
-                                  {t.label}
+                                  {labelFor(tabItem)}
                                 </span>
                                 <span
                                   className={`material-symbols-outlined text-[16px] shrink-0 ${
@@ -298,8 +289,11 @@ export default function SettingsHub({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                  {activeTab?.label ||
-                    (superAdmin ? 'Ρυθμίσεις πλατφόρμας' : 'Ρυθμίσεις γραφείου')}
+                  {activeTab
+                    ? labelFor(activeTab)
+                    : superAdmin
+                      ? t('section_platform')
+                      : t('section_office')}
                 </h2>
                 <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{tabHint}</p>
               </div>
@@ -328,7 +322,7 @@ export default function SettingsHub({
                           : 'text-violet-800'
                       }`}
                     >
-                      {activeTab.label}
+                      {labelFor(activeTab)}
                     </span>
                   </div>
                 ) : null}
@@ -338,16 +332,16 @@ export default function SettingsHub({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#86868b]">
-                  Σχεδιασμός σελίδας
+                  {t('settings_homepage')}
                 </p>
                 <h2 className="text-xl font-bold text-[#1d1d1f] tracking-tight mt-0.5">
-                  Διαμόρφωση custom σελίδας
+                  {hintFor('homepage')}
                 </h2>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-[#5e5ce6]/10 border border-[#5e5ce6]/20">
                   <span className="material-symbols-outlined text-[20px] text-[#5e5ce6]">palette</span>
-                  <span className="text-sm font-bold text-[#5e5ce6]">Σχεδιασμός σελίδων</span>
+                  <span className="text-sm font-bold text-[#5e5ce6]">{t('settings_homepage')}</span>
                 </div>
               </div>
             </div>

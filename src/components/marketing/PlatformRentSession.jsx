@@ -1,5 +1,6 @@
 /**
- * Marketing homepage — rent session (hook + clear info + car preview → /rent).
+ * Rent marketing session (hook + clear info + car preview).
+ * Lives on /rent only — not on the buses homepage.
  */
 import { Link } from 'react-router-dom';
 import { DEMO_RENT_FLEET, rentCategoryLabel } from '../../lib/rental/demoRentFleet.js';
@@ -8,9 +9,24 @@ import '../../styles/platform-service-sessions.css';
 
 const PREVIEW_CARS = DEMO_RENT_FLEET.slice(0, 3);
 
-export default function PlatformRentSession() {
+export default function PlatformRentSession({ placement = 'page' } = {}) {
+  const onRentPage = placement === 'page';
+  const ctaLabel = onRentPage ? 'Πάνω στον στόλο' : RENT_SESSION.ctaLabel;
+
+  const scrollToFleet = (e) => {
+    if (!onRentPage) return;
+    const el = document.getElementById('rent-guest-fleet');
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <section id={RENT_SESSION.id} className="pg-session pg-session--rent" aria-labelledby="rent-session-hook">
+    <section
+      id={RENT_SESSION.id}
+      className="pg-session pg-session--rent"
+      aria-labelledby="rent-session-hook"
+    >
       <div className="pg-session-intro">
         <p className="pg-session-kicker">
           <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
@@ -32,23 +48,39 @@ export default function PlatformRentSession() {
             </li>
           ))}
         </ul>
-        <Link to={RENT_SESSION.ctaTo} className="pg-session-cta pg-session-cta--rent">
-          {RENT_SESSION.ctaLabel}
-          <span className="material-symbols-outlined" aria-hidden>
-            arrow_forward
-          </span>
-        </Link>
+        {onRentPage ? (
+          <a href="#rent-guest-fleet" className="pg-session-cta pg-session-cta--rent" onClick={scrollToFleet}>
+            {ctaLabel}
+            <span className="material-symbols-outlined" aria-hidden>
+              arrow_upward
+            </span>
+          </a>
+        ) : (
+          <Link
+            to={RENT_SESSION.ctaTo}
+            className="pg-session-cta pg-session-cta--rent"
+            onClick={() => {
+              window.scrollTo(0, 0);
+            }}
+          >
+            {ctaLabel}
+            <span className="material-symbols-outlined" aria-hidden>
+              arrow_forward
+            </span>
+          </Link>
+        )}
       </div>
 
       <div className="pg-session-preview">
         <div className="pg-session-rent-grid" role="list" aria-label="Δείγμα στόλου ενοικιάσεων">
           {PREVIEW_CARS.map((car) => (
-            <Link
+            <a
               key={car.id}
-              to="/rent"
+              href="#rent-guest-fleet"
               className="pg-session-rent-card"
               role="listitem"
               aria-label={`${car.model} — από €${car.daily_rate_eur}/ημέρα`}
+              onClick={scrollToFleet}
             >
               <img src={car.photo_url} alt="" loading="lazy" />
               <div className="pg-session-rent-card-body">
@@ -60,7 +92,7 @@ export default function PlatformRentSession() {
                   <span> /ημέρα</span>
                 </p>
               </div>
-            </Link>
+            </a>
           ))}
         </div>
       </div>

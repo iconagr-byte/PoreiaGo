@@ -2,6 +2,8 @@
 
 export const PLATFORM_NAME = 'PoreiaGo';
 export const PLATFORM_TAGLINE = 'Η πλατφόρμα που τρέχει το ταξιδιωτικό σας γραφείο';
+/** Short line under the wordmark (header / footer mark). */
+export const PLATFORM_BRAND_LINE = 'Πλατφόρμα για ταξιδιωτικά γραφεία';
 
 export const HERO = {
   title: 'Μία πλατφόρμα για',
@@ -11,38 +13,128 @@ export const HERO = {
     'Το γραφείο σας με δική του επωνυμία, δικό του ιστότοπο και δικό του συμβόλαιο.',
 };
 
-/** Homepage hub — δύο πόρτες (λεωφορεία / ενοικιάσεις), όχι κατευθείαν στα buses. */
+/**
+ * Homepage hero — Stripe-grade hook for candidate offices (how PoreiaGo works),
+ * then visual flow + service chooser below the fold.
+ */
 export const SERVICE_HUB = {
-  headline: 'Επιλέξτε υπηρεσία',
-  support: 'Εκδρομές με λεωφορεία ή ενοικιάσεις οχημάτων — ίδια πλατφόρμα, δύο ξεχωριστές πόρτες.',
-  busesLabel: 'Εκδρομές & λεωφορεία',
-  busesHint: 'Κρατήσεις · GPS · στόλος',
+  micro: 'Πλατφόρμα για ταξιδιωτικά γραφεία · Ελλάδα & εξωτερικό',
+  hook: 'Υποδομή κρατήσεων',
+  hookLine2: 'για να μεγαλώσει το γραφείο σας.',
+  hookAccent: 'μεγαλώσει το γραφείο σας',
+  support:
+    'Δεχτείτε κρατήσεις, τρέξτε λεωφορεία ή ενοικιάσεις και κρατήστε το δικό σας brand — από την πρώτη κράτηση μέχρι την πληρότητα της σεζόν.',
+  primaryCta: 'Ξεκινήστε',
+  secondaryCta: 'Υπηρεσίες',
+  contractsCta: 'Συμβόλαια & τιμές',
+  contractsKicker: 'Συμβόλαια PoreiaGo',
+  contractsHook: 'Ένα συμβόλαιο για λεωφορεία.',
+  contractsHookAccent: 'Add-on όταν θέλετε ενοικιάσεις.',
+  contractsSupport:
+    'Όλες οι παροχές ανά πλάνο — ξεκάθαρα. Ξεκινήστε με λεωφορεία· προσθέστε Rent όταν το χρειαστείτε.',
+  contractsAllCta: 'Δείτε όλα τα συμβόλαια',
+  chooseTitle: 'Τι θέλετε να ανοίξετε πρώτα;',
+  chooseSupport:
+    'Ίδια πλατφόρμα PoreiaGo · ξεχωριστή εμπειρία για κάθε υπηρεσία. Ξεκινάτε στο subdomain σας · το δικό σας domain μετά.',
+  busesLabel: 'Λεωφορεία',
+  busesHint: 'Εκδρομές · QR · GPS · στόλος',
   rentLabel: 'Ενοικιάσεις',
-  rentHint: 'Αυτοκίνητα · βοήθεια · συμβόλαιο',
+  rentHint: 'Αυτοκίνητα · συμβόλαιο · check-in',
 };
 
 /** Below-hub sessions — ένα καθαρό block ανά υπηρεσία. */
+const BUSES_SESSION_GROUPS = [
+  {
+    id: 'sell',
+    label: 'Πουλάτε',
+    items: [
+      {
+        icon: 'confirmation_number',
+        label: 'Online κρατήσεις',
+        detail: 'Τιμές, ημερομηνίες και πληρωμή στο site σας',
+      },
+      {
+        icon: 'event_seat',
+        label: 'Χάρτης θέσεων',
+        detail: 'Πληρότητα και επιλογή θέσης σε πραγματικό χρόνο',
+      },
+      {
+        icon: 'campaign',
+        label: 'Email καμπάνιες',
+        detail: 'Έτοιμα πρότυπα για προσφορές εκδρομών',
+      },
+    ],
+  },
+  {
+    id: 'board',
+    label: 'Επιβιβάζετε',
+    items: [
+      {
+        icon: 'qr_code_2',
+        label: 'QR εισιτήρια',
+        detail: 'Check-in χωρίς χαρτί και χωρίς λίστες στο χέρι',
+      },
+      {
+        icon: 'account_balance_wallet',
+        label: 'My Wallet',
+        detail: 'Εισιτήρια και κάρτες ενοικίασης στο ίδιο κινητό',
+      },
+      {
+        icon: 'badge',
+        label: 'Εφαρμογή οδηγού',
+        detail: 'Επιβάτες, επιβίβαση και βάρδια στο κινητό',
+      },
+    ],
+  },
+  {
+    id: 'run',
+    label: 'Τρέχετε',
+    items: [
+      {
+        icon: 'directions_bus',
+        label: 'Στόλος λεωφορείων',
+        detail: 'Οχήματα και ανέσεις όπως τα βλέπει ο πελάτης',
+      },
+      {
+        icon: 'dashboard',
+        label: 'Πίνακας γραφείου',
+        detail: 'Εκδρομές, πελάτες και κρατήσεις σε ένα σημείο',
+      },
+    ],
+  },
+];
+
 export const BUSES_SESSION = {
   id: 'session-buses',
   kicker: 'Λεωφορεία',
-  hook: 'Από την κράτηση μέχρι το GPS — όλη η εκδρομή σε μία ροή',
+  hook: 'Πουλήστε εκδρομές online και εκτελέστε τις χωρίς χάος',
+  hookAccent: 'χωρίς χάος',
   support:
-    'Ο πελάτης κλείνει θέση online με QR. Εσείς βλέπετε στόλο, πληρότητα και ζωντανή διαδρομή — χωρίς Excel και χωρίς τηλέφωνα την ώρα της αναχώρησης.',
-  points: [
-    { icon: 'confirmation_number', label: 'Online κράτηση & QR εισιτήριο' },
-    { icon: 'map', label: 'Ζωντανό GPS στο λεωφορείο' },
-    { icon: 'event_seat', label: 'Θέσεις & πληρότητα σε πραγματικό χρόνο' },
-  ],
+    'Ο πελάτης βλέπει εκδρομές, κλείνει θέση και κρατάει QR εισιτήριο στο κινητό. Εσείς διαχειρίζεστε στόλο, πληρότητα, οδηγούς και αναχώρηση από έναν πίνακα — χωρίς Excel και χωρίς τηλέφωνα την τελευταία στιγμή.',
+  groups: BUSES_SESSION_GROUPS,
+  points: BUSES_SESSION_GROUPS.flatMap((g) => g.items),
   ctaLabel: 'Δείτε εκδρομές & στόλο',
   ctaHref: '#platform-trips',
+  tripsPreview: {
+    eyebrow: 'Εκδρομές',
+    title: 'Έτσι κλείνει θέση ο πελάτης',
+    subtitle:
+      'Επιλέγει εκδρομή και ημερομηνία → θέση στον χάρτη → πληρωμή → QR εισιτήριο στο κινητό. Ίδια ροή στο site του γραφείου σας — χωρίς τηλέφωνο και χωρίς Excel.',
+  },
+  abroadPreview: {
+    eyebrow: 'Εξωτερικό',
+    title: 'Ίδια κράτηση · εκδρομές εξωτερικού',
+    subtitle:
+      'Παρίσι · Ρώμη · Πράγα & Βιέννη — ίδια κάρτα, ίδια επιλογή θέσης και ίδιο QR εισιτήριο με τις εγχώριες.',
+  },
 };
 
 export const RENT_SESSION = {
   id: 'session-rent',
   kicker: 'Ενοικιάσεις',
-  hook: 'Νοίκιασε αυτοκίνητο όπως κλείνεις εκδρομή — καθαρά, με ασφάλεια και οδική βοήθεια',
+  hook: 'Νοίκιασε αυτοκίνητο όπως κλείνεις εκδρομή — καθαρά, με ασφάλεια',
   support:
-    'Ξεχωριστή πόρτα για ενοικιάσεις: στόλος, ημερομηνίες, ασφάλειες και ψηφιακή υπογραφή. Μπορεί να είναι add-on στο πλάνο λεωφορείων ή αυτόνομο συμβόλαιο.',
+    'Ξεχωριστή εμπειρία για ενοικιάσεις: στόλος, ημερομηνίες, ασφάλειες και ψηφιακή υπογραφή. Μπορεί να είναι add-on στο πλάνο λεωφορείων ή αυτόνομο συμβόλαιο.',
   points: [
     { icon: 'health_and_safety', label: 'Οδική βοήθεια 24/7' },
     { icon: 'shield', label: 'CDW / SCDW πριν την υπογραφή' },
@@ -50,6 +142,178 @@ export const RENT_SESSION = {
   ],
   ctaLabel: 'Άνοιγμα σελίδας ενοικιάσεων',
   ctaTo: '/rent',
+};
+
+/**
+ * /rent platform showcase — light hub (homepage-style graphics) + capability session.
+ * Not a pure customer booking strip: explains the whole Rent product.
+ */
+export const RENT_SHOWCASE_HUB = {
+  micro: 'PoreiaGo Rent · ενοικιάσεις για ταξιδιωτικά γραφεία',
+  brand: 'PoreiaGo',
+  brandAccent: 'Rent',
+  hook: 'Κράτηση αυτοκινήτου',
+  hookLine2: 'όπως πρέπει να είναι.',
+  support:
+    'Στόλος γραφείου, ημερομηνίες, ασφάλεια, ψηφιακό συμβόλαιο και QR στο My Wallet — μία καθαρή ροή από την αναζήτηση μέχρι την παραλαβή.',
+  primaryCta: 'Δες διαθεσιμότητα',
+  secondaryCta: 'Τι μπορείς να κάνεις',
+  primaryHref: '#rent-guest-search',
+  secondaryHref: '#session-rent-capabilities',
+};
+
+export const RENT_CAPABILITIES_SESSION = {
+  id: 'session-rent-capabilities',
+  kicker: 'Όλο το Rent',
+  hook: 'Τι μπορείς να κάνεις σε αυτή τη σελίδα',
+  hookAccent: 'αυτή τη σελίδα',
+  support:
+    'Δεν είναι μόνο λίστα αυτοκινήτων. Είναι η πλήρης εμπειρία ενοικίασης: από την αναζήτηση και την επιλογή, μέχρι συμβόλαιο, Wallet και υποστήριξη στο δρόμο.',
+  groups: [
+    {
+      id: 'find',
+      label: 'Βρίσκεις',
+      items: [
+        {
+          icon: 'search',
+          label: 'Αναζήτηση ημερομηνιών',
+          detail: 'Παραλαβή, επιστροφή και ώρες σε μία γραμμή',
+        },
+        {
+          icon: 'directions_car',
+          label: 'Στόλος γραφείου',
+          detail: 'Κατηγορίες, τιμή/ημέρα και φίλτρα όπως τα βλέπει ο πελάτης',
+        },
+        {
+          icon: 'location_on',
+          label: 'Σημεία παραλαβής',
+          detail: 'Γραφείο, αεροδρόμιο ή άλλο σημείο που ορίζει το γραφείο',
+        },
+      ],
+    },
+    {
+      id: 'book',
+      label: 'Κλείνεις',
+      items: [
+        {
+          icon: 'health_and_safety',
+          label: 'Ασφάλεια & extras',
+          detail: 'CDW / SCDW και πρόσθετα πριν την πληρωμή',
+        },
+        {
+          icon: 'payments',
+          label: 'Καθαρή πληρωμή',
+          detail: 'Σύνολο ημερών και προκαταβολή — χωρίς κρυφά βήματα',
+        },
+        {
+          icon: 'draw',
+          label: 'Ψηφιακό συμβόλαιο',
+          detail: 'Όροι και υπογραφή στο κινητό ή στο desk',
+        },
+      ],
+    },
+    {
+      id: 'drive',
+      label: 'Οδηγείς',
+      items: [
+        {
+          icon: 'qr_code_2',
+          label: 'Pass στο My Wallet',
+          detail: 'QR κράτησης πάντα στο κινητό',
+        },
+        {
+          icon: 'fact_check',
+          label: 'Online check-in',
+          detail: 'Checklist πριν φύγεις από το σημείο παραλαβής',
+        },
+        {
+          icon: 'sos',
+          label: 'Οδική βοήθεια',
+          detail: 'Υποστήριξη γραφείου όταν τη χρειαστείς',
+        },
+      ],
+    },
+  ],
+  ctaLabel: 'Ξεκίνα από την αναζήτηση',
+  ctaHref: '#rent-guest-search',
+  visual: {
+    title: 'Κράτηση Rent',
+    model: 'Compact · DEMO-RENT',
+    meta: '3 ημέρες · Παραλαβή γραφείο',
+    status: 'Έτοιμο στο Wallet',
+  },
+};
+
+/** Digital rental contracts — session on /rent. */
+export const RENT_CONTRACTS_SESSION = {
+  id: 'session-rent-contracts',
+  kicker: 'Ψηφιακό συμβόλαιο',
+  hook: 'Υπογράφεις μία φορά — και φεύγεις χωρίς χαρτί',
+  hookAccent: 'χωρίς χαρτί',
+  support:
+    'Πριν την παραλαβή βλέπεις όρους, ασφάλεια και checklist στο tablet του γραφείου ή στο κινητό σου. Η υπογραφή μένει στο φάκελο της κράτησης — καθαρά για σένα και για το γραφείο.',
+  points: [
+    {
+      icon: 'shield',
+      label: 'Ασφάλεια πριν την υπογραφή',
+      detail: 'CDW / SCDW και υποχρεωτικοί όροι — διαβάζεις πριν αγγίξεις το στυλό',
+    },
+    {
+      icon: 'stylus_note',
+      label: 'Sign-on-Glass ή σύνδεσμος',
+      detail: 'Υπογραφή στο desk ή ασφαλές σύνδεσμος στο κινητό — ίδια ισχύς',
+    },
+    {
+      icon: 'fact_check',
+      label: 'Checklist παραλαβής',
+      detail: 'Καύσιμο, χλμ. και φωτογραφίες μαζί με το συμβόλαιο στο My Wallet',
+    },
+  ],
+  ctaLabel: 'Δες στόλο & κράτησε',
+  ctaHref: '#rent-guest-fleet',
+  visual: {
+    title: 'Σύμβαση ενοικίασης',
+    plate: 'DEMO-SIGN',
+    terms: ['CDW / SCDW', 'Οδική βοήθεια', 'Κατάσταση οχήματος'],
+    status: 'Έτοιμο για υπογραφή',
+  },
+};
+
+/** My Wallet — one shell for bus tickets + rentals (homepage + auth copy). */
+export const WALLET_SESSION = {
+  id: 'session-wallet',
+  kicker: 'My Wallet',
+  hook: 'Η κράτησή σας, πάντα στο κινητό',
+  hookAccent: 'πάντα στο κινητό',
+  support:
+    'Ένας λογαριασμός για όλα — εισιτήρια λεωφορείου και κάρτες ενοικίασης στο ίδιο My Wallet. QR στην επιβίβαση ή στην παραλαβή, χωρίς χαρτί και χωρίς δεύτερο app.',
+  points: [
+    {
+      icon: 'confirmation_number',
+      label: 'Εισιτήρια εκδρομών',
+      detail: 'Θέση, ώρα αναχώρησης και QR — έτοιμα στην επιβίβαση',
+    },
+    {
+      icon: 'directions_car',
+      label: 'Κάρτες ενοικίασης',
+      detail: 'Ίδιο Wallet · καρτέλα Ενοικιάσεις δίπλα στα εισιτήρια',
+    },
+    {
+      icon: 'qr_code_2',
+      label: 'QR χωρίς χαρτί',
+      detail: 'Δείξτε το στον οδηγό ή στο γραφείο — χωρίς email ή PDF',
+    },
+  ],
+  ctaLabel: 'Άνοιγμα My Wallet',
+  ctaTo: '/wallet',
+  visual: {
+    route: 'Αθήνα → Μύκονος',
+    seat: 'Θέση 12A',
+    when: 'Σάβ 08:30',
+    status: 'Έτοιμο για επιβίβαση',
+    rentModel: 'Compact · DEMO-RENT',
+    rentMeta: 'Παραλαβή με QR',
+  },
 };
 
 /** Hero background — πλήρες cover, χωρίς demo εκδρομή */
@@ -109,7 +373,7 @@ export const FEATURES = [
     visual: 'rent',
     lane: 'rent',
     title: 'Σελίδα ενοικιάσεων',
-    body: 'Ξεχωριστή πόρτα /rent: στόλος αυτοκινήτων, ημερομηνίες, τιμές — χωρίς να μπερδεύεται με τις εκδρομές.',
+    body: 'Ξεχωριστή σελίδα /rent: στόλος αυτοκινήτων, ημερομηνίες, τιμές — χωρίς να μπερδεύεται με τις εκδρομές.',
     hook: 'Ίδια πλατφόρμα · ξεχωριστή εμπειρία πελάτη',
   },
   {
@@ -167,17 +431,17 @@ export const FEATURES = [
 export const FEATURE_LANES = {
   buses: {
     kicker: 'Λεωφορεία',
-    title: 'Εκδρομές από κράτηση έως GPS',
+    title: 'Εκδρομές από κράτηση έως επιβίβαση',
     href: '#session-buses',
   },
   rent: {
     kicker: 'Ενοικιάσεις',
     title: 'Αυτοκίνητα με βοήθεια και συμβόλαιο',
-    href: '#session-rent',
+    href: '/rent',
   },
   shared: {
     kicker: 'Κοινά',
-    title: 'Ό,τι μοιράζονται και οι δύο πόρτες',
+    title: 'Ό,τι μοιράζονται και οι δύο υπηρεσίες',
     href: '#pricing',
   },
 };
@@ -185,7 +449,7 @@ export const FEATURE_LANES = {
 export const STEPS = [
   {
     step: '01',
-    title: 'Επιλέγετε πόρτες',
+    title: 'Επιλέγετε υπηρεσίες',
     body: 'Λεωφορεία, Ενοικιάσεις, ή και τα δύο — με το συμβόλαιο που σας ταιριάζει.',
   },
   {
@@ -204,7 +468,7 @@ export const STEPS = [
 export const AUDIENCE = {
   kicker: 'Για ποιον είναι',
   title: 'Αναγνωρίζετε τον εαυτό σας;',
-  support: 'Ίδια πλατφόρμα · δύο πόρτες. Διαλέξτε ό,τι τρέχει το γραφείο σας σήμερα.',
+  support: 'Ίδια πλατφόρμα · δύο υπηρεσίες. Διαλέξτε ό,τι τρέχει το γραφείο σας σήμερα.',
   close:
     'Αν απαντήσατε «ναι» σε κάτι — ανοίγετε λεωφορεία, ενοικιάσεις, ή και τα δύο, με το δικό σας brand.',
   buses: {
@@ -220,7 +484,7 @@ export const AUDIENCE = {
   rent: {
     kicker: 'Ενοικιάσεις',
     title: 'Θέλετε αυτοκίνητα δίπλα στα λεωφορεία — καθαρά',
-    href: '#session-rent',
+    href: '/rent',
     points: [
       { icon: 'car_rental', text: 'Ενοικιάσεις χωρίς να μπερδεύονται με τις εκδρομές' },
       { icon: 'shield', text: 'Ασφάλειες και υπογραφή πριν φύγει το όχημα' },

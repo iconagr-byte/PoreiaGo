@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -410,10 +410,32 @@ async def admin_teltonika_status(tenant_id: Annotated[UUID, Depends(get_tenant_i
 
 
 @router.get("/teltonika/devices", response_model=list[TeltonikaDeviceResponse])
-async def admin_list_teltonika_devices(tenant_id: Annotated[UUID, Depends(get_tenant_id)]):
-    from travel_platform.telemetry.teltonika import list_devices
+async def admin_list_teltonika_devices(
+    request: Request,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import (
+        ensure_office_default_trackers,
+        list_devices,
+    )
 
-    return [TeltonikaDeviceResponse(**row) for row in list_devices(str(tenant_id))]
+    tid = str(tenant_id)
+    host = (request.headers.get("host") or request.headers.get("x-forwarded-host") or "").lower()
+    # Achillio Travel: if the dropdown went empty (redeploy / wrong-tenant bind),
+    # restore the known FTC961 IMEI so «Συσκευή» is never blank for that office.
+    if "achilliotravel" in host or "achillio" in host:
+        try:
+            ensure_office_default_trackers(tid)
+        except Exception:
+            pass
+
+    out: list[TeltonikaDeviceResponse] = []
+    for row in list_devices(tid):
+        try:
+            out.append(TeltonikaDeviceResponse.model_validate(row))
+        except Exception:
+            continue
+    return out
 
 
 @router.post("/teltonika/devices", response_model=TeltonikaDeviceResponse)
@@ -463,16 +485,42 @@ async def admin_teltonika_test_ping(
         raise HTTPException(status_code=400, detail="Η συσκευή είναι ανενεργή")
 
     req = body or TeltonikaTestPingRequest()
-    # Prefer last real fix; else Athens demo pin so the map always has something visible.
-    lat = req.latitude
-    lng = req.longitude
-    if lat is None or lng is None:
-        if device.get("last_lat") is not None and device.get("last_lng") is not None:
-            lat = float(device["last_lat"])
-            lng = float(device["last_lng"])
-        else:
-            lat, lng = 37.983810, 23.727539
+    from travel_platform.telemetry.teltonika.device_store import resolve_hardware_fix
+
     speed = float(req.speed_kmh or 0)
+    force_hw = bool(req.use_hardware) or (
+        req.latitude is None or req.longitude is None
+    )
+    fix_origin = "browser"
+
+    if force_hw:
+        # Δοκιμαστικό pin: Codec last_hw or live Teltonika fleet — never PC Lat/Lng.
+        resolved = resolve_hardware_fix(device, tenant_id=tid)
+        if not resolved:
+            # Stale last_lat (old PC/test) must not satisfy «Η θέση μου».
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Δεν βρέθηκε σήμα Teltonika (Codec TCP / live) για αυτό το IMEI. "
+                    "Ο tracker δεν έχει στείλει ακόμα fix στο VPS — "
+                    "έλεγξε Configurator IP+port 5027. Δεν χρησιμοποιείται θέση υπολογιστή."
+                ),
+            )
+        lat, lng, fix_origin = resolved
+        # Persist live Codec coords so the next click uses last_hw.
+        if fix_origin == "live_fleet":
+            touch_device(
+                str(device.get("imei")),
+                lat=lat,
+                lng=lng,
+                speed_kmh=speed,
+                points=1,
+                from_hardware=True,
+            )
+    else:
+        lat = float(req.latitude)
+        lng = float(req.longitude)
+        fix_origin = "browser"
 
     vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
     driver_name = str(device.get("label") or f"GPS {vehicle_code}")
@@ -488,22 +536,20 @@ async def admin_teltonika_test_ping(
         "driver_name": driver_name,
         "driver_id": device.get("driver_id") or None,
         "imei": device.get("imei"),
-        "source": "teltonika_test_ping",
+        # Hardware pin keeps teltonika provenance; browser stays test_ping.
+        "source": "teltonika" if force_hw else "teltonika_test_ping",
         "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
     result = await process_telemetry_payload(payload)
-    touch_device(
-        str(device.get("imei")),
-        lat=lat,
-        lng=lng,
-        speed_kmh=speed,
-        points=1,
-    )
+    # Never write browser coords into the IMEI device store.
+    if force_hw and fix_origin != "live_fleet":
+        touch_device(str(device.get("imei")), points=1)
     refreshed = get_device_by_imei(str(device.get("imei"))) or device
     return TeltonikaTestPingResponse(
-        device=TeltonikaDeviceResponse(**refreshed),
+        device=TeltonikaDeviceResponse.model_validate(refreshed),
         vehicle_id=str(result.vehicle_id),
         latitude=lat,
         longitude=lng,
-        source="test_ping",
+        source="test_ping" if not force_hw else "teltonika",
+        fix_origin=fix_origin,
     )

@@ -1,6 +1,7 @@
 name: Repair Achillio office (Contabo)
 
-# One-shot SSH repair: ensure admin-achillio-gr + optional admin password reset.
+# One-shot SSH repair: ensure admin-achillio-gr + seed excursions + rebuild SPA
+# so Διαχείριση Εκδρομών keeps office-seed trips (Μετέωρα / Αθήνα / Ιωάννινα).
 # Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (same as Deploy VPS).
 # Optional inputs: admin email + password (never logged; not committed).
 
@@ -17,6 +18,11 @@ on:
         required: false
         default: ""
         type: string
+      git_ref:
+        description: "Git branch/ref to deploy (default: main)"
+        required: false
+        default: "main"
+        type: string
 
 concurrency:
   group: repair-achillio-office
@@ -26,20 +32,46 @@ jobs:
   repair:
     runs-on: ubuntu-latest
     steps:
-      - name: Repair Achillio Travel office + optional admin password
+      - name: Repair Achillio Travel office + rebuild SPA for Back Office seeds
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          command_timeout: 10m
+          command_timeout: 25m
           script: |
             set -euo pipefail
             cd /opt/poreiago
-            git fetch origin main || true
-            git checkout main || true
-            git pull --ff-only origin main || true
+            git config --global --add safe.directory /opt/poreiago || true
+            REF='${{ inputs.git_ref }}'
+            if [ -z "$REF" ]; then
+              REF='cursor/achillio-seed-poreiago-trips-5ffb'
+            fi
+            echo "==> Deploying git ref: $REF"
+            git fetch origin "$REF" || git fetch origin
+            if git rev-parse --verify "origin/$REF" >/dev/null 2>&1; then
+              git checkout -B "$REF" "origin/$REF"
+            elif git rev-parse --verify "origin/main" >/dev/null 2>&1; then
+              echo "WARN: origin/$REF missing — falling back to main"
+              git checkout main
+              git pull --ff-only origin main || true
+            else
+              echo "ERROR: cannot resolve $REF or main"
+              exit 1
+            fi
+            git status -sb | head -5
             export ACHILLIO_ADMIN_EMAIL='${{ inputs.admin_email }}'
             export ACHILLIO_ADMIN_PASSWORD='${{ inputs.admin_password }}'
             bash deploy/scripts/repair-achillio-office.sh
+            # Smoke: public catalog must list seed ids
+            echo "==> Public trips smoke"
+            curl -sS "http://127.0.0.1:${NPM_APP_PORT:-8003}/api/site/trips?host=www.achilliotravel.com" \
+              | head -c 800 || true
+            echo
+            # Confirm rebuilt SPA knows office seed ids
+            if grep -Rql '91001\|isOfficeSeedTrip\|officeSeed' dist/assets/*.js 2>/dev/null; then
+              echo "  SPA bundle contains office-seed keep logic OK"
+            else
+              echo "  WARN: SPA bundle missing office-seed markers — Back Office may still strip demos"
+            fi

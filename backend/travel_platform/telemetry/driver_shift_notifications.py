@@ -179,14 +179,14 @@ async def _send_driver_shift_push(
     )
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_email,
         send_push_to_subscription,
-        web_push_configured,
     )
 
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     if event == "online":
         if reason == "login":
