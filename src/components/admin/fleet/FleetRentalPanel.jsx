@@ -1041,6 +1041,33 @@ export default function FleetRentalPanel({
         />
       )}
 
+      {tab === 'scan' && (
+        <RentalDeskQrScan
+          onCheckIn={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'PICKUP_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-in για αυτή την κράτηση');
+          }}
+          onCheckOut={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'RETURN_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-out για αυτή την κράτηση');
+          }}
+          onOpenBooking={() => {
+            setBookingFilter('ALL');
+            setTab('bookings');
+          }}
+        />
+      )}
+
       {tab === 'bookings' && (
         <div className="space-y-3">
           <div className="rounded-[22px] border border-black/[0.06] bg-white/90 p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
