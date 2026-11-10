@@ -636,9 +636,21 @@ export default function BackOffice() {
     bookings,
   ]);
 
+  const handleTabChange = (tab) => {
+    if (tab !== 'customers') {
+      setSelectedCustomer(null);
+      setCustomerReturn(null);
+    }
+    if (tab !== 'bookings') {
+      setSelectedBooking(null);
+    }
+    setActiveTab(tab);
+  };
+
   const openEmailHub = ({ to = '', subject = '', hubTab = 'mailbox' } = {}) => {
     setSelectedBooking(null);
     setSelectedCustomer(null);
+    setCustomerReturn(null);
     const toAddr = String(to).trim();
     const subj = String(subject).trim();
     setEmailIntent({
@@ -650,14 +662,14 @@ export default function BackOffice() {
 
   const goToEmailMailbox = () => {
     setEmailIntent({ hubTab: 'mailbox' });
-    setActiveTab('email');
+    handleTabChange('email');
   };
 
   const useEmailTemplate = (tpl) => {
     if (!tpl) return;
     const draft = applyStitchTemplate(tpl);
     setEmailIntent({ hubTab: 'marketing', initialDraft: draft });
-    setActiveTab('email');
+    handleTabChange('email');
     toast.success(`Φορτώθηκε το πρότυπο «${tpl.name}» — νέα καμπάνια`);
   };
 
@@ -689,6 +701,7 @@ export default function BackOffice() {
       joinDate: '—',
       serviceScope: scope,
     };
+    setCustomerReturn({ tab: 'bookings', bookingId: booking.id || null });
     setSelectedBooking(null);
     setCustomerServiceScope(scope);
     setCustomers(loadCustomersByService(scope));
@@ -726,6 +739,7 @@ export default function BackOffice() {
 
   const openBookingTicket = (booking) => {
     setSelectedCustomer(null);
+    setCustomerReturn(null);
     setActiveTab('bookings');
     setSelectedBooking(booking);
   };
