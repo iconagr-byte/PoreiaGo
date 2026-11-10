@@ -18,6 +18,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { sendWalletClaimBookingEmail } from '../lib/wallet/sendClaimBookingEmail.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { isNativeUnifiedApp } from '../lib/capacitor/nativeAppId.js';
@@ -187,9 +188,30 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       /* ignore */
     }
     const hadClaim = Boolean(claim);
+    const claimBookingId = highlightBooking || claim?.bookingId || claim?.reference || '';
     clearWalletClaim();
+
+    if (hadClaim && claimBookingId && !rentIntent) {
+      sendWalletClaimBookingEmail({
+        bookingId: claimBookingId,
+        reference: claim?.reference,
+        email,
+        name: profile?.name || claim?.name,
+        phone: claim?.phone,
+      })
+        .then((res) => {
+          if (res?.skipped) return;
+          if (res?.logged_only) {
+            toast.success(`Καταγράφηκε αποστολή εισιτηρίου → ${res.email}`);
+          } else if (res?.ok) {
+            toast.success(`Στάλθηκε email με την κράτηση στο ${res.email}`);
+          }
+        })
+        .catch(() => {});
+    }
+
     const homeState = walletHomeNavState({
-      highlightBooking,
+      highlightBooking: claimBookingId || highlightBooking,
       fromClaim: hadClaim,
     });
     const rentLookupState = goingRent
