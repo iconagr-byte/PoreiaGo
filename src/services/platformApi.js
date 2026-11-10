@@ -439,7 +439,7 @@ export async function fetchFleetDrivers(status) {
   } catch (err) {
     if (getSaasToken()) throw err;
   }
-  return getMockDrivers();
+  throw new Error(String(detail));
 }
 
 /** Invalidate after create/update/delete so the next list fetch is fresh. */
@@ -481,7 +481,16 @@ export async function fetchFleetDriver(driverId) {
   } catch (err) {
     if (getSaasToken()) throw err;
   }
-  return getMockDrivers().find((d) => d.id === driverId) || null;
+  throw new Error(String(detail));
+}
+
+/** Full driver history — logins, shifts, km (GPS + activity). */
+export async function fetchDriverHistory(driverId, { limit = 100 } = {}) {
+  const q = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+  const res = await adminFetch(`/api/admin/platform/drivers/${driverId}/history${q}`);
+  if (res.status === 404) return null;
+  if (!res.ok) await parseError(res);
+  return res.json();
 }
 
 export async function createFleetDriver(body) {
@@ -657,6 +666,26 @@ export async function updateFleetVehicle(vehicleId, payload) {
         ? data.detail
         : data.message || 'Αποτυχία ενημέρωσης οχήματος',
     );
+  }
+  return data;
+}
+
+export async function createFleetVehicle(body) {
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data.message || 'Αποτυχία εισαγωγής οχήματος';
+    throw new Error(message);
   }
   return data;
 }
@@ -955,11 +984,21 @@ export function getMasterQrPngUrl(tripId, { driverId } = {}) {
   return `${API_BASE}/api/admin/platform/operations/master-qr/${tripId}/png${qs ? `?${qs}` : ''}`;
 }
 
-export async function notifyDriverShiftPush({ tripId, driverId, message, tripTitle } = {}) {
+export async function notifyDriverShiftPush({
+  tripId,
+  driverId,
+  message,
+  tripTitle,
+  frontendBase,
+} = {}) {
   const body = { trip_id: Number(tripId) };
   if (driverId) body.driver_id = driverId;
   if (message) body.message = message;
   if (tripTitle) body.trip_title = tripTitle;
+  const origin =
+    frontendBase ||
+    (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '');
+  if (origin) body.frontend_base = origin;
   const res = await adminFetch('/api/admin/platform/operations/notify-driver-push', {
     method: 'POST',
     body: JSON.stringify(body),

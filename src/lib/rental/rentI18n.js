@@ -78,7 +78,7 @@ const DICTS = {
     services_cta_fleet: 'Δες στόλο & κλείσε',
     services_hero_title: 'Ενοικίαση με υποστήριξη στο δρόμο',
     services_hero_copy:
-      'Μοιραστείτε αυτή τη σελίδα — χωρίς σύνδεση. Οι υπηρεσίες ενεργοποιούνται στο Rent Wallet όταν νοικιάζετε.',
+      'SOS, οδική 24/7, καθαρή ασφάλεια CDW/SCDW, share trip και checklist — όλα για να κλείσεις με εμπιστοσύνη.',
     services_help: 'Βοήθεια & υπηρεσίες',
     services_unavailable: 'Η υπηρεσία ενοικίασης δεν είναι ενεργή για αυτό το γραφείο.',
   },
@@ -157,7 +157,7 @@ const DICTS = {
     services_cta_fleet: 'Browse fleet & book',
     services_hero_title: 'Rental with roadside support',
     services_hero_copy:
-      'Share this page — no login needed. Features unlock in Rent Wallet when you rent.',
+      'SOS, 24/7 roadside, clear CDW/SCDW cover, share trip and checklist — everything you need to book with confidence.',
     services_help: 'Help & services',
     services_unavailable: 'Vehicle rental is not enabled for this office.',
   },

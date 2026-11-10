@@ -142,6 +142,26 @@ class DriverOfficeSealTests(unittest.TestCase):
         real = self._create(email="real.office@example.com", tenant_id=OFFICE_A)
         result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
         self.assertTrue(result["ok"])
+        self.assertEqual(result["moved"], 0)
+        self.assertEqual(result.get("skipped_real"), 1)
+        store.reset_drivers_cache()
+        again = store.get_driver(row.id)
+        self.assertEqual(again.tenant_id, OFFICE_A)
+
+    def test_rehome_still_claims_demo_orphan(self):
+        orphan = store.create_driver(
+            {
+                "name": "Orphan Achilleas",
+                "license_no": f"LIC-{uuid4().hex[:8]}",
+                "email": "axilleas0@yahoo.gr",
+                "password": "BusPass99",
+                "status": "active",
+                "tenant_id": store.DEMO_TENANT_ID,
+                "_allow_demo_tenant": True,
+            }
+        )
+        result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
+        self.assertTrue(result["ok"])
         self.assertEqual(result["moved"], 1)
         store.reset_drivers_cache()
         self.assertEqual(store.get_driver(orphan.id).tenant_id, OFFICE_B)

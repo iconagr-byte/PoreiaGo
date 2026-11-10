@@ -352,7 +352,14 @@ class TenantBrandingService:
         custom_domain: str | None,
         subdomain_fqdn: str,
     ) -> dict[str, Any]:
-        ingress = self._olympus.get("ingress_cname", "ingress.olympus-saas.com")
+        import os
+
+        from travel_platform.growth.traefik_domains import (
+            apex_points_at_platform,
+            platform_ingress_ips,
+        )
+
+        ingress = self._olympus.get("ingress_cname", "www.poreiago.com")
         base_domain = self._olympus["base_domain"]
         ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "169.58.199.186").strip()
         cname_target = "www.poreiago.com" if custom_domain else ingress
@@ -365,7 +372,7 @@ class TenantBrandingService:
         ]
         if not custom_domain:
             return {
-                "cname_host": custom_domain or "your-domain.example",
+                "cname_host": "www.your-domain.example",
                 "cname_target": ingress,
                 "apex_host": None,
                 "apex_a_record": ingress_ip,
@@ -373,15 +380,34 @@ class TenantBrandingService:
                 "subdomain_cname_target": base_domain,
                 "notes": notes,
             }
+
+        apex_ok = apex_points_at_platform(custom_domain)
+        if apex_ok:
+            notes.append(f"Το apex {custom_domain} δείχνει ήδη στην πλατφόρμα — OK για HTTPS.")
+        else:
+            notes.append(
+                f"Τώρα χρησιμοποιήστε https://www.{custom_domain} μέχρι να αλλάξει το A record του apex."
+            )
+            notes.append(
+                f"Στον DNS provider (π.χ. intechs): {custom_domain} → A → {primary_ip}"
+            )
+
         return {
             "cname_host": f"www.{custom_domain}",
             "cname_target": "www.poreiago.com",
             "apex_host": custom_domain,
             "apex_a_record": ingress_ip,
             "alternate_www_host": f"www.{custom_domain}",
+            "apex_host": custom_domain,
+            "apex_a_ip": primary_ip,
+            "recommended_url": f"https://www.{custom_domain}",
+            "apex_points_at_platform": apex_ok,
             "subdomain_cname_host": subdomain_fqdn,
             "subdomain_cname_target": base_domain,
             "notes": notes,
+            "platform_ingress_ips": ingress_ips,
+            # Keep env discoverable for ops without importing os in callers.
+            "platform_ingress_ip_env": os.getenv("PLATFORM_INGRESS_IP") or primary_ip,
         }
 
     def _sync_file_branding(
