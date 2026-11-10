@@ -737,6 +737,16 @@
   height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
 }
 
+.rent-topbar--compact .rent-topbar-row {
+  min-height: 2.75rem;
+  padding-block: 0.35rem;
+}
+
+.rent-topbar--compact .rent-brand-mark-logo-wrap,
+.rent-topbar--compact .rent-brand-mark-badge {
+  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
+}
+
 .rent-brand-mark-logo {
   display: block;
   height: var(--rent-logo-h, 2.55rem);
