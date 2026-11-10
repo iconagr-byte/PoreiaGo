@@ -79,6 +79,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const [gpsError, setGpsError] = useState('');
   const [manifestSummary, setManifestSummary] = useState(null);
   const [starting, setStarting] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   const iosEnv = getIosGpsEnvironment();
   const backgroundWarning = useIosBackgroundGpsWarning(online && enabled);
@@ -96,6 +97,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const driverNameRef = useRef(driverName);
   const enabledRef = useRef(enabled);
   const startingRef = useRef(false);
+  const endingRef = useRef(false);
   driverNameRef.current = driverName;
   enabledRef.current = enabled;
 
@@ -117,6 +119,9 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
 
   const goOffline = useCallback(
     async ({ silent = false } = {}) => {
+      if (endingRef.current && !silent) return false;
+      endingRef.current = true;
+      if (!silent) setEnding(true);
       clearDriverGpsAutostart();
       let endedOk = false;
       try {
@@ -142,20 +147,25 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       // Explicit Τέλος βάρδιας must reach the server or the office map keeps the pin.
       // Silent paths (expired token / page teardown) still clear local GPS.
       if (!endedOk && !silent) {
+        endingRef.current = false;
+        setEnding(false);
         toast.error(
           'Το τέλος βάρδιας δεν καταχωρήθηκε — δοκιμάστε ξανά (ο χάρτης μπορεί να σας δείχνει ακόμα ενεργό)',
         );
-        return;
+        return false;
       }
 
       stopRuntime();
       setOnline(false);
       setGpsError('');
       setStarting(false);
+      setEnding(false);
+      endingRef.current = false;
       setShiftFlag(false);
       if (!silent && endedOk) {
         toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
       }
+      return endedOk || silent;
     },
     [stopRuntime],
   );
@@ -199,6 +209,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const goOnline = useCallback(
     async ({ resume = false } = {}) => {
       if (!enabledRef.current) return false;
+      if (endingRef.current) return false;
       if (runningRef.current || startingRef.current) return false;
       if (!isGeolocationSupported()) {
         if (!resume) toast.error('Το GPS δεν υποστηρίζεται σε αυτή τη συσκευή');
@@ -356,6 +367,8 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     const ensureRunning = () => {
       // Resume only an already-started shift (flag set by explicit «Έναρξη βάρδιας»).
       // Never autostart from login — peekDriverGpsAutostart is always false.
+      // Never resurrect GPS while Τέλος βάρδιας is in flight.
+      if (endingRef.current) return;
       if (!isDriverShiftOnline() && !peekDriverGpsAutostart()) return;
       setOnline(true);
       if (!runningRef.current && !startingRef.current) {
@@ -443,6 +456,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   return {
     online: online || starting || isDriverShiftOnline(),
     starting,
+    ending,
     lastPing,
     gpsError,
     manifestSummary,

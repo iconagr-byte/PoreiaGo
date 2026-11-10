@@ -42,7 +42,7 @@ class DriverOfficeSealTests(unittest.TestCase):
         self._create(email="shared@example.com", tenant_id=OFFICE_A)
         with self.assertRaises(ValueError) as ctx:
             self._create(email="shared@example.com", tenant_id=OFFICE_B)
-        self.assertIn("άλλο γραφείο", str(ctx.exception))
+        self.assertIn("άλλου γραφείου", str(ctx.exception))
 
     def test_list_never_claims_demo_orphans(self):
         orphan = store.create_driver(
@@ -127,19 +127,9 @@ class DriverOfficeSealTests(unittest.TestCase):
                     }
                 )
 
-    def test_rehome_moves_demo_orphan_only(self):
-        orphan = store.create_driver(
-            {
-                "name": "Orphan Achilleas",
-                "license_no": f"LIC-{uuid4().hex[:8]}",
-                "email": "axilleas0@yahoo.gr",
-                "password": "BusPass99",
-                "status": "active",
-                "tenant_id": store.DEMO_TENANT_ID,
-                "_allow_demo_tenant": True,
-            }
-        )
-        real = self._create(email="real.office@example.com", tenant_id=OFFICE_A)
+    def test_rehome_never_steals_from_real_office(self):
+        """SEAL: boot rehome must not move PoreiaGo ↔ Achillio drivers."""
+        row = self._create(email="axilleas0@yahoo.gr", tenant_id=OFFICE_A)
         result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
         self.assertTrue(result["ok"])
         self.assertEqual(result["moved"], 0)
@@ -164,12 +154,8 @@ class DriverOfficeSealTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["moved"], 1)
         store.reset_drivers_cache()
-        self.assertEqual(store.get_driver(orphan.id).tenant_id, OFFICE_B)
-        # Never steal a real-office driver onto another office.
-        steal = store.rehome_driver_to_tenant(real.email, OFFICE_B)
-        self.assertEqual(steal.get("moved"), 0)
-        store.reset_drivers_cache()
-        self.assertEqual(store.get_driver(real.id).tenant_id, OFFICE_A)
+        again = store.get_driver(orphan.id)
+        self.assertEqual(again.tenant_id, OFFICE_B)
 
 
 if __name__ == "__main__":

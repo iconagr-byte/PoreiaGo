@@ -1,12 +1,12 @@
-"""Purge legacy demo rental fleet (no longer seeded)."""
+"""Demo rental fleet seed (3 cars + 3 vans)."""
 
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
-
-import pytest
+from tempfile import TemporaryDirectory
+from unittest import mock
 
 from travel_platform.rental import rental_store as store
 
