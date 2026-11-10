@@ -2,36 +2,44 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import '../../styles/driver-app.css';
-import { clearDriverSession, getDriverSession, isSessionValid } from '../../lib/driver/driverSession.js';
+import {
+  clearDriverSession,
+  getDriverSession,
+  resolveDriverAuthOnLaunch,
+} from '../../lib/driver/driverSession.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
-import ExpenseUpload from '../../components/driver/enterprise/ExpenseUpload.jsx';
-import PreTripForm from '../../components/driver/enterprise/PreTripForm.jsx';
 import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
+import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
-import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
+import { useDriverDeviceForm } from '../../hooks/useDriverDeviceForm.js';
+import {
+  clearDriverShiftLaunchState,
+  useDriverShiftSession,
+} from '../../lib/driver/useDriverShiftSession.js';
+import {
+  clearDriverNotifications,
+  resetDriverEntryAlerts,
+} from '../../lib/driver/clearDriverNotifications.js';
+import { clearNativeRoleHome } from '../../lib/capacitor/nativeRoleHome.js';
+import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 
 const TABS = [
-  { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
-  { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'GPS' },
-  { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan' },
-  { id: 'logs', icon: 'receipt_long', label: 'Έξοδα', short: 'Έξ.' },
-  { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS' },
-  { id: 'summary', icon: 'summarize', label: 'Σύνοψη', short: 'Σύν.' },
+  { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχική' },
+  { id: 'chat', icon: 'chat', label: 'Chat', short: 'Chat' },
+  { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'Θέση' },
+  { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan', primary: true },
+  { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS', danger: true },
+  { id: 'summary', icon: 'event_seat', label: 'Κρατήσεις', short: 'Κρατ.' },
 ];
-
-function safetyComplete(tripId) {
-  if (!tripId) return false;
-  return !!localStorage.getItem(`safety_done_${tripId}`);
-}
 
 function driverInitials(name) {
   return (name || 'Ο')
@@ -43,52 +51,106 @@ function driverInitials(name) {
     .toUpperCase();
 }
 
-function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
-  const name = session?.driverName || 'Οδηγός';
-  const plate = session?.vehiclePlate || session?.vehicleCode;
+function DriverHeader({
+  session,
+  telemetryOnline,
+  onLogout,
+  kicker,
+  title,
+  chatUnread = 0,
+  onOpenChat,
+  onStartShift,
+  allowStartShift = true,
+}) {
+  const name = String(session?.driverName || '').trim() || 'Οδηγός';
+  const plate = String(session?.vehiclePlate || session?.vehicleCode || '').trim();
   const photoUrl = session?.photoUrl ? resolveSiteAssetUrl(session.photoUrl) : '';
-  const busUrl = session?.vehicleImageUrl ? resolveSiteAssetUrl(session.vehicleImageUrl) : '';
+  const unread = Math.max(0, Number(chatUnread) || 0);
+  // Name as title (readable); plate / status as short kicker — avoids ΔΑ… / Ε… truncation.
+  const displayKicker =
+    kicker || plate || (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια');
+  const displayTitle = title || name;
+  const logoutLabel = kicker === 'Pre-trip' ? 'Έξοδος' : 'Αποσύνδεση';
 
   return (
-    <header className="driver-header driver-shell flex justify-between items-center gap-3">
-      <div className="driver-brand min-w-0">
-        <div
-          className="driver-header-avatars"
-          aria-label={`${name}${plate ? ` · ${plate}` : ''}`}
-        >
-          {photoUrl ? (
-            <img src={photoUrl} alt="" className="driver-avatar" />
-          ) : (
-            <div className="driver-avatar driver-avatar--initials" aria-hidden>
-              {driverInitials(name)}
-            </div>
-          )}
-          {busUrl ? (
-            <img src={busUrl} alt="" className="driver-bus-thumb" />
-          ) : (
-            <div className="driver-bus-thumb" aria-hidden>
-              <span className="material-symbols-outlined">directions_bus</span>
-            </div>
-          )}
+    <header className="driver-header driver-shell">
+      <div className="driver-header-row">
+        <div className="driver-brand min-w-0">
+          <div
+            className="driver-header-avatars"
+            aria-label={`${name}${plate ? ` · ${plate}` : ''}`}
+          >
+            {photoUrl ? (
+              <img src={photoUrl} alt="" className="driver-avatar" />
+            ) : (
+              <div className="driver-avatar driver-avatar--initials" aria-hidden>
+                {driverInitials(name)}
+              </div>
+            )}
+          </div>
+          <div className="driver-header-copy min-w-0" title={`${displayTitle} · ${displayKicker}`}>
+            <p className="driver-header-kicker truncate">{displayKicker}</p>
+            <p className="driver-header-title truncate">{displayTitle}</p>
+          </div>
         </div>
-        <div className="driver-header-copy min-w-0">
-          <p className="driver-header-kicker truncate">{kicker || name}</p>
-          <p className="driver-header-title truncate">
-            {title || plate || (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια')}
-          </p>
+        <div className="driver-header-actions">
+          <button
+            type="button"
+            onClick={onOpenChat}
+            className={`driver-notif-btn${unread > 0 ? ' has-unread' : ''}`}
+            aria-label={
+              unread > 0
+                ? `Μηνύματα γραφείου, ${unread} μη αναγνωσμένα`
+                : 'Μηνύματα γραφείου'
+            }
+            title="Μηνύματα γραφείου"
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              notifications
+            </span>
+            {unread > 0 ? (
+              <span className="driver-notif-badge">{unread > 99 ? '99+' : unread}</span>
+            ) : null}
+          </button>
+          {telemetryOnline ? (
+            <span
+              className="driver-live-badge is-live"
+              title="Ζωντανή μετάδοση GPS"
+              aria-live="polite"
+            >
+              <span className="driver-live-label">LIVE</span>
+            </span>
+          ) : allowStartShift ? (
+            <button
+              type="button"
+              className="driver-live-badge is-offline driver-live-badge--action"
+              title="Πατήστε για έναρξη βάρδιας"
+              aria-label="Έναρξη βάρδιας — ενεργοποίηση GPS"
+              onClick={() => onStartShift?.()}
+            >
+              <span className="driver-live-label">Offline</span>
+            </button>
+          ) : (
+            <span
+              className="driver-live-badge is-offline"
+              title="Βάρδια offline — το SOS δεν ξεκινά βάρδια"
+              aria-label="Βάρδια offline"
+            >
+              <span className="driver-live-label">Offline</span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="driver-account-btn shrink-0"
+            aria-label={logoutLabel}
+            title={logoutLabel}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              person
+            </span>
+          </button>
         </div>
-      </div>
-      <div className="driver-header-actions">
-        <span
-          className={`driver-live-badge ${telemetryOnline ? 'is-live' : 'is-offline'}`}
-          title={telemetryOnline ? 'Ζωντανή μετάδοση GPS' : 'Εκτός σύνδεσης'}
-          aria-live="polite"
-        >
-          {telemetryOnline ? 'LIVE' : 'Offline'}
-        </span>
-        <button type="button" onClick={onLogout} className="driver-header-btn shrink-0">
-          Έξοδος
-        </button>
       </div>
     </header>
   );
@@ -113,23 +175,38 @@ const toastOptions = {
 export default function DriverCommandCenter() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [authenticated, setAuthenticated] = useState(isSessionValid());
+  // Always show login when reopening the app (no sticky localStorage session).
+  const [authenticated, setAuthenticated] = useState(() => resolveDriverAuthOnLaunch());
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
-  const tripId = session?.tripId;
-  const [safetyOk, setSafetyOk] = useState(() => {
-    const s = getDriverSession();
-    return s?.tripId ? safetyComplete(s.tripId) : false;
-  });
+  const device = useDriverDeviceForm();
+  const deviceClass = [
+    device.isTablet ? 'is-tablet' : 'is-phone',
+    device.isLandscape ? 'is-landscape' : 'is-portrait',
+  ].join(' ');
+
+  useEffect(() => {
+    if (!authenticated) {
+      clearDriverShiftLaunchState();
+    }
+  }, [authenticated]);
 
   const [onBreak, setOnBreak] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
   const shift = useDriverShiftSession({
     driverName: session?.driverName || 'Οδηγός',
-    enabled: authenticated && safetyOk,
+    enabled: authenticated,
   });
   const telemetryOnline = shift.online;
-  // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login / pre-trip.
+
+  // Unified native app: unauthenticated /driver → central /login (not driver-only gate).
+  useEffect(() => {
+    if (authenticated) return;
+    if (!isNativeApp() || isNativeDriverApp()) return;
+    navigate('/login', { replace: true });
+  }, [authenticated, navigate]);
+  // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login.
   const tachograph = useTachograph({
     active: telemetryOnline,
     onBreak,
@@ -155,8 +232,42 @@ export default function DriverCommandCenter() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/driver-sw.js').catch(() => {});
+      let refreshing = false;
+      const onControllerChange = () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+      import('../../services/driverPushNotificationApi.js')
+        .then(({ registerDriverServiceWorker }) => registerDriverServiceWorker())
+        .then((reg) => {
+          reg.update().catch(() => {});
+          const askWaitingToActivate = () => {
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          };
+          askWaitingToActivate();
+          reg.addEventListener('updatefound', () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed') askWaitingToActivate();
+            });
+          });
+        })
+        .catch(() => {});
+
+      return () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      };
     }
+    return undefined;
+  }, []);
+
+  useEffect(() => {
     const manifest = document.querySelector('link[rel="manifest"][href*="driver-telemetry"]');
     if (!manifest) {
       const link = document.createElement('link');
@@ -206,11 +317,33 @@ export default function DriverCommandCenter() {
     };
   }, [authenticated]);
 
+  // Only clear *stale* tray noise on open — never wipe a fresh «Άνοιξε βάρδια» push
+  // the moment the driver brings the app to the foreground.
   useEffect(() => {
-    if (authenticated && tripId) {
-      setSafetyOk(safetyComplete(tripId));
+    clearDriverNotifications({ onlyStale: true }).catch(() => {});
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        clearDriverNotifications({ onlyStale: true }).catch(() => {});
+      }
+    };
+    const onSwMessage = (event) => {
+      if (event?.data?.type === 'DRIVER_NOTIFICATION_OPENED') {
+        clearDriverNotifications({ onlyStale: false }).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage);
     }
-  }, [authenticated, tripId]);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMessage);
+      }
+    };
+  }, [authenticated]);
 
   useEffect(() => {
     if (tachograph.limitReached && telemetryOnline) {
@@ -222,127 +355,284 @@ export default function DriverCommandCenter() {
     setParams({ tab: id });
   };
 
-  const handlePreTripComplete = () => {
-    setSafetyOk(true);
-    setParams({ tab: 'gps' });
-    toast('Ενεργοποιήστε το GPS για ζωντανή θέση στο χάρτη', { icon: '📍', duration: 5000 });
-  };
+  useEffect(() => {
+    if (tab === 'logs') setParams({ tab: 'home' }, { replace: true });
+  }, [tab, setParams]);
 
-  const logout = () => {
-    toast.dismiss();
-    shift.goOffline({ silent: true });
+  const logout = async () => {
+    resetDriverEntryAlerts().catch(() => {});
+    // Await shift/end (+ office push) while the access token is still present.
+    try {
+      await shift.goOffline({ silent: true });
+    } catch {
+      /* still clear local session */
+    }
     clearDriverSession();
+    clearNativeRoleHome();
     setAuthenticated(false);
-    setSafetyOk(false);
-    navigate('/driver');
+    // Unified app → central login for customer / driver / rent (not driver-only gate).
+    navigate('/login', { replace: true });
   };
 
+  // Web / PWA / legacy driver APK: login in-place on /driver.
+  // Unified Capacitor app redirects to /login (see effect above).
   let body = null;
   if (!authenticated) {
-    body = (
-      <MasterQrGate
-        onAuthenticated={() => {
-          toast.dismiss();
-          setAuthenticated(true);
-          setProfileTick((n) => n + 1);
-          window.setTimeout(() => {
-            toast.success('Σύνδεση για τη σημερινή βάρδια', {
-              id: 'driver-shift-login',
-              duration: 2800,
-            });
-          }, 80);
-        }}
-      />
-    );
-  } else if (!safetyOk) {
-    body = (
-      <div className="driver-app">
-        <DriverHeader
-          session={session}
-          telemetryOnline={telemetryOnline}
-          onLogout={logout}
-          kicker="Pre-trip"
-          title="Έλεγχος ασφαλείας"
+    if (isNativeApp() && !isNativeDriverApp()) {
+      body = null;
+    } else {
+      body = (
+        <MasterQrGate
+          onAuthenticated={() => {
+            resetDriverEntryAlerts().catch(() => {});
+            // Login never starts a shift — clear any stale flag before shell mounts.
+            clearDriverShiftLaunchState();
+            setAuthenticated(true);
+            setProfileTick((n) => n + 1);
+            window.setTimeout(() => {
+              toast.success('Συνδεθήκατε — πατήστε Έναρξη βάρδιας', {
+                id: 'driver-shift-login',
+                duration: 3200,
+              });
+            }, 80);
+          }}
         />
-        <div className="driver-shell driver-main">
-          <PreTripForm onComplete={handlePreTripComplete} />
-        </div>
-      </div>
-    );
+      );
+    }
   } else {
-    body = (
-      <div className="driver-app">
-        <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
+    const startShiftNow = () => {
+      setTab('gps');
+      if (!shift.online) {
+        void shift.goOnline({ resume: false });
+      }
+    };
 
-        <div className="driver-shell">
-          <TachographStrip
-            drivingLabel={tachograph.drivingLabel}
-            limitReached={tachograph.limitReached}
-            progressPct={tachograph.progressPct}
-            isCounting={tachograph.isCounting}
-            onBreak={onBreak}
+    body = (
+      <div
+        className={`driver-app ${deviceClass}`}
+        data-device-form={device.form}
+        data-orientation={device.orientation}
+      >
+        <div className="driver-app-body">
+          <DriverHeader
+            session={session}
+            telemetryOnline={telemetryOnline}
+            onLogout={logout}
+            chatUnread={chatUnread}
+            onOpenChat={() => setTab('chat')}
+            onStartShift={startShiftNow}
+            allowStartShift={tab !== 'sos'}
           />
 
-          <div className="driver-break-bar">
-            <button
-              type="button"
-              onClick={() => {
-                if (onBreak) {
-                  setOnBreak(false);
-                  tachograph.resetBreak();
-                } else {
-                  setOnBreak(true);
-                }
-              }}
-              className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                onBreak
-                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-              }`}
-            >
-              {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-            </button>
-          </div>
+          {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
+            <div className="driver-shell">
+              <TachographStrip
+                drivingLabel={tachograph.drivingLabel}
+                limitReached={tachograph.limitReached}
+                progressPct={tachograph.progressPct}
+                isCounting={tachograph.isCounting}
+                onBreak={onBreak}
+              />
+
+              <div className="driver-break-bar">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onBreak) {
+                      setOnBreak(false);
+                      tachograph.resetBreak();
+                    } else {
+                      setOnBreak(true);
+                    }
+                  }}
+                  className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                    onBreak
+                      ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                      : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+                  }`}
+                >
+                  {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
+            {tab === 'home' && (
+              <div className="driver-home">
+                <div className="driver-home-hero">
+                  <p className="driver-home-hello">
+                    Γεια σου,{' '}
+                    <span className="driver-home-hello-name">
+                      {(session?.driverName || 'οδηγέ').split(/\s+/)[0]}
+                    </span>
+                  </p>
+                  <p className="driver-home-hello-sub">
+                    {telemetryOnline
+                      ? 'Η βάρδια τρέχει · GPS στο γραφείο'
+                      : 'Ξεκίνα βάρδια όταν είσαι έτοιμος'}
+                  </p>
+                </div>
+
+                {!telemetryOnline ? (
+                  <button
+                    type="button"
+                    onClick={startShiftNow}
+                    className="driver-home-start"
+                    aria-label="Έναρξη βάρδιας — ενεργοποίηση GPS"
+                  >
+                    <span className="driver-home-start-icon" aria-hidden>
+                      <span className="material-symbols-outlined">play_circle</span>
+                    </span>
+                    <span className="driver-home-start-copy">
+                      <span className="driver-home-start-title">Έναρξη βάρδιας</span>
+                      <span className="driver-home-start-sub">
+                        Ένα πάτημα · GPS στο γραφείο αμέσως
+                      </span>
+                    </span>
+                    <span className="material-symbols-outlined driver-home-start-chevron" aria-hidden>
+                      chevron_right
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setTab('gps')}
+                    className="driver-home-live"
+                    aria-label="Βάρδια ενεργή — άνοιγμα θέσης GPS"
+                  >
+                    <span className="driver-home-live-dot" aria-hidden />
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block font-extrabold text-base text-emerald-900">
+                        Βάρδια ενεργή
+                      </span>
+                      <span className="block text-xs text-emerald-800/80 mt-0.5">
+                        GPS στον χάρτη · πάτα για λεπτομέρειες
+                      </span>
+                    </span>
+                    <span className="material-symbols-outlined text-emerald-700">share_location</span>
+                  </button>
+                )}
+
+                <div className="driver-quick-grid" role="navigation" aria-label="Γρήγορες ενέργειες">
+                  <button
+                    type="button"
+                    className="driver-quick-tile driver-quick-tile--scan"
+                    onClick={() => setTab('scan')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">qr_code_scanner</span>
+                    </span>
+                    <span className="driver-quick-label">Σάρωση</span>
+                    <span className="driver-quick-hint">Εισιτήρια</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile driver-quick-tile--chat"
+                    onClick={() => setTab('chat')}
+                    aria-label={
+                      chatUnread > 0
+                        ? `Chat γραφείου, ${chatUnread} νέα`
+                        : 'Chat γραφείου'
+                    }
+                  >
+                    <span className="driver-quick-icon relative" aria-hidden>
+                      <span className="material-symbols-outlined">forum</span>
+                      {chatUnread > 0 ? (
+                        <span className="driver-inline-badge">
+                          {chatUnread > 99 ? '99+' : chatUnread}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="driver-quick-label">Chat</span>
+                    <span className="driver-quick-hint">
+                      {chatUnread > 0 ? `${chatUnread} νέα` : 'Γραφείο'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile"
+                    onClick={() => setTab('gps')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">share_location</span>
+                    </span>
+                    <span className="driver-quick-label">Θέση</span>
+                    <span className="driver-quick-hint">GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile"
+                    onClick={() => setTab('summary')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">event_seat</span>
+                    </span>
+                    <span className="driver-quick-label">Κρατήσεις</span>
+                    <span className="driver-quick-hint">Ημέρα</span>
+                  </button>
+                </div>
+
+                {/* Must be mounted — without this the phone never registers for Web Push. */}
+                <DriverPushPanel />
+                <DailyManifest />
+              </div>
+            )}
+            {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
+            <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
+              <DriverShiftTelemetry shift={shift} />
+            </div>
+            <div hidden={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
+              <DriverOfficeChat isActive={tab === 'chat'} onUnreadChange={setChatUnread} />
+            </div>
+            {tab === 'scan' && <Scanner />}
+            {tab === 'sos' && <SOSButton />}
+            {tab === 'summary' && <DaySummary />}
+          </main>
         </div>
 
-        <main className="driver-shell driver-main">
-          {tab === 'home' && (
-            <>
-              <DriverPushPanel />
-              <DailyManifest />
-            </>
-          )}
-          {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
-          <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
-            <DriverShiftTelemetry shift={shift} />
-          </div>
-          {tab === 'scan' && <Scanner />}
-          {tab === 'logs' && <ExpenseUpload />}
-          {/* Keep SOS mounted so remount never races with GPS keepalive. */}
-          <div hidden={tab !== 'sos'} aria-hidden={tab !== 'sos'}>
-            <SOSButton />
-          </div>
-          {tab === 'summary' && <DaySummary />}
-        </main>
-
-        <nav className="driver-nav" aria-label="Driver navigation">
+        <nav className="driver-nav" aria-label="Μενού οδηγού">
           <div className="driver-nav-inner">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={tab === t.id ? 'active' : ''}
-                onClick={() => setTab(t.id)}
-                aria-label={t.label}
-                aria-current={tab === t.id ? 'page' : undefined}
-              >
-                <span className="material-symbols-outlined">{t.icon}</span>
-                <span className="driver-nav-label">
-                  <span className="hidden min-[360px]:inline">{t.label}</span>
-                  <span className="min-[360px]:hidden">{t.short}</span>
-                </span>
-              </button>
-            ))}
+            {TABS.map((t) => {
+              const isActive = tab === t.id;
+              const showChatBadge = t.id === 'chat' && chatUnread > 0;
+              const classes = [
+                isActive ? 'active' : '',
+                t.primary ? 'driver-nav-item--primary' : '',
+                t.danger ? 'driver-nav-item--sos' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={classes}
+                  onClick={() => {
+                    // Tab enter (Αρχική / Θέση / Scan / Chat / SOS / Ημέρα) never starts shift.
+                    setTab(t.id);
+                  }}
+                  aria-label={
+                    showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label
+                  }
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <span className="driver-nav-icon-wrap">
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {t.icon}
+                    </span>
+                    {showChatBadge ? (
+                      <span className="driver-nav-badge">
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="driver-nav-label">
+                    {device.isTablet ? t.label : t.short}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </nav>
       </div>

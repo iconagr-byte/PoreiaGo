@@ -1,15 +1,16 @@
 {
-  "name": "PoreiaGo Οδηγός — GPS",
-  "short_name": "PoreiaGo Οδηγός",
-  "description": "Εφαρμογή ζωντανής θέσης οδηγού — PoreiaGo",
+  "name": "Οδηγός — GPS",
+  "short_name": "Οδηγός GPS",
+  "description": "Εφαρμογή ζωντανής θέσης οδηγού",
   "lang": "el",
   "dir": "ltr",
-  "start_url": "/driver?tab=gps",
+  "start_url": "/driver?tab=home",
   "scope": "/driver",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
+  "id": "/driver",
   "icons": [
     {
       "src": "/icons/driver-pwa-192.png",

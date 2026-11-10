@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.admin_booking_mapper import local_id_from_reference
@@ -52,6 +52,10 @@ class FiscalQueueService:
                         FiscalInvoiceStatus.QUEUED,
                         FiscalInvoiceStatus.FAILED,
                     ),
+                ),
+                or_(
+                    FiscalInvoice.metadata_json.is_(None),
+                    ~FiscalInvoice.metadata_json.contains({"abandoned": True}),
                 ),
             )
             .order_by(FiscalInvoice.updated_at.desc())

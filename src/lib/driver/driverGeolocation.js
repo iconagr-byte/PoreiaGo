@@ -1,11 +1,85 @@
 /**
- * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 5s).
+ * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 1s).
  */
 
+import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 import { detectIosDevice, iosGeolocationOptions } from './iosPwaGps.js';
 
 /** How often the driver app pushes GPS to the platform. */
-export const DRIVER_GPS_INTERVAL_MS = 5000;
+export const DRIVER_GPS_INTERVAL_MS = LIVE_REFRESH_MS;
+
+/** Shared last fix — SOS reuses this so it never opens a competing high-accuracy request. */
+let sharedLastCoords = null;
+
+/**
+ * @returns {{ lat: number, lng: number, accuracy_m: number|null, at: number } | null}
+ */
+export function getLastKnownDriverCoords() {
+  return sharedLastCoords ? { ...sharedLastCoords } : null;
+}
+
+function rememberCoords(position) {
+  if (!position?.coords) return;
+  const { latitude, longitude, accuracy } = position.coords;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+  sharedLastCoords = {
+    lat: latitude,
+    lng: longitude,
+    accuracy_m: Number.isFinite(accuracy) ? accuracy : null,
+    at: Date.now(),
+  };
+}
+
+/**
+ * Coords for SOS / incident — prefer last shift fix; never starts a shift.
+ * Fresh request (if needed) uses low accuracy so it won't fight live GPS.
+ */
+export async function resolveCoordsForSos({ allowFresh = true } = {}) {
+  const known = getLastKnownDriverCoords();
+  if (known) return known;
+
+  if (!allowFresh || !isGeolocationSupported()) {
+    return { lat: 0, lng: 0, accuracy_m: null, at: Date.now(), approximate: true };
+  }
+
+  try {
+    const fresh = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy_m: pos.coords.accuracy,
+            at: Date.now(),
+          }),
+        reject,
+        {
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 60_000,
+        },
+      );
+    });
+    sharedLastCoords = {
+      lat: fresh.lat,
+      lng: fresh.lng,
+      accuracy_m: fresh.accuracy_m ?? null,
+      at: fresh.at,
+    };
+    return fresh;
+  } catch {
+    return { lat: 0, lng: 0, accuracy_m: null, at: Date.now(), approximate: true };
+  }
+}
+
+/**
+ * Ask an *already online* shift to re-publish GPS after SOS.
+ * Must never start a new shift (listener guards on SHIFT_KEY).
+ */
+export function requestDriverGpsKeepalive() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('driver-gps-keepalive', { detail: { reason: 'sos' } }));
+}
 
 /** Shared last fix — SOS / incident reports must reuse this, not open a competing GPS request. */
 let sharedLastCoords = null;
@@ -95,10 +169,14 @@ export function startDriverGeolocationWatch({
   }
 
   const isIos = detectIosDevice();
+  const publishEveryMs = Math.max(
+    DRIVER_GPS_INTERVAL_MS,
+    Number(intervalMs) || DRIVER_GPS_INTERVAL_MS,
+  );
   const geoOptions = {
     ...iosGeolocationOptions(isIos),
     // Prefer a fresh fix at least as often as we publish.
-    maximumAge: Math.min(intervalMs, isIos ? 5000 : 4000),
+    maximumAge: Math.min(publishEveryMs, isIos ? 1000 : 1000),
   };
 
   let lastEmitAt = 0;
@@ -130,9 +208,9 @@ export function startDriverGeolocationWatch({
         // If getCurrentPosition fails, re-send last known fix so the map stays alive.
         if (lastPos) emit(lastPos, { force: true });
       },
-      { ...geoOptions, maximumAge: intervalMs, timeout: isIos ? 18000 : 12000 },
+      { ...geoOptions, maximumAge: publishEveryMs, timeout: isIos ? 18000 : 12000 },
     );
-  }, intervalMs);
+  }, publishEveryMs);
 
   const onKeepalive = () => {
     if (lastPos) emit(lastPos, { force: true });

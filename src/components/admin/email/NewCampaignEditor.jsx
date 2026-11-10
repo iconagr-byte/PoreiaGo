@@ -103,9 +103,14 @@ export default function NewCampaignEditor({
     }
   });
   const [sendingTest, setSendingTest] = useState(false);
-  const [railSettingsOpen, setRailSettingsOpen] = useState(true);
-  const [railBlocksOpen, setRailBlocksOpen] = useState(true);
-  const [railSendOpen, setRailSendOpen] = useState(true);
+  // Accordion: one rail section open at a time so short screens stay usable.
+  const [railOpenSection, setRailOpenSection] = useState('settings');
+  const railSettingsOpen = railOpenSection === 'settings';
+  const railBlocksOpen = railOpenSection === 'blocks';
+  const railSendOpen = railOpenSection === 'send';
+  const toggleRailSection = (section) => {
+    setRailOpenSection((cur) => (cur === section ? null : section));
+  };
 
   useEffect(() => {
     fetchCampaignSegments()
@@ -488,7 +493,7 @@ export default function NewCampaignEditor({
             <button
               type="button"
               className={`emh-rail-card-toggle ${railSettingsOpen ? 'emh-rail-card-toggle-open' : ''}`}
-              onClick={() => setRailSettingsOpen((v) => !v)}
+              onClick={() => toggleRailSection('settings')}
               aria-expanded={railSettingsOpen}
             >
               <span className="emh-rail-card-toggle-left">
@@ -556,7 +561,7 @@ export default function NewCampaignEditor({
             <button
               type="button"
               className={`emh-rail-card-toggle ${railBlocksOpen ? 'emh-rail-card-toggle-open' : ''}`}
-              onClick={() => setRailBlocksOpen((v) => !v)}
+              onClick={() => toggleRailSection('blocks')}
               aria-expanded={railBlocksOpen}
             >
               <span className="emh-rail-card-toggle-left">
@@ -609,7 +614,7 @@ export default function NewCampaignEditor({
             <button
               type="button"
               className={`emh-rail-card-toggle ${railSendOpen ? 'emh-rail-card-toggle-open' : ''}`}
-              onClick={() => setRailSendOpen((v) => !v)}
+              onClick={() => toggleRailSection('send')}
               aria-expanded={railSendOpen}
             >
               <span className="emh-rail-card-toggle-left">

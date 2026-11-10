@@ -143,10 +143,12 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(egress["type"], "fleet_location")
         self.assertEqual(egress["lat"], 37.98)
         self.assertEqual(egress["lng"], 23.73)
-        self.assertGreater(pending_count(), 0)
-        batch = drain_batch(10)
-        self.assertEqual(len(batch), 1)
-        self.assertEqual(batch[0].lat, 37.98)
+        # Coordinate history + live trail are persisted inside process_telemetry_payload
+        # (shared Teltonika/driver path). This test mocks process, so the buffer stays empty.
+        payload = process.await_args.args[0]
+        self.assertEqual(float(payload["latitude"]), 37.98)
+        self.assertEqual(float(payload["longitude"]), 23.73)
+        self.assertEqual(pending_count(), 0)
 
     async def test_remaps_legacy_demo_tenant_to_platform(self):
         platform = "11111111-2222-3333-4444-555555555555"
@@ -185,8 +187,20 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
 class FleetTelemetryWebSocketTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import os
+
         import api.ws_telemetry as ws_mod
 
+        cls._env = patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "test",
+                "ADMIN_AUTH_DISABLED": "1",
+                "AUTH_JWT_SECRET": TEST_JWT_SECRET,
+            },
+            clear=False,
+        )
+        cls._env.start()
         cls._orig_secrets = ws_mod._jwt_secrets
         ws_mod._jwt_secrets = lambda: [TEST_JWT_SECRET]
         cls.ws_mod = ws_mod
@@ -198,6 +212,13 @@ class FleetTelemetryWebSocketTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.ws_mod._jwt_secrets = cls._orig_secrets
+        cls._env.stop()
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
 
     def test_ingress_rejects_invalid_token(self):
         with self.client.websocket_connect("/ws/telemetry/ingress?token=not-a-jwt") as ws:

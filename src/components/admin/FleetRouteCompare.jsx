@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { compareTripRoutes } from '../../services/telemetryApi.js';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 
 const ROUTE_A = { color: '#0040df', label: 'Δρομολόγιο A' };
 const ROUTE_B = { color: '#dc2626', label: 'Δρομολόγιο B' };
@@ -74,7 +75,7 @@ export default function FleetRouteCompare() {
       if (result.error === 'missing_points') {
         setError('Λείπουν GPS σημεία σε ένα ή και τα δύο δρομολόγια.');
       } else if (result.error) {
-        setError('Η βάση δεδομένων δεν είναι διαθέσιμη ή λείπει το migration trip_coordinates.');
+        setError('Το ιστορικό GPS δεν είναι ακόμα διαθέσιμο — δοκιμάστε ξανά σε λίγο.');
       }
     } catch (err) {
       setError(err.message || 'Αποτυχία σύγκρισης');
@@ -174,9 +175,11 @@ export default function FleetRouteCompare() {
           <div className="h-[min(60vh,520px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
             <MapContainer center={center} zoom={8} className="h-full w-full" scrollWheelZoom>
               <TileLayer
-                attribution="© OpenStreetMap · © CARTO"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               <FitBounds positionsA={positionsA} positionsB={positionsB} />
               {positionsA.length > 1 ? (
                 <Polyline positions={positionsA} pathOptions={{ color: ROUTE_A.color, weight: 5, opacity: 0.9 }} />

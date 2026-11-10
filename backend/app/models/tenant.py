@@ -17,6 +17,8 @@ class TenantPlan(str, enum.Enum):
     STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
+    # Standalone vehicle rentals — no bus/trips storefront.
+    RENT = "rent"
 
 
 class Tenant(Base, TimestampMixin):
@@ -43,11 +45,14 @@ class Tenant(Base, TimestampMixin):
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     suspended_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    users = relationship("User", back_populates="tenant", lazy="selectin")
-    bookings = relationship("Booking", back_populates="tenant", lazy="selectin")
+    # Avoid selectin on bookings/subscription: Contabo DBs may lag migrations
+    # (e.g. missing subscriptions.plan / bookings.customer_user_id). Eager-loading
+    # those on every Tenant fetch (login, ensure_achillio) returns HTTP 500.
+    users = relationship("User", back_populates="tenant", lazy="select")
+    bookings = relationship("Booking", back_populates="tenant", lazy="select")
     subscription = relationship(
         "Subscription",
         back_populates="tenant",
         uselist=False,
-        lazy="selectin",
+        lazy="select",
     )

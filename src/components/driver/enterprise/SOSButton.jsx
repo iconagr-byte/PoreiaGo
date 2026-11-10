@@ -1,8 +1,8 @@
 /**
  * Module 4 — SOS button with long-press, GPS capture, optional incident photo.
  *
- * Important: never open a competing high-accuracy getCurrentPosition while the
- * shift GPS watch is running — that can stall telemetry and look like a disconnect.
+ * SOS must never start a shift. It notifies the office only.
+ * Prefer last known shift coords; avoid competing high-accuracy GPS requests.
  */
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -25,12 +25,14 @@ export default function SOSButton() {
   const [showIssues, setShowIssues] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [holding, setHolding] = useState(false);
+  const [sending, setSending] = useState(false);
   const timerRef = useRef(null);
   const firedRef = useRef(false);
 
   const sendSos = useCallback(async () => {
-    if (firedRef.current) return;
+    if (firedRef.current || sending) return;
     firedRef.current = true;
+    setSending(true);
     try {
       const coords = await resolveCoordsForSos();
       const res = await triggerSosAlert({
@@ -40,29 +42,34 @@ export default function SOSButton() {
         photoFile,
       });
       setSosSent(true);
-      toast.success(res.message || 'SOS εστάλη');
-      // Keep live GPS / map pin alive — SOS must never end the shift.
+      toast.success(res.message || 'SOS εστάλη στο γραφείο', {
+        id: 'driver-sos-sent',
+        duration: 4000,
+      });
+      // Refresh pin only if a shift is already live — never starts GPS/shift.
       requestDriverGpsKeepalive();
-      window.setTimeout(() => requestDriverGpsKeepalive(), 1500);
     } catch (err) {
       firedRef.current = false;
-      toast.error(err.message || 'Αποτυχία αποστολής SOS');
-      requestDriverGpsKeepalive();
+      toast.error(err.message || 'Αποτυχία αποστολής SOS', { id: 'driver-sos-err' });
+    } finally {
+      setSending(false);
+      setHolding(false);
     }
-  }, [photoFile]);
+  }, [photoFile, sending]);
 
   const onPressStart = (e) => {
-    // Prevent scroll / text-select / accidental sibling taps during long-press.
+    if (sending || sosSent) return;
     try {
       e.currentTarget.setPointerCapture?.(e.pointerId);
     } catch {
       /* ignore */
     }
+    e.preventDefault?.();
     firedRef.current = false;
     setHolding(true);
     timerRef.current = window.setTimeout(() => {
       setHolding(false);
-      sendSos();
+      void sendSos();
     }, LONG_PRESS_MS);
   };
 
@@ -77,8 +84,8 @@ export default function SOSButton() {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!firedRef.current) {
-      toast('Κρατήστε πατημένο για SOS', { icon: '⚠️' });
+    if (!firedRef.current && !sending) {
+      toast('Κρατήστε πατημένο για SOS', { icon: '⚠️', id: 'driver-sos-hold' });
     }
   };
 
@@ -103,8 +110,8 @@ export default function SOSButton() {
 
   return (
     <div className="driver-stack relative">
-      <p className="text-xs text-[var(--driver-muted)] text-center -mt-1 mb-1">
-        Το SOS ειδοποιεί το γραφείο χωρίς να διακόπτει τη βάρδια / GPS.
+      <p className="text-xs text-[var(--driver-muted)] text-center -mt-1 mb-1 leading-relaxed">
+        Ειδοποιεί το γραφείο αμέσως. Δεν ξεκινά και δεν σταματά τη βάρδια / GPS.
       </p>
       <button
         type="button"
@@ -112,18 +119,19 @@ export default function SOSButton() {
         onPointerUp={onPressEnd}
         onPointerCancel={onPressEnd}
         onContextMenu={(e) => e.preventDefault()}
+        disabled={sending}
         className={`driver-touch driver-btn-danger driver-sos w-full rounded-2xl min-h-[80px] text-2xl font-black select-none touch-manipulation ${
           holding ? 'scale-95 ring-4 ring-red-300' : ''
         }`}
         aria-label="SOS — κρατήστε πατημένο"
       >
         <span className="material-symbols-outlined align-middle mr-2 text-4xl">emergency</span>
-        {holding ? 'ΑΠΟΣΤΟΛΗ…' : 'SOS — ΚΡΑΤΗΣΤΕ'}
+        {sending ? 'ΑΠΟΣΤΟΛΗ…' : holding ? 'ΑΠΟΣΤΟΛΗ…' : 'SOS — ΚΡΑΤΗΣΤΕ'}
       </button>
 
       {sosSent && (
         <p className="text-center text-red-400 text-sm font-bold">
-          Σήμα εστάλη — περιμένετε επικοινωνία από το κεντρικό. Η βάρδια παραμένει ενεργή.
+          Σήμα εστάλη στο γραφείο. Η βάρδια δεν επηρεάζεται.
         </p>
       )}
 
