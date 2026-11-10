@@ -863,11 +863,19 @@ export default function FleetRentalPanel({
                       <p className="text-xs text-gray-500">
                         {formatWhen(b.start_time)} → {formatWhen(b.end_time)} · {b.pickup_location}
                         {` · ${bookingSource(b)}`}
+                        {b.reference_code ? ` · ${b.reference_code}` : ''}
                       </p>
                     </div>
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.rental_status)}`}>
-                      {b.rental_status}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {b.online_checkin_ready ? (
+                        <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-teal-100 text-teal-800">
+                          Online check-in
+                        </span>
+                      ) : null}
+                      <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.rental_status)}`}>
+                        {b.rental_status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

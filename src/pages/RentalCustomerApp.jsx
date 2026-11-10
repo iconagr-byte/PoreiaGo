@@ -56,9 +56,11 @@ import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import RentWalletCheckInBand from '../components/rental/RentWalletCheckInBand.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
+import NewsletterOfferBanner from '../components/storefront/NewsletterOfferBanner.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
+import RentOnlineCheckinBand from '../components/rental/RentOnlineCheckinBand.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
@@ -162,11 +164,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((rows) => {
         if (cancelled) return;
         // Showcase: office fleet, or Hertz-like demo cards when empty.
-        setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24)));
+        setHomeFleet(enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24)));
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -770,7 +772,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        const sliced = enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24));
+        const sliced = enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24));
         setHomeFleet(sliced);
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
@@ -784,7 +786,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -872,7 +874,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
             <span className="material-symbols-outlined" aria-hidden>
               account_balance_wallet
             </span>
-            My Wallet
+            Rent Wallet
           </button>
         </header>
 

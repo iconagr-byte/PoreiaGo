@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
 import { decodeJwtPayload, getImpersonationTarget } from '../lib/saasJwt.js';
-import { fetchLiveFleet } from '../services/telemetryApi.js';
+import { fetchLiveFleet, FLEET_LIVE_POLL_MS } from '../services/telemetryApi.js';
 import { adminAuthHeaders } from '../services/adminApi.js';
 import {
   FLEET_LIVE_POLL_ACTIVE_MS,
@@ -387,9 +387,11 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
     let closed = false;
-    let pollTimer = null;
     let ws = null;
     let mode = 'poll';
+    let pollMs = 3000;
+    let pollTimer = null;
+    let emptyPollStreak = 0;
 
     const wipeVehicles = () => {
       vehicleCountRef.current = 0;
@@ -407,8 +409,14 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
-          const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
-          if (normalized) map[id] = normalized;
+          const prior = map[id] || prev[id];
+          const normalized = normalizeVehicle(row, id, prior);
+          if (!normalized) return;
+          // HTTP poll historically omitted boarding — keep last known snapshot.
+          if (!normalized.boarding && prior?.boarding) {
+            normalized.boarding = prior.boarding;
+          }
+          map[id] = normalized;
         });
         const deduped = dedupeVehiclesByPlate(map);
         vehicleCountRef.current = Object.keys(deduped).length;
@@ -449,6 +457,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           setPollError('');
           setLastPollAt(new Date());
           setConnected(true);
+          pollMs = 3000;
           if (mode !== 'ws') {
             mode = 'poll';
             setTransport('poll');
@@ -480,7 +489,9 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
-              : raw || 'Αποτυχία φόρτωσης live στόλου';
+              : isGateway
+                ? 'Προσωρινή αποτυχία σύνδεσης με το API (502). Κρατάμε το τελευταίο στίγμα — επανασύνδεση…'
+                : raw || 'Αποτυχία φόρτωσης live στόλου';
           setPollError(msg);
           scheduleNext();
         });
@@ -580,6 +591,44 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
               vehicleCountRef.current = Object.keys(next).length;
               return next;
             });
+            return;
+          }
+          if (msg.type === 'boarding_update') {
+            setVehicles((prev) => {
+              const next = { ...prev };
+              let changed = false;
+              const tripKey = msg.trip_id != null ? String(msg.trip_id) : null;
+              Object.keys(next).forEach((id) => {
+                const v = next[id];
+                const sameTrip = tripKey && String(v.trip_id) === tripKey;
+                const listed =
+                  Array.isArray(msg.vehicle_ids) &&
+                  msg.vehicle_ids.some((vid) => String(vid) === String(v.vehicle_id || id));
+                if (!sameTrip && !listed) return;
+                next[id] = {
+                  ...v,
+                  boarding: msg.boarding ?? v.boarding,
+                  timestamp: msg.timestamp || v.timestamp,
+                };
+                changed = true;
+              });
+              return changed ? next : prev;
+            });
+            try {
+              window.dispatchEvent(
+                new CustomEvent('office-boarding-updated', {
+                  detail: {
+                    tripId: msg.trip_id,
+                    bookingId: msg.booking_id,
+                    saasBookingId: msg.saas_booking_id,
+                    passengerName: msg.passenger_name,
+                    boarding: msg.boarding,
+                  },
+                }),
+              );
+            } catch {
+              /* ignore */
+            }
             return;
           }
           if (msg.type === 'fleet_driver_offline') {

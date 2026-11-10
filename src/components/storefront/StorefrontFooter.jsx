@@ -299,6 +299,7 @@ export default function StorefrontFooter({
   }
 
   if (templateId === 'newsletter_cta') {
+    // CTA banner lives above the footer (NewsletterOfferBanner); keep contact only.
     return (
       <footer id="contact" className="scroll-mt-24 bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
         <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
