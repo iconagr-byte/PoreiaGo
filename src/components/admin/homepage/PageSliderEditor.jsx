@@ -485,7 +485,7 @@ export default function PageSliderEditor({
                             className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
                             value={slide.cta_href}
                             onChange={(e) => setSlide(slide.id, { cta_href: e.target.value })}
-                            placeholder={isRent ? '/rent/wallet' : '#trips'}
+                            placeholder={isRent ? '/wallet?tab=rentals' : '#trips'}
                           />
                         </label>
                         <label className="flex items-center gap-2 text-sm sm:col-span-2">

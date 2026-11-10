@@ -72,9 +72,18 @@ def booking_id_aliases(booking_id: str) -> list[str]:
     upper = raw.upper().replace(" ", "")
     canon = local_id_from_reference(upper)
     pnr = normalize_reference(upper)
-    candidates = [raw, upper, canon, pnr]
+    # Bare hex core (Contabo sometimes stores reference_code without BK-/B-).
+    core = pnr[3:] if pnr.startswith("BK-") else upper
+    while core.startswith("B-") and not core.startswith("BK-"):
+        core = core[2:]
+    if core.startswith("BK-"):
+        core = core[3:]
+    candidates = [raw, upper, canon, pnr, core]
     if pnr.startswith("BK-"):
         candidates.append(f"B-{pnr}")  # legacy B-BK-HEX
+    if core:
+        candidates.append(f"B-{core}")
+        candidates.append(f"BK-{core}")
     out: list[str] = []
     seen: set[str] = set()
     for c in candidates:
@@ -238,19 +247,69 @@ def booking_to_admin_dict(
     checked_in = bool(meta.get("checked_in")) or status == BookingStatus.BOARDED
     check_in_status = meta.get("check_in_status") or ("CHECKED_IN" if checked_in else "NONE")
 
-    trip_id = meta.get("external_trip_id") or meta.get("trip_id") or 0
-    total_eur = float(booking.total_price or meta.get("total_eur") or booking.amount_eur)
-    amount_paid = float(booking.amount_paid if booking.amount_paid is not None else meta.get("amount_paid") or booking.amount_eur)
-    balance_due = float(meta.get("balance_due") or 0)
+    trip_id = (
+        meta.get("external_trip_id")
+        or meta.get("trip_id")
+        or getattr(booking, "trip_id", None)
+        or 0
+    )
+    try:
+        if trip_id is not None and trip_id != "":
+            trip_id = int(trip_id)
+    except (TypeError, ValueError):
+        trip_id = trip_id or 0
+    total_eur = float(booking.total_price or meta.get("total_eur") or booking.amount_eur or 0)
+    # Column wins for money. Never fall back to amount_eur (that invents "fully paid").
+    if booking.amount_paid is not None:
+        amount_paid = float(booking.amount_paid)
+    elif meta.get("amount_paid") is not None:
+        amount_paid = float(meta.get("amount_paid") or 0)
+    else:
+        amount_paid = 0.0
+    amount_paid = max(0.0, round(amount_paid, 2))
+    # Derive balance from price − paid so wallet and office never disagree on stale meta.
+    computed_balance = max(0.0, round(total_eur - amount_paid, 2))
+    if meta.get("balance_due") is not None:
+        try:
+            meta_balance = float(meta.get("balance_due") or 0)
+        except (TypeError, ValueError):
+            meta_balance = computed_balance
+        # Stale metadata after cash/Stripe capture: trust the columns.
+        balance_due = (
+            computed_balance
+            if abs(meta_balance - computed_balance) > 0.009
+            else max(0.0, round(meta_balance, 2))
+        )
+    else:
+        balance_due = computed_balance
     payment_plan = meta.get("payment_plan") or ("deposit" if balance_due > 0 else "full")
     deposit_percent = int(meta.get("deposit_percent") or (30 if balance_due > 0 else 0))
 
-    if balance_due > 0:
-        payment_status = meta.get("payment_status") or f"DEPOSIT {deposit_percent}% (Online)"
+    meta_payment_status = str(meta.get("payment_status") or "").strip()
+    meta_ps_upper = meta_payment_status.upper()
+    # Ignore stale PENDING/UNPAID labels when columns already show a capture.
+    meta_looks_unpaid = (not meta_payment_status) or any(
+        token in meta_ps_upper for token in ("PENDING", "UNPAID", "ΕΚΚΡΕΜ")
+    )
+    if balance_due > 0 and amount_paid > 0:
+        payment_status = (
+            meta_payment_status
+            if meta_payment_status and not meta_looks_unpaid
+            else f"DEPOSIT {deposit_percent}% (Online)"
+        )
+    elif balance_due <= 0 and amount_paid > 0:
+        payment_status = (
+            meta_payment_status
+            if meta_payment_status and not meta_looks_unpaid
+            else "PAID (SaaS)"
+        )
+    elif paid and amount_paid <= 0:
+        # Status says confirmed but no capture yet — keep pending money signal.
+        payment_status = meta_payment_status or status.value.upper()
     elif paid:
-        payment_status = meta.get("payment_status") or "PAID (SaaS)"
+        payment_status = meta_payment_status or "PAID (SaaS)"
     else:
-        payment_status = meta.get("payment_status") or status.value.upper()
+        payment_status = meta_payment_status or status.value.upper()
 
     taxes = float(meta.get("taxes") if meta.get("taxes") is not None else round(total_eur * 0.24, 2))
     base_price = float(
@@ -272,12 +331,20 @@ def booking_to_admin_dict(
     if boarding is None:
         boarding = paid or status in (BookingStatus.CONFIRMED, BookingStatus.PAID, BookingStatus.BOARDED)
 
+    wallet_cid = str(meta.get("wallet_customer_id") or "").strip() or None
+    wallet_email = str(meta.get("wallet_customer_email") or "").strip().lower() or None
+    account_linked = bool(meta.get("account_linked") or wallet_email)
     result = {
         "id": local_id_from_reference(booking.reference_code),
         "saasBookingId": str(booking.id),
         "syncedToSaas": True,
         "customerName": booking.passenger_name,
-        "customerId": str(booking.customer_user_id) if booking.customer_user_id else None,
+        # Prefer SaaS user UUID; fall back to My Wallet CUST-* so office CRM sees who booked.
+        "customerId": (
+            str(booking.customer_user_id)
+            if booking.customer_user_id
+            else wallet_cid
+        ),
         "tripTitle": meta.get("trip_title") or "—",
         "tripId": trip_id,
         "date": trip_date,
@@ -297,7 +364,7 @@ def booking_to_admin_dict(
         "checkInStatus": check_in_status,
         "checkedIn": checked_in,
         "phone": meta.get("phone") or "",
-        "email": booking.passenger_email or "",
+        "email": booking.passenger_email or wallet_email or "",
         "paymentStatus": payment_status,
         "paymentMethod": meta.get("payment_method") or "Online",
         "paymentDate": meta.get("payment_date")
@@ -314,9 +381,15 @@ def booking_to_admin_dict(
         "notes": booking.notes,
         "tenant_id": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
         "tenantId": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
+        "accountLinked": account_linked,
+        "walletCustomerId": wallet_cid,
+        "walletCustomerEmail": wallet_email,
+        # Per-seat party for My Wallet multi-QR (keep even if seats[] is incomplete).
+        "passengers": meta.get("passengers") or [],
     }
     result.update(build_fiscal_admin_fields(booking, fiscal_invoices))
     return result
+
 
 
 def parse_status(value: str | None) -> BookingStatus | None:

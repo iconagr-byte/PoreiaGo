@@ -26,6 +26,7 @@ from app.services.billing_service import BillingService
 from app.services.tenant_modules import (
     _heal_subscription_plan_column,
     _tenant_noload_options,
+    resolve_provision_plan_and_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -472,26 +473,25 @@ class PlatformAdminService:
         )
         from app.core.auth_deps import apply_tenant_rls
 
+        # Use a savepoint — never roll back the outer txn. Contabo booking
+        # schema quirks used to abort create-office after a successful flush.
         try:
-            await apply_tenant_rls(self._session, tenant.id)
-            detail["user_count"] = int(
-                await self._session.scalar(
-                    select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+            async with self._session.begin_nested():
+                await apply_tenant_rls(self._session, tenant.id)
+                detail["user_count"] = int(
+                    await self._session.scalar(
+                        select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+                    )
+                    or 0,
                 )
-                or 0,
-            )
-            detail["booking_count"] = int(
-                await self._session.scalar(
-                    select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+                detail["booking_count"] = int(
+                    await self._session.scalar(
+                        select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+                    )
+                    or 0,
                 )
-                or 0,
-            )
         except Exception:
             logger.exception("tenant detail counts failed for %s", tenant.id)
-            try:
-                await self._session.rollback()
-            except Exception:
-                pass
             detail["user_count"] = detail.get("user_count") or 0
             detail["booking_count"] = detail.get("booking_count") or 0
         return detail
@@ -570,6 +570,7 @@ class PlatformAdminService:
         admin_password: str,
         admin_full_name: str,
         vat_number: str | None = None,
+        service_mode: str | None = "buses",
     ) -> tuple[Tenant, User]:
         slug = slug.strip().lower()
         subdomain = subdomain.strip().lower()
@@ -577,6 +578,19 @@ class PlatformAdminService:
             raise ValueError("Invalid slug — use lowercase letters, numbers, hyphens")
         if not _SLUG_RE.match(subdomain):
             raise ValueError("Invalid subdomain")
+
+        from app.services.tenant_modules import (
+            build_subscription_insert_sql,
+            prepare_contabo_tenant_write,
+            tenant_plan_db_token,
+            tenant_plan_sql_expr,
+        )
+
+        # Contabo: same-txn softeners (name NOT NULL, plan CHECKs without rent).
+        schema_flags = await prepare_contabo_tenant_write(self._session)
+        plan_style = str(schema_flags.get("plan_style") or "value")
+        has_plan_enum = bool(schema_flags.get("has_plan_enum"))
+        subscription_columns = set(schema_flags.get("subscription_columns") or ())
 
         dup = await self._session.execute(
             select(Tenant.id).where(
@@ -586,39 +600,134 @@ class PlatformAdminService:
         if dup.scalar_one_or_none():
             raise ValueError("Slug or subdomain already exists")
 
-        tenant = Tenant(
-            id=uuid4(),
-            slug=slug,
-            legal_name=legal_name.strip(),
-            vat_number=vat_number,
-            subdomain=subdomain,
+        resolved_plan, seed_settings = resolve_provision_plan_and_settings(
             plan=plan,
-            is_active=True,
-            isolation_strategy=(
-                IsolationStrategy.DATABASE.value
-                if plan == TenantPlan.ENTERPRISE
-                else IsolationStrategy.SCHEMA.value
-                if plan == TenantPlan.PROFESSIONAL
-                else IsolationStrategy.SHARED_RLS.value
-            ),
+            service_mode=service_mode,
+            office_name=legal_name.strip(),
         )
-        self._session.add(tenant)
-        await self._session.flush()
+        legal = legal_name.strip()
+        vat = normalize_vat_number(vat_number) if vat_number else None
+        tenant_id = uuid4()
+        isolation = (
+            IsolationStrategy.DATABASE.value
+            if resolved_plan == TenantPlan.ENTERPRISE
+            else IsolationStrategy.SCHEMA.value
+            if resolved_plan == TenantPlan.PROFESSIONAL
+            else IsolationStrategy.SHARED_RLS.value
+        )
+        settings_raw = json.dumps(seed_settings, ensure_ascii=False)
+        # Contabo may store STARTER/RENT in VARCHAR (no PG type) or as native enum.
+        plan_db = tenant_plan_db_token(resolved_plan, plan_style)
+        plan_sql = tenant_plan_sql_expr(has_plan_enum=has_plan_enum)
 
-        self._session.add(
-            Subscription(
-                id=uuid4(),
-                tenant_id=tenant.id,
-                plan=plan,
-                status=SubscriptionStatus.TRIALING,
-                base_amount_cents=_PLAN_BASE_CENTS[plan],
-                trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
-            ),
+        # Core-insert when Contabo has legacy name col OR name-style tokens OR real PG enum.
+        # Keep a transient Tenant holder afterwards — merge(load=False) rejects unpersisted
+        # instances, and session.get() can LookupError on STARTER vs starter.
+        use_core_tenant = bool(
+            schema_flags.get("has_name_col") or plan_style == "name" or has_plan_enum
         )
+        settings_before_provision = settings_raw
+        if use_core_tenant:
+            name_cols = ", name" if schema_flags.get("has_name_col") else ""
+            name_vals = ", :name" if schema_flags.get("has_name_col") else ""
+            await self._session.execute(
+                text(
+                    f"""
+                    INSERT INTO tenants (
+                      id, slug, legal_name{name_cols}, vat_number, subdomain, plan,
+                      is_active, settings_json, isolation_strategy
+                    ) VALUES (
+                      :id, :slug, :legal_name{name_vals}, :vat_number, :subdomain, {plan_sql},
+                      true, :settings_json, :isolation_strategy
+                    )
+                    """
+                ),
+                {
+                    "id": tenant_id,
+                    "slug": slug,
+                    "legal_name": legal,
+                    "name": legal,
+                    "vat_number": vat,
+                    "subdomain": subdomain,
+                    "plan": plan_db,
+                    "settings_json": settings_raw,
+                    "isolation_strategy": isolation,
+                },
+            )
+            tenant = Tenant(
+                id=tenant_id,
+                slug=slug,
+                legal_name=legal,
+                vat_number=vat,
+                subdomain=subdomain,
+                plan=resolved_plan,
+                is_active=True,
+                settings_json=settings_raw,
+                isolation_strategy=isolation,
+            )
+        else:
+            tenant = Tenant(
+                id=tenant_id,
+                slug=slug,
+                legal_name=legal,
+                vat_number=vat,
+                subdomain=subdomain,
+                plan=resolved_plan,
+                is_active=True,
+                settings_json=settings_raw,
+                isolation_strategy=isolation,
+            )
+            self._session.add(tenant)
+            await self._session.flush()
+
+        sub_id = uuid4()
+        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+        base_cents = int(_PLAN_BASE_CENTS.get(resolved_plan, 0))
+        # Contabo: Core INSERT with only columns that exist (after soft-ADD).
+        # Avoid ORM Subscription flush — missing base_amount_cents etc. → 500.
+        if plan_style == "name" or has_plan_enum or use_core_tenant or subscription_columns:
+            cols = subscription_columns or {
+                "id",
+                "tenant_id",
+                "plan",
+                "status",
+                "base_amount_cents",
+                "trial_ends_at",
+                "cancel_at_period_end",
+                "metered_buses",
+                "metered_trips",
+            }
+            sub_sql, bind_keys = build_subscription_insert_sql(
+                columns=cols,
+                plan_sql=plan_sql,
+            )
+            sub_params = {
+                "id": sub_id,
+                "tenant_id": tenant_id,
+                "plan": plan_db,
+                "status": SubscriptionStatus.TRIALING.value,
+                "base_amount_cents": base_cents,
+                "trial_ends_at": trial_end,
+            }
+            await self._session.execute(
+                text(sub_sql),
+                {k: sub_params[k] for k in bind_keys if k in sub_params},
+            )
+        else:
+            self._session.add(
+                Subscription(
+                    id=sub_id,
+                    tenant_id=tenant.id,
+                    plan=resolved_plan,
+                    status=SubscriptionStatus.TRIALING,
+                    base_amount_cents=base_cents,
+                    trial_ends_at=trial_end,
+                ),
+            )
 
         admin = User(
             id=uuid4(),
-            tenant_id=tenant.id,
+            tenant_id=tenant_id,
             email=admin_email.strip().lower(),
             password_hash=hash_password(admin_password),
             full_name=admin_full_name.strip(),
@@ -631,7 +740,27 @@ class PlatformAdminService:
             await provision_tenant_schema(self._session, tenant)
         elif tenant.isolation_strategy == IsolationStrategy.DATABASE.value:
             await provision_dedicated_database(self._session, tenant)
-        logger.info("Provisioned tenant %s (%s)", tenant.slug, tenant.id)
+        # Schema/dedicated provision may mutate settings_json on the transient holder —
+        # persist via Core UPDATE (object is not in the ORM identity map).
+        if use_core_tenant and tenant.settings_json != settings_before_provision:
+            await self._session.execute(
+                text("UPDATE tenants SET settings_json = :settings_json WHERE id = :id"),
+                {"settings_json": tenant.settings_json, "id": tenant_id},
+            )
+        if use_core_tenant and getattr(tenant, "database_dsn", None):
+            await self._session.execute(
+                text("UPDATE tenants SET database_dsn = :dsn WHERE id = :id"),
+                {"dsn": tenant.database_dsn, "id": tenant_id},
+            )
+        logger.info(
+            "Provisioned tenant %s (%s) plan_db=%s style=%s enum=%s name_col=%s",
+            tenant.slug,
+            tenant.id,
+            plan_db,
+            plan_style,
+            has_plan_enum,
+            schema_flags.get("has_name_col"),
+        )
         return tenant, admin
 
     async def update_tenant(
@@ -646,6 +775,8 @@ class PlatformAdminService:
         contact_email: str | None = None,
         contact_phone: str | None = None,
         admin_notes: str | None = None,
+        admin_password: str | None = None,
+        admin_email: str | None = None,
     ) -> Tenant | None:
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
         tenant = result.scalar_one_or_none()
@@ -695,7 +826,91 @@ class PlatformAdminService:
             settings["ops"] = ops
             tenant.settings_json = json.dumps(settings, ensure_ascii=False)
 
+        if admin_password is not None or admin_email is not None:
+            await self._upsert_office_admin_credentials(
+                tenant_id,
+                admin_email=admin_email,
+                admin_password=admin_password,
+                fallback_name=tenant.legal_name or tenant.slug,
+            )
+
         return tenant
+
+    async def _upsert_office_admin_credentials(
+        self,
+        tenant_id: UUID,
+        *,
+        admin_email: str | None,
+        admin_password: str | None,
+        fallback_name: str,
+    ) -> None:
+        """Set login credentials for the office's primary admin user."""
+        email_l = (admin_email or "").strip().lower() or None
+        pwd = (admin_password or "").strip() or None
+        if pwd is not None and len(pwd) < 8:
+            raise ValueError("Ο κωδικός admin πρέπει να έχει τουλάχιστον 8 χαρακτήρες")
+
+        users = (
+            await self._session.execute(
+                select(User)
+                .where(User.tenant_id == tenant_id)
+                .order_by(func.lower(User.email)),
+            )
+        ).scalars().all()
+
+        def _is_admin(u: User) -> bool:
+            roles = {str(r).lower() for r in (u.roles or [])}
+            return bool(
+                roles
+                & {
+                    UserRole.TENANT_ADMIN.value,
+                    UserRole.SUPERADMIN.value,
+                    UserRole.DISPATCHER.value,
+                }
+            )
+
+        target = None
+        if email_l:
+            target = next(
+                (u for u in users if str(u.email or "").lower() == email_l),
+                None,
+            )
+        if target is None:
+            admins = [u for u in users if _is_admin(u) and u.is_active]
+            target = admins[0] if admins else (users[0] if users else None)
+
+        if target is None:
+            if not email_l or not pwd:
+                raise ValueError(
+                    "Δεν υπάρχει admin σε αυτό το γραφείο — συμπλήρωσε email και κωδικό",
+                )
+            target = User(
+                tenant_id=tenant_id,
+                email=email_l,
+                password_hash=hash_password(pwd),
+                full_name=(fallback_name or email_l).strip(),
+                roles=[UserRole.TENANT_ADMIN.value],
+                is_active=True,
+                mfa_enabled=False,
+            )
+            self._session.add(target)
+            await self._session.flush()
+            return
+
+        if email_l and str(target.email or "").lower() != email_l:
+            dup = next(
+                (u for u in users if str(u.email or "").lower() == email_l and u.id != target.id),
+                None,
+            )
+            if dup:
+                raise ValueError("Το email admin χρησιμοποιείται ήδη σε αυτό το γραφείο")
+            target.email = email_l
+        if pwd:
+            target.password_hash = hash_password(pwd)
+        if not _is_admin(target):
+            target.roles = [UserRole.TENANT_ADMIN.value]
+        target.is_active = True
+        await self._session.flush()
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str = "superadmin") -> bool:
         billing = BillingService(self._session)
@@ -718,3 +933,82 @@ class PlatformAdminService:
         if sub and sub.status == SubscriptionStatus.PAST_DUE:
             sub.status = SubscriptionStatus.ACTIVE
         return True
+
+    async def delete_tenant(self, tenant_id: UUID) -> dict:
+        """Permanently remove an office (DB CASCADE child rows). Guards platform offices.
+
+        Uses a raw DELETE (not ORM session.delete) so SQLAlchemy does not lazy-load
+        users/bookings mid-transaction. Optional pre-cleanups run in SAVEPOINTs so a
+        missing table cannot abort the whole transaction.
+        """
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+
+        await self._session.execute(text("SET LOCAL row_security = off"))
+
+        result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            return {"ok": False, "reason": "not_found"}
+
+        if is_poreiago_platform_office(tenant) or is_achillio_travel_office(tenant):
+            raise ValueError(
+                "Απαγορεύεται η διαγραφή του κεντρικού γραφείου PoreiaGo ή Achillio Travel"
+            )
+
+        slug = str(getattr(tenant, "slug", "") or "")
+        legal = str(getattr(tenant, "legal_name", "") or "")
+        subdomain = str(getattr(tenant, "subdomain", "") or "")
+        tid = str(tenant_id)
+
+        # Cancel Stripe first so CASCADE does not orphan a live remote subscription.
+        try:
+            async with self._session.begin_nested():
+                await BillingService(self._session).cancel_stripe_subscription_best_effort(
+                    tenant_id
+                )
+        except Exception:
+            logger.warning(
+                "Stripe cancel before tenant delete failed for %s", tenant_id, exc_info=True
+            )
+
+        # Best-effort extras that may not exist on every deploy — never poison the txn.
+        for stmt in (
+            "DELETE FROM vehicle_inspections WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM rental_bookings WHERE tenant_id = CAST(:tid AS uuid)",
+            "DELETE FROM rental_vehicles WHERE tenant_id = CAST(:tid AS uuid)",
+        ):
+            try:
+                async with self._session.begin_nested():
+                    await self._session.execute(text(stmt), {"tid": tid})
+            except Exception:
+                logger.debug("tenant delete cleanup skipped: %s", stmt, exc_info=True)
+
+        # Drop ORM identity so SQLAlchemy does not lazy-load users mid-delete.
+        # Child FKs are ON DELETE CASCADE at the DB layer.
+        try:
+            self._session.expunge(tenant)
+        except Exception:
+            pass
+        try:
+            res = await self._session.execute(
+                text("DELETE FROM tenants WHERE id = CAST(:tid AS uuid)"),
+                {"tid": tid},
+            )
+            if res.rowcount == 0:
+                return {"ok": False, "reason": "not_found"}
+            await self._session.flush()
+        except Exception as exc:
+            logger.exception("tenant delete failed for %s", tenant_id)
+            detail = str(getattr(exc, "orig", None) or exc).split("\n", 1)[0][:240]
+            raise ValueError(f"Η διαγραφή απέτυχε: {detail}") from exc
+
+        return {
+            "ok": True,
+            "tenant_id": tid,
+            "slug": slug,
+            "subdomain": subdomain,
+            "legal_name": legal,
+        }

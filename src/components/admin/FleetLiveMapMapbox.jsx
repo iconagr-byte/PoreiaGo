@@ -14,17 +14,26 @@ import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
 import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
   formatBoardingLabel,
+  formatHeadingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatSpeedKmh,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
+  resolveVehicleHeadingDeg,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import {
   formatFleetBusPillLabel,
   formatFleetExcursionBadge,
   resolveVehicleTripTitle,
 } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetGpsSourceBadge,
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -52,6 +61,10 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const pillLabel = formatFleetBusPillLabel(vehicle);
   const tripTitle = resolveVehicleTripTitle(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
+  const gpsSources = resolveFleetGpsSources(vehicle);
+  const speed = formatSpeedKmh(vehicle);
+  const headingLabel = formatHeadingLabel(vehicle);
+  const headingDeg = resolveVehicleHeadingDeg(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -66,9 +79,44 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onDoubleClick={openHistory}
       >
         <div className="fleet-apple-bus-pin">
+          {gpsSources.length ? (
+            <div
+              className={`fleet-apple-bus-gps-sources${gpsSources.length > 1 ? ' is-dual' : ''}`}
+            >
+              {gpsSources.map((kind) => (
+                <span
+                  key={kind}
+                  className={`fleet-apple-bus-gps-source fleet-apple-bus-gps-source--${kind}`}
+                >
+                  {formatFleetGpsSourceChipLabel(kind)}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
             {pillLabel}
+          </div>
+          <div
+            className="fleet-apple-bus-hud"
+            role="status"
+            aria-label={`Ταχύτητα ${speed} χιλιόμετρα ανά ώρα${headingLabel ? `, κατεύθυνση ${headingLabel}` : ''}`}
+          >
+            <span className="fleet-apple-bus-hud__speed">
+              <strong>{speed}</strong>
+              <small>km/h</small>
+            </span>
+            <span className="fleet-apple-bus-hud__sep" aria-hidden="true" />
+            <span className={`fleet-apple-bus-hud__heading${headingLabel ? '' : ' is-empty'}`}>
+              {headingDeg != null ? (
+                <span
+                  className="fleet-apple-bus-hud__arrow"
+                  style={{ transform: `rotate(${Math.round(headingDeg)}deg)` }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {headingLabel || '—'}
+            </span>
           </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">
@@ -77,7 +125,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
             <div
               className="fleet-apple-bus-pin__heading"
               style={{
-                transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
+                transform: `translateX(-50%) rotate(${headingDeg ?? 0}deg)`,
               }}
             />
           </div>
@@ -108,7 +156,12 @@ function BusMarker({ vehicle, onVehicleHistory }) {
                 </div>
               </div>
             </div>
-            <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
+            <div>Ταχύτητα: {speed} km/h</div>
+            <div>Κατεύθυνση: {headingLabel || '—'}</div>
+            <div>
+              Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}
+              {gpsSources.length > 1 ? ' (και τα δύο ενεργά)' : ''}
+            </div>
             <div>Δρομολόγιο #{vehicle.trip_id ?? '—'}</div>
             <div>Ενημέρωση: {formatUpdatedAgo(vehicle.timestamp) || '—'}</div>
             {formatBoardingLabel(vehicle) ? <div>Επιβιβασμένοι: {formatBoardingLabel(vehicle)}</div> : null}
@@ -145,12 +198,17 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
   const userMovedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
 
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance?.on) return undefined;
     const markMoved = () => {
+      if (programmaticRef.current) {
+        programmaticRef.current = false;
+        return;
+      }
       userMovedRef.current = true;
     };
     mapInstance.on('dragstart', markMoved);
@@ -164,7 +222,11 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance || !vehicles?.length) return;
-    const ids = vehicles
+    const pts = vehicles.filter(
+      (v) => Number.isFinite(Number(v.lng)) && Number.isFinite(Number(v.lat)),
+    );
+    if (!pts.length) return;
+    const ids = pts
       .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
       .sort()
       .join('|');
@@ -178,14 +240,23 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       return;
     }
     fittedIdsRef.current = ids;
+    const count = pts.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    const duration = force ? 700 : 500;
+    programmaticRef.current = true;
+    if (count === 1) {
+      mapInstance.flyTo({
+        center: [pts[0].lng, pts[0].lat],
+        zoom: maxZoom,
+        duration,
+      });
+      return;
+    }
     const bounds = new LngLatBounds();
-    vehicles.forEach((v) => {
-      if (Number.isFinite(v.lng) && Number.isFinite(v.lat)) {
-        bounds.extend([v.lng, v.lat]);
-      }
-    });
+    pts.forEach((v) => bounds.extend([v.lng, v.lat]));
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 13, duration: force ? 600 : 0 });
+    mapInstance.fitBounds(bounds, { padding: pad, maxZoom, duration });
   }, [vehicles, map, fitNonce]);
 
   return null;
@@ -194,6 +265,7 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
 /** Mapbox GL — Apple light style + ελληνικές ετικέτες. */
 export default function FleetLiveMapMapbox({
   vehicles,
+  trailVehicles,
   heatmap = [],
   showHeat = false,
   geofenceLayers = null,
@@ -206,13 +278,18 @@ export default function FleetLiveMapMapbox({
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
+  onClearSos = null,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
-      return { longitude: vehicles[0].lng, latitude: vehicles[0].lat, zoom: 10 };
+      return {
+        longitude: vehicles[0].lng,
+        latitude: vehicles[0].lat,
+        zoom: resolveFleetFitMaxZoom(vehicles.length),
+      };
     }
     if (sosAlerts.length) {
-      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 12 };
+      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 14 };
     }
     return { longitude: 23.0, latitude: 38.5, zoom: 6.4 };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial only
@@ -222,7 +299,9 @@ export default function FleetLiveMapMapbox({
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
 
-  const trails = useFleetVehicleTrails(vehicles, {
+  // Blue trail only for vehicles with an active excursion (parent may pass a subset).
+  const trailSource = trailVehicles ?? vehicles;
+  const trails = useFleetVehicleTrails(trailSource, {
     enabled: showTrails,
     maxPoints: 3000,
     minMoveM: 3,
@@ -242,7 +321,7 @@ export default function FleetLiveMapMapbox({
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
-      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
+      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <HeatmapDots points={heatmap} visible={showHeat} />
       <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </Map>

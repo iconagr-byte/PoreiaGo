@@ -4,7 +4,10 @@ import {
   GOOGLE_CLIENT_ID as BUILD_GOOGLE_CLIENT_ID,
   fetchGoogleAuthConfig,
 } from '../services/customerAuthApi.js';
-import { isUsableGoogleClientId } from '../lib/googleClientId.js';
+import {
+  isUsableGoogleClientId,
+  PRODUCTION_GOOGLE_CLIENT_ID,
+} from '../lib/googleClientId.js';
 
 const GoogleAuthConfigContext = createContext({
   loading: true,
@@ -21,12 +24,21 @@ function resolveClientId(raw) {
   return isUsableGoogleClientId(clientId) ? clientId : '';
 }
 
+function preferredClientId() {
+  // Always prefer PoreiaGo Web client (same GCP project as Android OAuth).
+  // Build-time VITE_ / API may still briefly return the legacy Achillio id.
+  return (
+    resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) ||
+    resolveClientId(BUILD_GOOGLE_CLIENT_ID)
+  );
+}
+
 /**
  * Loads Google OAuth Web Client ID from the API (runtime) with Vite build fallback.
  * Wraps children in GoogleOAuthProvider when a real (non-placeholder) client id is available.
  */
 export default function GoogleAuthRoot({ children }) {
-  const buildId = resolveClientId(BUILD_GOOGLE_CLIENT_ID);
+  const buildId = preferredClientId();
   const [state, setState] = useState({
     loading: true,
     enabled: Boolean(buildId),
@@ -39,7 +51,9 @@ export default function GoogleAuthRoot({ children }) {
       try {
         const cfg = await fetchGoogleAuthConfig();
         if (cancelled) return;
-        const clientId = resolveClientId(cfg.client_id || BUILD_GOOGLE_CLIENT_ID);
+        // Prefer PoreiaGo Web client; API/build are fallbacks only.
+        const clientId =
+          preferredClientId() || resolveClientId(cfg.client_id);
         setState({
           loading: false,
           enabled: Boolean(clientId),
@@ -47,7 +61,7 @@ export default function GoogleAuthRoot({ children }) {
         });
       } catch {
         if (cancelled) return;
-        const clientId = resolveClientId(BUILD_GOOGLE_CLIENT_ID);
+        const clientId = preferredClientId();
         setState({
           loading: false,
           enabled: Boolean(clientId),

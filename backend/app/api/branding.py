@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas import (
     TenantBrandingSettingsResponse,
     TenantBrandingSettingsUpdate,
+    TenantDomainDnsCheckResponse,
     TenantSiteAppearanceResponse,
     TenantSiteAppearanceUpdate,
 )
@@ -35,7 +36,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/branding", tags=["Tenant Branding"])
 
-_ASSET_KINDS = frozenset({"logo", "hero"})
+_ASSET_KINDS = frozenset({"logo", "hero", "rent_logo"})
+
+
+def _appearance_key_for_kind(kind: str) -> str:
+    if kind == "logo":
+        return "logo_url"
+    if kind == "rent_logo":
+        return "rent_logo_url"
+    return "hero_image_url"
 
 
 def _dev_fallback_enabled() -> bool:
@@ -70,6 +79,89 @@ async def get_branding_settings(
             logger.exception("Branding GET failed")
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable") from exc
     return TenantBrandingSettingsResponse(**data)
+
+
+@router.get("/domain/dns-check", response_model=TenantDomainDnsCheckResponse)
+async def check_custom_domain_dns_status(
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    payload: Annotated[dict, Depends(get_token_payload)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+    domain: str | None = None,
+):
+    """
+    Live DNS check for THIS office's saved custom domain only.
+
+    Verifies www CNAME → www.poreiago.com and optional apex A → VPS IP.
+    """
+    from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.domain_security import (
+        assert_domain_owned_by_tenant,
+        enforce_rate_limit,
+        load_tenant_custom_domain,
+    )
+
+    if not enforce_rate_limit(f"dns:{tenant_id}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many DNS checks")
+    owned = await load_tenant_custom_domain(db, tenant_id)
+    try:
+        target = assert_domain_owned_by_tenant(domain, owned)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    result = check_custom_domain_dns(target)
+    return TenantDomainDnsCheckResponse(**result)
+
+
+@router.post("/domain/provision-edge", response_model=TenantDomainDnsCheckResponse)
+async def provision_custom_domain_edge(
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    payload: Annotated[dict, Depends(get_token_payload)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+    domain: str | None = None,
+):
+    """
+    Edge sync for THIS office's saved custom domain only.
+
+    Regenerates Traefik/nginx maps from DB, upserts NPM host for the owned domain,
+    never accepts arbitrary third-party domains.
+    """
+    from travel_platform.growth.domain_dns import check_custom_domain_dns
+    from travel_platform.growth.domain_security import (
+        assert_domain_owned_by_tenant,
+        enforce_rate_limit,
+        load_tenant_custom_domain,
+        sanitize_edge_status,
+    )
+    from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
+    from travel_platform.growth.npm_domains import upsert_npm_custom_domain
+
+    if not enforce_rate_limit(f"prov:{tenant_id}", max_calls=6):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many edge sync requests")
+
+    owned = await load_tenant_custom_domain(db, tenant_id)
+    try:
+        target = assert_domain_owned_by_tenant(domain, owned)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    try:
+        # Full map rewrite is required so apex→www stays consistent for all offices,
+        # but the HTTP response never lists other tenants' domains.
+        await sync_edge_custom_domains_from_db(db, provision_npm=False)
+    except Exception:
+        logger.warning("Edge map sync failed for tenant %s", tenant_id, exc_info=True)
+
+    npm_one: dict = {}
+    try:
+        npm_one = await upsert_npm_custom_domain(target)
+    except Exception:
+        logger.warning("NPM upsert failed for owned domain tenant=%s", tenant_id, exc_info=True)
+        npm_one = {"ok": False, "error": "edge_provision_failed"}
+
+    result = check_custom_domain_dns(target)
+    result["edge"] = sanitize_edge_status(owned_domain=target, npm_result=npm_one)
+    return TenantDomainDnsCheckResponse(**result)
 
 
 @router.put("/settings", response_model=TenantBrandingSettingsResponse)
@@ -245,7 +337,7 @@ async def upload_site_appearance_asset(
             detail="Αποτυχία επεξεργασίας εικόνας",
         ) from exc
 
-    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
+    key = _appearance_key_for_kind(kind_norm)
     persist_warning = None
     appearance: dict = {}
     svc = TenantSiteAppearanceService(db)
@@ -255,6 +347,8 @@ async def upload_site_appearance_asset(
         # Prefer minimal writer — full update_appearance can choke on legacy bags.
         if kind_norm == "logo":
             return await svc.force_set_media_url(tenant_id, logo_url=saved["url"])
+        if kind_norm == "rent_logo":
+            return await svc.force_set_media_url(tenant_id, rent_logo_url=saved["url"])
         return await svc.force_set_media_url(tenant_id, hero_image_url=saved["url"])
 
     try:
@@ -294,7 +388,7 @@ async def upload_site_appearance_asset(
             appearance = {key: saved["url"]}
 
     if isinstance(appearance, dict):
-        for heavy in ("logo_url", "hero_image_url"):
+        for heavy in ("logo_url", "rent_logo_url", "hero_image_url"):
             val = str(appearance.get(heavy) or "")
             if val.startswith("data:") and len(val) > 8000:
                 appearance[heavy] = saved["url"] if heavy == key else ""
@@ -329,8 +423,12 @@ async def clear_site_appearance_asset(
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
-    value = "" if kind_norm == "logo" else DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
+    key = _appearance_key_for_kind(kind_norm)
+    value = (
+        DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
+        if kind_norm == "hero"
+        else ""
+    )
     appearance = await TenantSiteAppearanceService(db).update_appearance(
         tenant_id,
         {key: value},

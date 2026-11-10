@@ -140,7 +140,14 @@ export default function ContractsPanel({
         setInterval(subscription.interval);
       }
     } catch (e) {
-      toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
+      const raw = String(e?.message || '').trim();
+      const friendly =
+        !raw ||
+        /^internal server error$/i.test(raw) ||
+        /^request failed$/i.test(raw)
+          ? 'Αποτυχία φόρτωσης συνδρομής γραφείου. Δοκιμάστε Ανανέωση.'
+          : raw;
+      toast.error(friendly);
       setSub(null);
     } finally {
       setLoading(false);

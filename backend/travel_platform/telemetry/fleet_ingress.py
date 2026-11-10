@@ -206,22 +206,51 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     payload = driver_payload_to_telemetry(body, session=session)
     tenant_id = str(payload["tenant_id"])
 
-    # Teltonika-bound plates: ack the driver PWA (shift / heartbeat keep working)
-    # but never write phone GPS onto the live map — only the tracker paints the pin.
+    # Teltonika-first: while the tracker is alive, soft-ack the driver PWA
+    # (shift / heartbeat) but do not let phone GPS overwrite the live pin.
+    # If the tracker goes quiet, phone GPS paints as soft fallback.
+    # Redis-aware: Teltonika pin often lives on another Gunicorn worker.
     try:
-        from travel_platform.telemetry.teltonika.device_store import (
-            get_enabled_device_by_vehicle_code,
+        from travel_platform.telemetry.tracker_priority import (
+            is_teltonika_preferred_for_plate_async,
+            is_tracker_binding_alive,
+            resolve_tracker_alive_seconds,
         )
 
-        tracker = get_enabled_device_by_vehicle_code(
+        plate = payload.get("vehicle_code") or payload.get("bus_plate")
+        prefer_tracker, tracker = await is_teltonika_preferred_for_plate_async(
             tenant_id,
-            payload.get("vehicle_code") or payload.get("bus_plate"),
+            plate,
         )
+        # Device online but live pin missing/stale — paint last fix first, then
+        # soft-ack App so both badges show on one pin (never soft-ack with no pin).
+        if tracker and is_tracker_binding_alive(
+            tracker,
+            max_age_sec=resolve_tracker_alive_seconds(tenant_id),
+        ):
+            try:
+                from travel_platform.telemetry.teltonika.paint_live import (
+                    paint_live_pin_from_device,
+                )
+
+                painted = await paint_live_pin_from_device(
+                    tracker,
+                    open_channel=True,
+                    reason="ingress_device_online",
+                )
+                if painted:
+                    prefer_tracker = True
+                    logger.info(
+                        "Teltonika device online — painted pin then soft-ack plate=%s",
+                        plate,
+                    )
+            except Exception:
+                logger.debug("teltonika ingress paint skipped", exc_info=True)
     except Exception:
-        tracker = None
-    if tracker:
+        prefer_tracker, tracker = False, None
+    if prefer_tracker and tracker:
         logger.info(
-            "Soft-ack phone GPS (skip live map) — plate=%s Teltonika IMEI=%s tenant=%s",
+            "Soft-ack phone GPS (Teltonika preferred) — plate=%s IMEI=%s tenant=%s",
             payload.get("vehicle_code"),
             tracker.get("imei"),
             tenant_id,
@@ -235,14 +264,46 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             )
         except Exception:
             logger.debug("touch_driver_gps after Teltonika soft-ack failed", exc_info=True)
+        # One pin only: purge leftover App UUID, stamp app heartbeat on Teltonika.
+        gps_sources = ["teltonika", "app"]
+        try:
+            from travel_platform.telemetry.processor import get_live_fleet
+
+            plate = payload.get("vehicle_code") or payload.get("bus_plate")
+            fleet = get_live_fleet()
+            await fleet.purge_phone_siblings_for_plate(tenant_id, plate)
+            stamped = await fleet.mark_app_heartbeat_for_plate(
+                tenant_id,
+                plate,
+                driver_id=session.get("driver_id") if isinstance(session, dict) else None,
+                driver_name=(
+                    session.get("driver_name") if isinstance(session, dict) else None
+                )
+                or payload.get("driver_name"),
+                recorded_at=payload.get("recorded_at"),
+            )
+            if stamped and isinstance(stamped.get("gps_sources"), list):
+                gps_sources = [str(s) for s in stamped["gps_sources"]]
+        except Exception:
+            logger.debug("soft-ack dual-source stamp skipped", exc_info=True)
         return {
             "ok": True,
             "skipped_live_map": True,
             "map_source": "teltonika",
-            "detail": "Το στίγμα στον χάρτη έρχεται από το Teltonika — το κινητό επιβεβαιώθηκε",
+            "gps_sources": gps_sources,
+            "detail": "Ένα στίγμα στον χάρτη — Teltonika + App οδηγού ενεργά",
             "tenant_id": tenant_id,
             "tracker_imei": tracker.get("imei"),
         }
+    if tracker and not prefer_tracker:
+        # Soft fallback: tracker bound but silent — phone may paint the pin.
+        payload["map_fallback"] = "phone_after_tracker_stale"
+        logger.info(
+            "Phone GPS fallback (Teltonika stale) — plate=%s IMEI=%s tenant=%s",
+            payload.get("vehicle_code"),
+            tracker.get("imei"),
+            tenant_id,
+        )
 
     preferred_title = (
         body.get("trip_title")
@@ -278,6 +339,46 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         payload.get("driver_id"),
     )
 
+    # Enrich dual badge when Teltonika IMEI is online but this frame is App-sourced.
+    gps_sources: list[str] = ["app"]
+    app_seen_at = payload.get("recorded_at")
+    tracker_signal_at = None
+    imei = payload.get("imei")
+    hydrated_from_store = False
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+        from travel_platform.telemetry.tracker_priority import (
+            is_tracker_binding_alive,
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
+
+        meta = {}
+        if vehicle_id:
+            meta = dict(get_live_fleet()._vehicles.get(str(vehicle_id)) or {})
+        meta.setdefault("tenant_id", tenant_id)
+        meta.setdefault("vehicle_code", payload.get("vehicle_code"))
+        meta.setdefault("bus_plate", payload.get("bus_plate"))
+        meta.setdefault("source", payload.get("source") or "driver_pwa")
+        meta["app_seen_at"] = app_seen_at or meta.get("app_seen_at")
+        alive = resolve_tracker_alive_seconds(tenant_id)
+        gps_sources = resolve_live_gps_sources(
+            meta, max_age_sec=alive, tenant_id=tenant_id
+        ) or ["app"]
+        if "app" not in gps_sources:
+            gps_sources = [*gps_sources, "app"]
+        tracker_signal_at = meta.get("tracker_signal_at")
+        imei = imei or meta.get("imei")
+        bound = tracker if isinstance(tracker, dict) else None
+        if bound and is_tracker_binding_alive(bound, max_age_sec=alive):
+            if "teltonika" not in gps_sources:
+                gps_sources = ["teltonika", *gps_sources]
+            tracker_signal_at = bound.get("last_seen_at") or tracker_signal_at
+            imei = imei or bound.get("imei")
+            hydrated_from_store = False
+    except Exception:
+        logger.debug("phone GPS dual-source enrich skipped", exc_info=True)
+
     egress = {
         "type": "fleet_location",
         "tenant_id": tenant_id,
@@ -297,6 +398,12 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         "altitude_m": payload.get("altitude_m"),
         "boarding": payload.get("boarding_snapshot"),
         "sensors": payload.get("device_sensors"),
+        "source": payload.get("source") or "driver_pwa",
+        "imei": imei,
+        "gps_sources": gps_sources,
+        "app_seen_at": app_seen_at,
+        "tracker_signal_at": tracker_signal_at,
+        "hydrated_from_store": hydrated_from_store,
     }
 
     await publish_fleet_location(tenant_id, egress)

@@ -43,6 +43,108 @@ export function pathLengthKm(points = []) {
   return total / 1000;
 }
 
+function pointTimeMs(p) {
+  if (!p?.recorded_at) return NaN;
+  const t = new Date(p.recorded_at).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/**
+ * Split GPS breadcrumbs into map presence sessions (entered / exited).
+ * A gap longer than `gapMs` means the vehicle left the live map and later re-entered.
+ */
+export function segmentGpsSessions(
+  points = [],
+  { gapMs = 20 * 60 * 1000, activeWithinMs = 5 * 60 * 1000 } = {},
+) {
+  const sorted = (Array.isArray(points) ? points : [])
+    .filter((p) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
+    .slice()
+    .sort((a, b) => {
+      const ta = pointTimeMs(a);
+      const tb = pointTimeMs(b);
+      if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+      if (!Number.isFinite(ta)) return 1;
+      if (!Number.isFinite(tb)) return -1;
+      return ta - tb;
+    });
+
+  if (!sorted.length) return [];
+
+  const chunks = [];
+  let current = [sorted[0]];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prevT = pointTimeMs(sorted[i - 1]);
+    const curT = pointTimeMs(sorted[i]);
+    const gap = Number.isFinite(prevT) && Number.isFinite(curT) ? curT - prevT : 0;
+    if (gap > gapMs) {
+      chunks.push(current);
+      current = [sorted[i]];
+    } else {
+      current.push(sorted[i]);
+    }
+  }
+  chunks.push(current);
+
+  const now = Date.now();
+  return chunks.map((chunk, idx) => {
+    const enteredAt = chunk[0]?.recorded_at || null;
+    const exitedAt = chunk[chunk.length - 1]?.recorded_at || null;
+    const t0 = pointTimeMs(chunk[0]);
+    const t1 = pointTimeMs(chunk[chunk.length - 1]);
+    const durationMin =
+      Number.isFinite(t0) && Number.isFinite(t1) ? Math.max(0, (t1 - t0) / 60000) : null;
+    const km = pathLengthKm(chunk);
+    const speeds = chunk.map((p) => Number(p.speed_kmh || 0)).filter((n) => Number.isFinite(n));
+    const avgSpeed = speeds.length ? speeds.reduce((s, n) => s + n, 0) / speeds.length : 0;
+    const maxSpeed = speeds.length ? Math.max(...speeds) : 0;
+    const stillActive = Number.isFinite(t1) && now - t1 <= activeWithinMs;
+    const tripId = chunk.find((p) => p.trip_id != null)?.trip_id ?? null;
+    const driverId = chunk.find((p) => p.driver_id)?.driver_id || null;
+    const source = chunk.find((p) => p.source)?.source || null;
+    return {
+      id: `session-${idx}-${enteredAt || idx}`,
+      index: idx + 1,
+      enteredAt,
+      exitedAt,
+      active: stillActive,
+      points: chunk,
+      pointCount: chunk.length,
+      km,
+      durationMin,
+      avgSpeed,
+      maxSpeed,
+      tripId,
+      driverId,
+      source,
+      enterLat: Number(chunk[0]?.lat),
+      enterLng: Number(chunk[0]?.lng),
+      exitLat: Number(chunk[chunk.length - 1]?.lat),
+      exitLng: Number(chunk[chunk.length - 1]?.lng),
+    };
+  });
+}
+
+export function summarizeRoutePoints(points = []) {
+  const list = Array.isArray(points) ? points : [];
+  const speeds = list.map((p) => Number(p.speed_kmh || 0)).filter((n) => Number.isFinite(n) && n >= 0);
+  const maxSpeed = speeds.length ? Math.max(...speeds) : 0;
+  const moving = speeds.filter((n) => n >= 3);
+  const movingAvg = moving.length ? moving.reduce((s, n) => s + n, 0) / moving.length : 0;
+  const sources = [...new Set(list.map((p) => String(p.source || '').trim()).filter(Boolean))];
+  const first = list[0] || null;
+  const last = list[list.length - 1] || null;
+  return {
+    maxSpeed,
+    movingAvg,
+    sources,
+    startLat: Number.isFinite(Number(first?.lat)) ? Number(first.lat) : null,
+    startLng: Number.isFinite(Number(first?.lng)) ? Number(first.lng) : null,
+    endLat: Number.isFinite(Number(last?.lat)) ? Number(last.lat) : null,
+    endLng: Number.isFinite(Number(last?.lng)) ? Number(last.lng) : null,
+  };
+}
+
 function parseTimeToMinutes(value) {
   if (!value) return null;
   const m = String(value).match(/(\d{1,2}):(\d{2})/);
@@ -193,6 +295,13 @@ export async function loadVehicleTripHistory(vehicle) {
     boarding.missing_passengers || [],
   );
 
+  const sessions = segmentGpsSessions(points);
+  const summary = summarizeRoutePoints(points);
+  const maxSpeed = Math.max(
+    summary.maxSpeed,
+    Number(vehicle?.speed || vehicle?.speed_kmh || 0) || 0,
+  );
+
   return {
     tripId: hasTrip ? tripId : null,
     trip,
@@ -209,6 +318,14 @@ export async function loadVehicleTripHistory(vehicle) {
     km,
     durationMin,
     avgSpeed,
+    maxSpeed,
+    movingAvgSpeed: summary.movingAvg,
+    pointSources: summary.sources,
+    startLat: summary.startLat,
+    startLng: summary.startLng,
+    endLat: summary.endLat,
+    endLng: summary.endLng,
+    sessions,
     boarding,
     checkinsByStop,
     plannedStops,

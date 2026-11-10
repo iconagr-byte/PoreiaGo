@@ -1159,3 +1159,7 @@
     opacity: 0;
   }
 }
+
+/* Capacitor Wallet visual theme lives in src/styles/wallet-native-theme.css
+   (imported only from main.jsx when isNativeApp()). Keep index.css free of
+   native-only wallet chrome so the website look stays independent. */

@@ -34,8 +34,8 @@ export default function AgencySignupSuccessPage() {
             </p>
             <ol className="list-decimal list-inside space-y-1">
               <li>Περιμένετε 10–30 δευτ. για provisioning (webhook Stripe)</li>
-              <li>Συνδεθείτε με το admin email της εγγραφής</li>
-              <li>Ολοκληρώστε τον οδηγό ρύθμισης γραφείου (επωνυμία, email, IBAN, στόλος)</li>
+              <li>Συνδεθείτε στο /admin/login με το admin email της εγγραφής</li>
+              <li>Ξεκινήστε στο PoreiaGo · το δικό σας domain το βάζετε μετά από τον οδηγό</li>
             </ol>
           </div>
 

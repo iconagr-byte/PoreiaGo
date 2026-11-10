@@ -238,9 +238,10 @@ async function updatePlatformSettingsLegacy(body) {
   return { data: body, source: 'local' };
 }
 
-export async function fetchPlatformUsers() {
+export async function fetchPlatformUsers({ allOffices = false } = {}) {
   try {
-    const res = await adminFetch('/api/admin/platform/users');
+    const q = allOffices ? '?all_offices=1' : '';
+    const res = await adminFetch(`/api/admin/platform/users${q}`);
     if (res.ok) return res.json();
   } catch {
     /* offline */
@@ -307,6 +308,24 @@ export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
     body: JSON.stringify({
       email,
       ...(tenantId ? { tenant_id: tenantId } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: request admin password-reset email from /admin/login (no session). */
+export async function requestAdminPasswordReset({ email, host } = {}) {
+  const officeHost =
+    String(host || (typeof window !== 'undefined' ? window.location.hostname : '') || '')
+      .trim()
+      .toLowerCase();
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      ...(officeHost ? { host: officeHost } : {}),
     }),
   });
   if (!res.ok) await parseError(res);
@@ -1175,4 +1194,36 @@ function getMockUsers() {
       created_at: new Date().toISOString(),
     },
   ];
+}
+
+export const DEFAULT_TRIP_REMINDER = {
+  enabled: true,
+  days_before: 3,
+  send_hour: 9,
+  subject: 'Η εκδρομή σου πλησιάζει · {trip}',
+  headline: 'Σε {days} μέρες φεύγεις',
+  body:
+    'Υπενθύμιση για την επερχόμενη εκδρομή σου. Έλεγξε ώρα και θέσεις — το εισιτήριό σου είναι στο My Wallet.',
+};
+
+export async function fetchTripReminderSettings() {
+  const res = await adminFetch('/api/admin/platform/trip-reminder');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία φόρτωσης υπενθύμισης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}
+
+export async function updateTripReminderSettings(patch) {
+  const res = await adminFetch('/api/admin/platform/trip-reminder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία αποθήκευσης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
 }

@@ -1,14 +1,49 @@
-import { API_BASE } from '../config/api.js';
 import {
+  clearDriverOfficeSeal,
   clearDriverTripBinding,
   driverSessionHeaders,
   getActiveTripId,
+  getDriverOfficeSeal,
   getDriverSession,
   saveDriverSession,
+  sealDriverOffice,
 } from '../lib/driver/driverSession.js';
+import { getApiBase } from '../config/api.js';
+import { shouldPersistNativeDriverSession } from '../lib/capacitor/isNativeApp.js';
 import { fetchBoardingManifest, adminScanTicket } from './ticketingApi.js';
 
 export { adminScanTicket, fetchBoardingManifest };
+
+const DEFAULT_NATIVE_DRIVER_HOST = 'https://www.achilliotravel.com';
+/** Offices to try when Host-scoped login fails (driver may live on PoreiaGo vs Achillio). */
+const DRIVER_OFFICE_HOSTS = [
+  'https://www.achilliotravel.com',
+  'https://achilliotravel.com',
+  'https://www.poreiago.com',
+  'https://poreiago.com',
+];
+
+function defaultDriverApiHost() {
+  return (
+    String(import.meta.env.VITE_NATIVE_API_BASE || '')
+      .trim()
+      .replace(/\/$/, '') || DEFAULT_NATIVE_DRIVER_HOST
+  );
+}
+
+function uniqueApiHosts(...hosts) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of hosts) {
+    const h = String(raw || '')
+      .trim()
+      .replace(/\/$/, '');
+    if (!h || seen.has(h)) continue;
+    seen.add(h);
+    out.push(h);
+  }
+  return out;
+}
 
 function mapSessionPayload(data) {
   const rawTrip = data?.trip_id;
@@ -31,9 +66,15 @@ function mapSessionPayload(data) {
   };
 }
 
-function saveMappedSession(data) {
+function saveMappedSession(data, apiHost = '') {
   const session = mapSessionPayload(data);
   saveDriverSession(session);
+  if (shouldPersistNativeDriverSession() && session.tenantId) {
+    sealDriverOffice({
+      tenantId: session.tenantId,
+      apiHost: apiHost || getApiBase() || defaultDriverApiHost(),
+    });
+  }
   return session;
 }
 
@@ -52,35 +93,111 @@ const DEV_SESSION = {
   vehicleImageUrl: '/images/hero-bus-achillio.png',
 };
 
+async function postDriverLogin(apiHost, username, password) {
+  const base = String(apiHost || '').replace(/\/$/, '');
+  const res = await fetch(`${base}/api/driver/session/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { res, data, apiHost: base };
+}
+
 export async function loginDriver(username, password) {
-  let res;
-  try {
-    res = await fetch(`${API_BASE}/api/driver/session/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-  } catch {
-    if (import.meta.env.DEV) {
-      saveDriverSession(DEV_SESSION);
-      return DEV_SESSION;
+  const seal = getDriverOfficeSeal();
+  const sealedHost = String(seal?.apiHost || '')
+    .trim()
+    .replace(/\/$/, '');
+  // Prefer sealed / current API host, then known office apex+www (Achillio + PoreiaGo).
+  // Server error text conflates wrong password with wrong office — must try peers.
+  const hosts = uniqueApiHosts(
+    sealedHost,
+    getApiBase(),
+    defaultDriverApiHost(),
+    ...DRIVER_OFFICE_HOSTS,
+  );
+
+  let lastMessage = '';
+  let sawNetwork = false;
+
+  for (const host of hosts) {
+    let attempt;
+    try {
+      attempt = await postDriverLogin(host, username, password);
+    } catch {
+      sawNetwork = true;
+      continue;
     }
+
+    if (attempt.res.ok) {
+      if (sealedHost && sealedHost !== attempt.apiHost) {
+        clearDriverOfficeSeal();
+      }
+      const session = saveMappedSession(attempt.data, attempt.apiHost);
+      if (attempt.data.trip_id) await cacheManifestForOffline(attempt.data.trip_id);
+      return session;
+    }
+
+    const msg =
+      typeof attempt.data?.detail === 'string' ? attempt.data.detail : '';
+    lastMessage = msg || lastMessage;
+    // 401/403: try next office Host (driver may belong there).
+    if (attempt.res.status === 401 || attempt.res.status === 403) {
+      continue;
+    }
+    // Unexpected status — stop with that message.
+    throw new Error(msg || `Αποτυχία σύνδεσης οδηγού (${attempt.res.status})`);
+  }
+
+  if (import.meta.env.DEV && sawNetwork && !lastMessage) {
+    saveDriverSession(DEV_SESSION);
+    return DEV_SESSION;
+  }
+
+  if (!lastMessage && sawNetwork) {
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
   }
+  throw new Error(lastMessage || 'Λάθος όνομα χρήστη ή κωδικός');
+}
+
+/** Request password-reset email for fleet driver PWA. */
+export async function forgotDriverPassword(username) {
+  const res = await fetch(`${getApiBase()}/api/driver/session/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: String(username || '').trim() }),
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = data.detail;
-    throw new Error(typeof detail === 'string' ? detail : 'Λάθος όνομα χρήστη ή κωδικός');
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία αιτήματος επαναφοράς');
   }
-  const session = saveMappedSession(data);
-  if (data.trip_id) await cacheManifestForOffline(data.trip_id);
-  return session;
+  return data;
+}
+
+/** Confirm new password from emailed reset link. */
+export async function resetDriverPassword(token, newPassword) {
+  const res = await fetch(`${getApiBase()}/api/driver/session/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token: String(token || '').trim(),
+      new_password: String(newPassword || ''),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία επαναφοράς κωδικού');
+  }
+  return data;
 }
 
 export async function exchangeMasterQr(qrRaw) {
   let res;
   try {
-    res = await fetch(`${API_BASE}/api/driver/session/master-qr`, {
+    res = await fetch(`${getApiBase()}/api/driver/session/master-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ qr_raw: qrRaw }),
@@ -107,7 +224,7 @@ export async function exchangeMasterQr(qrRaw) {
 
 export async function fetchDriverMe() {
   try {
-    const res = await fetch(`${API_BASE}/api/driver/me`, {
+    const res = await fetch(`${getApiBase()}/api/driver/me`, {
       headers: driverSessionHeaders(),
     });
     if (!res.ok) return null;
@@ -134,7 +251,7 @@ export async function fetchDriverMe() {
 
 /** HTTP fallback for live GPS when WebSocket upgrade is blocked. */
 export async function postDriverTelemetryLocation(payload) {
-  const res = await fetch(`${API_BASE}/api/driver/telemetry/location`, {
+  const res = await fetch(`${getApiBase()}/api/driver/telemetry/location`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -149,7 +266,7 @@ export async function postDriverTelemetryLocation(payload) {
 
 /** Explicit start-of-shift — notifies admin office (alert + Web Push). */
 export async function startDriverShift() {
-  const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/start`, {
+  const res = await fetch(`${getApiBase()}/api/driver/telemetry/shift/start`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     keepalive: true,
@@ -162,9 +279,9 @@ export async function startDriverShift() {
   return data;
 }
 
-/** Explicit end-of-shift — notifies admin platform + clears live map pin. */
+/** Explicit end-of-shift — stops App GPS / duty clock; Teltonika pin stays on the office map. */
 export async function endDriverShift() {
-  const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/end`, {
+  const res = await fetch(`${getApiBase()}/api/driver/telemetry/shift/end`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     // Survive tab close / navigation so office still gets the push.
@@ -182,7 +299,7 @@ export async function fetchDriverManifest() {
   const tripId = getActiveTripId();
   if (!tripId) return null;
   try {
-    const res = await fetch(`${API_BASE}/api/driver/manifest`, {
+    const res = await fetch(`${getApiBase()}/api/driver/manifest`, {
       headers: driverSessionHeaders(),
     });
     if (res.ok) {
@@ -205,7 +322,7 @@ export async function fetchDriverManifest() {
 
 export async function fetchDriverSchedule() {
   try {
-    const res = await fetch(`${API_BASE}/api/driver/schedule`, {
+    const res = await fetch(`${getApiBase()}/api/driver/schedule`, {
       headers: driverSessionHeaders(),
     });
     if (res.ok) {
@@ -221,7 +338,7 @@ export async function fetchDriverSchedule() {
 
 export async function fetchDriverTrip() {
   try {
-    const res = await fetch(`${API_BASE}/api/driver/trip`, {
+    const res = await fetch(`${getApiBase()}/api/driver/trip`, {
       headers: driverSessionHeaders(),
     });
     if (res.ok) return res.json();
@@ -269,7 +386,7 @@ export async function driverCheckin({ qrRaw, ticketId, tripId } = {}) {
   if (ticketId) body.ticket_id = ticketId;
 
   try {
-    const res = await fetch(`${API_BASE}/api/driver/checkin`, {
+    const res = await fetch(`${getApiBase()}/api/driver/checkin`, {
       method: 'POST',
       headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -301,7 +418,7 @@ export async function submitPreTripInspection(items, notes) {
     return { ok: true, local: true, cleared_for_shift: true, status: 'completed' };
   }
   try {
-    const res = await fetch(`${API_BASE}/api/driver/inspection`, {
+    const res = await fetch(`${getApiBase()}/api/driver/inspection`, {
       method: 'POST',
       headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ items, notes }),
@@ -334,7 +451,7 @@ export async function uploadDriverExpense({ amount, category, description, recei
   if (receiptFile) form.append('receipt', receiptFile);
 
   try {
-    const res = await fetch(`${API_BASE}/api/expenses/upload`, {
+    const res = await fetch(`${getApiBase()}/api/expenses/upload`, {
       method: 'POST',
       headers: driverSessionHeaders(),
       body: form,
@@ -372,7 +489,7 @@ export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message
     if (message) form.append('message', message);
     form.append('incident_type', 'sos');
     form.append('photo', photoFile);
-    const res = await fetch(`${API_BASE}/api/telemetry/sos/upload`, {
+    const res = await fetch(`${getApiBase()}/api/telemetry/sos/upload`, {
       method: 'POST',
       headers: driverSessionHeaders(),
       body: form,
@@ -382,7 +499,7 @@ export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message
     return data;
   }
 
-  const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
+  const res = await fetch(`${getApiBase()}/api/telemetry/sos`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -403,7 +520,7 @@ export async function reportDriverIssue(payload) {
   if (!session?.accessToken) {
     throw new Error('Δεν είστε συνδεδεμένος — ξανασυνδεθείτε για αναφορά');
   }
-  const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
+  const res = await fetch(`${getApiBase()}/api/telemetry/sos`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -431,7 +548,7 @@ export async function submitDriverExpense(form) {
     return { ok: true, local: true, id: `local-exp-${Date.now()}` };
   }
   try {
-    const res = await fetch(`${API_BASE}/api/v1/drivers/${driverId}/expenses`, {
+    const res = await fetch(`${getApiBase()}/api/v1/drivers/${driverId}/expenses`, {
       method: 'POST',
       headers: {
         ...driverSessionHeaders(),
@@ -466,7 +583,7 @@ export async function submitSafetyChecklist(verificationId, items) {
     let vid = verificationId;
     if (!vid) {
       const startRes = await fetch(
-        `${API_BASE}/api/v1/drivers/${driverId}/safety-checklist/start`,
+        `${getApiBase()}/api/v1/drivers/${driverId}/safety-checklist/start`,
         {
           method: 'POST',
           headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
@@ -480,7 +597,7 @@ export async function submitSafetyChecklist(verificationId, items) {
     }
     if (vid) {
       const res = await fetch(
-        `${API_BASE}/api/v1/drivers/${driverId}/safety-checklist/submit`,
+        `${getApiBase()}/api/v1/drivers/${driverId}/safety-checklist/submit`,
         {
           method: 'POST',
           headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
@@ -513,7 +630,7 @@ export function getDaySummaryStats(manifest) {
 /** Driver ↔ office chat */
 export async function fetchDriverChatMessages({ after } = {}) {
   const q = after ? `?after=${encodeURIComponent(after)}` : '';
-  const res = await fetch(`${API_BASE}/api/driver/chat/messages${q}`, {
+  const res = await fetch(`${getApiBase()}/api/driver/chat/messages${q}`, {
     headers: driverSessionHeaders(),
   });
   if (!res.ok) {
@@ -524,7 +641,7 @@ export async function fetchDriverChatMessages({ after } = {}) {
 }
 
 export async function sendDriverChatMessage(body) {
-  const res = await fetch(`${API_BASE}/api/driver/chat/messages`, {
+  const res = await fetch(`${getApiBase()}/api/driver/chat/messages`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ body }),
@@ -537,7 +654,7 @@ export async function sendDriverChatMessage(body) {
 }
 
 export async function markDriverChatRead() {
-  const res = await fetch(`${API_BASE}/api/driver/chat/read`, {
+  const res = await fetch(`${getApiBase()}/api/driver/chat/read`, {
     method: 'POST',
     headers: driverSessionHeaders(),
   });

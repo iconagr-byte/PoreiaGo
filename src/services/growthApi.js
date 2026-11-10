@@ -143,6 +143,22 @@ export async function updateTenantBrandingSettings(payload) {
   return normalizeBrandingResponse(legacy, 'file');
 }
 
+/** Live DNS check for office custom domain (www CNAME + apex A). */
+export async function checkTenantDomainDns(domain) {
+  const q = new URLSearchParams();
+  if (domain) q.set('domain', String(domain).trim().toLowerCase());
+  const suffix = q.toString() ? `?${q}` : '';
+  return saasFetch(`/api/v1/branding/domain/dns-check${suffix}`);
+}
+
+/** Re-run Traefik/NPM/nginx edge provision for the saved custom domain. */
+export async function provisionTenantDomainEdge(domain) {
+  const q = new URLSearchParams();
+  if (domain) q.set('domain', String(domain).trim().toLowerCase());
+  const suffix = q.toString() ? `?${q}` : '';
+  return saasFetch(`/api/v1/branding/domain/provision-edge${suffix}`, { method: 'POST' });
+}
+
 /** @deprecated — use fetchTenantBrandingSettings */
 export async function fetchAdminBranding() {
   return fetchTenantBrandingSettings();

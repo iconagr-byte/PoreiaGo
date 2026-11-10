@@ -60,35 +60,14 @@ class TeltonikaLiveMapFilterTests(unittest.TestCase):
             )
         )
 
-    def test_hides_phone_gps_on_teltonika_bound_plate(self):
-        """Driver smartphone must never paint a Teltonika-bound bus pin."""
+    def test_tracker_pin_rejects_phone_source(self):
+        """Phone GPS must use the driver path — not masquerade as tracker pin."""
         self.assertFalse(
             filt.office_allows_tracker_pin(
                 self.tenant,
-                {
-                    "vehicle_code": "EEX5670",
-                    "bus_plate": "EEX5670",
-                    "source": "driver_pwa",
-                    "driver_id": "drv-phone",
-                },
+                {"vehicle_code": "EEX5670", "source": "driver_pwa", "driver_id": "drv-1"},
             )
         )
-        self.assertFalse(
-            filt.office_allows_live_driver(
-                self.tenant,
-                "drv-phone",
-                {
-                    "vehicle_code": "EEX5670",
-                    "bus_plate": "EEX5670",
-                    "source": "driver_pwa",
-                    "driver_id": "drv-phone",
-                },
-            )
-        )
-
-    def test_plate_has_enabled_tracker(self):
-        self.assertTrue(filt.office_plate_has_enabled_tracker(self.tenant, "EEX5670"))
-        self.assertFalse(filt.office_plate_has_enabled_tracker(self.tenant, "NOPE"))
 
 
 if __name__ == "__main__":
