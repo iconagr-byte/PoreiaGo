@@ -838,15 +838,16 @@
 }
 
 .pg-wallet-pass-qr {
+  display: block;
   width: 5.25rem;
   height: 5.25rem;
   margin: 0 auto;
+  padding: 0.35rem;
+  box-sizing: border-box;
   border-radius: 0.75rem;
-  background:
-    linear-gradient(90deg, #0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    linear-gradient(#0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    #f8fafc;
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.12);
+  shape-rendering: crispEdges;
 }
 
 .pg-wallet-rise {

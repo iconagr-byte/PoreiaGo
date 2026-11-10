@@ -3,6 +3,7 @@
  */
 import { Link } from 'react-router-dom';
 import { WALLET_SESSION } from '../../lib/marketing/platformCopy.js';
+import MockBoardingQr from './MockBoardingQr.jsx';
 import '../../styles/platform-service-sessions.css';
 
 function renderHook(hook, accent) {
@@ -100,7 +101,7 @@ export default function PlatformWalletSession() {
                       <span>{v.when}</span>
                       <span>{v.seat}</span>
                     </div>
-                    <div className="pg-wallet-pass-qr" />
+                    <MockBoardingQr className="pg-wallet-pass-qr" />
                   </article>
                 </div>
               </div>
