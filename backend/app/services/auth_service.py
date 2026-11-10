@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from app.core.config import get_settings
 from app.core.tenant_rls import apply_tenant_rls
@@ -16,6 +17,13 @@ from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.services.mfa_service import MfaService
 from app.services.refresh_token_service import RefreshTokenService
+
+# Contabo schema drift must not 500 login when Tenant rows are fetched.
+_TENANT_NO_HEAVY = (
+    noload(Tenant.users),
+    noload(Tenant.bookings),
+    noload(Tenant.subscription),
+)
 
 
 def hash_password(password: str) -> str:
@@ -35,6 +43,16 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+_ADMIN_ROLES = frozenset(
+    {
+        UserRole.SUPERADMIN.value,
+        UserRole.TENANT_ADMIN.value,
+        UserRole.DISPATCHER.value,
+        UserRole.AUDITOR.value,
+    }
+)
+
+
 class AuthService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -49,19 +67,33 @@ class AuthService:
         password: str,
         mfa_code: str | None = None,
     ) -> tuple[str, str, User]:
+        # Contabo RLS can hide the office admin row even after set_config —
+        # same SET LOCAL off pattern as email+password multi-tenant match.
+        try:
+            await self._session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+
         tenant_result = await self._session.execute(
-            select(Tenant).where(Tenant.id == tenant_id),
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == tenant_id),
         )
         tenant = tenant_result.scalar_one_or_none()
         if not tenant:
             raise ValueError("Invalid credentials")
 
         result = await self._session.execute(
-            select(User).where(User.tenant_id == tenant_id, User.email == email.lower()),
+            select(User).where(
+                User.tenant_id == tenant_id,
+                func.lower(User.email) == email.strip().lower(),
+            ),
         )
         user = result.scalar_one_or_none()
-        if not user or not user.is_active or not verify_password(password, user.password_hash):
-            raise ValueError("Invalid credentials")
+        if not user or not user.is_active:
+            raise ValueError(
+                "Δεν βρέθηκε λογαριασμός διαχείρισης με αυτό το email σε αυτό το γραφείο"
+            )
+        if not verify_password(password, user.password_hash or ""):
+            raise ValueError("Λάθος email ή κωδικός")
 
         user = await self._ensure_dev_superadmin(user)
 
@@ -146,9 +178,128 @@ class AuthService:
                 password=password,
                 mfa_code=mfa_code,
             )
-        tenant_result = await self._session.execute(select(Tenant).where(Tenant.id == resolved_id))
+        tenant_result = await self._session.execute(
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == resolved_id),
+        )
         tenant = tenant_result.scalar_one()
         return token, refresh, user, tenant
+
+    async def login_with_google(
+        self,
+        *,
+        email: str,
+        tenant_id: UUID | None = None,
+        tenant_slug: str | None = None,
+        google_name: str | None = None,
+    ) -> tuple[str, str, User, Tenant]:
+        """Admin login via verified Google email — user must already exist with admin roles."""
+        resolved_id = await self._resolve_tenant_id_for_google(
+            email=email,
+            tenant_id=tenant_id,
+            tenant_slug=tenant_slug,
+        )
+        await apply_tenant_rls(self._session, resolved_id)
+        token, refresh, user = await self._authenticate_google_user(
+            tenant_id=resolved_id,
+            email=email,
+            google_name=google_name,
+        )
+        tenant_result = await self._session.execute(
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == resolved_id),
+        )
+        tenant = tenant_result.scalar_one()
+        return token, refresh, user, tenant
+
+    async def _authenticate_google_user(
+        self,
+        *,
+        tenant_id: UUID,
+        email: str,
+        google_name: str | None = None,
+    ) -> tuple[str, str, User]:
+        tenant_result = await self._session.execute(
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == tenant_id),
+        )
+        tenant = tenant_result.scalar_one_or_none()
+        if not tenant:
+            raise ValueError("Invalid credentials")
+
+        result = await self._session.execute(
+            select(User).where(User.tenant_id == tenant_id, User.email == email.lower()),
+        )
+        user = result.scalar_one_or_none()
+        if not user or not user.is_active:
+            raise ValueError("Δεν βρέθηκε λογαριασμός διαχείρισης με αυτό το Google email")
+
+        roles = [r for r in (user.roles or []) if r in _ADMIN_ROLES]
+        if not roles:
+            raise ValueError("Ο λογαριασμός δεν έχει δικαιώματα διαχείρισης")
+
+        if google_name and not str(user.full_name or "").strip():
+            user.full_name = google_name.strip()
+        user = await self._ensure_dev_superadmin(user)
+
+        role_enums = [UserRole(r) for r in roles if r in {e.value for e in UserRole}]
+        token = create_access_token(
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+            roles=role_enums or [UserRole.TENANT_ADMIN],
+            mfa_verified=True,
+            extra={"tenant_slug": tenant.slug, "provider": "google"},
+        )
+        refresh = await RefreshTokenService(self._session).issue(
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+        )
+        return token, refresh, user
+
+    async def _resolve_tenant_id_for_google(
+        self,
+        *,
+        email: str,
+        tenant_id: UUID | None,
+        tenant_slug: str | None,
+    ) -> UUID:
+        if tenant_id is not None:
+            return tenant_id
+
+        slug = (tenant_slug or "").strip().lower()
+        if slug:
+            result = await self._session.execute(
+                select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.slug == slug),
+            )
+            tenant = result.scalar_one_or_none()
+            if not tenant:
+                raise ValueError("Άγνωστος κωδικός εταιρείας")
+            return tenant.id
+
+        matches = await self._match_admin_users_by_email(email)
+        if not matches:
+            raise ValueError(
+                "Δεν βρέθηκε λογαριασμός διαχείρισης — χρησιμοποιήστε email που έχει "
+                "εγγραφεί στο γραφείο ή ζητήστε πρόσκληση από τον διαχειριστή.",
+            )
+        if len(matches) > 1:
+            raise ValueError(
+                "Το email ανήκει σε πολλές εταιρείες — συμπληρώστε τον κωδικό εταιρείας "
+                "(π.χ. admin-achillio-gr για Achillio Travel, όχι achillio)",
+            )
+        return matches[0].tenant_id
+
+    async def _match_admin_users_by_email(self, email: str) -> list[User]:
+        normalized = email.strip().lower()
+        try:
+            await self._session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+        result = await self._session.execute(
+            select(User).where(func.lower(User.email) == normalized),
+        )
+        return [
+            user
+            for user in result.scalars().all()
+            if user.is_active and bool(set(user.roles or []) & _ADMIN_ROLES)
+        ]
 
     async def _mirror_user_onto_tenant(
         self,
@@ -171,7 +322,10 @@ class AuthService:
 
             for candidate in matches:
                 t_result = await self._session.execute(
-                    select(Tenant).where(Tenant.id == candidate.tenant_id).limit(1),
+                    select(Tenant)
+                    .options(*_TENANT_NO_HEAVY)
+                    .where(Tenant.id == candidate.tenant_id)
+                    .limit(1),
                 )
                 t = t_result.scalar_one_or_none()
                 if t and not is_achillio_travel_office(t):
@@ -210,6 +364,25 @@ class AuthService:
         }
         if not (set(roles) & admin_roles):
             roles = [UserRole.TENANT_ADMIN.value]
+        # Achillio Travel office must not inherit PoreiaGo platform superadmin.
+        try:
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            t_result = await self._session.execute(
+                select(Tenant)
+                .options(*_TENANT_NO_HEAVY)
+                .where(Tenant.id == target_tenant_id)
+                .limit(1),
+            )
+            target = t_result.scalar_one_or_none()
+            if target and is_achillio_travel_office(target):
+                roles = [
+                    r
+                    for r in roles
+                    if str(r).lower() != UserRole.SUPERADMIN.value
+                ] or [UserRole.TENANT_ADMIN.value, UserRole.DISPATCHER.value]
+        except Exception:
+            pass
 
         user = User(
             tenant_id=target_tenant_id,
@@ -238,7 +411,9 @@ class AuthService:
 
         slug = (tenant_slug or "").strip().lower()
         if slug:
-            result = await self._session.execute(select(Tenant).where(Tenant.slug == slug))
+            result = await self._session.execute(
+                select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.slug == slug),
+            )
             tenant = result.scalar_one_or_none()
             if not tenant:
                 raise ValueError("Άγνωστος κωδικός εταιρείας")
@@ -249,7 +424,8 @@ class AuthService:
             raise ValueError("Λάθος email ή κωδικός")
         if len(matches) > 1:
             raise ValueError(
-                "Το email ανήκει σε πολλές εταιρείες — συμπληρώστε τον κωδικό εταιρείας (π.χ. achillio)",
+                "Το email ανήκει σε πολλές εταιρείες — συμπληρώστε τον κωδικό εταιρείας "
+                "(π.χ. admin-achillio-gr για Achillio Travel, όχι achillio)",
             )
         return matches[0].tenant_id
 

@@ -35,12 +35,43 @@ export function bookingIdAliases(bookingId) {
   const upper = raw.toUpperCase().replace(/\s+/g, '');
   const canon = localIdFromReference(upper);
   const pnr = normalizeReference(upper);
+  let core = pnr.startsWith('BK-') ? pnr.slice(3) : upper;
+  while (core.startsWith('B-') && !core.startsWith('BK-')) core = core.slice(2);
+  if (core.startsWith('BK-')) core = core.slice(3);
   const out = [];
   const seen = new Set();
-  for (const c of [raw, upper, canon, pnr, pnr.startsWith('BK-') ? `B-${pnr}` : '']) {
+  for (const c of [
+    raw,
+    upper,
+    canon,
+    pnr,
+    pnr.startsWith('BK-') ? `B-${pnr}` : '',
+    core,
+    core ? `B-${core}` : '',
+    core ? `BK-${core}` : '',
+  ]) {
     if (!c || seen.has(c)) continue;
     seen.add(c);
     out.push(c);
   }
   return out;
+}
+
+/**
+ * Prefer Postgres UUID / PNR for admin PATCH/cancel/delete.
+ * Local `B-…` display ids can 404 when Contabo reference_code differs slightly.
+ */
+export function adminBookingLookupKey(booking, fallbackId = '') {
+  if (booking && typeof booking === 'object') {
+    const key = String(
+      booking.saasBookingId ||
+        booking.pnr ||
+        booking.ticketRef ||
+        booking.reference_code ||
+        booking.id ||
+        '',
+    ).trim();
+    if (key) return key;
+  }
+  return String(fallbackId || '').trim();
 }

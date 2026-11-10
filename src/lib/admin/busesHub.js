@@ -4,7 +4,7 @@ import { isFleetOpsSubTab } from './fleetOpsHub.js';
 
 export const DEFAULT_BUSES_HUB_TAB = 'routes';
 
-export const BUSES_HUB_ORDER_KEY = 'poreiago_buses_hub_order_v1';
+export const BUSES_HUB_ORDER_KEY = 'poreiago_buses_hub_order_v2';
 
 export const BUSES_HUB_TABS = [
   {
@@ -16,7 +16,7 @@ export const BUSES_HUB_TABS = [
   },
   {
     id: 'customers',
-    label: 'Πελάτες λεωφορείων',
+    label: 'Πελάτες',
     description: 'CRM επιβατών — χωριστά από ενοικιάσεις',
     icon: 'group',
     accent: 'violet',
@@ -41,6 +41,13 @@ export const BUSES_HUB_TABS = [
     description: 'Λογαριασμοί και βάρδιες',
     icon: 'badge',
     accent: 'indigo',
+  },
+  {
+    id: 'driver_chat',
+    label: 'Chat Οδηγών',
+    description: 'Μηνύματα γραφείου ↔ οδηγός',
+    icon: 'forum',
+    accent: 'sky',
   },
   {
     id: 'bus_setup',
@@ -133,6 +140,19 @@ export function isBusesHubTab(tab) {
   if (!id) return false;
   if (BUSES_HUB_ID_SET.has(id)) return true;
   return isFleetOpsSubTab(id);
+}
+
+/**
+ * Rent CRM renders outside BusesHub. Never mount the hub chrome under it
+ * (empty «Εκδρομές / Πελάτες» rail below rental customer detail).
+ */
+export function shouldRenderBusesHub(tab, { rentOnly = false, customerServiceScope } = {}) {
+  if (!isBusesHubTab(tab)) return false;
+  const id = String(tab || '').trim();
+  const rentScope =
+    rentOnly || String(customerServiceScope || '').trim().toLowerCase() === 'rent';
+  if (id === 'customers' && rentScope) return false;
+  return true;
 }
 
 export function sanitizeBusesHubTab(tab) {

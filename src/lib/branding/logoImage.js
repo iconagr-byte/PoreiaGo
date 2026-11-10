@@ -7,8 +7,13 @@ const MAX_EDGE = 640;
  */
 export function fileToLogoDataUrl(file) {
   return new Promise((resolve, reject) => {
-    if (!file?.type?.startsWith('image/')) {
-      reject(new Error('Μόνο αρχεία εικόνας'));
+    const type = String(file?.type || '').toLowerCase();
+    if (!file || (!type.startsWith('image/') && !/\.(jpe?g|png|webp|gif)$/i.test(file.name || ''))) {
+      reject(new Error('Μόνο αρχεία εικόνας (JPG, PNG, WebP)'));
+      return;
+    }
+    if (/heic|heif/.test(type) || /\.heic$/i.test(file.name || '')) {
+      reject(new Error('Τα HEIC δεν υποστηρίζονται — αποθηκεύστε ως JPG ή PNG'));
       return;
     }
     const reader = new FileReader();
@@ -33,9 +38,9 @@ export function fileToLogoDataUrl(file) {
           ctx.drawImage(img, 0, 0, w, h);
 
           const preferPng =
-            file.type === 'image/png' ||
-            file.type === 'image/webp' ||
-            file.type === 'image/gif';
+            type === 'image/png' ||
+            type === 'image/webp' ||
+            type === 'image/gif';
 
           if (preferPng) {
             const png = canvas.toDataURL('image/png');
@@ -47,9 +52,18 @@ export function fileToLogoDataUrl(file) {
 
           let quality = 0.9;
           let dataUrl = canvas.toDataURL('image/jpeg', quality);
-          while (dataUrl.length > MAX_BYTES && quality > 0.5) {
+          while (dataUrl.length > MAX_BYTES && quality > 0.45) {
             quality -= 0.08;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+          if (dataUrl.length > MAX_BYTES) {
+            // Last resort: shrink canvas further.
+            const scale2 = 0.65;
+            canvas.width = Math.max(1, Math.round(w * scale2));
+            canvas.height = Math.max(1, Math.round(h * scale2));
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.72);
           }
           if (dataUrl.length > MAX_BYTES) {
             reject(new Error('Το λογότυπο είναι πολύ μεγάλο μετά τη συμπίεση'));

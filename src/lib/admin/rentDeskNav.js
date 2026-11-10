@@ -1,6 +1,6 @@
 /**
  * Rent desk tabs — one BackOffice panel (`fleet_rental`) + hub card rail.
- * Labels stay distinct from bus left-nav (Στόλος, Πελάτες λεωφορείων, …).
+ * Labels stay distinct from bus left-nav (Στόλος, Πελάτες, …).
  */
 
 export const RENT_DESK_TABS = [
@@ -8,7 +8,7 @@ export const RENT_DESK_TABS = [
     id: 'clients',
     label: 'Πελάτες ενοικιάσεων',
     icon: 'groups',
-    description: 'CRM πελατών ενοικίασης — χωριστά από λεωφορεία',
+    description: '',
     accent: 'teal',
     group: 'desk',
   },

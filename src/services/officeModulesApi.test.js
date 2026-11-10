@@ -10,11 +10,16 @@ vi.mock('../lib/saasJwt.js', () => ({
 
 vi.mock('../lib/platform/tenantHost.js', () => ({
   isPlatformMarketingHost: vi.fn(() => false),
+  isAchillioTravelHost: vi.fn((hostname = '') => {
+    const host = String(hostname || '').toLowerCase().split(':')[0];
+    const apex = host.replace(/^www\./, '');
+    return apex === 'achilliotravel.com' || host.endsWith('.achilliotravel.com');
+  }),
 }));
 
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
-import { shouldShowRentMenu } from './officeModulesApi.js';
+import { shouldShowRentMenu, shouldShowRentStorefront } from './officeModulesApi.js';
 
 describe('shouldShowRentMenu', () => {
   beforeEach(() => {
@@ -125,5 +130,94 @@ describe('shouldShowRentMenu', () => {
         tenant_slug: 'sunny-buses',
       }),
     ).toBe(false);
+  });
+});
+
+describe('shouldShowRentStorefront', () => {
+  beforeEach(() => {
+    isPlatformMarketingHost.mockReturnValue(false);
+  });
+
+  it('shows Rent on PoreiaGo marketing host', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(shouldShowRentStorefront({ rent_enabled: false })).toBe(true);
+  });
+
+  it('hides Rent on tenant storefront without rent_enabled', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: false,
+        office_kind: 'customer',
+      }),
+    ).toBe(false);
+  });
+
+  it('shows Rent on tenant storefront when rent_enabled', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: true,
+        office_kind: 'customer',
+      }),
+    ).toBe(true);
+  });
+
+  it('hides Rent for Achillio Travel even if rent_enabled is set', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: true,
+        office_kind: 'achillio_travel',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides Rent on achilliotravel.com hostname even if rent_enabled is set', () => {
+    expect(
+      shouldShowRentStorefront(
+        { rent_enabled: true, office_kind: 'customer' },
+        { hostname: 'www.achilliotravel.com' },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native Achillio even when hostname is localhost (marketing)', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'achillio_travel',
+          tenant_slug: 'admin-achillio-gr',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native customer office without rent contract despite localhost', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'customer',
+          tenant_slug: 'sunny-buses',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('shows Rent on native only when rent_enabled for sealed office', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: true,
+          office_kind: 'customer',
+          tenant_slug: 'rent-office',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(true);
   });
 });

@@ -1,11 +1,12 @@
 /**
- * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 5s).
+ * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 1s).
  */
 
+import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 import { detectIosDevice, iosGeolocationOptions } from './iosPwaGps.js';
 
 /** How often the driver app pushes GPS to the platform. */
-export const DRIVER_GPS_INTERVAL_MS = 5000;
+export const DRIVER_GPS_INTERVAL_MS = LIVE_REFRESH_MS;
 
 /** Shared last fix — SOS reuses this so it never opens a competing high-accuracy request. */
 let sharedLastCoords = null;
@@ -98,11 +99,14 @@ export function startDriverGeolocationWatch({
   }
 
   const isIos = detectIosDevice();
-  const publishEveryMs = Math.max(DRIVER_GPS_INTERVAL_MS, Number(intervalMs) || DRIVER_GPS_INTERVAL_MS);
+  const publishEveryMs = Math.max(
+    DRIVER_GPS_INTERVAL_MS,
+    Number(intervalMs) || DRIVER_GPS_INTERVAL_MS,
+  );
   const geoOptions = {
     ...iosGeolocationOptions(isIos),
     // Prefer a fresh fix at least as often as we publish.
-    maximumAge: Math.min(publishEveryMs, isIos ? 5000 : 4000),
+    maximumAge: Math.min(publishEveryMs, isIos ? 1000 : 1000),
   };
 
   let lastEmitAt = 0;

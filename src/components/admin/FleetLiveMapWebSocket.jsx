@@ -2,19 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
 import { isMapboxEnabled } from '../../lib/maps/mapboxConfig.js';
 import { useTelemetryAlerts } from '../../hooks/useTelemetryAlerts.js';
-import { mapSosAlertsWithCoords } from '../../lib/admin/fleetMapAlerts.js';
 import {
+  findActiveSosForVehicle,
+  mapSosAlertsWithCoords,
+} from '../../lib/admin/fleetMapAlerts.js';
+import {
+  fleetTelemetryIndicators,
   formatBoardingLabel,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
-import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  resolveVehicleTripTitle,
+  vehicleHasActiveExcursion,
+} from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
+import { formatTeltonikaEmptyMapHint } from '../../lib/admin/teltonikaMapPresence.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
+import { collapseVehicleListByPlate } from '../../lib/admin/fleetPinDedupe.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
+import { fetchTeltonikaDevices } from '../../services/telemetryApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
-import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
 import FleetVehicleHistoryModal from './FleetVehicleHistoryModal.jsx';
 import DriverOfficeChatPanel from './DriverOfficeChatPanel.jsx';
@@ -31,6 +44,9 @@ export default function FleetLiveMapWebSocket() {
   const [showPlaces, setShowPlaces] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [rentalOverlays, setRentalOverlays] = useState([]);
+  const [teltonikaDevices, setTeltonikaDevices] = useState([]);
+  /** 'loading' | 'ready' | 'error' — never claim unbound before fetch settles. */
+  const [teltonikaDevicesStatus, setTeltonikaDevicesStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -50,15 +66,57 @@ export default function FleetLiveMapWebSocket() {
     };
   }, [tenantId]);
 
+  // When the live fleet is empty, explain Teltonika online/offline (not a map bug).
+  useEffect(() => {
+    let cancelled = false;
+    let hadReady = false;
+    setTeltonikaDevicesStatus((prev) => {
+      if (prev === 'ready') {
+        hadReady = true;
+        return prev;
+      }
+      return 'loading';
+    });
+    const load = async () => {
+      try {
+        const rows = await fetchTeltonikaDevices();
+        if (cancelled) return;
+        setTeltonikaDevices(Array.isArray(rows) ? rows : []);
+        setTeltonikaDevicesStatus('ready');
+        hadReady = true;
+      } catch {
+        if (cancelled) return;
+        // Keep last good list on 502 blips — never flash «no IMEI bound».
+        setTeltonikaDevicesStatus(hadReady ? 'ready' : 'error');
+      }
+    };
+    load();
+    const timer = setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [tenantId]);
+
   const mapVehicles = useMemo(
-    () => mergeRentalOverlays(vehicles, rentalOverlays),
+    () => collapseVehicleListByPlate(mergeRentalOverlays(vehicles, rentalOverlays)),
     [vehicles, rentalOverlays],
   );
 
+  // Blue breadcrumb trail only while an excursion is active — not idle Teltonika pins.
+  const trailVehicles = useMemo(
+    () => mapVehicles.filter((v) => vehicleHasActiveExcursion(v)),
+    [mapVehicles],
+  );
+
   // SOS pins always on (χωρίς toggle UI) — κρίσιμο για ασφάλεια.
-  const { alerts } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
+  const { alerts, clearAlert } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
   const sosAlerts = useMemo(() => mapSosAlertsWithCoords(alerts), [alerts]);
   const focusSosAlert = sosAlerts[0] ?? null;
+  const historySos = useMemo(
+    () => findActiveSosForVehicle(sosAlerts, historyVehicle),
+    [sosAlerts, historyVehicle],
+  );
 
   const center = useMemo(() => {
     if (mapVehicles.length) return [mapVehicles[0].lat, mapVehicles[0].lng];
@@ -84,7 +142,7 @@ export default function FleetLiveMapWebSocket() {
             {mapVehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
             {rentalLiveCount ? ` · ${rentalLiveCount} ενοικιάσεις` : ''}
             {transport === 'poll'
-              ? ` · ενημέρωση ${Math.max(1, Math.round((pollIntervalMs || 5000) / 1000))}s`
+              ? ` · ενημέρωση ${Math.max(1, Math.round((pollIntervalMs || 1000) / 1000))}s`
               : ''}
           </p>
         </div>
@@ -103,6 +161,11 @@ export default function FleetLiveMapWebSocket() {
             onClick={() => setShowTrails((v) => !v)}
             className={`fleet-apple-chip ${showTrails ? 'is-on' : ''}`}
             aria-pressed={showTrails}
+            title={
+              trailVehicles.length
+                ? `Μπλε πορεία μόνο σε ενεργές εκδρομές (${trailVehicles.length})`
+                : 'Μπλε πορεία μόνο όταν υπάρχει ενεργή εκδρομή'
+            }
           >
             <span className="material-symbols-outlined text-[16px]">route</span>
             Πλήρης πορεία
@@ -126,8 +189,9 @@ export default function FleetLiveMapWebSocket() {
 
       {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          Δεν υπάρχουν ενεργοί οδηγοί. Στην PWA πατήστε «Έναρξη βάρδιας», επιτρέψτε τοποθεσία και
-          περιμένετε μήνυμα επιβεβαίωσης θέσης — μετά hard-refresh αυτόν τον χάρτη.
+          {formatTeltonikaEmptyMapHint(teltonikaDevices, teltonikaDevicesStatus)} Η «Έναρξη
+          βάρδιας» αφορά μόνο το App οδηγού — όταν και τα δύο κανάλια είναι ζωντανά, στο εικονίδιο
+          φαίνονται «GPS οχήματος» + «App».
         </p>
       ) : null}
 
@@ -136,6 +200,7 @@ export default function FleetLiveMapWebSocket() {
           {mapbox ? (
             <FleetLiveMapMapbox
               vehicles={mapVehicles}
+              trailVehicles={trailVehicles}
               heatmap={[]}
               showHeat={false}
               geofenceLayers={null}
@@ -148,10 +213,12 @@ export default function FleetLiveMapWebSocket() {
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}
+              onClearSos={clearAlert}
             />
           ) : (
             <FleetLiveMapLeaflet
               vehicles={mapVehicles}
+              trailVehicles={trailVehicles}
               center={center}
               heatmap={[]}
               showHeat={false}
@@ -165,6 +232,7 @@ export default function FleetLiveMapWebSocket() {
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}
+              onClearSos={clearAlert}
             />
           )}
         </div>
@@ -187,6 +255,8 @@ export default function FleetLiveMapWebSocket() {
                 {mapVehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
                   const active = (selected?.id || selectedId) === v.id;
+                  const indicators = fleetTelemetryIndicators(v);
+                  const gpsSources = resolveFleetGpsSources(v);
                   return (
                     <li key={v.id}>
                       <button
@@ -227,12 +297,33 @@ export default function FleetLiveMapWebSocket() {
                               })()}
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--fleet-secondary)]">
-                              <span>{Math.round(v.speed || 0)} km/h</span>
                               <span>
                                 {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
                               </span>
                               <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
                               {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
+                            </div>
+                            <div className="fleet-apple-telemetry-chips">
+                              {indicators.map((chip) => (
+                                <span
+                                  key={chip.key}
+                                  className={`fleet-apple-telemetry-chip${chip.tone ? ` fleet-apple-telemetry-chip--${chip.tone}` : ''}`}
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">{chip.label}</span>
+                                  <span className="fleet-apple-telemetry-chip__value">{chip.value}</span>
+                                </span>
+                              ))}
+                              {gpsSources.map((kind) => (
+                                <span
+                                  key={`gps-${kind}`}
+                                  className="fleet-apple-telemetry-chip fleet-apple-telemetry-chip--gps"
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">GPS</span>
+                                  <span className="fleet-apple-telemetry-chip__value">
+                                    {formatFleetGpsSourceChipLabel(kind)}
+                                  </span>
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -247,13 +338,15 @@ export default function FleetLiveMapWebSocket() {
           </div>
 
           <div className="fleet-apple-side-card">
-            <AdminFleetPushPanel />
-          </div>
-
-          <div className="fleet-apple-side-card">
             <DriverOfficeChatPanel
               compact
-              driverId={selected?.driver_id || selected?.driverId || null}
+              driverId={
+                selected?.driver_id ||
+                selected?.app_driver_id ||
+                selected?.driverId ||
+                selected?.appDriverId ||
+                null
+              }
               driverName={selected?.driver_name || selected?.driverName}
               tripId={selected?.trip_id ?? selected?.tripId ?? null}
             />
@@ -269,6 +362,8 @@ export default function FleetLiveMapWebSocket() {
         open={Boolean(historyVehicle)}
         vehicle={historyVehicle}
         onClose={() => setHistoryVehicle(null)}
+        activeSos={historySos}
+        onClearSos={clearAlert}
       />
     </div>
   );
