@@ -9,6 +9,8 @@ const PLATFORM_COPY_RE = /aerostride|poreiago/i;
  */
 const PLATFORM_LOGO_RE = /poreiago|aerostride/i;
 
+const LOGO_BG_MODES = new Set(['none', 'white', 'soft', 'dark']);
+
 export function isPlatformPlaceholderBrand(name) {
   return !name || PLATFORM_BRAND_RE.test(String(name).trim());
 }
@@ -20,9 +22,10 @@ export function isPlatformPlaceholderCopyright(text) {
 export function isPlatformPlaceholderLogo(url) {
   const value = String(url || '').trim();
   if (!value) return true;
-  // Tenant uploads (data URLs, absolute CDN, /api/site/assets/…) are valid.
+  // Tenant uploads (data URLs, absolute CDN, /api/site/assets/…, office-assets) are valid.
   if (value.startsWith('data:image/')) return false;
   if (value.startsWith('/api/site/assets/')) return false;
+  if (value.startsWith('/api/site/office-assets/')) return false;
   return PLATFORM_LOGO_RE.test(value);
 }
 
@@ -53,6 +56,10 @@ export function resolveOfficeBrand(siteAppearance = {}) {
     hasLogo: Boolean(logoUrl),
     heightPx: clampLogoHeight(siteAppearance.logo_height_px),
     maxWidthPx: clampLogoMaxWidth(siteAppearance.logo_max_width_px),
+    radiusPx: clampLogoRadius(siteAppearance.logo_radius_px),
+    paddingPx: clampLogoPadding(siteAppearance.logo_padding_px),
+    bgMode: normalizeLogoBgMode(siteAppearance.logo_bg_mode),
+    shadow: siteAppearance.logo_shadow === true,
     // Default ON when a real office name exists — brand must be visible in the header.
     showName: siteAppearance.logo_show_name !== false && Boolean(name),
   };
@@ -70,14 +77,71 @@ export function clampLogoMaxWidth(value) {
   return Math.max(60, Math.min(400, Math.round(n)));
 }
 
-/** Inline styles for office logo images (header / footer / admin). */
-export function officeLogoImageStyle(siteAppearance = {}) {
-  return {
-    height: `${clampLogoHeight(siteAppearance.logo_height_px)}px`,
+export function clampLogoRadius(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(48, Math.round(n)));
+}
+
+export function clampLogoPadding(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(24, Math.round(n)));
+}
+
+export function normalizeLogoBgMode(value) {
+  const mode = String(value || 'none').trim().toLowerCase();
+  return LOGO_BG_MODES.has(mode) ? mode : 'none';
+}
+
+function logoBgColor(mode) {
+  switch (mode) {
+    case 'white':
+      return '#ffffff';
+    case 'soft':
+      return 'rgba(15, 23, 42, 0.06)';
+    case 'dark':
+      return 'rgba(15, 23, 42, 0.92)';
+    default:
+      return 'transparent';
+  }
+}
+
+/** Caps for phone / Capacitor top bars (website header sizes are often 48–96px). */
+export const NATIVE_LOGO_MAX_HEIGHT_PX = 36;
+export const NATIVE_LOGO_MAX_WIDTH_PX = 140;
+
+/**
+ * Inline styles for office logo images (header / footer / admin).
+ * @param {object} siteAppearance
+ * @param {{ compact?: boolean }} [opts] — compact: mobile / native topbar (smaller + tighter).
+ */
+export function officeLogoImageStyle(siteAppearance = {}, opts = {}) {
+  const compact = opts.compact === true;
+  const radius = clampLogoRadius(siteAppearance.logo_radius_px);
+  let padding = clampLogoPadding(siteAppearance.logo_padding_px);
+  let height = clampLogoHeight(siteAppearance.logo_height_px);
+  let maxWidth = clampLogoMaxWidth(siteAppearance.logo_max_width_px);
+  if (compact) {
+    height = Math.min(height, NATIVE_LOGO_MAX_HEIGHT_PX);
+    maxWidth = Math.min(maxWidth, NATIVE_LOGO_MAX_WIDTH_PX);
+    padding = Math.min(padding, 2);
+  }
+  const bgMode = normalizeLogoBgMode(siteAppearance.logo_bg_mode);
+  const shadow = siteAppearance.logo_shadow === true && !compact;
+  const style = {
+    height: `${height}px`,
     width: 'auto',
-    maxWidth: `${clampLogoMaxWidth(siteAppearance.logo_max_width_px)}px`,
+    maxWidth: `${maxWidth}px`,
+    maxHeight: compact ? `${NATIVE_LOGO_MAX_HEIGHT_PX}px` : undefined,
     objectFit: 'contain',
+    borderRadius: `${Math.min(radius, compact ? 8 : radius)}px`,
+    padding: padding ? `${padding}px` : undefined,
+    background: bgMode === 'none' ? undefined : logoBgColor(bgMode),
+    boxShadow: shadow ? '0 4px 14px rgba(15, 23, 42, 0.14)' : undefined,
+    display: 'block',
   };
+  return style;
 }
 
 /** Strip legacy platform defaults from appearance payloads. */

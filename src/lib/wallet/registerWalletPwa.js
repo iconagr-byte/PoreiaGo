@@ -2,9 +2,11 @@
  * Register My Wallet service worker + manifest (scope /wallet).
  */
 
+import { isNativeApp } from '../capacitor/isNativeApp.js';
+
 const MANIFEST_HREF = '/wallet-pwa/manifest.webmanifest';
 const SW_HREF = '/wallet-pwa/sw.js';
-const THEME = '#0f4c81';
+const THEME = '#ffffff';
 const APPLE_ICON = '/icons/wallet-pwa-192.png';
 
 function upsertLink(rel, href, attrs = {}) {
@@ -83,6 +85,16 @@ export function registerWalletServiceWorker() {
 }
 
 export function setupWalletPwa() {
+  // Native Capacitor Wallet app: no SW cache of old website assets.
+  if (isNativeApp()) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => {
+        regs.forEach((r) => r.unregister().catch(() => {}));
+      }).catch(() => {});
+    }
+    injectWalletPwaHead();
+    return () => {};
+  }
   injectWalletPwaHead();
   return registerWalletServiceWorker();
 }

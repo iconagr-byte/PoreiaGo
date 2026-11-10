@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { generateSeatMap } from '../lib/seats/generateSeatMap.js';
 import {
   findSeatConflicts,
@@ -13,6 +12,7 @@ import { loadBookings } from '../lib/ticketing/bookingStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { useTripPricing } from '../hooks/useTripPricing.js';
+import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
 import LuxuryBusSeatMap from '../components/seats/LuxuryBusSeatMap.jsx';
 import SeatSelectionAside from '../components/seats/SeatSelectionAside.jsx';
@@ -28,28 +28,28 @@ import {
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+} from '../lib/wallet/walletBookTrip.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
+  const seedTrip = officeTripFromWalletState(location.state, tripId);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [fleetCheck, setFleetCheck] = useState({ loading: true, available: true, reason: null, warning: null });
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
-  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
-
-  const trip = useMemo(() => {
-    const id = Number(tripId);
-    if (!id) return null;
-    const found = loadTrips().find((t) => t.id === id) || null;
-    if (found) return found;
-    if (isPlatformSeatBookingDemo()) {
-      return loadPlatformDemoTrips().find((t) => t.id === id) || null;
-    }
-    return null;
-  }, [tripId]);
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
+    seedTrip,
+    fromWallet,
+  });
 
   const { pricePerSeat, quote } = useTripPricing(trip);
   const tripBasePrice = quote?.finalPrice ?? trip?.price ?? 0;
@@ -75,7 +75,10 @@ export default function SeatSelection() {
     (async () => {
       let remote = [];
       try {
-        const data = await fetchOccupiedSeats(trip.id, getSaasTenantId());
+        const data = await fetchOccupiedSeats(
+          trip.id,
+          getWalletTenantId() || getSaasTenantId(),
+        );
         remote = Array.isArray(data?.seats) ? data.seats : [];
       } catch {
         /* offline / no tenant — fall back to local bookings */
@@ -142,6 +145,25 @@ export default function SeatSelection() {
     );
   };
 
+  useEffect(() => {
+    if (tripLoading || trip) return;
+    toast.error(
+      fromWallet
+        ? 'Η εκδρομή δεν φορτώθηκε. Μείνετε στο Wallet / δοκιμάστε ξανά.'
+        : 'Η εκδρομή δεν βρέθηκε.',
+      { id: 'seat-trip-missing' },
+    );
+  }, [tripLoading, trip, fromWallet]);
+
+  if (tripLoading) {
+    return (
+      <div className="relative min-h-screen bg-surface flex items-center justify-center p-6">
+        <MinimalPageBackground />
+        <p className="relative z-10 text-on-surface-variant text-sm font-semibold">Φόρτωση θέσεων…</p>
+      </div>
+    );
+  }
+
   if (!trip || !layout) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center p-6">
@@ -149,8 +171,15 @@ export default function SeatSelection() {
         <div className="relative z-10 bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl p-8 text-center max-w-sm shadow-sm border border-black/[0.05]">
           <span className="material-symbols-outlined text-4xl text-error mb-3">error</span>
           <h1 className="font-bold text-lg text-on-surface mb-2">Η εκδρομή δεν βρέθηκε</h1>
-          <Link to="/" className="text-primary font-bold text-sm hover:underline">
-            Αρχική σελίδα
+          <p className="text-sm text-on-surface-variant mb-4 leading-relaxed">
+            Δεν φορτώθηκε ο χάρτης θέσεων. Επιστρέψτε στο Wallet και δοκιμάστε ξανά — όχι στην
+            αρχική της πλατφόρμας.
+          </p>
+          <Link
+            to={fromWallet ? '/wallet' : '/'}
+            className="text-primary font-bold text-sm hover:underline"
+          >
+            {fromWallet ? 'Πίσω στο Wallet' : 'Αρχική σελίδα'}
           </Link>
         </div>
       </div>
@@ -196,6 +225,8 @@ export default function SeatSelection() {
       extrasTotal: 0,
       extrasSelection: {},
       demo: isDemo,
+      // Survive refresh / lost React Router state on Capacitor WebView.
+      fromWallet: Boolean(fromWallet),
     });
     if (!isDemo) {
       trackAbandonedCheckout({
@@ -205,20 +236,27 @@ export default function SeatSelection() {
         amountEur: total,
       });
     }
-    navigate(`/book/extras/${trip.id}`);
+    navigate(`/book/extras/${trip.id}`, { state: fromWallet ? location.state : undefined });
   };
 
+  const nativeApp = isNativeApp();
+
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-[#f8f6f1] via-surface to-[#eef1f5] py-6 px-4 md:py-8">
-      <MinimalPageBackground />
+    <div className="relative min-h-screen bg-gradient-to-b from-[#f8f6f1] via-surface to-[#eef1f5] py-6 px-4 md:py-8 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))] xl:pb-8">
+      {/* Blur orbs / fixed layers hurt Android WebView scroll + IME — skip on Capacitor. */}
+      {nativeApp ? null : <MinimalPageBackground />}
       <div className="relative z-10 max-w-7xl mx-auto">
         <button
           type="button"
-          onClick={() => navigate(`/trip/${trip.id}`)}
+          onClick={() => {
+            // Wallet Κράτηση → back to Αρχική; storefront cards → trip list.
+            if (fromWallet) navigate('/wallet');
+            else navigate('/#search-results');
+          }}
           className="mb-4 flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-bold text-sm"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          Πίσω
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
         </button>
 
         {isDemo ? (
@@ -303,7 +341,10 @@ export default function SeatSelection() {
             className="hidden xl:block xl:sticky xl:top-6"
           />
 
-          <div className="w-full flex flex-col items-center xl:justify-self-center">
+          <div
+            className="w-full flex flex-col items-center xl:justify-self-center"
+            style={{ touchAction: 'pan-y' }}
+          >
             <LuxuryBusSeatMap
               layout={layout}
               seats={seats}
@@ -316,15 +357,17 @@ export default function SeatSelection() {
             />
           </div>
 
-          <div className="w-full xl:w-auto shrink-0 xl:sticky xl:top-6 xl:justify-self-end">
-            <div className="bg-white/90 backdrop-blur-md rounded-[1.5rem] p-5 border border-amber-500/10 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
-              <h3 className="font-bold text-base text-slate-900 mb-4 flex items-center gap-2">
+          {/* Mobile: sticky bottom bar so Συνέχεια stays reachable without scroll.
+              Desktop: sticky sidebar as before. */}
+          <div className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-[#eef1f5] via-[#eef1f5]/95 to-transparent xl:static xl:inset-auto xl:z-auto xl:w-auto xl:shrink-0 xl:sticky xl:top-6 xl:justify-self-end xl:p-0 xl:bg-transparent">
+            <div className="bg-white/95 backdrop-blur-md rounded-[1.5rem] p-4 md:p-5 border border-amber-500/10 shadow-[0_16px_40px_rgba(15,23,42,0.12)] max-w-7xl mx-auto xl:max-w-none xl:shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+              <h3 className="font-bold text-base text-slate-900 mb-3 xl:mb-4 flex items-center gap-2">
                 <span className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center">
                   <span className="material-symbols-outlined text-amber-800 text-[18px]">shopping_bag</span>
                 </span>
                 Η κράτησή σας
               </h3>
-              <div className="space-y-3 mb-5 text-sm">
+              <div className="space-y-2 xl:space-y-3 mb-3 xl:mb-5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">Θέσεις</span>
                   <span className="font-bold text-on-surface">{selectedLabels || '—'}</span>
@@ -337,7 +380,7 @@ export default function SeatSelection() {
                       : `από €${fromPrice.toFixed(0)}`}
                   </span>
                 </div>
-                <div className="flex justify-between pt-3 border-t border-surface-container">
+                <div className="flex justify-between pt-2 xl:pt-3 border-t border-surface-container">
                   <span className="font-bold">Σύνολο</span>
                   <span className="text-xl font-bold text-primary">€{total.toFixed(2)}</span>
                 </div>
@@ -351,9 +394,9 @@ export default function SeatSelection() {
                   occupancyLoading
                 }
                 onClick={continueToExtras}
-                className={`w-full py-3.5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
+                className={`w-full py-3.5 px-5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
               >
-                {isDemo ? 'Συνέχεια (Demo)' : 'Πρόσθεσε υπηρεσίες'}
+                {isDemo ? 'Συνέχεια (Demo)' : 'Συνέχεια'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>

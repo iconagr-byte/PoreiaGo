@@ -848,12 +848,20 @@
   border-right: 1px solid var(--emh-border);
   background: linear-gradient(180deg, #f8fafc 0%, #fafbfc 100%);
   gap: 0.5rem;
+  /* Keep rail menus reachable on short / laptop screens */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  max-height: 100%;
+  scrollbar-gutter: stable;
 }
 
 .emh-panel-rail--stack {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
   gap: 0.5rem;
 }
 
@@ -1685,17 +1693,48 @@ select.emh-input {
   }
 }
 
+@media (max-height: 820px) {
+  .emh-editor {
+    height: calc(100vh - 8rem);
+    min-height: 0;
+  }
+
+  .emh-editor--wide {
+    height: calc(100vh - 5.5rem);
+    min-height: 0;
+  }
+
+  .emh-panel-rail {
+    padding-bottom: 1.5rem;
+  }
+
+  .emh-rail-card-body {
+    max-height: min(42vh, 360px);
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 900px) {
   .emh-split-editor {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
   }
 
-  .emh-panel-rail {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    align-items: start;
+  .emh-panel-rail,
+  .emh-panel-rail--stack {
+    display: flex;
+    flex-direction: column;
+    max-height: min(52vh, 420px);
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--emh-border);
+  }
+
+  .emh-rail-templates-btn {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: linear-gradient(135deg, #fff 0%, var(--emh-accent-soft) 120%);
   }
 
   .emh-panel-preview {

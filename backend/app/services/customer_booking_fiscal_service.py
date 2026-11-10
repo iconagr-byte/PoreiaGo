@@ -34,10 +34,14 @@ async def _resolve_tenant_id(
     email = customer_email.strip().lower()
     key = booking_key.strip()
     filters = []
+    from sqlalchemy import String, cast
+
     try:
-        filters.append(Booking.id == UUID(key))
+        as_uuid = str(UUID(key))
+        filters.append(cast(Booking.id, String) == as_uuid)
+        filters.append(cast(Booking.id, String) == key)
     except ValueError:
-        pass
+        filters.append(cast(Booking.id, String) == key)
     ref = normalize_reference(key)
     filters.append(Booking.reference_code == ref)
     filters.append(Booking.reference_code == key.upper())
@@ -87,10 +91,15 @@ class CustomerBookingFiscalService:
 
             key = booking_key.strip()
             filters = []
+            # Contabo may store bookings.id as TEXT — always compare as text.
+            from sqlalchemy import String, cast
+
             try:
-                filters.append(Booking.id == UUID(key))
+                as_uuid = str(UUID(key))
+                filters.append(cast(Booking.id, String) == as_uuid)
+                filters.append(cast(Booking.id, String) == key)
             except ValueError:
-                pass
+                filters.append(cast(Booking.id, String) == key)
             ref = normalize_reference(key)
             filters.append(Booking.reference_code == ref)
             filters.append(Booking.reference_code == key.upper())

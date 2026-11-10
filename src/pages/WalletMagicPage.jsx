@@ -36,6 +36,7 @@ export default function WalletMagicPage() {
             provider: profile.provider || 'magic',
             phone: profile.phone,
             customerId: profile.customer_id,
+            tenant_id: profile.tenant_id,
           },
           profile.access_token,
         );
