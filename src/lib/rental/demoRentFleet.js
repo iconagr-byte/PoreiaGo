@@ -8,6 +8,7 @@
  */
 
 import { isPlatformMarketingHost } from '../platform/tenantHost.js';
+import { isNativeRentDemo } from './nativeRentDemo.js';
 
 const WM = (path) =>
   `https://upload.wikimedia.org/wikipedia/commons/${path}`;
@@ -140,6 +141,9 @@ export function withDemoRentFleet(vehicles, opts = {}) {
 
   // No window + no explicit host (SSR / unit without mock) → never invent.
   if (!hostname && opts.hostname == null && typeof window === 'undefined') return [];
+
+  // Native «Δες demo ενοικιάσεις» — showcase fleet without an office contract.
+  if (isNativeRentDemo()) return DEMO_RENT_FLEET;
 
   if (!isPlatformMarketingHost(hostname)) return [];
   return DEMO_RENT_FLEET;

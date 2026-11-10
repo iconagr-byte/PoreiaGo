@@ -220,4 +220,29 @@ describe('shouldShowRentStorefront', () => {
       ),
     ).toBe(true);
   });
+
+  it('shows Rent on native Achillio when rent demo session is active', () => {
+    const store = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => {
+        store.set(k, String(v));
+      },
+      removeItem: (k) => {
+        store.delete(k);
+      },
+    });
+    store.set('poreiago_native_rent_demo_v1', '1');
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'achillio_travel',
+          tenant_slug: 'admin-achillio-gr',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(true);
+    vi.unstubAllGlobals();
+  });
 });

@@ -35,6 +35,7 @@ import {
   clearPreferRentLookup,
   markPreferRentLookup,
 } from '../lib/rental/preferRentLookup.js';
+import { enableNativeRentDemo } from '../lib/rental/nativeRentDemo.js';
 import {
   getQuickLoginCandidate,
   unlockQuickLogin,
@@ -649,11 +650,28 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               Εγγραφή
             </Link>
           </p>
-          {!isNativeApp() ? (
+          {isNativeApp() ? (
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-ghost wallet-btn-block mt-4"
+              onClick={() => {
+                enableNativeRentDemo();
+                rememberNativeRoleHome(NATIVE_ROLE_RENT);
+                navigate('/rent', { replace: true });
+              }}
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                  directions_car
+                </span>
+                Demo ενοικιάσεις — χωρίς γραφείο
+              </span>
+            </button>
+          ) : (
             <p className="text-xs text-center mt-3">
               <BookingLookupEntryLink preferRent={rentIntent} className={linkClass} />
             </p>
-          ) : null}
+          )}
         </>
       )}
     </>
