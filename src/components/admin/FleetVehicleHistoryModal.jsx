@@ -103,8 +103,6 @@ export default function FleetVehicleHistoryModal({
       });
     return () => {
       cancelled = true;
-      window.clearInterval(pollTimer);
-      window.removeEventListener('office-boarding-updated', onBoarded);
     };
   }, [open, vehicle?.id, vehicle?.trip_id, vehicle?.driver_id, vehicle?.bus_plate]);
 

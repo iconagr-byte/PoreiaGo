@@ -815,38 +815,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       if (result.offline) {
         toast.success('Το θέμα αποθηκεύτηκε τοπικά', { id: 'theme-apply' });
       } else {
-        toast.success(
-          includeColors
-            ? `Εφαρμόστηκε διάταξη + χρώματα «${theme.nameEl}»`
-            : `Εφαρμόστηκε διάταξη «${theme.nameEl}» — ρύθμισε χρώματα στα Γενικά`,
-          { id: 'theme-apply' },
-        );
+        toast.success(includeColors ? `Εφαρμόστηκε διάταξη + χρώματα «${theme.nameEl}»` : `Εφαρμόστηκε διάταξη «${theme.nameEl}» — ρύθμισε χρώματα στα Γενικά`, { id: 'theme-apply' });
       }
     } catch (err) {
       if (err.message === 'AUTH_EXPIRED') return;
-      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος', { id: 'theme-apply' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRentThemePreview = (theme, opts = {}) => {
-    const patch = rentThemeToAppearancePatch(theme, opts);
-    setForm((p) => ({ ...p, ...patch }));
-    toast.success(`Προεπισκόπηση /rent: ${theme.nameEl}`, { id: 'rent-theme-preview' });
-  };
-
-  const handleRentThemeApply = async (theme, opts = {}) => {
-    const patch = rentThemeToAppearancePatch(theme, opts);
-    setForm((p) => ({ ...p, ...patch }));
-    setSaving(true);
-    try {
-      const result = await updateSiteAppearance(patch);
-      setForm((p) => ({ ...p, ...result.data }));
-      toast.success(`Εφαρμόστηκε θέμα /rent «${theme.nameEl}»`, { id: 'rent-theme-apply' });
-    } catch (err) {
-      if (err.message === 'AUTH_EXPIRED') return;
-      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος /rent', { id: 'rent-theme-apply' });
+      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος', { id: 'theme-apply-err' });
     } finally {
       setSaving(false);
     }

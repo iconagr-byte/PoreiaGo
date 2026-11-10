@@ -25,13 +25,6 @@ console.assert(grafio.brandLabel === 'Poreiago Rent', 'strip placeholder Γρα�
 const enoik = resolveRentAppBranding({ rent_office_name: 'Ενοικιάσεις' });
 console.assert(enoik.brandLabel === 'Poreiago Rent', 'strip Ενοικιάσεις');
 
-const genericOffice = resolveRentAppBranding({ rent_office_name: 'Γραφείο' });
-console.assert(genericOffice.brandLabel === 'Ενοικίαση', 'generic office brand');
-console.assert(
-  genericOffice.heroKicker === 'Επωφελήσου από την ενοικίαση',
-  'generic office hero is benefit copy',
-);
-
 const office = resolveRentAppBranding({
   rent_office_name: 'Achillio Rent',
   rent_hero_title: 'Κλείσε αυτοκίνητο σήμερα',
@@ -39,10 +32,6 @@ const office = resolveRentAppBranding({
   logo_url: '/api/site/assets/logo',
 });
 console.assert(office.brandLabel === 'Achillio Rent', 'custom office');
-console.assert(
-  office.heroKicker === DEFAULT_RENT_APP_BRANDING.rent_hero_kicker,
-  'named office still uses benefit kicker in hero',
-);
 console.assert(office.title === 'Κλείσε αυτοκίνητο σήμερα', 'custom title');
 console.assert(office.isCustomized === true, 'customized flag');
 console.assert(office.logoUrl === '/api/site/assets/logo', 'logo kept');

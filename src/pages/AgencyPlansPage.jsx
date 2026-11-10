@@ -21,13 +21,7 @@ import { fetchPublicAgencyPlanCatalog } from '../services/agencyPlanCatalogApi.j
 import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
 import '../styles/platform-contracts.css';
 
-/**
- * Public SaaS contracts — split by product:
- * - /grafeia → λεωφορεία
- * - /grafeia/rent → ενοικιάσεις
- */
-export default function AgencyPlansPage({ product = 'buses' } = {}) {
-  const isRent = product === 'rent';
+export default function AgencyPlansPage() {
   const navigate = useNavigate();
   const [interval, setInterval] = useState('month');
   const loggedIn = Boolean(getSaasToken());
@@ -35,7 +29,6 @@ export default function AgencyPlansPage({ product = 'buses' } = {}) {
   const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
 
   useEffect(() => {
-    if (!isRent) return undefined;
     let cancelled = false;
     const loadAll = () => {
       Promise.all([fetchPublicRentPlanCatalog(), fetchPublicAgencyPlanCatalog()]).then(
@@ -65,7 +58,7 @@ export default function AgencyPlansPage({ product = 'buses' } = {}) {
       window.removeEventListener('agency-plan-catalog-changed', onAgency);
       window.removeEventListener('rent-plan-catalog-changed', onRent);
     };
-  }, [isRent]);
+  }, []);
 
   const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
   const addon = rentCatalog.addon || RENT_ADDON;
@@ -94,7 +87,7 @@ export default function AgencyPlansPage({ product = 'buses' } = {}) {
           settingsSubTab: 'contracts',
           plan: planId,
           interval,
-          focusRentModule: planId === 'rent' || isRent,
+          focusRentModule: planId === 'rent',
         },
       });
       return;
@@ -236,7 +229,11 @@ export default function AgencyPlansPage({ product = 'buses' } = {}) {
                           : ' pg-contracts-btn--ghost'
                     }`}
                   >
-                    {loggedIn ? standalone.ctaLoggedIn : standalone.ctaGuest}
+                    {plan.contactSales
+                      ? 'Επικοινωνία πωλήσεων'
+                      : loggedIn
+                        ? 'Επιλογή συμβολαίου'
+                        : 'Ξεκινήστε εγγραφή'}
                   </button>
                 </article>
               );

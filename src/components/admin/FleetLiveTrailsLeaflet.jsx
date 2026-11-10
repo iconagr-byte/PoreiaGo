@@ -16,6 +16,7 @@ export default function FleetLiveTrailsLeaflet({ trails = [], visible = true }) 
           .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
           .map((p) => [p.lat, p.lng]);
         if (!positions.length) return null;
+        const tip = positions[positions.length - 1];
         const crumbs = sampleTrailBreadcrumbs(positions, 72);
         return (
           <Fragment key={`trail-${trail.id}`}>
@@ -56,21 +57,32 @@ export default function FleetLiveTrailsLeaflet({ trails = [], visible = true }) 
                 />
               </>
             ) : null}
-            {/* Skip the last crumb — the bus pin sits on the live GPS tip. */}
-            {crumbs.slice(0, -1).map((pos, idx) => (
+            {crumbs.map((pos, idx) => (
               <CircleMarker
                 key={`crumb-${trail.id}-${idx}`}
                 center={pos}
-                radius={3.25}
+                radius={idx === crumbs.length - 1 ? 5 : 3.25}
                 pathOptions={{
                   color: '#ffffff',
-                  weight: 1.25,
+                  weight: idx === crumbs.length - 1 ? 2 : 1.25,
                   fillColor: APPLE_MAP_COLORS.accent,
-                  fillOpacity: 0.82,
+                  fillOpacity: idx === crumbs.length - 1 ? 0.95 : 0.82,
                 }}
                 className="fleet-live-trail-crumb"
               />
             ))}
+            {positions.length >= 2 ? (
+              <CircleMarker
+                center={tip}
+                radius={5.5}
+                pathOptions={{
+                  color: '#ffffff',
+                  weight: 2,
+                  fillColor: APPLE_MAP_COLORS.accent,
+                  fillOpacity: 0.98,
+                }}
+              />
+            ) : null}
           </Fragment>
         );
       })}

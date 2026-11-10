@@ -369,8 +369,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         block: 'start',
       });
     });
-    setTestResult(null);
-    setPasswordVisible(false);
   };
 
   const runTest = async () => {
@@ -750,13 +748,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md text-on-surface-variant hover:bg-surface-container-low"
           >
             .env
-          </button>
-          <button
-            type="button"
-            onClick={downloadEmailSettingsEnvTemplate}
-            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
-          >
-            Πρότυπο .env
           </button>
           <button
             type="button"

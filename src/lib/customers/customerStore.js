@@ -333,7 +333,7 @@ export function ensureCustomerForPassenger({ name, email, phone }) {
 }
 
 /** Δημιουργία/ενημέρωση φυσικού προσώπου από κράτηση ενοικίασης. */
-export function ensureCustomerForRental({ name, email, phone, id, afm } = {}) {
+export function ensureCustomerForRental({ name, email, phone, id } = {}) {
   if (!email) return null;
   if (isDeletedEmail(email, CUSTOMER_SERVICE_RENT)) return null;
   return upsertCustomer(

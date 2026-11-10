@@ -348,8 +348,7 @@ function WalletAuthenticatedApp() {
       document.removeEventListener('visibilitychange', refresh);
       window.clearInterval(poll);
     };
-    // Also refresh when opening ticket/bookings tabs so Postgres walk-ins appear.
-  }, [email, focusId, activeTab]);
+  }, [email, focusId]);
 
   useEffect(() => {
     const syncSeal = () => setSealedTenantId(getWalletTenantId() || '');
@@ -1159,7 +1158,7 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'account' && (
-          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
+          <div className="wallet-stack">
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>

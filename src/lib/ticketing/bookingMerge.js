@@ -34,7 +34,6 @@ export function mapSaasBookingToLocal(row) {
   }
   const status = String(row.status || '').toLowerCase();
   const paid = ['paid', 'confirmed', 'boarded'].includes(status);
-  const checkedIn = status === 'boarded' || Boolean(meta.checked_in);
   const totalEur = Number(meta.total_eur) || Number(row.amount_eur) || 0;
   const amountPaid = Number(meta.amount_paid) || Number(row.amount_eur) || 0;
   const balanceDue = Number(meta.balance_due) || 0;
@@ -64,8 +63,8 @@ export function mapSaasBookingToLocal(row) {
     basePrice,
     taxes,
     status: paid ? 'Επιβεβαιωμένη' : row.status,
-    checkInStatus: checkedIn ? CHECK_IN.CHECKED_IN : CHECK_IN.NONE,
-    checkedIn,
+    checkInStatus: CHECK_IN.NONE,
+    checkedIn: false,
     phone: meta.phone || '',
     email: row.passenger_email || '',
     paymentStatus:

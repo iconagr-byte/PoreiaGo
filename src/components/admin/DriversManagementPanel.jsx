@@ -1,14 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   deleteFleetDriver,
   fetchFleetDrivers,
 } from '../../services/platformApi.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
-import { isAchillioTravelHost, isPoreiagoHost } from '../../lib/platform/officePublicUrl.js';
-
-const ACHILLIO_DRIVERS_URL = 'https://www.achilliotravel.com/admin/drivers';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -39,19 +36,9 @@ function driverInitials(name) {
     .toUpperCase();
 }
 
-function currentBrowserHost() {
-  if (typeof window === 'undefined') return '';
-  return String(window.location.hostname || '').toLowerCase();
-}
-
 export default function DriversManagementPanel() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const pendingCreatedRef = useRef(location.state?.createdDriver || null);
-  const [drivers, setDrivers] = useState(() => {
-    const seeded = pendingCreatedRef.current;
-    return seeded?.id ? [seeded] : [];
-  });
+  const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('');
@@ -82,7 +69,7 @@ export default function DriversManagementPanel() {
       setLoadError(msg);
       if (!quiet) toast.error(msg);
     } finally {
-      if (!soft) setLoading(false);
+      setLoading(false);
     }
   }, [filter]);
 
@@ -122,32 +109,13 @@ export default function DriversManagementPanel() {
     };
   }, [filter]);
 
-  useEffect(() => {
-    const created = location.state?.createdDriver;
-    if (!created?.id) return undefined;
-    pendingCreatedRef.current = created;
-    setDrivers((prev) => {
-      if (prev.some((d) => d.id === created.id)) return prev;
-      return [created, ...prev];
-    });
-    navigate(`${location.pathname}${location.search}`, {
-      replace: true,
-      state: { activeTab: 'drivers' },
-    });
-    return undefined;
-  }, [location.state, location.pathname, location.search, navigate]);
-
   const onDelete = async (d) => {
     if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;
-    const prev = drivers;
-    // Optimistic: remove instantly — no skeleton flash while DELETE + refetch run.
-    setDrivers((rows) => rows.filter((row) => row.id !== d.id));
     try {
       await deleteFleetDriver(d.id);
       toast.success('Διαγράφηκε');
-      load({ soft: true });
+      load();
     } catch (err) {
-      setDrivers(prev);
       toast.error(err.message);
     }
   };
@@ -245,58 +213,24 @@ export default function DriversManagementPanel() {
             <div className="w-14 h-14 rounded-[16px] bg-zinc-50 flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-zinc-300 text-[28px]">badge</span>
             </div>
-            {drivers.length === 0 &&
-            isPoreiagoHost(currentBrowserHost()) &&
-            !isAchillioTravelHost(currentBrowserHost()) ? (
-              <>
-                <p className="text-[16px] font-semibold text-zinc-800 tracking-tight">
-                  Δεν υπάρχουν οδηγοί σε αυτό το γραφείο PoreiaGo
-                </p>
-                <p className="text-[14px] text-zinc-500 mt-2 max-w-md mx-auto leading-relaxed">
-                  Ο λογαριασμός <span className="font-medium text-zinc-700">Αχιλλέας Χαραλαμπίδης</span>{' '}
-                  είναι στο Achillio Travel. Άνοιξέ το εκεί — ή δημιούργησε νέο οδηγό μόνο για το
-                  PoreiaGo.
-                </p>
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                  <a
-                    href={ACHILLIO_DRIVERS_URL}
-                    className="inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold hover:bg-zinc-800"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                    Οδηγοί Achillio Travel
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin/drivers/new')}
-                    className="inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-100 text-zinc-800 text-[14px] font-semibold hover:bg-zinc-200/80"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">person_add</span>
-                    Νέος για PoreiaGo
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[16px] font-semibold text-zinc-800 tracking-tight">
-                  {drivers.length === 0 ? 'Κανένας λογαριασμός ακόμα' : 'Κανένα αποτέλεσμα'}
-                </p>
-                <p className="text-[14px] text-zinc-500 mt-1">
-                  {drivers.length === 0
-                    ? 'Δημιουργήστε τον πρώτο οδηγό για την εφαρμογή.'
-                    : 'Δοκιμάστε άλλο φίλτρο ή αναζήτηση.'}
-                </p>
-                {drivers.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin/drivers/new')}
-                    className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">person_add</span>
-                    Νέος λογαριασμός
-                  </button>
-                ) : null}
-              </>
-            )}
+            <p className="text-[16px] font-semibold text-zinc-800 tracking-tight">
+              {drivers.length === 0 ? 'Κανένας λογαριασμός ακόμα' : 'Κανένα αποτέλεσμα'}
+            </p>
+            <p className="text-[14px] text-zinc-500 mt-1">
+              {drivers.length === 0
+                ? 'Δημιουργήστε τον πρώτο οδηγό για την εφαρμογή.'
+                : 'Δοκιμάστε άλλο φίλτρο ή αναζήτηση.'}
+            </p>
+            {drivers.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => navigate('/admin/drivers/new')}
+                className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Νέος λογαριασμός
+              </button>
+            ) : null}
           </div>
         ) : (
           <ul className="divide-y divide-zinc-100/90">
@@ -349,24 +283,6 @@ export default function DriversManagementPanel() {
                     </div>
 
                     <div className="flex items-center gap-0.5 shrink-0 opacity-60 group-hover:opacity-100">
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/admin/drivers/${d.id}#driver-qr`);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.stopPropagation();
-                            navigate(`/admin/drivers/${d.id}#driver-qr`);
-                          }
-                        }}
-                        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-zinc-500 hover:bg-sky-50 hover:text-sky-700"
-                        title="QR εφαρμογής"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
-                      </span>
                       <span
                         role="button"
                         tabIndex={0}

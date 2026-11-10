@@ -240,29 +240,8 @@ export default function PlatformMarketingHeader() {
             </section>
 
             <div className="pm-mobile-footer">
-              <Link
-                to="/login"
-                state={{ from: '/wallet' }}
-                className="pm-mobile-login"
-                onClick={closeAll}
-                title="Σύνδεση λογαριασμού πελάτη"
-              >
-                <span className="material-symbols-outlined" aria-hidden>
-                  person
-                </span>
-                Σύνδεση
-              </Link>
-              <Link
-                to="/register"
-                state={{ from: '/wallet' }}
-                className="pm-mobile-login pm-mobile-register"
-                onClick={closeAll}
-                title="Δημιουργία λογαριασμού"
-              >
-                <span className="material-symbols-outlined" aria-hidden>
-                  person_add
-                </span>
-                Εγγραφή
+              <Link to="/admin/login" className="pm-mobile-login" onClick={closeAll}>
+                Σύνδεση γραφείου
               </Link>
               <Link
                 to="/wallet"

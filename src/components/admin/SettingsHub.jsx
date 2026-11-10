@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import SettingsTabPanels from './SettingsTabPanels.jsx';
 import AdminMenuFade from './AdminMenuFade.jsx';
 import AdminResizableRail from './AdminResizableRail.jsx';

@@ -13,13 +13,12 @@ export async function fetchBillingConfig() {
   return res.json();
 }
 
-export async function startBillingTrial(plan, billingInterval = 'month', rentAddon = false) {
+export async function startBillingTrial(plan, billingInterval = 'month') {
   return saasFetch('/api/v1/billing/start-trial', {
     method: 'POST',
     body: JSON.stringify({
       plan: plan || 'professional',
       billing_interval: billingInterval,
-      rent_addon: Boolean(rentAddon),
     }),
   });
 }
@@ -32,7 +31,6 @@ export async function createSignupCheckout({
   password,
   plan = 'starter',
   billingInterval = 'month',
-  rent_addon = false,
 }) {
   const res = await fetch(`${API_BASE}/api/v1/billing/signup-checkout`, {
     method: 'POST',
@@ -44,7 +42,6 @@ export async function createSignupCheckout({
       password,
       plan,
       billing_interval: billingInterval,
-      rent_addon: Boolean(rent_addon),
     }),
   });
   if (!res.ok) {
@@ -60,13 +57,12 @@ export async function createSignupCheckout({
   return res.json();
 }
 
-export async function createBillingCheckout(plan, billingInterval = 'month', rentAddon = false) {
+export async function createBillingCheckout(plan, billingInterval = 'month') {
   return saasFetch('/api/v1/billing/checkout-session', {
     method: 'POST',
     body: JSON.stringify({
       plan: plan || undefined,
       billing_interval: billingInterval,
-      rent_addon: Boolean(rentAddon),
     }),
   });
 }

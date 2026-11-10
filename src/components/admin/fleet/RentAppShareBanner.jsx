@@ -129,19 +129,6 @@ export default function RentAppShareBanner() {
                 Άνοιγμα My Wallet
                 <span className="material-symbols-outlined text-[16px]">open_in_new</span>
               </a>
-              <a
-                href={
-                  rentUrl
-                    ? `${String(rentUrl).replace(/\/$/, '')}/services`
-                    : '/rent/services'
-                }
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-teal-600 text-white text-xs font-bold"
-              >
-                Υπηρεσίες
-                <span className="material-symbols-outlined text-[16px]">campaign</span>
-              </a>
               <button
                 type="button"
                 onClick={copyLink}
