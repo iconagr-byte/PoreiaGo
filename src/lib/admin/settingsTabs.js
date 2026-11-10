@@ -10,6 +10,8 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'homepage', label: 'Σχεδιασμός σελίδων', icon: 'web', section: 'office' },
   { id: 'domain', label: 'Domain', icon: 'language', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
+  { id: 'telematics', label: 'Teltonika GPS', icon: 'sensors', section: 'office' },
+  { id: 'trip_reminder', label: 'Υπενθύμιση εκδρομής', icon: 'event_upcoming', section: 'office' },
 ];
 
 /** Settings relevant for a Rent-only office (no bus driver portal settings). */
@@ -23,10 +25,12 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
   'homepage',
   'domain',
   'users',
+  'telematics',
 ]);
 
 export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
+  { id: 'password_reset', label: 'Κωδικοί', icon: 'lock_reset', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).

@@ -1,0 +1,40 @@
+name: Diagnose orphan trip bookings (Contabo)
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Trip title to inspect (e.g. test1)"
+        required: true
+        default: "test1"
+        type: string
+      purge:
+        description: "Also permanently delete matching Achillio bookings (PURGE=1)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: diagnose-orphan-trip-bookings
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH diagnose orphan trip bookings on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 5m
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            git fetch origin main
+            git reset --hard origin/main
+            if [ "${{ inputs.purge }}" = "true" ]; then export PURGE=1; else export PURGE=0; fi
+            export TITLE='${{ inputs.title }}'
+            bash deploy/scripts/diagnose-orphan-trip-bookings.sh
