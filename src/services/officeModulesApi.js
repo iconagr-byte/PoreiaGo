@@ -8,6 +8,7 @@ import {
 } from '../lib/admin/officeDesignPages.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { isAchillioTravelHost, isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
+import { isNativeRentDemo } from '../lib/rental/nativeRentDemo.js';
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 
 export {
@@ -149,10 +150,14 @@ export function shouldShowRentStorefront(modules, opts = {}) {
     (typeof window !== 'undefined' ? window.location.hostname : '');
   // Achillio Travel domain is bus-only even if modules API drifts.
   if (isAchillioTravelHost(hostname)) return false;
+
+  const native = _isNativeShell(opts);
+  // Explicit native demo (login «Δες demo ενοικιάσεις») — no office required.
+  if (native && isNativeRentDemo()) return true;
+
   // Sealed Achillio office (native wallet /tenant_id) — bus-only.
   if (modules?.office_kind === 'achillio_travel') return false;
 
-  const native = _isNativeShell(opts);
   if (native) {
     // Capacitor serves from localhost — ignore marketing-host shortcut.
     if (modules?.office_kind === 'poreiago_platform') return true;

@@ -7,6 +7,7 @@ import {
 } from '../../services/officeModulesApi.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 
 /**
  * Blocks /rent surfaces on tenant storefronts without an active Rent contract/add-on.
@@ -14,13 +15,16 @@ import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
  */
 export default function RentStorefrontGate({ children }) {
   const [state, setState] = useState(() => ({
-    loading: isTenantStorefrontHost() && !isPlatformMarketingHost(),
-    allowed: isPlatformMarketingHost() || !isTenantStorefrontHost(),
+    loading: isTenantStorefrontHost() && !isPlatformMarketingHost() && !isNativeRentDemo(),
+    allowed:
+      isPlatformMarketingHost() ||
+      !isTenantStorefrontHost() ||
+      isNativeRentDemo(),
     modules: DEFAULT_OFFICE_MODULES,
   }));
 
   useEffect(() => {
-    if (isPlatformMarketingHost()) {
+    if (isNativeRentDemo() || isPlatformMarketingHost()) {
       setState({ loading: false, allowed: true, modules: DEFAULT_OFFICE_MODULES });
       return undefined;
     }
