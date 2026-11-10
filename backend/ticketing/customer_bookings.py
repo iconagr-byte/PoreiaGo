@@ -61,11 +61,12 @@ async def list_bookings_for_email(
     tid = _normalize_tenant(tenant_id)
     db = get_db()
     if tid:
+        # Strict office seal — never surface NULL/foreign tenant rows.
         cursor = await db.execute(
             """
             SELECT * FROM customer_bookings
             WHERE customer_email = ?
-              AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')
+              AND tenant_id = ?
             ORDER BY updated_at DESC
             """,
             (key, tid),
@@ -104,6 +105,77 @@ async def get_booking(booking_id: str, tenant_id: str | None = None) -> dict | N
             # Safer default: hide from office-scoped wallet until tenant is stamped.
             return None
     return booking
+
+
+def _booking_alias_set(booking: dict, row_id: str | None = None) -> set[str]:
+    out: set[str] = set()
+    for raw in (
+        booking.get("id"),
+        booking.get("saasBookingId"),
+        booking.get("pnr"),
+        booking.get("ticketRef"),
+        booking.get("reference_code"),
+        row_id,
+    ):
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        out.add(text)
+        out.add(text.upper())
+        out.add(text.lower())
+    return out
+
+
+async def find_booking_by_aliases(
+    aliases: list[str],
+    *,
+    email: str | None = None,
+    tenant_id: str | None = None,
+) -> dict | None:
+    """
+    Resolve a wallet cache row by id / saasBookingId / PNR.
+
+    SQLite primary key is the local B-… id while clients often DELETE with the
+    Postgres UUID (saasBookingId). Primary-key lookup alone misses those rows.
+    """
+    keys = [str(a).strip() for a in (aliases or []) if str(a or "").strip()]
+    if not keys:
+        return None
+    # Fast path — exact primary key.
+    tid = _normalize_tenant(tenant_id)
+    for key in keys:
+        hit = await get_booking(key, tenant_id=tid)
+        if hit:
+            if email and str(hit.get("email") or "").strip().lower() != email.strip().lower():
+                continue
+            return hit
+
+    email_key = str(email or "").strip().lower() or None
+    db = get_db()
+    if tid and email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ? AND tenant_id = ?",
+            (email_key, tid),
+        )
+    elif email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ?",
+            (email_key,),
+        )
+    elif tid:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE tenant_id = ?",
+            (tid,),
+        )
+    else:
+        return None
+    rows = await cur.fetchall()
+    alias_set = {k for k in keys} | {k.upper() for k in keys} | {k.lower() for k in keys}
+    for row in rows:
+        booking = _row_to_booking(row)
+        if _booking_alias_set(booking, str(row["id"] or "")) & alias_set:
+            return booking
+    return None
 
 
 async def upsert_booking(
@@ -214,6 +286,91 @@ async def upsert_many_for_customer(
             tenant_id=tid,
         )
     return await list_bookings_for_email(key, tenant_id=tid)
+
+
+async def delete_booking_for_customer(
+    booking_id: str,
+    *,
+    email: str,
+    tenant_id: str | None = None,
+) -> bool:
+    """Delete one wallet cache row — must match customer email (+ optional office)."""
+    bid = str(booking_id or "").strip()
+    key = str(email or "").strip().lower()
+    if not bid or not key:
+        return False
+    tid = _normalize_tenant(tenant_id)
+    db = get_db()
+    if tid:
+        cur = await db.execute(
+            """
+            DELETE FROM customer_bookings
+            WHERE id = ? AND customer_email = ? AND tenant_id = ?
+            """,
+            (bid, key, tid),
+        )
+    else:
+        cur = await db.execute(
+            "DELETE FROM customer_bookings WHERE id = ? AND customer_email = ?",
+            (bid, key),
+        )
+    await db.commit()
+    return bool(cur.rowcount)
+
+
+async def delete_booking_by_aliases(
+    aliases: list[str],
+    *,
+    email: str | None = None,
+    tenant_id: str | None = None,
+) -> int:
+    """
+    Hard-delete wallet cache rows matching any id / saas id / PNR alias.
+    Used when desktop permanently deletes a booking.
+    """
+    keys = [str(a).strip() for a in (aliases or []) if str(a or "").strip()]
+    if not keys:
+        return 0
+    tid = _normalize_tenant(tenant_id)
+    email_key = str(email or "").strip().lower() or None
+    db = get_db()
+    # Load candidate rows then filter aliases in Python (payload may hold saasBookingId).
+    if tid and email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ? AND tenant_id = ?",
+            (email_key, tid),
+        )
+    elif email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ?",
+            (email_key,),
+        )
+    elif tid:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE tenant_id = ?",
+            (tid,),
+        )
+    else:
+        cur = await db.execute("SELECT * FROM customer_bookings")
+    rows = await cur.fetchall()
+    alias_set = {k for k in keys} | {k.upper() for k in keys} | {k.lower() for k in keys}
+    deleted = 0
+    for row in rows:
+        booking = _row_to_booking(row)
+        candidates = {
+            str(booking.get("id") or ""),
+            str(booking.get("saasBookingId") or ""),
+            str(booking.get("pnr") or ""),
+            str(booking.get("ticketRef") or ""),
+            str(row["id"] or ""),
+        }
+        if not (candidates & alias_set):
+            continue
+        await db.execute("DELETE FROM customer_bookings WHERE id = ?", (row["id"],))
+        deleted += 1
+    if deleted:
+        await db.commit()
+    return deleted
 
 
 async def seed_customer_bookings_if_empty() -> None:

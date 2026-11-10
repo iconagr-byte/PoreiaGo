@@ -1,82 +1,124 @@
+import { useMemo } from 'react';
 import {
   RENT_GUEST_HERO,
   RENT_GUEST_HERO_IMAGE,
-  rentGuestHeroStats,
+  resolveRentGuestHeroBenefits,
 } from '../../lib/rental/rentGuestHero.js';
+import { readPageSlider } from '../../lib/homepage/pageSlider.js';
+import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
+import RentBrandMark from './RentBrandMark.jsx';
 
 /**
- * Full-bleed photo hero for guest /rent — mirrors platform bus landing form.
+ * Full-bleed guest /rent hero — Rentalcars-style: headline, trust checks, search in-hero.
+ * No stays/flights nav — rent only.
  */
 export default function RentGuestHero({
-  brandLabel = 'Ενοικίαση',
+  brandLabel = 'Poreiago Rent',
+  logoUrl = '',
+  brandSubtitle = '',
+  logoHeightPx,
+  logoMaxWidthPx,
+  logoRadiusPx,
+  logoPaddingPx,
+  logoBgMode,
+  logoShadow,
+  heroStyle = 'coastal',
+  heroLayout: heroLayoutProp = 'strip',
+  heroImageUrl = '',
   title,
   titleAccent,
   copy,
-  carCount = 0,
-  vanCount = 0,
-  onBrowseFleet,
-  onStartSearch,
-  onRequireLogin,
+  benefits: benefitsProp,
+  siteAppearance,
+  children,
 } = {}) {
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
   const subtitle = String(copy || '').trim();
-  const stats = rentGuestHeroStats({ carCount, vanCount });
-  const startSearch =
-    typeof onStartSearch === 'function'
-      ? onStartSearch
-      : () => {
-          document.getElementById('rent-guest-search')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        };
+  const benefits = useMemo(
+    () => resolveRentGuestHeroBenefits(benefitsProp),
+    [benefitsProp],
+  );
+  const slider = readPageSlider(siteAppearance, 'rent');
+
+  const heroMode = String(heroStyle || 'coastal').trim().toLowerCase() || 'coastal';
+  const heroLayout = String(heroLayoutProp || 'strip').trim().toLowerCase() || 'strip';
+  const photoSrc = String(heroImageUrl || '').trim() || RENT_GUEST_HERO_IMAGE;
 
   return (
-    <section className="rent-hero rent-hero--landing" aria-label="Ενοικίαση">
-      <div className="rent-hero-media" aria-hidden>
-        <img src={RENT_GUEST_HERO_IMAGE} alt="" />
+    <section
+      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode} rent-hero-layout--${heroLayout}`}
+      data-rent-hero={heroMode}
+      data-rent-hero-layout={heroLayout}
+      aria-label="Ενοικίαση"
+    >
+      <div className="rent-hero-media" aria-hidden={!slider.enabled}>
+        {slider.enabled ? (
+          <SiteHeroSlider
+            slides={slider.slides}
+            autoplay={slider.autoplay}
+            intervalSec={slider.interval_sec}
+            options={slider.options}
+            variant="media"
+            accent="rent"
+            ariaLabel="Hero slider ενοικιάσεων"
+            className="rent-hero-slider"
+          />
+        ) : (
+          <img
+            key={photoSrc}
+            src={photoSrc}
+            alt=""
+            width={3840}
+            height={2160}
+            decoding="async"
+            fetchPriority="high"
+          />
+        )}
         <div className="rent-hero-shade rent-hero-shade--x" />
         <div className="rent-hero-shade rent-hero-shade--y" />
-        <div className="rent-hero-glow" />
-        <div className="rent-hero-grid" />
+        <div className="rent-hero-shade rent-hero-shade--bluefade" aria-hidden />
+        <div className="rent-hero-shade rent-hero-shade--booking" />
       </div>
 
-      <div className="rent-hero-landing-inner">
-        <p className="rent-hero-brand rent-hero-brand--landing">{brandLabel}</p>
+      <div className="rent-hero-landing-inner rent-hero-booking-inner">
+        <div className="rent-hero-booking-brand">
+          <RentBrandMark
+            label={brandLabel}
+            logoUrl={logoUrl}
+            showName
+            subtitle={brandSubtitle}
+            variant="onDark"
+            logoHeightPx={logoHeightPx}
+            logoMaxWidthPx={logoMaxWidthPx}
+            logoRadiusPx={logoRadiusPx}
+            logoPaddingPx={logoPaddingPx}
+            logoBgMode={logoBgMode}
+            logoShadow={logoShadow}
+          />
+        </div>
 
-        <h1 className="rent-hero-landing-title">
-          {headline}{' '}
-          <span className="rent-hero-accent">{accent}</span>
+        <h1 className="rent-hero-landing-title rent-hero-booking-title">
+          <span className="rent-hero-title-main">{headline}</span>
+          {accent ? <span className="rent-hero-accent">{accent}</span> : null}
         </h1>
 
-        {subtitle ? <p className="rent-hero-landing-copy">{subtitle}</p> : null}
+        {subtitle ? <p className="rent-hero-landing-copy rent-hero-booking-copy">{subtitle}</p> : null}
 
-        <div className="rent-hero-actions">
-          <button type="button" className="rent-hero-cta rent-hero-cta--primary" onClick={startSearch}>
-            Ξεκίνα αναζήτηση
-            <span className="material-symbols-outlined" aria-hidden>
-              arrow_forward
-            </span>
-          </button>
-          <button type="button" className="rent-hero-cta rent-hero-cta--teal" onClick={onBrowseFleet}>
-            <span className="material-symbols-outlined" aria-hidden>
-              directions_car
-            </span>
-            Δες τον στόλο
-          </button>
-        </div>
+        {benefits.length ? (
+          <ul className="rent-hero-benefits" aria-label="Πλεονεκτήματα">
+            {benefits.map((item) => (
+              <li key={item}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  check_circle
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
-        <p className="rent-hero-tagline">{RENT_GUEST_HERO.tagline}</p>
-
-        <div className="rent-hero-stats">
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              className={`rent-hero-stat${s.accent ? ' rent-hero-stat--accent' : ''}`}
-            >
-              <strong>{s.value}</strong>
-              <span>{s.label}</span>
-            </div>
-          ))}
-        </div>
+        {children ? <div className="rent-hero-search-slot">{children}</div> : null}
       </div>
     </section>
   );

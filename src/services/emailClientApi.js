@@ -79,6 +79,11 @@ export const patchMailboxMessage = (id, body) =>
   request(`/api/mailbox/messages/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const deleteMailboxMessage = (id) =>
   request(`/api/mailbox/messages/${id}`, { method: 'DELETE' });
+export const bulkTrashMailboxMessages = (ids) =>
+  request('/api/mailbox/messages/bulk-trash', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
 export const replyMailboxMessage = (id, body) =>
   request(`/api/mailbox/messages/${id}/reply`, { method: 'POST', body: JSON.stringify(body) });
 export const forwardMailboxMessage = (id, body) =>

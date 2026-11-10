@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { fetchTenantBrandingSettings, updateTenantBrandingSettings } from '../../services/growthApi.js';
+import {
+  fetchTenantBrandingSettings,
+  updateTenantBrandingSettings,
+} from '../../services/growthApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 import { cacheBranding } from '../../lib/branding/applyBranding.js';
-import { DEFAULT_INGRESS_CNAME, getPlatformBaseDomain } from '../../lib/platform/domain.js';
+import { getPlatformBaseDomain } from '../../lib/platform/domain.js';
+import CustomDomainSetupWizard from './CustomDomainSetupWizard.jsx';
 
 const EMPTY_DNS = {
   cname_host: '',
   cname_target: '',
+  apex_host: '',
+  apex_a_record: '',
   notes: [],
 };
 
@@ -68,6 +74,7 @@ export default function BrandingPanel() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
+  const [domainWizardKey, setDomainWizardKey] = useState(0);
 
   const patch = (updater) => {
     setDirty(true);
@@ -105,7 +112,6 @@ export default function BrandingPanel() {
     load();
   }, [load]);
 
-  const dns = form.dns_instructions || EMPTY_DNS;
   const hasCustomDomain = Boolean(form.custom_domain?.trim());
   const primary = form.primary_color || '#0b4f6c';
   const officeCode = form.subdomain || form.slug || '—';
@@ -158,10 +164,6 @@ export default function BrandingPanel() {
       setSaving(false);
     }
   };
-
-  const cnameLine = hasCustomDomain
-    ? `${dns.cname_host || form.custom_domain}  CNAME  ${dns.cname_target || DEFAULT_INGRESS_CNAME}`
-    : '';
 
   if (loading) {
     return (
@@ -278,9 +280,39 @@ export default function BrandingPanel() {
           </SectionCard>
 
           <SectionCard
+            tone="teal"
             icon="public"
-            title="Δικό σας domain"
-            subtitle="Συνδέστε το domain του γραφείου σας (χωρίς www)."
+            title="Δικό σας domain — βήμα βήμα"
+            subtitle="Ίδιο μονοπάτι με Achillio Travel: καταχώρηση → DNS CNAME → έλεγχος → HTTPS."
+          >
+            <div className="cdw-branding-shell">
+              <CustomDomainSetupWizard
+                key={domainWizardKey}
+                compact
+                initialDomain={form.custom_domain}
+                onComplete={async (result) => {
+                  await load();
+                  toast.success(
+                    result?.domain
+                      ? `Domain έτοιμο: www.${result.domain}`
+                      : 'Οδηγός domain ολοκληρώθηκε',
+                  );
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              className="text-xs font-bold text-teal-800 hover:underline"
+              onClick={() => setDomainWizardKey((k) => k + 1)}
+            >
+              Επανεκκίνηση οδηγού domain
+            </button>
+          </SectionCard>
+
+          <SectionCard
+            icon="badge"
+            title="Επωνυμία & checkout"
+            subtitle="Εμφανίζονται στην ιστοσελίδα και στα links πληρωμής."
           >
             <label className="block text-sm">
               <span className="font-bold text-slate-700">Επωνυμία γραφείου</span>
@@ -290,27 +322,6 @@ export default function BrandingPanel() {
                 onChange={(e) => patch({ display_name: e.target.value })}
                 placeholder="π.χ. Achillio Travel"
               />
-            </label>
-
-            <label className="block text-sm">
-              <span className="font-bold text-slate-700">Custom domain</span>
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  className={`${FIELD} mt-0 font-mono`}
-                  placeholder="bookings.myagency.gr"
-                  value={form.custom_domain}
-                  onChange={(e) =>
-                    patch({
-                      custom_domain: e.target.value
-                        .trim()
-                        .toLowerCase()
-                        .replace(/^https?:\/\//, '')
-                        .split('/')[0],
-                    })
-                  }
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">Παράδειγμα: bookings.achillio.gr — όχι www.</p>
             </label>
 
             <label className="block text-sm">
@@ -375,54 +386,6 @@ export default function BrandingPanel() {
                 ) : null}
               </label>
             </div>
-          </SectionCard>
-
-          <SectionCard
-            tone="teal"
-            icon="route"
-            title="Οδηγίες DNS"
-            subtitle={
-              hasCustomDomain
-                ? 'Μετά την αποθήκευση, πρόσθεσε αυτή την εγγραφή στον πάροχο DNS.'
-                : 'Συμπλήρωσε custom domain και αποθήκευσε για να εμφανιστεί το CNAME.'
-            }
-          >
-            {hasCustomDomain ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-white border border-teal-100 px-3.5 py-3 font-mono text-xs overflow-x-auto">
-                  <p className="text-slate-400 mb-1.5"># Custom domain → platform</p>
-                  <p className="text-slate-800 whitespace-pre">{cnameLine}</p>
-                  {dns.alternate_www_host ? (
-                    <p className="mt-2 text-slate-800">
-                      {dns.alternate_www_host}  CNAME  {dns.cname_target || DEFAULT_INGRESS_CNAME}
-                    </p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => copyText(cnameLine, 'CNAME αντιγράφηκε')}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3.5 py-2 text-xs font-bold text-teal-900 hover:bg-teal-50"
-                >
-                  <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                  Αντιγραφή CNAME
-                </button>
-              </div>
-            ) : (
-              <p className="text-sm text-teal-900/80 rounded-2xl border border-dashed border-teal-200 bg-white/70 px-3.5 py-3">
-                Δεν έχει οριστεί ακόμα custom domain.
-              </p>
-            )}
-
-            {Array.isArray(dns.notes) && dns.notes.length > 0 ? (
-              <ul className="text-xs text-teal-950/90 space-y-1.5">
-                {dns.notes.map((note) => (
-                  <li key={note} className="flex gap-2">
-                    <span className="material-symbols-outlined text-[15px] text-teal-700 shrink-0">info</span>
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
           </SectionCard>
 
           <div className="rounded-[22px] border border-slate-200 bg-slate-50/50 overflow-hidden">

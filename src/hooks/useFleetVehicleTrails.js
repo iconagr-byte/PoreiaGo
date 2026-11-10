@@ -1,22 +1,18 @@
 /**
  * Accumulate live GPS breadcrumbs for each active fleet vehicle.
+ * Merges server trail (Redis shift path) with live pin append so the
+ * route keeps growing while the bus moves — even when the API only
+ * returns a short / 1-point trail.
  */
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  mergeVehicleTrail,
+  normalizeServerTrail,
+  sameTrailTip,
+} from '../lib/maps/fleetTrailMerge.js';
 
-const EARTH_M = 6371000;
-
-function haversineM(a, b) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_M * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+export { haversineM, mergeVehicleTrail, normalizeServerTrail } from '../lib/maps/fleetTrailMerge.js';
 
 function vehicleKey(v) {
   return String(v?.id || v?.vehicle_id || v?.driver_id || '');
@@ -24,26 +20,30 @@ function vehicleKey(v) {
 
 /**
  * @param {Array<object>} vehicles
- * @param {{ maxPoints?: number, minMoveM?: number, enabled?: boolean }} [opts]
- * @returns {{ id: string, points: Array<{lat:number,lng:number}>, color?: string }[]}
+ * @param {{ maxPoints?: number, minMoveM?: number, enabled?: boolean, graceMs?: number }} [opts]
+ * @returns {{ id: string, points: Array<{lat:number,lng:number,s?:number}>, color?: string }[]}
  */
 export function useFleetVehicleTrails(vehicles, opts = {}) {
-  const maxPoints = opts.maxPoints ?? 450;
-  const minMoveM = opts.minMoveM ?? 10;
+  const maxPoints = opts.maxPoints ?? 3000;
+  const minMoveM = opts.minMoveM ?? 3;
   const enabled = opts.enabled !== false;
+  const graceMs = opts.graceMs ?? 45000;
   const trailsRef = useRef(new Map());
+  const lastSeenRef = useRef(new Map());
   const [trails, setTrails] = useState([]);
 
   useEffect(() => {
     if (!enabled) {
       if (trailsRef.current.size) {
         trailsRef.current = new Map();
+        lastSeenRef.current = new Map();
         setTrails([]);
       }
       return;
     }
 
     const list = Array.isArray(vehicles) ? vehicles : [];
+    const now = Date.now();
     const active = new Set();
     let changed = false;
 
@@ -51,32 +51,29 @@ export function useFleetVehicleTrails(vehicles, opts = {}) {
       const id = vehicleKey(v);
       if (!id) continue;
       active.add(id);
+      lastSeenRef.current.set(id, now);
 
+      const serverPts = normalizeServerTrail(v.trail);
       const lat = Number(v.targetLat ?? v.lat);
       const lng = Number(v.targetLng ?? v.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const prev = trailsRef.current.get(id) || [];
+      const next = mergeVehicleTrail(prev, serverPts, { lat, lng }, { maxPoints, minMoveM });
 
-      let pts = trailsRef.current.get(id);
-      if (!pts) {
-        pts = [{ lat, lng }];
-        trailsRef.current.set(id, pts);
+      const prevTip = prev[prev.length - 1];
+      const nextTip = next[next.length - 1];
+      if (prev.length !== next.length || !sameTrailTip(prevTip, nextTip)) {
+        trailsRef.current.set(id, next);
         changed = true;
-        continue;
       }
-
-      const last = pts[pts.length - 1];
-      if (haversineM(last, { lat, lng }) < minMoveM) continue;
-
-      pts.push({ lat, lng });
-      if (pts.length > maxPoints) {
-        pts.splice(0, pts.length - maxPoints);
-      }
-      changed = true;
     }
 
     for (const id of [...trailsRef.current.keys()]) {
-      if (!active.has(id)) {
+      if (active.has(id)) continue;
+      const seen = lastSeenRef.current.get(id) || 0;
+      // Keep drawing briefly through poll gaps; drop after grace (shift ended).
+      if (now - seen > graceMs) {
         trailsRef.current.delete(id);
+        lastSeenRef.current.delete(id);
         changed = true;
       }
     }
@@ -89,7 +86,7 @@ export function useFleetVehicleTrails(vehicles, opts = {}) {
         })),
       );
     }
-  }, [vehicles, maxPoints, minMoveM, enabled]);
+  }, [vehicles, maxPoints, minMoveM, enabled, graceMs]);
 
   return trails;
 }
