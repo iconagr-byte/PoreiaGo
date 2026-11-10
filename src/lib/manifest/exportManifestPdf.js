@@ -57,6 +57,7 @@ export function exportTripManifestPdf({
       (b, i) => `
     <tr>
       <td>${i + 1}</td>
+      <td>${escapeHtml(b.date || '—')}</td>
       <td>${escapeHtml(b.customerName || b.user || '—')}</td>
       <td>${escapeHtml(b.seat || (b.seats || []).join(', ') || '—')}</td>
       <td>${escapeHtml(b.flightSeat || '—')}</td>
@@ -98,6 +99,7 @@ export function exportTripManifestPdf({
     <thead>
       <tr>
         <th>#</th>
+        <th>Αναχώρηση</th>
         <th>Επιβάτης</th>
         <th>Θέση λεωφ.</th>
         <th>Θέση πτήσης</th>
@@ -106,7 +108,7 @@ export function exportTripManifestPdf({
         <th>Check-in</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="7">Δεν υπάρχουν κρατήσεις</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="8">Δεν υπάρχουν κρατήσεις</td></tr>'}</tbody>
   </table>
   <p class="foot">Εμπιστευτικό — εσωτερική χρήση διαχείρισης στόλου & tour leaders.</p>
 </body>

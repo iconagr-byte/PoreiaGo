@@ -10,13 +10,21 @@ export default function AdminMobileNavDrawer({
   onClose,
   activeTab,
   settingsSubTab,
+  fleetOpsSubTab,
   fleetRentalTab,
+  customerServiceScope,
   onTabChange,
   onSettingsSubTabChange,
+  onSettingsHubFocus,
+  onBusesHubFocus,
+  onFleetOpsSubTabChange,
   onFleetRentalTabChange,
   onEmailClick,
   onNavigate,
   officeMode = 'trips_only',
+  rentEnabled = true,
+  brandRefreshKey = 0,
+  onEditLogo,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -48,8 +56,27 @@ export default function AdminMobileNavDrawer({
         onClick={onClose}
       />
       <aside className="absolute inset-y-0 left-0 w-[min(100%,22rem)] bg-surface-container-lowest shadow-2xl border-r border-black/[0.06] flex flex-col animate-in slide-in-from-left duration-200">
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-black/[0.05]">
-          <OfficeBrandMark className="h-8" variant="light" asLink={false} fallbackLabel="Γραφείο" />
+        <div className="flex items-center justify-between gap-3 px-5 pt-6 pb-5 border-b border-black/[0.05]">
+          <button
+            type="button"
+            className="group flex items-center gap-3 min-w-0 text-left rounded-xl hover:bg-slate-50 p-2 -m-1"
+            onClick={() => onEditLogo?.()}
+            aria-label="Αλλαγή λογοτύπου εταιρείας"
+            title="Αλλαγή λογοτύπου"
+          >
+            <OfficeBrandMark
+              className="min-h-12"
+              variant="light"
+              asLink={false}
+              fallbackLabel="Γραφείο"
+              refreshKey={brandRefreshKey}
+              preferAdmin
+              minHeightPx={52}
+            />
+            <span className="material-symbols-outlined text-[20px] text-slate-300 group-hover:text-primary shrink-0">
+              edit
+            </span>
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -62,13 +89,19 @@ export default function AdminMobileNavDrawer({
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
+          fleetOpsSubTab={fleetOpsSubTab}
           fleetRentalTab={fleetRentalTab}
+          customerServiceScope={customerServiceScope}
           onTabChange={go(onTabChange)}
           onSettingsSubTabChange={onSettingsSubTabChange}
+          onSettingsHubFocus={go(onSettingsHubFocus)}
+          onBusesHubFocus={go(onBusesHubFocus)}
+          onFleetOpsSubTabChange={onFleetOpsSubTabChange}
           onFleetRentalTabChange={onFleetRentalTabChange}
           onEmailClick={go(onEmailClick)}
           onNavigate={go(onNavigate)}
           officeMode={officeMode}
+          rentEnabled={rentEnabled}
         />
       </aside>
     </div>

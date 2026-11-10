@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from api.request_tenant import admin_tenant_id
 from email_client.dynamic_mailer import test_account_connection
 from email_client.settings_store import (
-    claim_legacy_owner,
     create_settings,
     delete_settings,
     get_settings,
@@ -28,7 +27,8 @@ async def _list_for_request(request: Request, *, active_only: bool = False):
     return await list_settings(
         owner_key=_owner_key(request),
         active_only=active_only,
-        include_legacy_default=True,
+        # Never pull / auto-adopt shared owner_key=default into another office.
+        include_legacy_default=False,
     )
 
 
@@ -39,9 +39,7 @@ async def _require_owned(settings_id: str, request: Request, *, with_password: b
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
     if row.get("owner_key") == owner:
         return row
-    claimed = await claim_legacy_owner(settings_id, owner)
-    if claimed:
-        return await get_settings(settings_id, with_password=with_password)
+    # Do not auto-claim foreign/legacy rows on read — prevents email credential theft.
     raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
 
 
@@ -133,7 +131,14 @@ async def list_email_settings(
 async def create_email_settings(body: EmailSettingsCreate, request: Request):
     if not body.mail_password:
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός email")
+    from email_client.dynamic_mailer import normalize_mail_password
+
     payload = body.model_dump()
+    payload["mail_password"] = normalize_mail_password(
+        payload.get("mail_password"),
+        host=payload.get("imap_host") or payload.get("smtp_host") or "",
+        email=payload.get("email_address") or "",
+    )
     payload["owner_key"] = _owner_key(request)
     created = await create_settings(payload)
     return EmailSettingsOut(**created)
@@ -148,7 +153,21 @@ async def get_email_settings(settings_id: str, request: Request):
 @router.patch("/{settings_id}", response_model=EmailSettingsOut)
 async def patch_email_settings(settings_id: str, body: EmailSettingsUpdate, request: Request):
     await _require_owned(settings_id, request)
-    updated = await update_settings(settings_id, body.model_dump(exclude_unset=True))
+    from email_client.dynamic_mailer import normalize_mail_password
+
+    patch = body.model_dump(exclude_unset=True)
+    if patch.get("mail_password"):
+        existing = await get_settings(settings_id) or {}
+        patch["mail_password"] = normalize_mail_password(
+            patch["mail_password"],
+            host=patch.get("imap_host")
+            or existing.get("imap_host")
+            or patch.get("smtp_host")
+            or existing.get("smtp_host")
+            or "",
+            email=patch.get("email_address") or existing.get("email_address") or "",
+        )
+    updated = await update_settings(settings_id, patch)
     if not updated:
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
     return EmailSettingsOut(**updated)

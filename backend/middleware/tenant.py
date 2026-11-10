@@ -51,11 +51,9 @@ def _jwt_settings() -> tuple[str, str, bool]:
 
 PUBLIC_PATHS = {
     "/health",
-    "/docs",
-    "/openapi.json",
-    "/redoc",
     "/api/v1/health",
     "/api/v1/auth/login",
+    "/api/v1/auth/google",
     "/api/v1/auth/dev-login",
     "/api/v1/auth/refresh",
     "/api/v1/aade/webhook",
@@ -66,7 +64,12 @@ PUBLIC_PATHS = {
     "/api/v1/telemetry/update",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
+    "/api/v1/bookings/occupied-seats",
 }
+
+# Swagger only in non-production (FastAPI also disables docs_url there).
+if os.getenv("ENVIRONMENT", "development").lower() not in ("production", "prod"):
+    PUBLIC_PATHS |= {"/docs", "/openapi.json", "/redoc"}
 
 BILLING_PREFIX = "/api/v1/billing"
 PLATFORM_ADMIN_PREFIX = "/api/v1/platform"
@@ -88,6 +91,12 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
+# Public POST — password reset confirm / forgot request (no session yet)
+ADMIN_PUBLIC_POST_PREFIXES = (
+    "/api/admin/platform/password-reset/confirm",
+    "/api/admin/platform/password-reset/request",
+)
+
 # Email / mailbox / campaigns — SQLite-backed, must not be world-writable.
 # Require the same admin JWT gate as file-store admin routes.
 EMAIL_ADMIN_PREFIXES = (
@@ -106,7 +115,12 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/payment-settings",
     "/api/admin/platform/bank-accounts",
     "/api/admin/platform/rent-plan-catalog",
+    "/api/admin/platform/agency-plan-catalog",
     "/api/admin/platform/drivers",
+    # Fleet coaches/vans — JSON file store (same isolation model as drivers).
+    "/api/admin/platform/fleet",
+    # Driver ↔ office chat — JSON file store, must stay office-scoped.
+    "/api/admin/platform/driver-chat",
 )
 
 
@@ -145,6 +159,8 @@ def _attach_bearer_tenant_context(
     roles = list(payload.get("roles") or [])
     if roles:
         request.state.roles = roles
+    if payload.get("impersonating"):
+        request.state.impersonating = True
 
 
 def _requires_jwt(path: str) -> bool:
@@ -155,6 +171,10 @@ def _requires_jwt(path: str) -> bool:
 
 def _admin_public_get(path: str, method: str) -> bool:
     return method.upper() == "GET" and any(path.startswith(p) for p in ADMIN_PUBLIC_GET_PREFIXES)
+
+
+def _admin_public_post(path: str, method: str) -> bool:
+    return method.upper() == "POST" and any(path.startswith(p) for p in ADMIN_PUBLIC_POST_PREFIXES)
 
 
 def _is_file_store_admin(path: str) -> bool:
@@ -187,9 +207,23 @@ async def _require_admin_bearer(
     if not jwt_secret:
         return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
     try:
-        payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+        payload = jwt.decode(
+            token,
+            jwt_secret,
+            algorithms=[jwt_algorithm],
+            options={"require": ["exp", "sub"]},
+            leeway=60,
+        )
+    except jwt.ExpiredSignatureError:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+        )
     except jwt.PyJWTError:
-        return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+        )
     raw_tid = payload.get("tenant_id")
     if not raw_tid:
         return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
@@ -205,6 +239,26 @@ async def _require_admin_bearer(
             status_code=403,
             content={"detail": "Admin access required"},
         )
+    if payload.get("impersonating"):
+        request.state.impersonating = True
+    # SEAL: Achillio Travel JWT must not serve drivers/settings on poreiago.com
+    # (and the reverse). Same οδηγός appearing / deleting on both URLs.
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+        from travel_platform.settings.office_host_guard import office_host_mismatch_detail
+
+        host = _request_host(request)
+        detail = await office_host_mismatch_detail(
+            host=host,
+            tenant_id=str(request.state.tenant_id),
+            roles=roles,
+            is_platform_host=_is_platform_host(host),
+            impersonating=bool(payload.get("impersonating")),
+        )
+        if detail:
+            return JSONResponse(status_code=403, content={"detail": detail})
+    except Exception:
+        pass
     return None
 
 
@@ -300,7 +354,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if path.startswith(ADMIN_PREFIX):
-            if _admin_public_get(path, request.method):
+            if _admin_public_get(path, request.method) or _admin_public_post(path, request.method):
                 return await call_next(request)
             if admin_auth_disabled:
                 await _apply_dev_admin_context(request)
@@ -331,9 +385,23 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
         token = auth[7:].strip()
         try:
-            payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+            payload = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=[jwt_algorithm],
+                options={"require": ["exp", "sub"]},
+                leeway=60,
+            )
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+            )
         except jwt.PyJWTError:
-            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+            )
 
         tenant_id = payload.get("tenant_id")
         if not tenant_id:

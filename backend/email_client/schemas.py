@@ -31,6 +31,10 @@ class MessagePatch(BaseModel):
     folder: str | None = None
 
 
+class BulkTrashBody(BaseModel):
+    ids: list[str] = Field(default_factory=list, min_length=1)
+
+
 class ComposeAttachment(BaseModel):
     filename: str
     content_type: str = "application/octet-stream"
