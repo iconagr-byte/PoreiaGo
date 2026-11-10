@@ -2382,6 +2382,7 @@ async def admin_chat_threads(
         )
         t["driver_name"] = d.name if d else None
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
+        t["driver_missing"] = d is None
     return {"tenant_id": tenant_id, "threads": threads}
 
 
@@ -2425,9 +2426,13 @@ async def admin_chat_messages(
         limit=limit,
         viewer="office",
     )
+    if driver is None and not messages:
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     counts = unread_counts(tenant_id=tenant_id, driver_id=driver_id)
     return {
         "driver_id": driver_id,
+        "driver_name": driver.name if driver else None,
+        "driver_missing": driver is None,
         "messages": messages,
         "unread": counts.get("office", 0),
     }
@@ -2440,7 +2445,17 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Req
     tenant_id, allow_legacy = await _chat_office_scope(request)
     driver = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy)
     if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
+        # Still allow office reply on an existing thread (driver may be demo-tenant).
+        from travel_platform.driver.chat_store import list_messages
+
+        existing = list_messages(
+            tenant_id=tenant_id,
+            driver_id=driver_id,
+            limit=1,
+            viewer="office",
+        )
+        if not existing and not get_driver(driver_id):
+            raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     try:
         row = append_message(
             tenant_id=tenant_id,
