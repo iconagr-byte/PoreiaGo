@@ -29,4 +29,28 @@ describe('rent desk nav vs bus fleet', () => {
     expect(RENT_DESK_TABS.map((t) => t.id)).not.toContain('payments');
     expect(buildRentDeskNavItems().fleet_rental_payments).toBeUndefined();
   });
+
+  it('wires Γραφείο desk items to stable tab ids', () => {
+    const desk = RENT_DESK_TABS.filter((t) => t.group === 'desk');
+    expect(desk.map((t) => t.id)).toEqual(['clients', 'bookings', 'paperwork', 'wizard']);
+    expect(desk.map((t) => t.label)).toEqual([
+      'Πελάτες ενοικιάσεων',
+      'Κρατήσεις /rent',
+      'Χαρτούρα',
+      'Νέα κράτηση /rent',
+    ]);
+    for (const t of desk) {
+      const nav = buildRentDeskNavItems()[`fleet_rental_${t.id}`];
+      expect(nav.tab).toBe('fleet_rental');
+      expect(nav.fleetRentalTab).toBe(t.id);
+      expect(nav.type).toBe('fleet_rental_subtab');
+    }
+  });
+
+  it('clients button shows only the label (no CRM subtitle)', () => {
+    const clients = RENT_DESK_TABS.find((t) => t.id === 'clients');
+    expect(clients.label).toBe('Πελάτες ενοικιάσεων');
+    expect(String(clients.description || '').trim()).toBe('');
+    expect(String(clients.description || '')).not.toMatch(/CRM/i);
+  });
 });

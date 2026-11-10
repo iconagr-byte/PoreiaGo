@@ -74,6 +74,42 @@ class DriverShiftNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Nikos", alerts[0]["message"])
         self.assertIn("ξεκίνησε τη βάρδια", alerts[0]["message"])
 
+    async def test_notify_login_creates_connect_alert(self):
+        from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
+
+        session = {
+            "tenant_id": "00000000-0000-0000-0000-000000000001",
+            "sub": "drv-2",
+            "trip_id": None,
+            "driver_name": "Maria",
+            "vehicle_code": "EEX5670",
+        }
+
+        with (
+            patch(
+                "travel_platform.telemetry.driver_shift_notifications._send_driver_shift_push",
+                new_callable=AsyncMock,
+                return_value={"sent": 0},
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_pubsub.publish_fleet_alert",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            result = await notify_driver_shift(
+                "online",
+                session,
+                body={"reason": "login"},
+            )
+
+        self.assertIn("alert_id", result)
+        alerts = TelemetryAlertBus.list_recent(session["tenant_id"], limit=5)
+        self.assertEqual(alerts[0]["alert_type"], "DRIVER_ONLINE")
+        self.assertEqual(alerts[0]["metadata"].get("reason"), "login")
+        self.assertIn("συνδέθηκε", alerts[0]["message"])
+        self.assertIn("Maria", alerts[0]["message"])
+
     async def test_push_reports_no_subscriptions(self):
         from travel_platform.telemetry.driver_shift_notifications import _send_driver_shift_push
 

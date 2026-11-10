@@ -7,6 +7,7 @@ import {
   moveBusesHubTab,
   normalizeBusesHubOrder,
   sanitizeBusesHubTab,
+  shouldRenderBusesHub,
 } from './busesHub.js';
 
 describe('busesHub', () => {
@@ -17,11 +18,21 @@ describe('busesHub', () => {
     expect(isBusesHubTab('fleet_kpis')).toBe(true);
     expect(isBusesHubTab('customers')).toBe(true);
     expect(isBusesHubTab('bus_setup')).toBe(true);
+    expect(isBusesHubTab('driver_chat')).toBe(true);
+  });
+
+  it('does not render BusesHub chrome under rent customers CRM', () => {
+    expect(shouldRenderBusesHub('customers', { customerServiceScope: 'rent' })).toBe(false);
+    expect(shouldRenderBusesHub('customers', { rentOnly: true })).toBe(false);
+    expect(shouldRenderBusesHub('customers', { customerServiceScope: 'buses' })).toBe(true);
+    expect(shouldRenderBusesHub('routes', { customerServiceScope: 'rent' })).toBe(true);
+    expect(shouldRenderBusesHub('fleet_rental', { customerServiceScope: 'rent' })).toBe(false);
   });
 
   it('sanitizes tab ids', () => {
     expect(sanitizeBusesHubTab('bookings')).toBe('bookings');
     expect(sanitizeBusesHubTab('bus_setup')).toBe('bus_setup');
+    expect(sanitizeBusesHubTab('driver_chat')).toBe('driver_chat');
     expect(sanitizeBusesHubTab('fleet_kpis')).toBe('fleet_ops');
     expect(sanitizeBusesHubTab('nope')).toBe('routes');
   });

@@ -12,6 +12,9 @@ import {
   hasImpersonationBackup,
 } from '../../services/saasApi.js';
 import toast from 'react-hot-toast';
+import { useUiLang } from '../../hooks/useUiLang.js';
+import AdminAccountInlinePanel from './AdminAccountSecurityModal.jsx';
+import '../../styles/admin-header-icons.css';
 
 function initialsFromEmail(email) {
   const local = String(email || '')
@@ -26,182 +29,251 @@ function initialsFromEmail(email) {
   return local.slice(0, 2).toUpperCase();
 }
 
-function displayNameFromEmail(email) {
+function displayNameFromEmail(email, fallbackAdmin) {
   const local = String(email || '').split('@')[0] || '';
-  if (!local) return 'Διαχειριστής';
+  if (!local) return fallbackAdmin;
   return local
     .replace(/[._-]+/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim();
 }
 
-function roleLabel() {
-  if (isImpersonating()) return 'Impersonation';
-  if (canAccessPlatformOperatorUi()) return 'Super Admin';
+function roleLabel(t) {
+  if (isImpersonating()) return t('role_impersonation');
+  if (canAccessPlatformOperatorUi()) return t('role_super');
   const roles = getSaasRoles();
-  if (roles.includes('tenant_admin')) return 'Διαχειριστής γραφείου';
-  if (roles.includes('agent')) return 'Agent';
-  return 'Διαχειριστής';
+  if (roles.includes('tenant_admin')) return t('role_office_admin');
+  if (roles.includes('agent')) return t('role_agent');
+  return t('role_admin');
 }
 
 /**
- * Header account chip + menu — name, role, logout (and exit impersonation).
+ * Header account menu — user-only: account/security expand inline in the dropdown.
  */
-export default function AdminAccountMenu({ onOpenSettings } = {}) {
+export default function AdminAccountMenu() {
+  const { t } = useUiLang();
   const navigate = useNavigate();
   const rootRef = useRef(null);
+  const firstItemRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const email = useMemo(() => getSaasUserEmail(), [open]);
-  const name = displayNameFromEmail(email);
+  /** null | 'account' | 'security' — sub-panels stay inside the dropdown */
+  const [panel, setPanel] = useState(null);
+  const [displayName, setDisplayName] = useState('');
+  const email = useMemo(() => getSaasUserEmail(), [open, panel]);
+  const fallbackName = displayNameFromEmail(email, t('role_admin'));
+  const name = displayName.trim() || fallbackName;
   const initials = initialsFromEmail(email);
-  const role = roleLabel();
+  const role = roleLabel(t);
   const impersonating = isImpersonating() && hasImpersonationBackup();
+
+  const closeMenu = () => {
+    setOpen(false);
+    setPanel(null);
+  };
 
   useEffect(() => {
     if (!open) return undefined;
     const onDoc = (e) => {
-      if (!rootRef.current?.contains(e.target)) setOpen(false);
+      if (!rootRef.current?.contains(e.target)) closeMenu();
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      if (panel) {
+        setPanel(null);
+        return;
+      }
+      closeMenu();
     };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
+    const focusTimer = window.setTimeout(() => {
+      if (!panel) firstItemRef.current?.focus?.();
+    }, 30);
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+      window.clearTimeout(focusTimer);
     };
-  }, [open]);
+  }, [open, panel]);
 
   const logout = () => {
-    setOpen(false);
+    closeMenu();
     localStorage.removeItem('userRole');
     clearSaasSession();
     navigate('/admin/login');
   };
 
   const exitImpersonation = () => {
-    setOpen(false);
+    closeMenu();
     if (exitImpersonationSession()) {
-      toast.success('Επιστροφή σε Super Admin');
+      toast.success(t('back_super'));
       window.location.assign('/admin?tab=settings&sub=tenants');
     }
   };
 
-  const goSettings = () => {
-    setOpen(false);
-    if (typeof onOpenSettings === 'function') {
-      onOpenSettings();
-      return;
+  const copyEmail = async () => {
+    const value = String(email || '').trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t('email_copied'));
+    } catch {
+      toast.error(value);
     }
-    navigate('/admin?tab=settings');
   };
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="admin-acct relative" ref={rootRef}>
       <button
         type="button"
-        className={`flex items-center gap-2 sm:gap-2.5 pl-1 pr-2 sm:pr-2.5 py-1 rounded-full border transition-colors ${
-          open
-            ? 'bg-sky-50 border-sky-200 shadow-sm'
-            : 'bg-white border-black/[0.08] hover:border-black/[0.14] hover:bg-black/[0.02]'
-        }`}
-        aria-label="Λογαριασμός"
+        className={`admin-hdr-avatar-btn${open ? ' is-open' : ''}${impersonating ? ' is-impersonating' : ''}`}
+        aria-label={`${t('account')} · ${name} · ${role}`}
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
+        title={`${name} · ${role}`}
+        onClick={() => {
+          if (open) {
+            closeMenu();
+            return;
+          }
+          setPanel(null);
+          setOpen(true);
+        }}
       >
-        <span
-          className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold tracking-wide shrink-0 ${
-            impersonating
-              ? 'bg-amber-500 text-white'
-              : 'bg-[#0b4f6c] text-white'
-          }`}
-          aria-hidden
-        >
-          {initials}
-        </span>
-        <span className="hidden sm:flex flex-col items-start min-w-0 text-left leading-tight pr-0.5">
-          <span className="text-[13px] font-semibold text-on-surface truncate max-w-[9.5rem]">
-            {name}
-          </span>
-          <span className="text-[11px] text-on-surface-variant truncate max-w-[9.5rem]">
-            {role}
+        <span className="admin-hdr-avatar-ring" aria-hidden>
+          <span
+            className={`admin-hdr-avatar-core${impersonating ? ' is-impersonating' : ''}`}
+          >
+            {initials}
           </span>
         </span>
-        <span
-          className={`material-symbols-outlined text-[18px] text-on-surface-variant transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
-          aria-hidden
-        >
-          expand_more
-        </span>
+        {!impersonating ? <span className="admin-hdr-online" aria-hidden /> : null}
       </button>
 
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-[17.5rem] rounded-2xl border border-black/[0.08] bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)] overflow-hidden z-50"
+          className={`admin-acct-menu${panel ? ' is-panel' : ''}`}
+          aria-label={t('account')}
         >
-          <div className="px-3.5 py-3 border-b border-black/[0.06] bg-slate-50/80">
-            <p className="text-sm font-bold text-on-surface truncate">{name}</p>
-            <p className="text-xs text-on-surface-variant truncate mt-0.5">
-              {email || 'Συνδεδεμένος διαχειριστής'}
-            </p>
-            <span
-              className={`inline-flex items-center gap-1 mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                impersonating
-                  ? 'bg-amber-100 text-amber-900'
-                  : 'bg-sky-100 text-sky-900'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]" aria-hidden>
-                {impersonating ? 'visibility' : 'verified_user'}
-              </span>
-              {role}
-            </span>
-          </div>
-
-          <div className="p-1.5">
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-black/[0.04] text-left"
-              onClick={goSettings}
-            >
-              <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden>
-                settings
-              </span>
-              Ρυθμίσεις
-            </button>
-
-            {impersonating ? (
-              <button
-                type="button"
-                role="menuitem"
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-amber-900 hover:bg-amber-50 text-left"
-                onClick={exitImpersonation}
-              >
-                <span className="material-symbols-outlined text-[20px]" aria-hidden>
-                  logout
+          {panel ? (
+            <AdminAccountInlinePanel
+              open
+              focus={panel}
+              onBack={() => setPanel(null)}
+              onProfileSaved={(nextName) => {
+                if (nextName) setDisplayName(nextName);
+              }}
+            />
+          ) : (
+            <>
+              <div className="admin-acct-identity">
+                <span
+                  className={`admin-acct-avatar${impersonating ? ' is-impersonating' : ''}`}
+                  aria-hidden
+                >
+                  {initials}
                 </span>
-                Έξοδος impersonation
-              </button>
-            ) : null}
+                <div className="admin-acct-identity-text">
+                  <p className="admin-acct-name">{name}</p>
+                  {email ? (
+                    <button
+                      type="button"
+                      className="admin-acct-email"
+                      title={t('copy_email')}
+                      onClick={copyEmail}
+                    >
+                      {email}
+                    </button>
+                  ) : (
+                    <p className="admin-acct-email is-static">{t('signed_in_admin')}</p>
+                  )}
+                  <span
+                    className={`admin-acct-role${impersonating ? ' is-impersonating' : ''}`}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {impersonating ? 'visibility' : 'verified_user'}
+                    </span>
+                    {role}
+                  </span>
+                </div>
+              </div>
 
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-rose-700 hover:bg-rose-50 text-left"
-              onClick={logout}
-            >
-              <span className="material-symbols-outlined text-[20px]" aria-hidden>
-                logout
-              </span>
-              Αποσύνδεση
-            </button>
-          </div>
+              <div className="admin-acct-section" role="group" aria-label={t('account')}>
+                <button
+                  ref={firstItemRef}
+                  type="button"
+                  role="menuitem"
+                  className="admin-acct-item"
+                  onClick={() => setPanel('account')}
+                >
+                  <span className="admin-acct-item-icon is-mint" aria-hidden>
+                    <span className="material-symbols-outlined">manage_accounts</span>
+                  </span>
+                  <span className="admin-acct-item-body">
+                    <span className="admin-acct-item-label">{t('my_account')}</span>
+                    <span className="admin-acct-item-hint">{t('my_account_hint')}</span>
+                  </span>
+                  <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
+                    chevron_right
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="admin-acct-item"
+                  onClick={() => setPanel('security')}
+                >
+                  <span className="admin-acct-item-icon" aria-hidden>
+                    <span className="material-symbols-outlined">lock</span>
+                  </span>
+                  <span className="admin-acct-item-body">
+                    <span className="admin-acct-item-label">{t('security')}</span>
+                    <span className="admin-acct-item-hint">{t('security_hint')}</span>
+                  </span>
+                  <span className="material-symbols-outlined admin-acct-chevron" aria-hidden>
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+
+              {impersonating ? (
+                <div className="admin-acct-section">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="admin-acct-item is-warn"
+                    onClick={exitImpersonation}
+                  >
+                    <span className="admin-acct-item-icon is-warn" aria-hidden>
+                      <span className="material-symbols-outlined">switch_account</span>
+                    </span>
+                    <span className="admin-acct-item-body">
+                      <span className="admin-acct-item-label">{t('exit_impersonation')}</span>
+                      <span className="admin-acct-item-hint">{t('back_super')}</span>
+                    </span>
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="admin-acct-footer">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="admin-acct-item is-danger"
+                  onClick={logout}
+                >
+                  <span className="admin-acct-item-icon is-danger" aria-hidden>
+                    <span className="material-symbols-outlined">logout</span>
+                  </span>
+                  <span className="admin-acct-item-body">
+                    <span className="admin-acct-item-label">{t('logout')}</span>
+                    <span className="admin-acct-item-hint">{t('logout_hint')}</span>
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
     </div>

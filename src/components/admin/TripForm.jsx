@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { createFleetDriver, fetchFleetDrivers } from '../../services/platformApi.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
-import TripRouteStopsPanel from './TripRouteStopsPanel.jsx';
-import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import LocationPicker from './LocationPicker.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -18,9 +20,9 @@ const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Earl
 const HIGHLIGHT_SUGGESTIONS = ['Ξενάγηση', 'Γεύμα', 'Wi‑Fi', 'A/C', 'USB φόρτιση', 'Ασφάλεια'];
 
 const VEHICLE_TYPE_OPTIONS = [
-  { value: 'Luxury Coach', label: 'Luxury Coach (50 θέσεις)' },
-  { value: 'Premium Express', label: 'Premium Express (30 θέσεις)' },
-  { value: 'VIP Minibus', label: 'VIP Minibus (15 θέσεις)' },
+  { value: 'Luxury Coach', label: 'Πολυτελές λεωφορείο (50 θέσεις)' },
+  { value: 'Premium Express', label: 'Εξπρές πολυτελείας (30 θέσεις)' },
+  { value: 'VIP Minibus', label: 'VIP μικρό λεωφορείο (15 θέσεις)' },
 ];
 
 const emptyFleetRow = () => ({
@@ -183,8 +185,12 @@ export default function TripForm({
 }) {
   const [drivers, setDrivers] = useState([]);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [highlightDraft, setHighlightDraft] = useState('');
   const [quickAddFor, setQuickAddFor] = useState(null); // 'primary' | number index | null
+
+  const galleryImages = Array.isArray(formData.images) ? formData.images : [];
+  const MAX_GALLERY = 8;
 
   useEffect(() => {
     fetchFleetDrivers().then(setDrivers);
@@ -317,6 +323,70 @@ export default function TripForm({
       setCoverUploading(false);
       e.target.value = '';
     }
+  };
+
+  const handleGalleryUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const room = Math.max(0, MAX_GALLERY - galleryImages.length);
+    if (room <= 0) {
+      toast.error(`Μέχρι ${MAX_GALLERY} φωτογραφίες στο gallery`);
+      e.target.value = '';
+      return;
+    }
+    const batch = files.slice(0, room);
+    setGalleryUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of batch) {
+        if (file.size > 12 * 1024 * 1024) {
+          toast.error(`${file.name}: πολύ μεγάλο (μέγ. 12MB)`);
+          continue;
+        }
+        try {
+          uploaded.push(await fileToTripCoverDataUrl(file));
+        } catch (err) {
+          toast.error(
+            err.message?.includes('large')
+              ? `${file.name}: πολύ μεγάλη μετά τη συμπίεση`
+              : `Αποτυχία: ${file.name}`,
+          );
+        }
+      }
+      if (!uploaded.length) return;
+      setFormData((prev) => {
+        const nextImages = [...(Array.isArray(prev.images) ? prev.images : []), ...uploaded];
+        return {
+          ...prev,
+          images: nextImages,
+          image: prev.image || uploaded[0],
+        };
+      });
+      toast.success(
+        uploaded.length > 1
+          ? `Προστέθηκαν ${uploaded.length} φωτογραφίες`
+          : 'Προστέθηκε φωτογραφία',
+      );
+    } finally {
+      setGalleryUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeGalleryImage = (url) => {
+    setFormData((prev) => {
+      const nextImages = (Array.isArray(prev.images) ? prev.images : []).filter((u) => u !== url);
+      return {
+        ...prev,
+        images: nextImages,
+        image: prev.image === url ? nextImages[0] || '' : prev.image,
+      };
+    });
+  };
+
+  const setCoverFromGallery = (url) => {
+    patch({ image: url });
+    toast.success('Ορίστηκε ως κύρια φωτογραφία κάρτας');
   };
 
   const addHighlight = (raw) => {
@@ -457,7 +527,11 @@ export default function TripForm({
         )}
       </Section>
 
-      <Section icon="photo_camera" title="Εικόνα & κάρτα" hint="Η φωτογραφία εμφανίζεται στην αρχική σελίδα.">
+      <Section
+        icon="photo_camera"
+        title="Εικόνα & κάρτα"
+        hint="Κύρια φωτογραφία κάρτας + gallery για τη σελίδα εκδρομής (bento)."
+      >
         <div className="grid lg:grid-cols-[220px_1fr] gap-5">
           <div
             className={`relative h-44 rounded-xl overflow-hidden border border-dashed flex items-center justify-center ${
@@ -485,12 +559,12 @@ export default function TripForm({
             <div className="flex flex-wrap gap-2">
               <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold cursor-pointer hover:bg-slate-800">
                 <span className="material-symbols-outlined text-[18px]">upload</span>
-                {formData.image ? 'Αλλαγή' : 'Ανέβασμα'}
+                {formData.image ? 'Αλλαγή κύριας' : 'Ανέβασμα κύριας'}
                 <input
                   type="file"
                   accept={TRIP_COVER_ACCEPT}
                   className="hidden"
-                  disabled={coverUploading}
+                  disabled={coverUploading || galleryUploading}
                   onChange={handleCoverImageUpload}
                 />
               </label>
@@ -500,7 +574,7 @@ export default function TripForm({
                   onClick={() => patch({ image: '' })}
                   className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50"
                 >
-                  Αφαίρεση
+                  Αφαίρεση κύριας
                 </button>
               )}
             </div>
@@ -550,6 +624,90 @@ export default function TripForm({
               />
             </Field>
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Gallery εκδρομής
+              </span>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Έως {MAX_GALLERY} φωτογραφίες — εμφανίζονται στη σελίδα λεπτομερειών (bento).
+              </p>
+            </div>
+            <label
+              className={`inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:underline cursor-pointer ${
+                galleryUploading || galleryImages.length >= MAX_GALLERY
+                  ? 'opacity-50 pointer-events-none'
+                  : ''
+              }`}
+            >
+              {galleryUploading ? 'Ανέβασμα…' : '+ Προσθήκη'}
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading || galleryImages.length >= MAX_GALLERY}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          </div>
+          {galleryImages.length ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {galleryImages.map((url, idx) => (
+                <div
+                  key={`${idx}-${String(url).slice(0, 48)}`}
+                  className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border ${
+                    url === formData.image
+                      ? 'border-sky-500 ring-2 ring-sky-200'
+                      : 'border-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    title="Ορισμός ως κύρια"
+                    className="absolute inset-0"
+                    onClick={() => setCoverFromGallery(url)}
+                  >
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                    onClick={() => removeGalleryImage(url)}
+                    aria-label="Αφαίρεση"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-8 text-sm text-slate-500 hover:bg-slate-50">
+              <span className="material-symbols-outlined mb-1 text-[28px] opacity-40">
+                photo_library
+              </span>
+              Σύρε ή επίλεξε φωτογραφίες της εκδρομής
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          )}
+          {galleryUploading && (
+            <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+              <span className="material-symbols-outlined animate-spin text-[16px]">
+                progress_activity
+              </span>
+              Συμπίεση & αποθήκευση…
+            </p>
+          )}
         </div>
       </Section>
 
@@ -913,27 +1071,6 @@ export default function TripForm({
       </Section>
 
       <Section
-        icon="airline_seat_recline_extra"
-        title="Ενιαίο manifest (λεωφορείο + πτήση)"
-        hint="Χαρτογράφηση θέσης λεωφορείου, θέσης πτήσης και PNR/ticket ανά επιβάτη."
-        action={
-          tripId ? (
-            <a
-              href={`/tour-leader/${tripId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[16px]">luggage</span>
-              Tour leader
-            </a>
-          ) : null
-        }
-      >
-        <HybridPassengerManifest formData={formData} setFormData={setFormData} tripId={tripId} />
-      </Section>
-
-      <Section
         icon="bed"
         title="Rooming & extras"
         hint="Δωμάτια ξενοδοχείου και ασφάλεια / έξτρα ανά επιβάτη."
@@ -946,12 +1083,82 @@ export default function TripForm({
         title="Διαδρομή & στάσεις"
         hint="Αναζήτηση τόπου, συντομεύσεις πόλεων, κλικ στον χάρτη και αναδιάταξη στάσεων."
       >
-        <TripRouteStopsPanel
-          formData={formData}
-          setFormData={setFormData}
-          activeStopId={activeStopId}
-          setActiveStopId={setActiveStopId}
-        />
+        <div className="grid lg:grid-cols-2 gap-5">
+          <div>
+            {(formData.stops || []).length === 0 ? (
+              <p className="text-sm text-slate-500 italic py-8 text-center border border-dashed border-slate-200 rounded-xl">
+                Δεν έχουν προστεθεί στάσεις ακόμα.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                {formData.stops.map((stop, index) => (
+                  <div
+                    key={stop.id}
+                    onClick={() => setActiveStopId(stop.id)}
+                    className={`rounded-xl border p-3 cursor-pointer transition ${
+                      activeStopId === stop.id
+                        ? 'border-slate-900 bg-slate-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                          activeStopId === stop.id
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={stop.name}
+                        onChange={(e) => handleUpdateStop(stop.id, 'name', e.target.value)}
+                        className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm"
+                        placeholder="Όνομα στάσης"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <input
+                        type="time"
+                        required
+                        value={stop.time}
+                        onChange={(e) => handleUpdateStop(stop.id, 'time', e.target.value)}
+                        className="w-[7.5rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveStop(stop.id);
+                        }}
+                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+            <MapContainer center={[38.5, 23.0]} zoom={6} className="h-full w-full">
+              <TileLayer
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
+              <LocationPicker activeStopId={activeStopId} setFormData={setFormData} />
+              {(formData.stops || []).map((stop) => (
+                <Marker key={stop.id} position={[stop.lat, stop.lng]} />
+              ))}
+            </MapContainer>
+          </div>
+        </div>
       </Section>
 
       <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg">
