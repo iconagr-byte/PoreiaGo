@@ -1,18 +1,23 @@
 /**
- * Apple-inspired live map theme — soft light basemap, SF-like chrome, Greek labels.
+ * Soft light Leaflet basemap with place labels.
+ *
+ * Always use OpenStreetMap — CARTO anonymous tiles watermark "API KEY REQUIRED"
+ * and optional VITE_CARTO_API_KEY is ignored so a bad/placeholder key cannot
+ * put watermarks back on fleet / planned-vs-actual maps.
  */
 
-/** Soft light raster tiles with dense place labels (Leaflet fallback). */
-export const APPLE_LEAFLET_TILES = {
-  url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  attribution: '© OpenStreetMap · © CARTO',
-  subdomains: 'abcd',
+/** Shared Leaflet raster basemap — no third-party API keys. */
+export const LEAFLET_BASEMAP = {
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: '© OpenStreetMap contributors',
+  subdomains: 'abc',
   maxZoom: 19,
 };
 
-/** Cleaner light companion layer (optional underlay feel via CSS). */
-export const APPLE_LEAFLET_LABELS_HINT =
-  'Πόλεις & περιφέρειες Ελλάδας — ετικέτες PoreiaGo πάνω στο basemap';
+/**
+ * Live map tiles — same as LEAFLET_BASEMAP (Greek πόλεις/δήμοι via overlay).
+ */
+export const APPLE_LEAFLET_TILES = LEAFLET_BASEMAP;
 
 /** Mapbox style closest to Apple Maps light aesthetic. */
 export const APPLE_MAPBOX_STYLE = 'mapbox://styles/mapbox/light-v11';

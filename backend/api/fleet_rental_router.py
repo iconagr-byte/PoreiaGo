@@ -1,0 +1,732 @@
+"""Admin Fleet Rental API — vehicles, availability, bookings, inspections."""
+
+from __future__ import annotations
+
+import os
+import re
+import uuid
+from pathlib import Path
+from uuid import UUID
+
+from datetime import date
+
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+
+from travel_platform.rental import rental_store as store
+
+try:
+    from app.core.auth_deps import get_current_tenant_id, get_token_payload
+except ImportError:
+
+    async def get_token_payload() -> dict:
+        raise HTTPException(status_code=503, detail="SaaS auth not available")
+
+    async def get_current_tenant_id() -> UUID:
+        raise HTTPException(status_code=503, detail="SaaS auth not available")
+
+
+router = APIRouter(prefix="/api/admin/platform/fleet-rental", tags=["Fleet Rental"])
+
+_ADMIN_ROLES = {"tenant_admin", "dispatcher", "superadmin"}
+_DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+_RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
+_RENTAL_DOC_DIR = _DATA_ROOT / "uploads" / "rental_docs"
+# Phone camera originals are often 5–10 MB; we compress after read (nginx allows 12m).
+_MAX_PHOTO_BYTES = 12 * 1024 * 1024
+_MAX_DOC_BYTES = 12 * 1024 * 1024
+
+
+async def _require_admin(payload: dict = Depends(get_token_payload)) -> dict:
+    roles = set(payload.get("roles") or [])
+    if not roles & _ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail="Απαιτείται ρόλος διαχειριστή")
+    return payload
+
+
+def _tid(tenant_id: UUID) -> str:
+    return str(tenant_id)
+
+
+class VehicleBody(BaseModel):
+    plate_number: str = Field(min_length=2, max_length=32)
+    category: str = Field(min_length=2, max_length=32)
+    model: str = Field(min_length=1, max_length=120)
+    year: int | None = Field(default=None, ge=1980, le=2100)
+    seating_capacity: int = Field(default=5, ge=2, le=80)
+    current_status: str = "AVAILABLE"
+    current_mileage: int = Field(default=0, ge=0)
+    daily_rate_eur: float = Field(default=0, ge=0)
+    one_way_surcharge_eur: float = Field(default=0, ge=0)
+    with_driver_daily_eur: float = Field(default=0, ge=0)
+    gps_device_id: str | None = None
+    photo_url: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
+    description: str | None = Field(default=None, max_length=2000)
+    notes: str | None = None
+    legal_deadline: date | None = None
+    insurance_due_date: date | None = None
+
+
+class ExpenseBody(BaseModel):
+    vehicle_id: str
+    expense_date: date | None = None
+    category: str = "fuel"
+    amount: float = Field(ge=0)
+    liters: float | None = None
+    odometer: int | None = None
+    note: str | None = None
+
+
+class BookingBody(BaseModel):
+    vehicle_id: str
+    client_name: str = Field(min_length=1, max_length=160)
+    client_email: str | None = None
+    client_phone: str | None = None
+    client_id: str | None = None
+    channel: str = "DESK"
+    start_time: str
+    end_time: str
+    pickup_location: str = Field(min_length=1, max_length=240)
+    dropoff_location: str | None = None
+    total_cost: float | None = None
+    driver_mode: str = "SELF_DRIVE"
+    assigned_driver_id: str | None = None
+    notes: str | None = None
+
+
+class BookingStatusBody(BaseModel):
+    rental_status: str
+
+
+class LegalDocSignatureBody(BaseModel):
+    doc_id: str = Field(min_length=2, max_length=64)
+    signature_url: str = Field(min_length=4, max_length=500)
+    signer_name: str | None = Field(default=None, max_length=160)
+
+
+class RentalCheckoutBody(BaseModel):
+    signature_url: str = Field(min_length=4, max_length=500)
+    signer_name: str | None = Field(default=None, max_length=160)
+    accepted_terms: list[str] = Field(default_factory=list)
+    fuel_level: float | None = Field(default=None, ge=0, le=100)
+    insurance_label: str | None = Field(default=None, max_length=80)
+    deposit_eur: float | None = Field(default=None, ge=0)
+    summary: dict | None = None
+    signing_method: str = "IN_PERSON"
+
+
+class SignLinkBody(BaseModel):
+    public_base_url: str | None = Field(default=None, max_length=240)
+
+
+class ResetSignatureBody(BaseModel):
+    send_link: bool = True
+    public_base_url: str | None = Field(default=None, max_length=240)
+
+
+class InspectionBody(BaseModel):
+    rental_booking_id: str
+    inspection_type: str
+    fuel_level: float = Field(default=100, ge=0, le=100)
+    mileage: int = Field(default=0, ge=0)
+    damage_notes: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
+    signature_url: str | None = None
+    inspector_name: str | None = None
+
+
+@router.get("/summary")
+async def rental_summary(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return store.dashboard_summary(_tid(tenant_id))
+
+
+@router.get("/vehicles")
+async def list_vehicles(
+    category: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    tid = _tid(tenant_id)
+    store.ensure_demo_rental_fleet(tid)
+    store.ensure_demo_rental_sample_booking(tid)
+    return {"vehicles": store.list_vehicles(tid, category=category)}
+
+
+@router.post("/vehicles")
+async def create_vehicle(
+    body: VehicleBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.upsert_vehicle(_tid(tenant_id), body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return row
+
+
+@router.patch("/vehicles/{vehicle_id}")
+async def patch_vehicle(
+    vehicle_id: str,
+    body: VehicleBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.upsert_vehicle(_tid(tenant_id), body.model_dump(), vehicle_id=vehicle_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.delete("/vehicles/{vehicle_id}", status_code=204)
+async def remove_vehicle(
+    vehicle_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        ok = store.delete_vehicle(_tid(tenant_id), vehicle_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not ok:
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε")
+    return None
+
+
+@router.get("/availability")
+async def availability(
+    start_time: str = Query(...),
+    end_time: str = Query(...),
+    category: str | None = None,
+    min_seats: int | None = Query(default=None, ge=1, le=80),
+    pickup_location: str | None = None,
+    dropoff_location: str | None = None,
+    driver_mode: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        rows = store.check_availability(
+            _tid(tenant_id),
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+            min_seats=min_seats,
+            pickup_location=pickup_location,
+            dropoff_location=dropoff_location,
+            driver_mode=driver_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"vehicles": rows, "count": len(rows)}
+
+
+@router.get("/bookings")
+async def list_bookings(
+    vehicle_id: str | None = None,
+    status: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    tid = _tid(tenant_id)
+    store.ensure_demo_rental_sample_booking(tid)
+    return {
+        "bookings": store.list_bookings(tid, vehicle_id=vehicle_id, status=status),
+    }
+
+
+@router.post("/bookings/demo-sign-sample")
+async def create_demo_sign_sample(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """One-click demo booking so Χαρτούρα can open dual-mode signature immediately."""
+    try:
+        return store.create_demo_sign_sample(_tid(tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/clients")
+async def list_rental_clients(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Unique rental customers (desk + Wallet) for the Ενοικιάσεις → Πελάτες tab."""
+    clients = store.list_clients(_tid(tenant_id))
+    return {"clients": clients, "total": len(clients)}
+
+
+@router.post("/bookings")
+async def create_booking(
+    body: BookingBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.create_booking(_tid(tenant_id), body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return row
+
+
+@router.patch("/bookings/{booking_id}/status")
+async def patch_booking_status(
+    booking_id: str,
+    body: BookingStatusBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.update_booking_status(_tid(tenant_id), booking_id, body.rental_status)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(row)
+    except Exception:
+        pass
+    return row
+
+
+class ConfirmPaymentBody(BaseModel):
+    amount_paid: float | None = None
+    note: str | None = None
+
+
+@router.post("/bookings/{booking_id}/confirm-payment")
+async def confirm_booking_payment(
+    booking_id: str,
+    body: ConfirmPaymentBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Office confirms bank/cash settlement — never trust client PAID."""
+    try:
+        row = store.confirm_booking_payment(
+            _tid(tenant_id),
+            booking_id,
+            amount_paid=body.amount_paid,
+            note=body.note,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    # Fiscal: mark PENDING_ISSUE for rent desk; MARK pipeline can pick up later.
+    # AADE stub stays warn-only until live credentials.
+    return row
+
+
+@router.patch("/bookings/{booking_id}/legal-docs")
+async def patch_booking_legal_doc(
+    booking_id: str,
+    body: LegalDocSignatureBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Save customer signature on a rental legal document (σύμβαση, GDPR, κ.λπ.)."""
+    try:
+        row = store.save_legal_doc_signature(
+            _tid(tenant_id),
+            booking_id,
+            doc_id=body.doc_id,
+            signature_url=body.signature_url,
+            signer_name=body.signer_name,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+async def _notify_sign_link(link: dict, sign_url: str) -> dict:
+    notify: dict = {"email": None, "sms": None}
+    name = link.get("client_name") or ""
+    try:
+        from travel_platform.notifications.dispatcher import send_email, send_sms
+        from ticketing.fiscal_notifications import normalize_phone
+
+        email = str(link.get("client_email") or "").strip()
+        phone = normalize_phone(link.get("client_phone"))
+        msg = (
+            f"Γεια σας {name},\n\n"
+            f"Υπογράψτε τη σύμβαση ενοικίασης online (ισχύει 24 ώρες):\n"
+            f"{sign_url}\n\n"
+            f"PoreiaGo Rent"
+        )
+        if email:
+            notify["email"] = await send_email(email, "Υπογραφή σύμβασης ενοικίασης", msg)
+        if phone:
+            sms_body = f"PoreiaGo Rent: υπογράψτε τη σύμβαση {sign_url}"
+            notify["sms"] = await send_sms(phone, sms_body[:300])
+    except Exception:
+        pass
+    return notify
+
+
+@router.post("/bookings/{booking_id}/sign-link")
+async def generate_rental_sign_link(
+    booking_id: str,
+    body: SignLinkBody = Body(default_factory=SignLinkBody),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Create 24h contactless signing link and notify client via SMS/email."""
+    try:
+        link = store.create_signature_link(_tid(tenant_id), booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    base = str(body.public_base_url or "").strip().rstrip("/")
+    sign_url = f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+    notify = await _notify_sign_link(link, sign_url)
+    return {**link, "sign_url": sign_url, "notify": notify}
+
+
+@router.post("/bookings/{booking_id}/reset-signature")
+async def reset_rental_signature(
+    booking_id: str,
+    body: ResetSignatureBody = Body(default_factory=ResetSignatureBody),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Clear wrong/issued signature and optionally send a fresh remote signing link."""
+    tid = _tid(tenant_id)
+    try:
+        booking = store.reset_rental_signature(tid, booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    result: dict = {
+        "booking": booking,
+        "sign_url": None,
+        "notify": None,
+        "signature_token": None,
+    }
+    if body.send_link:
+        try:
+            link = store.create_signature_link(tid, booking_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        base = str(body.public_base_url or "").strip().rstrip("/")
+        sign_url = (
+            f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+        )
+        notify = await _notify_sign_link(link, sign_url)
+        # Refresh booking after token write.
+        booking = next(
+            (b for b in store.list_bookings(tid) if b.get("id") == booking_id),
+            booking,
+        )
+        result.update(
+            {
+                "booking": booking,
+                "sign_url": sign_url,
+                "notify": notify,
+                "signature_token": link.get("signature_token"),
+                "signature_token_expires_at": link.get("signature_token_expires_at"),
+            }
+        )
+    return result
+
+
+@router.get("/bookings/{booking_id}/checkout-status")
+async def rental_checkout_status(
+    booking_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Poll remote signing progress for the agent tablet."""
+    try:
+        return store.get_checkout_status(_tid(tenant_id), booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+
+@router.post("/bookings/{booking_id}/checkout")
+async def rental_tablet_checkout(
+    booking_id: str,
+    body: RentalCheckoutBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """
+    Tablet checkout: accept mandatory terms + one signature → stamp legal pack,
+    activate contract, write printable HTML contract, notify customer.
+    """
+    payload = body.model_dump()
+    if not payload.get("signing_method"):
+        payload["signing_method"] = "IN_PERSON"
+    try:
+        result = store.complete_rental_checkout(
+            _tid(tenant_id),
+            booking_id,
+            payload,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    booking = result.get("booking") or {}
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(booking)
+    except Exception:
+        pass
+    try:
+        from travel_platform.notifications.dispatcher import send_email
+
+        email = str(booking.get("client_email") or "").strip()
+        if email:
+            contract_url = result.get("contract_pdf_url") or ""
+            await send_email(
+                email,
+                "Η σύμβαση ενοικίασης εκδόθηκε",
+                (
+                    f"Γεια σας {booking.get('client_name') or ''},\n\n"
+                    f"Η ψηφιακή σύμβαση για την κράτησή σας είναι έτοιμη.\n"
+                    f"Κατάσταση: ACTIVE\n"
+                    f"Αρχείο: {contract_url}\n\n"
+                    "PoreiaGo Rent"
+                ),
+            )
+    except Exception:
+        pass
+    return result
+
+
+@router.get("/contracts/file/{filename}")
+async def get_rental_contract_file(
+    filename: str,
+    _: dict = Depends(_require_admin),
+):
+    safe = Path(filename).name
+    path = _DATA_ROOT / "uploads" / "rental_contracts" / safe
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Η σύμβαση δεν βρέθηκε")
+    return FileResponse(path, media_type="text/html; charset=utf-8")
+
+
+@router.get("/calendar")
+async def rental_calendar(
+    days: int = Query(default=30, ge=7, le=120),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"blocks": store.calendar_blocks(_tid(tenant_id), days=days)}
+
+
+@router.get("/availability-board")
+async def rental_availability_board(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"vehicles": store.availability_board(_tid(tenant_id))}
+
+
+@router.get("/documents")
+async def rental_documents(
+    vehicle_id: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"documents": store.list_documents(_tid(tenant_id), vehicle_id=vehicle_id)}
+
+
+@router.post("/vehicles/{vehicle_id}/documents", status_code=201)
+async def upload_rental_vehicle_document(
+    vehicle_id: str,
+    file: UploadFile = File(...),
+    kind: str = Query("registration"),
+    expires_at: date | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    tid = _tid(tenant_id)
+    if not store.get_vehicle(tid, vehicle_id):
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Λείπει όνομα αρχείου")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="Το αρχείο είναι πολύ μεγάλο (μέγ. 12 MB)")
+    safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
+    out_name = f"rdoc-{vehicle_id}-{uuid.uuid4().hex[:10]}-{safe_name}"[:180]
+    _RENTAL_DOC_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _RENTAL_DOC_DIR / out_name
+    out_path.write_bytes(content)
+    try:
+        doc = store.add_vehicle_document(
+            tid,
+            vehicle_id,
+            {
+                "kind": kind,
+                "file_name": file.filename,
+                "mime_type": file.content_type or "application/octet-stream",
+                "size_bytes": len(content),
+                "storage_path": str(out_path),
+                "url": f"/api/admin/platform/fleet-rental/documents/file/{out_name}",
+                "expires_at": expires_at.isoformat() if expires_at else None,
+            },
+        )
+    except KeyError as exc:
+        out_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε") from exc
+    return doc
+
+
+@router.delete("/vehicles/{vehicle_id}/documents/{document_id}")
+async def delete_rental_vehicle_document(
+    vehicle_id: str,
+    document_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    if not store.delete_vehicle_document(_tid(tenant_id), vehicle_id, document_id):
+        raise HTTPException(status_code=404, detail="Το έγγραφο δεν βρέθηκε")
+    return {"ok": True}
+
+
+@router.get("/documents/file/{filename}")
+async def get_rental_document_file(
+    filename: str,
+    _: dict = Depends(_require_admin),
+):
+    safe = Path(filename).name
+    path = _RENTAL_DOC_DIR / safe
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Το αρχείο δεν βρέθηκε")
+    return FileResponse(path)
+
+
+@router.get("/expenses")
+async def rental_expenses(
+    vehicle_id: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"expenses": store.list_expenses(_tid(tenant_id), vehicle_id=vehicle_id)}
+
+
+@router.post("/expenses", status_code=201)
+async def create_rental_expense(
+    body: ExpenseBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        return store.create_expense(_tid(tenant_id), body.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/expenses/{expense_id}")
+async def delete_rental_expense(
+    expense_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    if not store.delete_expense(_tid(tenant_id), expense_id):
+        raise HTTPException(status_code=404, detail="Η δαπάνη δεν βρέθηκε")
+    return {"ok": True}
+
+
+@router.get("/live-overlays")
+async def rental_live_overlays(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Active rentals for live-map GPS overlay (match by plate / gps_device_id)."""
+    overlays = store.active_rental_overlays(_tid(tenant_id))
+    return {"overlays": overlays, "count": len(overlays)}
+
+
+@router.get("/inspections")
+async def list_inspections(
+    booking_id: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"inspections": store.list_inspections(_tid(tenant_id), booking_id=booking_id)}
+
+
+@router.post("/inspections")
+async def create_inspection(
+    body: InspectionBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.create_inspection(_tid(tenant_id), body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return row
+
+
+@router.post("/inspections/photo-upload")
+async def upload_inspection_photo(
+    file: UploadFile = File(...),
+    _: dict = Depends(_require_admin),
+):
+    """Vehicle / damage / check-in photo — returns public URL for photo_urls."""
+    from travel_platform.media.image_optimize import looks_like_image, optimize_driver_photo
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 12 MB)")
+    if not looks_like_image(content, file.content_type, file.filename):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+
+    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
+    if optimized.ext == ".heic":
+        raise HTTPException(
+            status_code=400,
+            detail="Μορφή HEIC δεν υποστηρίζεται — αποθηκεύστε ως JPG/PNG από το κινητό",
+        )
+    if optimized.ext == ".bin" or not optimized.content:
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "photo").stem)[:40] or "photo"
+    filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
+
+    _RENTAL_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _RENTAL_PHOTO_DIR / filename
+    out_path.write_bytes(optimized.content)
+    url = f"/api/site/rental-photos/{filename}"
+    return {
+        "ok": True,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }

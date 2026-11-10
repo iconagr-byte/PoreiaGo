@@ -1,0 +1,165 @@
+import { useEffect, useRef } from 'react';
+import { useAdminNotifications } from '../../hooks/useAdminNotifications.js';
+import {
+  armNotificationAudioUnlock,
+  unlockNotificationAudio,
+} from '../../lib/admin/notificationClickSound.js';
+import { useUiLang } from '../../hooks/useUiLang.js';
+import { getSaasTenantId } from '../../services/saasApi.js';
+import '../../styles/admin-header-icons.css';
+
+function formatWhen(iso, dateLocale) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleString(dateLocale || 'el-GR', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function iconFor(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('sos')) return 'emergency';
+  if (t.includes('booking') || t.includes('paid')) return 'confirmation_number';
+  if (t.includes('chat') || t.includes('message')) return 'chat';
+  if (t.includes('lost')) return 'support_agent';
+  if (t.includes('online') || t.includes('shift')) return 'play_circle';
+  if (t.includes('offline')) return 'stop_circle';
+  if (t.includes('route') || t.includes('deviation')) return 'alt_route';
+  return 'notifications';
+}
+
+/**
+ * Top-right admin bell — inbox + classic click sound on new events.
+ */
+export default function AdminNotificationBell({ onNavigate } = {}) {
+  const { t, dateLocale } = useUiLang();
+  // Must use the logged-in office tenant — DEMO default broke Achillio alerts WS.
+  const officeTenantId = getSaasTenantId();
+  const { items, unreadCount, open, setOpen, markAllRead, markRead, clearAll } =
+    useAdminNotifications({ tenantId: officeTenantId, enabled: true });
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    armNotificationAudioUnlock();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open, setOpen]);
+
+  const openItem = (item) => {
+    markRead(item.id);
+    setOpen(false);
+    const tab = item.tab || null;
+    if (typeof onNavigate === 'function' && tab) {
+      onNavigate(tab, { driverId: item.driverId || null, url: item.url });
+      return;
+    }
+    if (item.url) {
+      window.location.assign(item.url);
+    }
+  };
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className={`admin-hdr-icon${open ? ' is-open' : ''}`}
+        aria-label={
+          unreadCount > 0
+            ? t('notifications_unread', { n: unreadCount })
+            : t('notifications')
+        }
+        aria-expanded={open}
+        onClick={() => {
+          unlockNotificationAudio();
+          setOpen((v) => {
+            const next = !v;
+            if (next) markAllRead();
+            return next;
+          });
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden>
+          notifications
+        </span>
+        {unreadCount > 0 ? (
+          <span className="admin-hdr-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(28rem,70vh)] overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-xl z-50 flex flex-col"
+          role="dialog"
+          aria-label={t('notifications')}
+        >
+          <div className="px-4 py-3 border-b border-black/[0.06] flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-gray-900">{t('notifications')}</p>
+            {items.length > 0 ? (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-[11px] font-bold text-gray-500 hover:text-gray-800"
+              >
+                {t('clear')}
+              </button>
+            ) : null}
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {items.length === 0 ? (
+              <p className="px-4 py-8 text-sm text-gray-500 text-center">
+                {t('notifications_empty')}
+              </p>
+            ) : (
+              <ul className="divide-y divide-black/[0.05]">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => openItem(item)}
+                      className={`w-full text-left px-4 py-3 hover:bg-sky-50/80 transition-colors flex gap-3 ${
+                        item.read ? 'opacity-80' : 'bg-sky-50/40'
+                      }`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5"
+                        aria-hidden
+                      >
+                        {iconFor(item.type)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-gray-900 truncate">
+                          {item.title}
+                        </span>
+                        {item.body ? (
+                          <span className="block text-xs text-gray-600 mt-0.5 line-clamp-2">
+                            {item.body}
+                          </span>
+                        ) : null}
+                        <span className="block text-[11px] text-gray-400 mt-1">
+                          {formatWhen(item.at, dateLocale)}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

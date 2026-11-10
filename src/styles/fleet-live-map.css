@@ -12,17 +12,24 @@
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI',
     system-ui, sans-serif;
   color: var(--fleet-ink);
+  margin: -0.15rem -0.1rem 0;
+  padding: 0.55rem 0.35rem 0.85rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(1200px 480px at 12% -10%, rgba(0, 113, 227, 0.07), transparent 55%),
+    radial-gradient(900px 420px at 90% 0%, rgba(52, 199, 89, 0.06), transparent 50%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
 }
 
 .fleet-apple-shell .fleet-apple-title {
-  font-size: 1.375rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
 }
 
 .fleet-apple-shell .fleet-apple-subtitle {
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
   font-size: 0.8125rem;
   color: var(--fleet-secondary);
   letter-spacing: -0.01em;
@@ -37,12 +44,13 @@
   background: var(--fleet-card);
   backdrop-filter: blur(16px) saturate(1.4);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  padding: 0.4rem 0.85rem;
+  padding: 0.45rem 0.9rem;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--fleet-ink);
-  transition: background 0.2s ease, transform 0.15s ease;
+  transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+  cursor: pointer;
 }
 
 .fleet-apple-chip:hover {
@@ -53,63 +61,32 @@
   color: #0b7a2b;
   background: rgba(52, 199, 89, 0.14);
   border-color: rgba(52, 199, 89, 0.28);
+  cursor: default;
 }
 
 .fleet-apple-chip.is-warn {
   color: #9a6700;
   background: rgba(255, 204, 0, 0.16);
   border-color: rgba(255, 204, 0, 0.3);
+  cursor: default;
 }
 
-.fleet-apple-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.85rem 1.25rem;
-  border-radius: 18px;
-  border: 1px solid var(--fleet-stroke);
-  background: var(--fleet-card);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  padding: 0.85rem 1.1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
-}
-
-.fleet-apple-toolbar label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--fleet-ink);
-  cursor: pointer;
-  user-select: none;
-}
-
-.fleet-apple-toolbar input[type='checkbox'] {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--fleet-accent);
-}
-
-.fleet-apple-toolbar select {
-  border-radius: 10px;
-  border: 1px solid var(--fleet-stroke);
-  background: #fff;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
+.fleet-apple-chip.is-on {
+  color: var(--fleet-accent);
+  background: rgba(0, 113, 227, 0.1);
+  border-color: rgba(0, 113, 227, 0.28);
 }
 
 .fleet-apple-map-frame {
   position: relative;
-  height: min(72vh, 680px);
+  height: min(90vh, 980px);
+  min-height: 560px;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: 22px;
   border: 1px solid var(--fleet-stroke);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04),
-    0 12px 40px rgba(0, 0, 0, 0.08);
+    0 18px 48px rgba(15, 23, 42, 0.1);
   background: linear-gradient(160deg, #e8eef5 0%, #f5f5f7 45%, #eef2f6 100%);
 }
 
@@ -119,18 +96,67 @@
   background: #eef1f4 !important;
 }
 
-/* Soften tiles toward Apple Maps */
+/* Soften light_all / Mapbox light — keep place labels readable */
 .fleet-apple-map-frame .leaflet-tile-pane {
-  filter: saturate(0.78) brightness(1.04) contrast(0.94);
+  filter: saturate(0.9) brightness(1.02) contrast(0.98);
+}
+
+.fleet-apple-map-frame .mapboxgl-canvas {
+  filter: saturate(0.92) brightness(1.01) contrast(0.98);
 }
 
 .fleet-apple-map-frame .leaflet-control-attribution,
 .fleet-apple-map-frame .mapboxgl-ctrl-attrib {
   background: rgba(255, 255, 255, 0.72) !important;
   backdrop-filter: blur(10px);
-  border-radius: 8px 0 0 0;
+  border-radius: 10px 0 0 0;
   font-size: 10px !important;
   color: var(--fleet-secondary) !important;
+  box-shadow: none !important;
+}
+
+/* Apple-like zoom controls */
+.fleet-apple-map-frame .leaflet-control-zoom {
+  border: 0 !important;
+  margin: 14px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.fleet-apple-map-frame .leaflet-control-zoom a {
+  width: 38px !important;
+  height: 38px !important;
+  line-height: 38px !important;
+  font-size: 18px !important;
+  font-weight: 500 !important;
+  color: var(--fleet-ink) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.fleet-apple-map-frame .leaflet-control-zoom a:last-child {
+  border-bottom: 0 !important;
+}
+
+.fleet-apple-map-frame .leaflet-control-zoom a:hover {
+  background: #fff !important;
+  color: var(--fleet-accent) !important;
+}
+
+.fleet-apple-map-frame .mapboxgl-ctrl-group {
+  border: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(16px);
+}
+
+.fleet-apple-map-frame .mapboxgl-ctrl-group button {
+  width: 38px !important;
+  height: 38px !important;
 }
 
 .fleet-apple-side-card {
@@ -139,8 +165,22 @@
   background: var(--fleet-card);
   backdrop-filter: blur(18px) saturate(1.4);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  padding: 1rem;
+  padding: 1rem 1.05rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 28px rgba(0, 0, 0, 0.05);
+}
+
+.fleet-apple-side-card > .rounded-2xl,
+.fleet-apple-side-card > aside,
+.fleet-apple-side-card > .office-chat-panel,
+.fleet-apple-side-card > [class*='rounded-[24px]'],
+.fleet-apple-side-card > [class*='rounded-2xl'] {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
 }
 
 .fleet-apple-vehicle-btn {
@@ -165,13 +205,14 @@
 }
 
 .fleet-apple-banner {
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--fleet-stroke);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1.05rem;
   font-size: 0.875rem;
   color: var(--fleet-secondary);
+  letter-spacing: -0.01em;
 }
 
 .fleet-apple-banner.is-error {
@@ -180,7 +221,10 @@
   border-color: rgba(255, 59, 48, 0.18);
 }
 
-/* Place labels — Apple Maps typography */
+.fleet-live-trail {
+  filter: drop-shadow(0 0 1px rgba(0, 113, 227, 0.35));
+}
+
 .fleet-place-marker {
   background: transparent !important;
   border: 0 !important;
@@ -201,17 +245,23 @@
 }
 
 .fleet-place-label.is-region {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(29, 29, 31, 0.45);
+  letter-spacing: 0.08em;
+  color: rgba(29, 29, 31, 0.38);
 }
 
 .fleet-place-label.is-city {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(29, 29, 31, 0.82);
+}
+
+.fleet-place-label.is-muni {
+  font-size: 11px;
   font-weight: 600;
-  color: rgba(29, 29, 31, 0.78);
+  color: rgba(29, 29, 31, 0.68);
 }
 
 /* Bus markers — soft glass Apple pin */
@@ -226,6 +276,263 @@
   align-items: center;
   transform: translateY(-8px);
   filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.22));
+}
+
+.fleet-apple-bus-pill {
+  margin-top: 4px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.fleet-apple-bus-pill--above {
+  margin-top: 0;
+  margin-bottom: 6px;
+  order: -1;
+}
+
+/* Live speed / heading HUD bubble sitting above the pin avatar */
+.fleet-apple-bus-hud {
+  order: 0;
+  margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 200px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px) saturate(1.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65) inset,
+    0 8px 22px rgba(15, 23, 42, 0.18);
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.fleet-apple-bus-hud__speed {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  line-height: 1;
+}
+
+.fleet-apple-bus-hud__speed strong {
+  font-size: 15px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #0071e3;
+}
+
+.fleet-apple-bus-hud__speed small {
+  font-size: 10px;
+  font-weight: 650;
+  color: #6e6e73;
+  letter-spacing: -0.01em;
+}
+
+.fleet-apple-bus-hud__sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(60, 60, 67, 0.18);
+  flex-shrink: 0;
+}
+
+.fleet-apple-bus-hud__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.fleet-apple-bus-hud__heading.is-empty {
+  color: #86868b;
+  font-weight: 600;
+}
+
+.fleet-apple-bus-hud__arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-bottom: 7px solid #0071e3;
+  transform-origin: 50% 60%;
+  flex-shrink: 0;
+}
+
+/* Side-panel telemetry chips inside Ενεργά οχήματα */
+.fleet-apple-telemetry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.fleet-apple-telemetry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  background: rgba(242, 242, 247, 0.92);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+  line-height: 1.2;
+}
+
+.fleet-apple-telemetry-chip__label {
+  color: #6e6e73;
+  font-weight: 600;
+}
+
+.fleet-apple-telemetry-chip__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet-apple-telemetry-chip--speed {
+  border-color: rgba(0, 113, 227, 0.22);
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.fleet-apple-telemetry-chip--speed .fleet-apple-telemetry-chip__value {
+  color: #0071e3;
+}
+
+.fleet-apple-telemetry-chip--heading {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.fleet-apple-telemetry-chip--engine-on {
+  border-color: rgba(22, 163, 74, 0.28);
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.fleet-apple-telemetry-chip--engine-on .fleet-apple-telemetry-chip__value {
+  color: #15803d;
+}
+
+.fleet-apple-telemetry-chip--engine-off {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(241, 245, 249, 0.95);
+  color: #64748b;
+}
+
+.fleet-apple-telemetry-chip--gps {
+  border-color: rgba(15, 118, 110, 0.2);
+  background: rgba(240, 253, 250, 0.95);
+}
+
+/* GPS provenance — one pin, chips for every live source (vehicle GPS / App). */
+.fleet-apple-bus-gps-sources {
+  order: -3;
+  margin-bottom: 4px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 210px;
+  pointer-events: none;
+}
+
+.fleet-apple-bus-gps-sources.is-dual {
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.22);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  animation: fleet-gps-dual-pulse 2.4s ease-in-out infinite;
+}
+
+.fleet-apple-bus-gps-source {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.fleet-apple-bus-gps-sources .fleet-apple-bus-gps-source {
+  box-shadow: none;
+}
+
+.fleet-apple-bus-gps-source--teltonika {
+  background: linear-gradient(180deg, #0f766e 0%, #0d9488 100%);
+  color: #fff;
+}
+
+.fleet-apple-bus-gps-source--app {
+  background: linear-gradient(180deg, #1d4ed8 0%, #2563eb 100%);
+  color: #fff;
+}
+
+.fleet-apple-bus-gps-source--dual {
+  background: linear-gradient(90deg, #0f766e 0%, #1d4ed8 100%);
+  color: #fff;
+}
+
+@keyframes fleet-gps-dual-pulse {
+  0%,
+  100% {
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+    transform: translateY(-1px);
+  }
+}
+
+.fleet-apple-bus-excursion {
+  order: -2;
+  margin-bottom: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 10px;
+  border: 1px solid rgba(14, 116, 144, 0.35);
+  background: linear-gradient(180deg, #0e7490 0%, #0f766e 100%);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
 }
 
 .fleet-apple-bus-pin__ring {
@@ -261,25 +568,6 @@
   border-right: 5px solid transparent;
   border-bottom: 8px solid #0071e3;
   transform-origin: 50% 30px;
-}
-
-.fleet-apple-bus-pill {
-  margin-top: 4px;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  padding: 3px 9px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #1d1d1f;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .fleet-apple-popup {
@@ -326,4 +614,254 @@
 
 .leaflet-tooltip.fleet-apple-tooltip::before {
   display: none !important;
+}
+
+/* Teltonika GPS test map — travel card pin (photo + details) */
+.teltonika-gps-map .leaflet-popup-content-wrapper {
+  background: #fff !important;
+}
+
+.leaflet-div-icon.teltonika-travel-pin {
+  background: transparent !important;
+  border: 0 !important;
+  width: 210px !important;
+  height: 86px !important;
+  overflow: visible !important;
+}
+
+.leaflet-div-icon.teltonika-travel-pin img {
+  width: 64px !important;
+  height: 64px !important;
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
+}
+
+.teltonika-travel-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 228px;
+  filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.22));
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  pointer-events: none;
+}
+
+.teltonika-travel-marker__card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+
+.teltonika-travel-marker__photo {
+  width: 72px;
+  flex: 0 0 72px;
+  min-height: 72px;
+  background: #0f172a;
+  position: relative;
+}
+
+.teltonika-travel-marker__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.teltonika-travel-marker__photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, rgba(15, 23, 42, 0.08));
+  pointer-events: none;
+}
+
+.teltonika-travel-marker__body {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px 8px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.teltonika-travel-marker__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.teltonika-travel-marker__plate {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0e7490;
+  text-transform: uppercase;
+}
+
+.teltonika-travel-marker__meta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teltonika-travel-marker__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.teltonika-travel-marker__badge--live {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.teltonika-travel-marker__badge--idle {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
+.teltonika-travel-marker__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.teltonika-travel-marker__tip {
+  width: 16px;
+  height: 12px;
+  margin-top: -1px;
+  background: linear-gradient(145deg, #fff, #f1f5f9);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.8);
+  border-right: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.teltonika-travel-popup {
+  display: flex;
+  gap: 10px;
+  min-width: 220px;
+  max-width: 280px;
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', sans-serif;
+}
+
+.teltonika-travel-popup__photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex: 0 0 72px;
+  background: #0f172a;
+}
+
+.teltonika-travel-popup__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.teltonika-travel-popup__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.teltonika-travel-popup__meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.teltonika-travel-popup__plate {
+  display: inline-block;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0e7490;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+}
+
+/* GPS history modal — deep Aegean header, soft body.
+   Portaled to document.body so AdminLayout overflow/transform cannot clip it. */
+.fleet-history-modal {
+  overscroll-behavior: contain;
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
+.fleet-history-modal__hero {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(56, 189, 248, 0.35), transparent 55%),
+    linear-gradient(135deg, #0b1f3a 0%, #123a6b 48%, #0d4f8c 100%);
+}
+
+.fleet-history-modal__hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 28px;
+  background: linear-gradient(to top, #f5f7fb, transparent);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .fleet-apple-shell {
+    margin: 0;
+    padding: 0.25rem 0 0.65rem;
+    border-radius: 0;
+  }
+
+  .fleet-apple-map-frame {
+    height: min(74vh, 680px);
+    min-height: 440px;
+    border-radius: 18px;
+  }
+
+  .fleet-apple-shell .fleet-apple-title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .fleet-apple-shell {
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+
+  .fleet-apple-map-frame {
+    border-radius: 20px;
+  }
 }

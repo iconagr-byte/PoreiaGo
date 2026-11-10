@@ -37,7 +37,7 @@ export default function FleetKpisDashboard() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || 'Αποτυχία φόρτωσης KPIs');
+          setError(err.message || 'Αποτυχία φόρτωσης δεικτών στόλου');
           setData(null);
         }
       })
@@ -63,10 +63,9 @@ export default function FleetKpisDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-headline-md font-bold">Fleet KPIs</h2>
+          <h2 className="font-headline-md font-bold">Δείκτες στόλου</h2>
           <p className="text-sm text-on-surface-variant">
-            Μετρικές από <code className="text-xs bg-gray-100 px-1 rounded">trip_coordinates</code> και live
-            στόλο
+            Απόδοση στόλου με βάση πραγματικά GPS traces και ζωντανή θέση οχημάτων.
           </p>
         </div>
         <label className="text-sm">
@@ -87,14 +86,24 @@ export default function FleetKpisDashboard() {
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">{error}</p>
       ) : null}
       {data?.error === 'database_unavailable' ? (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-          Η βάση GPS δεν είναι διαθέσιμη — εμφανίζονται μόνο live/alert metrics. Τρέξτε{' '}
-          <code className="font-mono text-xs">alembic upgrade head</code>.
-        </p>
+        <div className="rounded-2xl border border-black/[0.06] bg-white/80 backdrop-blur-md px-4 py-3.5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-[20px] text-amber-600 mt-0.5">info</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-tight text-slate-900">
+                Ιστορικό GPS σε προετοιμασία
+              </p>
+              <p className="mt-0.5 text-sm text-slate-500 leading-snug">
+                Εμφανίζονται προς το παρόν μόνο ζωντανά δεδομένα και ειδοποιήσεις. Τα χιλιόμετρα και το
+                ιστορικό διαδρομών θα ενεργοποιηθούν αυτόματα μόλις ολοκληρωθεί η ενημέρωση βάσης.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {loading && !summary ? (
-        <p className="text-sm text-gray-500">Φόρτωση KPIs…</p>
+        <p className="text-sm text-gray-500">Φόρτωση δεικτών στόλου…</p>
       ) : null}
 
       {summary ? (
@@ -146,7 +155,7 @@ export default function FleetKpisDashboard() {
               tone="amber"
             />
             <DashboardKpiCard
-              label="Alerts περιόδου"
+              label="Ειδοποιήσεις περιόδου"
               value={summary.alerts_total}
               icon="notifications"
               tone="violet"
@@ -176,7 +185,7 @@ export default function FleetKpisDashboard() {
             </div>
 
             <div className="rounded-[28px] border border-black/[0.06] bg-white p-6">
-              <h3 className="font-bold mb-4">Alerts ανά τύπο</h3>
+              <h3 className="font-bold mb-4">Ειδοποιήσεις ανά τύπο</h3>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Απόκλιση διαδρομής</dt>
