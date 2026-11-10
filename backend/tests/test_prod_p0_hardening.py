@@ -90,7 +90,8 @@ class DemoFleetGateTests(unittest.TestCase):
                 self.assertEqual(store.ensure_demo_rental_fleet(tid), 0)
                 self.assertEqual(store.public_catalog(tid), [])
 
-    def test_explicit_flag_allows_seed_even_in_prod_env_for_tests(self):
+    def test_explicit_flag_no_longer_seeds_demo_fleet(self):
+        """Demo rent fleet was removed — ensure_demo is a purge no-op."""
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "rental_store.json"
             with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
@@ -101,7 +102,8 @@ class DemoFleetGateTests(unittest.TestCase):
                 clear=False,
             ):
                 tid = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
-                self.assertEqual(store.ensure_demo_rental_fleet(tid), 6)
+                self.assertEqual(store.ensure_demo_rental_fleet(tid), 0)
+                self.assertEqual(store.public_catalog(tid), [])
 
 
 class RentPaymentTrustTests(unittest.TestCase):

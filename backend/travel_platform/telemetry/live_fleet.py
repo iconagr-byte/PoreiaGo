@@ -107,6 +107,11 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        if raw.get("accuracy_m") is not None:
+            try:
+                merged["accuracy_m"] = float(raw.get("accuracy_m"))
+            except (TypeError, ValueError):
+                pass
         if raw.get("altitude_m") is not None:
             try:
                 merged["altitude_m"] = float(raw.get("altitude_m"))
@@ -1238,8 +1243,14 @@ class LiveFleetService:
 
             # Offline / unbound — remove pin; never shift-suppress (hydrate restores).
             self._vehicles.pop(vid, None)
+            # Drop every index key that still points at this vehicle (display vs
+            # normalized plate variants used by older writers / tests).
+            for idx_key, idx_vid in list(self._code_index.items()):
+                if idx_vid == vid or (
+                    plate and idx_key in {f"{tid}:{plate}", f"{tid}:{code}"}
+                ):
+                    self._code_index.pop(idx_key, None)
             if plate:
-                self._code_index.pop(f"{tid}:{plate}", None)
                 try:
                     from travel_platform.telemetry.teltonika.shift_suppress import (
                         clear_shift_suppress,

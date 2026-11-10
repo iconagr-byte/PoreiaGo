@@ -27,7 +27,7 @@ class TelemetryRuntimeSettings:
     prefer_tracker_events: bool = True
     eta_refresh_seconds: int = 1
     eta_ws_push_seconds: int = 1
-    driver_stale_seconds: int = 90
+    driver_stale_seconds: int = 360
     gps_retention_days: int = 90
     # 1 Hz GPS needs ≥60; headroom for retries / dual transport.
     driver_gps_max_per_minute: int = 120

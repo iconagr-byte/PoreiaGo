@@ -19,7 +19,7 @@ class RejectPhoneGpsTeltonikaTests(unittest.TestCase):
         self.patcher = patch.object(ds, "_store_path", return_value=path)
         self.patcher.start()
         self.tenant = "97798681-2f60-4398-b1f6-9eb38dc341b0"
-        ds.upsert_device(
+        device = ds.upsert_device(
             {
                 "imei": "861076085468260",
                 "vehicle_code": "EEX5670",
@@ -27,6 +27,14 @@ class RejectPhoneGpsTeltonikaTests(unittest.TestCase):
                 "enabled": True,
             },
             tenant_id=self.tenant,
+        )
+        # Fresh last_seen so Teltonika is preferred over phone GPS soft-ack.
+        ds.touch_device(
+            device["imei"],
+            lat=38.25,
+            lng=20.65,
+            speed_kmh=0,
+            from_hardware=True,
         )
 
     def tearDown(self):
@@ -123,10 +131,6 @@ class RejectPhoneGpsTeltonikaTests(unittest.TestCase):
             patch(
                 "travel_platform.telemetry.fleet_ws_hub.get_fleet_egress_hub",
                 return_value=type("H", (), {"broadcast": AsyncMock()})(),
-            ),
-            patch(
-                "travel_platform.telemetry.fleet_metrics.record_gps_ingress",
-                return_value=None,
             ),
             patch(
                 "travel_platform.telemetry.driver_gps_heartbeat.touch_driver_gps",

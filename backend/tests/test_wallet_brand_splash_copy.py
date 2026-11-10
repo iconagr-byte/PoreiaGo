@@ -30,6 +30,14 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         self.assertIn("pg-wallet-splash-wordmark", jsx)
         self.assertNotIn("Αγγίξτε για συνέχεια", jsx)
 
+    def test_splash_brand_helper_keeps_achillio_name(self):
+        helper = (
+            ROOT / "src" / "lib" / "wallet" / "officeSplashBrand.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Achillio Travel", helper)
+        self.assertIn("pickOfficeName", helper)
+        self.assertIn("footer_brand_name", helper)
+
     def test_not_b2b_office_platform_line(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
         self.assertNotIn("ταξιδιωτικά γραφεία", text)

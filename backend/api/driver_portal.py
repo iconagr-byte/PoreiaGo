@@ -513,6 +513,17 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         tenant_id=str(tenant_id) if tenant_id else None,
         detail=driver.license_plate or driver.vehicle_code,
     )
+    try:
+        from travel_platform.settings.driver_activity_store import record_driver_login
+
+        record_driver_login(
+            driver_id=driver.id,
+            tenant_id=tenant_id,
+            trip_id=trip_id,
+            method="password",
+        )
+    except Exception:
+        pass
     resp = _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,

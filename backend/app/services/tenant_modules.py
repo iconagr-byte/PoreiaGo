@@ -90,6 +90,14 @@ def initial_settings_for_plan(
         }
     else:
         settings["modules"] = {"trips_enabled": True, "rent_enabled": False}
+        if rent_addon:
+            settings = enable_rent_addon_in_settings(settings)
+            name = str(office_name or "").strip()
+            if name:
+                appearance = dict(settings.get("site_appearance") or {})
+                appearance.setdefault("footer_brand_name", name)
+                appearance.setdefault("rent_office_name", name)
+                settings["site_appearance"] = appearance
     return settings
 
 

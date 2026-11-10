@@ -17,7 +17,7 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Always default to main (v1.0.14+). Old hardcode cursor/wallet-splash-apple-5ffb
+  # Always default to main (v1.0.15+). Old hardcode cursor/wallet-splash-apple-5ffb
   # produced stale APKs (v1.0.9) missing recent Wallet UI fixes (tabs / multi-ticket).
   [string]$Branch = "main",
   [double]$WaitMinutes = 5,
@@ -143,7 +143,7 @@ if ($Branch -ne "main") {
   Write-Host ("WARNING: -Branch is '" + $Branch + "' (not main).") -ForegroundColor Yellow
   Write-Host "You will get an OLD Wallet build. Prefer: -Branch main (default)." -ForegroundColor Yellow
   if ($Branch -match 'wallet-splash-apple') {
-    Write-Host "cursor/wallet-splash-apple-5ffb is obsolete (v1.0.9). Use main (v1.0.14+)." -ForegroundColor Red
+    Write-Host "cursor/wallet-splash-apple-5ffb is obsolete (v1.0.9). Use main (v1.0.15+)." -ForegroundColor Red
   }
 }
 
@@ -326,7 +326,7 @@ function Test-ApkHasMainActivity([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.14)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.15)" -ForegroundColor Green
 
 if (-not (Test-ApkHasMainActivity $apk)) {
   throw "APK built without com.poreiago.wallet.MainActivity in classes.dex - check android/app/src/main/java"
