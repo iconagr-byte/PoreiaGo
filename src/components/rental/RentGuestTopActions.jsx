@@ -4,18 +4,7 @@ import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 import { isPlatformMarketingHost } from '../../lib/platform/tenantHost.js';
 
-/** Booking-only nav — always on office + platform /rent. */
-const BOOKING_QUICK_NAV = [
-  { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search' },
-  { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
-];
-
-/** Capability showcase links — platform marketing host only. */
-const MARKETING_QUICK_NAV = [
-  { id: 'session-rent-capabilities', el: 'Τι κάνεις', en: 'What you can do' },
-  { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
-];
-
+/** Browse items live only in the Μενού dropdown (no duplicate top-bar links). */
 const BOOKING_NAV_ITEMS = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
@@ -62,7 +51,8 @@ function scrollToSection(id) {
 }
 
 /**
- * Guest header — Menu (left, beside brand) + quick links / lang / Sign in / My Wallet.
+ * Guest header — Menu (left, beside brand) + lang / Sign in / My Wallet.
+ * Browse links (Αναζήτηση, Στόλος, …) live only in the Μενού dropdown.
  * Pass `brand` to place the logo immediately before the menu control.
  * My Wallet opens unified /wallet?tab=rentals — same shell as bus tickets.
  */
@@ -78,11 +68,6 @@ export default function RentGuestTopActions({
   const menuBtnRef = useRef(null);
   const tel = phoneHref(phone);
   const showMarketingNav = isPlatformMarketingHost();
-  const quickNav = useMemo(
-    () =>
-      showMarketingNav ? [...BOOKING_QUICK_NAV, ...MARKETING_QUICK_NAV] : BOOKING_QUICK_NAV,
-    [showMarketingNav],
-  );
   const navItems = useMemo(
     () =>
       showMarketingNav ? [...BOOKING_NAV_ITEMS, ...MARKETING_NAV_ITEMS] : BOOKING_NAV_ITEMS,
@@ -294,19 +279,6 @@ export default function RentGuestTopActions({
       </div>
 
       <div className="rent-top-actions">
-        <nav className="rent-top-quick" aria-label={el ? 'Γρήγορη πλοήγηση' : 'Quick navigation'}>
-          {quickNav.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="rent-top-quick-link"
-              onClick={() => scrollToSection(item.id)}
-            >
-              {el ? item.el : item.en}
-            </button>
-          ))}
-        </nav>
-
         <div
           className="rent-top-lang rent-top-lang--bar"
           role="group"
