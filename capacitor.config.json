@@ -4,7 +4,7 @@
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,
-    "backgroundColor": "#ffffff"
+    "backgroundColor": "#6e6e73"
   },
   "server": {
     "androidScheme": "https",
@@ -30,13 +30,14 @@
     },
     "SplashScreen": {
       "launchAutoHide": false,
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#6e6e73",
+      "androidSplashResourceName": "splash",
       "showSpinner": false,
-      "launchFadeOutDuration": 150
+      "launchFadeOutDuration": 200
     },
     "StatusBar": {
-      "style": "LIGHT",
-      "backgroundColor": "#ffffff"
+      "style": "DARK",
+      "backgroundColor": "#6e6e73"
     }
   }
 }
