@@ -2,7 +2,14 @@
  * Rent Wallet hero pass — vehicle rental booking (separate from bus My Wallet).
  */
 import { QRCode } from 'react-qr-code';
-import { getRentLang, rentStatusLabel, t } from '../../lib/rental/rentI18n.js';
+
+const STATUS_LABEL = {
+  RESERVED: 'Εκκρεμεί πληρωμή',
+  CONFIRMED: 'Επιβεβαιωμένη',
+  ACTIVE: 'Σε εξέλιξη',
+  COMPLETED: 'Ολοκληρωμένη',
+  CANCELLED: 'Ακυρωμένη',
+};
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -117,6 +124,17 @@ export default function RentalWalletPass({
             <p className="wallet-pass-kicker">{t('amount', lang)}</p>
             <p className="wallet-pass-meta-value">€{Number(booking.total_cost || 0).toFixed(2)}</p>
           </div>
+          {booking.payment_status || booking.payment_method ? (
+            <div>
+              <p className="wallet-pass-kicker">Πληρωμή</p>
+              <p className="wallet-pass-meta-value">
+                {booking.payment_status || booking.payment_method}
+                {Number(booking.balance_due) > 0
+                  ? ` · υπόλοιπο €${Number(booking.balance_due).toFixed(2)}`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {booking.payment_status || booking.payment_label ? (
@@ -216,7 +234,7 @@ export default function RentalWalletPass({
         </div>
 
         <div className="wallet-pass-actions">
-          {status === 'CONFIRMED' && onCancel ? (
+          {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
             <button
               type="button"
               className="wallet-btn wallet-btn-danger wallet-btn-block"
