@@ -1160,6 +1160,29 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+.rent-top-menu-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0.15rem 0.35rem 0.25rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, 0.08);
+}
+
+.rent-top-menu-lang-label {
+  font-size: 0.8125rem;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+}
+
+.rent-top-lang--menu {
+  flex-shrink: 0;
+  background: rgba(118, 118, 128, 0.14);
+}
+
 .rent-top-menu-item--static {
   cursor: default;
   color: #248a3d;
@@ -1264,8 +1287,13 @@
   }
 }
 
-@media (max-width: 360px) {
-  .rent-top-lang {
+@media (max-width: 900px) {
+  /* Phone/tablet header: language lives in Μενού → Περιήγηση */
+  .rent-top-lang--bar {
+    display: none;
+  }
+
+  .rent-top-actions .rent-top-icon-btn--soft:not([href^='tel']) {
     display: none;
   }
 }
@@ -8445,16 +8473,51 @@
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar--guest {
-  padding: 0.55rem 0.75rem 0.55rem;
+  padding: 0.45rem 0.7rem 0.45rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-row {
+  gap: 0.45rem;
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-brand {
-  max-width: min(52vw, 12.5rem);
-  min-height: 2.4rem;
+  max-width: min(48vw, 11.5rem);
+  min-height: 2.25rem;
 }
 
-.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-quick {
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-start {
+  gap: 0.35rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-actions {
+  gap: 0.25rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-quick,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-lang--bar,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-actions .rent-top-icon-btn--soft {
   display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--menu .rent-top-chip-label {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--menu {
+  padding: 0.3rem 0.42rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip-wallet-label {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--wallet {
+  padding: 0.3rem 0.45rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-name {
+  font-size: 1rem;
+  max-width: min(38vw, 9.5rem);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-home-stack--book-mid {
