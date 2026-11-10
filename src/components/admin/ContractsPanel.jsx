@@ -63,7 +63,7 @@ function formatDate(iso) {
   try {
     return new Date(iso).toLocaleDateString('el-GR', {
       day: 'numeric',
-      month: 'short',
+      month: 'long',
       year: 'numeric',
     });
   } catch {
