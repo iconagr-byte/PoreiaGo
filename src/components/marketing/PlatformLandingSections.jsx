@@ -186,7 +186,7 @@ export function FeaturesSection() {
       <div className="pg-features-rest-inner">
         <div className="pg-features-rest-head pg-features-glass">
           <p className="pg-features-kicker">Δυνατότητες</p>
-          <h2 id="features-title">Δύο πόρτες. Ένας πίνακας.</h2>
+          <h2 id="features-title">Δύο υπηρεσίες. Ένας πίνακας.</h2>
           <p>
             Λεωφορεία για εκδρομές, ενοικιάσεις για αυτοκίνητα — και κοινά εργαλεία brand, email και
             συμβολαίου.
@@ -378,7 +378,7 @@ export function FinalCtaSection() {
       <div className="pg-final-orbit" aria-hidden />
 
       <div className="pg-final-panel pg-final-glass">
-        <h2 id="final-cta-title">Έτοιμοι να ανοίξετε τις πόρτες σας;</h2>
+        <h2 id="final-cta-title">Έτοιμοι να ξεκινήσετε;</h2>
         <p>
           Επιλέξτε συμβόλαιο για λεωφορεία, ενοικιάσεις, ή και τα δύο — με το brand του γραφείου σας
           από την πρώτη μέρα.
