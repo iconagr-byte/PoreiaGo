@@ -1,5 +1,6 @@
 """Lightweight API — My Wallet (auth + bookings). Includes SaaS admin auth on /api/v1."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -33,11 +34,26 @@ from middleware.tenant import TenantContextMiddleware
 from ticketing.db import init_ticketing_db, close_ticketing_db
 from ticketing.customer_bookings import seed_customer_bookings_if_empty
 from ticketing.lost_items import seed_lost_items_if_empty
+from ticketing.demo_catalog import allow_demo_seeds, purge_seed_demo_catalog
 
 try:
     from app.api.router import saas_router
 except ImportError:
     saas_router = None
+
+_DEFAULT_CORS_ORIGINS = (
+    "https://www.poreiago.com,"
+    "https://poreiago.com,"
+    "http://localhost:5173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:5173,"
+    "http://127.0.0.1:3000"
+)
+
+
+def _cors_origins() -> list[str]:
+    raw = (os.getenv("CORS_ORIGINS") or _DEFAULT_CORS_ORIGINS).strip()
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 try:
     from api.driver_portal import router as driver_portal_router
@@ -64,6 +80,11 @@ except ImportError:
     driver_sos_router = None
 
 try:
+    from api.driver_chat_router import router as driver_chat_router
+except ImportError:
+    driver_chat_router = None
+
+try:
     from api.ws_telemetry import router as ws_telemetry_router
 except ImportError:
     ws_telemetry_router = None
@@ -87,7 +108,10 @@ except ImportError:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_ticketing_db()
-    await seed_customer_bookings_if_empty()
+    if allow_demo_seeds():
+        await seed_customer_bookings_if_empty()
+    else:
+        await purge_seed_demo_catalog()
     await seed_lost_items_if_empty()
     await init_email_marketing_tables()
     await init_email_client_tables()
@@ -103,15 +127,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS outermost so preflight/401 responses get Access-Control-* headers.
+app.add_middleware(TenantContextMiddleware)
+app.add_middleware(DomainTenantMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(TenantContextMiddleware)
-app.add_middleware(DomainTenantMiddleware)
 
 app.include_router(wallet_compat_router)
 app.include_router(admin_bookings_router)
@@ -143,6 +168,8 @@ if expenses_upload_router:
     app.include_router(expenses_upload_router)
 if driver_sos_router:
     app.include_router(driver_sos_router)
+if driver_chat_router:
+    app.include_router(driver_chat_router)
 if ws_telemetry_router:
     app.include_router(ws_telemetry_router)
 if admin_platform_router:

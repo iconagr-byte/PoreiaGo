@@ -1,6 +1,7 @@
 import { DEFAULT_PLATFORM_SETTINGS } from '../../services/platformApi.js';
 import { loadBookings, isBookingPaid } from '../ticketing/bookingStore.js';
 import { generateSeatMap } from '../seats/generateSeatMap.js';
+import { extractBookingSeats, seatsTakenForTrip } from '../seats/occupiedSeats.js';
 
 /**
  * @param {import('../../data/mockData.js').mockTrips[0]} trip
@@ -16,22 +17,16 @@ export function getTripSeatCapacity(trip) {
  */
 export function countSoldSeatsForTrip(trip) {
   if (!trip) return 0;
-  const { seats } = generateSeatMap(trip);
-  const fromMap = seats.filter((s) => s.status === 'BOOKED').length;
+  const taken = seatsTakenForTrip(trip, loadBookings());
+  if (taken.size) return taken.size;
 
-  const fromBookings = loadBookings()
+  return loadBookings()
     .filter(
       (b) =>
         isBookingPaid(b) &&
         (b.tripId === trip.id || b.tripTitle === trip.title),
     )
-    .reduce((sum, b) => {
-      if (Array.isArray(b.seats) && b.seats.length) return sum + b.seats.length;
-      if (b.seat) return sum + b.seat.split(',').filter(Boolean).length;
-      return sum + 1;
-    }, 0);
-
-  return Math.max(fromMap, fromBookings);
+    .reduce((sum, b) => sum + Math.max(1, extractBookingSeats(b).length), 0);
 }
 
 /**
