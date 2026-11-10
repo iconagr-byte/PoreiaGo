@@ -949,6 +949,10 @@ function WalletAuthenticatedApp() {
             <OfficeBrandMark
               className="h-7 max-w-[14.5rem]"
               variant="light"
+              officeName={
+                officeBrand.displayName ||
+                (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
+              }
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}

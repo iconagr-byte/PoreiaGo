@@ -58,11 +58,27 @@ function mergeWithCachedLogo(serverAppearance = {}) {
  * preferAdmin: use JWT/tenant appearance (BackOffice sidebar). Public host fetch can
  * miss postgres branding when the admin UI runs on the platform domain.
  */
+function isGenericOfficeLabel(value) {
+  const v = String(value || '').trim();
+  return (
+    !v ||
+    v === 'Γραφείο' ||
+    v === 'PoreiaGo' ||
+    v === 'My Wallet' ||
+    /^aerostride$/i.test(v)
+  );
+}
+
 export default function OfficeBrandMark({
   className = '',
   variant = 'light',
   asLink = true,
   fallbackLabel = 'Γραφείο',
+  /**
+   * Preferred office name from the parent (wallet already resolved branding).
+   * Wins over appearance generics so compact/native top bars always show text.
+   */
+  officeName = '',
   refreshKey = 0,
   preferAdmin = false,
   /** Sealed wallet office UUID — Capacitor Host=localhost needs this for logo. */
@@ -131,11 +147,15 @@ export default function OfficeBrandMark({
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  // Prefer a real office name from props over generic resolveOfficeBrand fallback «Γραφείο».
-  const resolvedName = brand.displayName || (brand.name !== 'Γραφείο' ? brand.name : '');
+  // Prefer parent officeName (wallet seal) → appearance → fallbackLabel.
+  const propOfficeName = String(officeName || '').trim();
+  const resolvedName =
+    (!isGenericOfficeLabel(propOfficeName) ? propOfficeName : '') ||
+    brand.displayName ||
+    (!isGenericOfficeLabel(brand.name) ? brand.name : '');
   const label =
     resolvedName ||
-    (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
+    (!isGenericOfficeLabel(fallbackLabel) ? fallbackLabel : '') ||
     brand.name ||
     (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const resolvedHeight =
@@ -149,11 +169,7 @@ export default function OfficeBrandMark({
   // Respect admin «εμφάνιση ονόματος» (default on). Compact wallet used to hide
   // the name whenever a logo image existed — customers only saw an icon mark.
   const nameOptOut = appearance.logo_show_name === false;
-  const showName =
-    !nameOptOut &&
-    Boolean(label) &&
-    label !== 'Γραφείο' &&
-    label !== 'PoreiaGo';
+  const showName = !nameOptOut && !isGenericOfficeLabel(label);
 
   const compactLogoStyle =
     useCompact && showName

@@ -131,11 +131,18 @@ class GuestRentalLookupBody(BaseModel):
     code: str | None = Field(default=None, max_length=120)
 
 
-class GuestRentalLookupBody(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
-    reference: str | None = Field(default=None, max_length=120)
-    booking_code: str | None = Field(default=None, max_length=120)
-    code: str | None = Field(default=None, max_length=120)
+class ReviewBody(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class CustomerInspectionBody(BaseModel):
+    inspection_type: str
+    fuel_level: float = Field(default=100, ge=0, le=100)
+    mileage: int = Field(default=0, ge=0)
+    damage_notes: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
+    signature_url: str | None = None
 
 
 def _public_booking(row: dict) -> dict:
