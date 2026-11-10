@@ -65,6 +65,7 @@ class TripSyncItem(BaseModel):
 class TripsSyncRequest(BaseModel):
     trips: list[TripSyncItem] = Field(default_factory=list)
     replace_catalog: bool = False
+    prune_missing: bool = False
 
 
 class TripsSyncResponse(BaseModel):
@@ -85,3 +86,9 @@ class SafetyVerificationResponse(BaseModel):
     trip_id: int
     status: str
     items: dict[str, str]
+
+
+
+class TripsListResponse(BaseModel):
+    trips: list[dict] = Field(default_factory=list)
+    tenant_id: str | None = None

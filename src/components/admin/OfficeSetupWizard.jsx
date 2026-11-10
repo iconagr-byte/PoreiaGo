@@ -10,59 +10,116 @@ import {
   updatePaymentSettings,
   createBankAccount,
 } from '../../services/paymentSettingsApi.js';
-import {
-  fetchSiteAppearance,
-  updateSiteAppearance,
-} from '../../services/siteAppearanceApi.js';
+import { fetchAdminSiteAppearance } from '../../services/siteAppearanceApi.js';
 import { createRentalVehicle } from '../../services/fleetRentalApi.js';
+import {
+  fetchTenantBrandingSettings,
+  updateTenantBrandingSettings,
+} from '../../services/growthApi.js';
+import { getSaasTenantId } from '../../services/saasApi.js';
+import {
+  DEFAULT_INGRESS_CNAME,
+  getDefaultIngressCname,
+  getPlatformBaseDomain,
+} from '../../lib/platform/domain.js';
 import EmailConnectWizard from './email/EmailConnectWizard.jsx';
+import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
 import '../../styles/office-setup-wizard.css';
 
-const STORAGE_KEY = 'poreiago_office_setup_v1';
+const STORAGE_KEY_BASE = 'poreiago_office_setup_v1';
 
-export function isOfficeSetupComplete() {
+/** Per-tenant so a new office always gets the wizard (not a previous office's «done»). */
+function setupStorageKey(tenantId) {
+  const tid = String(tenantId || getSaasTenantId() || '').trim() || 'default';
+  return `${STORAGE_KEY_BASE}:${tid}`;
+}
+
+export function isOfficeSetupComplete(tenantId) {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'done';
+    const key = setupStorageKey(tenantId);
+    if (localStorage.getItem(key) === 'done') return true;
+    // Older builds used an unscoped flag — migrate once into this tenant.
+    if (localStorage.getItem(STORAGE_KEY_BASE) === 'done') {
+      localStorage.setItem(key, 'done');
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
-export function markOfficeSetupComplete() {
+export function markOfficeSetupComplete(tenantId) {
   try {
-    localStorage.setItem(STORAGE_KEY, 'done');
+    localStorage.setItem(setupStorageKey(tenantId), 'done');
   } catch {
     /* ignore */
   }
 }
 
-export function clearOfficeSetupComplete() {
+export function clearOfficeSetupComplete(tenantId) {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(setupStorageKey(tenantId));
+    // Legacy unscoped key from older builds.
+    localStorage.removeItem(STORAGE_KEY_BASE);
   } catch {
     /* ignore */
   }
 }
-
-const ACCENTS = [
-  { id: 'blue', color: '#0071e3', label: 'Ocean' },
-  { id: 'teal', color: '#0a7a6c', label: 'Aegean' },
-  { id: 'indigo', color: '#5856d6', label: 'Indigo' },
-  { id: 'orange', color: '#ff9f0a', label: 'Sunset' },
-  { id: 'pink', color: '#ff2d55', label: 'Coral' },
-  { id: 'graphite', color: '#1d1d1f', label: 'Graphite' },
-];
 
 const STEPS = [
   { id: 'welcome', title: 'Καλώς ήρθατε' },
   { id: 'office', title: 'Γραφείο' },
-  { id: 'brand', title: 'Εμφάνιση' },
+  { id: 'domain', title: 'Domain' },
   { id: 'email', title: 'Email' },
   { id: 'payments', title: 'Πληρωμές' },
+  { id: 'fiscal', title: 'Πάροχος' },
   { id: 'fleet', title: 'Στόλος' },
   { id: 'done', title: 'Έτοιμοι' },
 ];
 
+function stepIndex(id) {
+  return STEPS.findIndex((s) => s.id === id);
+}
+
+/** Platform placeholder seeds — treat as empty so office identity wins. */
+export function isPlatformPlaceholderName(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return true;
+  return (
+    v === 'poreiago travel' ||
+    v === 'poreiago' ||
+    v === 'aerostride' ||
+    v === 'iconarent' ||
+    v === 'icona rent'
+  );
+}
+
+export function isPlatformPlaceholderEmail(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return true;
+  return (
+    v.endsWith('@poreiago.app') ||
+    v.endsWith('@poreiago.com') ||
+    v.endsWith('@aerostride.com')
+  );
+}
+
+export function pickOfficeName(...candidates) {
+  for (const c of candidates) {
+    const v = String(c || '').trim();
+    if (v && !isPlatformPlaceholderName(v)) return v;
+  }
+  return '';
+}
+
+export function pickOfficeEmail(...candidates) {
+  for (const c of candidates) {
+    const v = String(c || '').trim();
+    if (v && !isPlatformPlaceholderEmail(v)) return v;
+  }
+  return '';
+}
 function MarkIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -83,8 +140,9 @@ function MarkIcon() {
 }
 
 /**
- * Full-screen Apple-style onboarding for offices after contract purchase.
- * Collects: identity, branding, email, payments, first vehicle.
+ * Full-screen Apple-style onboarding after new office create / contract.
+ * Collects: identity, custom domain, email, payments, first vehicle.
+ * Appearance (logo/theme) lives in Σχεδιασμός σελίδων — not in this wizard.
  */
 export default function OfficeSetupWizard({
   rentEnabled = false,
@@ -104,13 +162,21 @@ export default function OfficeSetupWizard({
     smtp_from_email: '',
   });
 
+  const [domain, setDomain] = useState({
+    subdomain_fqdn: '',
+    office_code: '',
+    custom_domain: '',
+    checkout_base_url: '',
+    cname_host: '',
+    cname_target: getDefaultIngressCname() || DEFAULT_INGRESS_CNAME,
+    notes: [],
+    saved: false,
+  });
+
   const [brand, setBrand] = useState({
-    accent: ACCENTS[0].color,
+    accent: '#0071e3',
+    logo_url: '',
     footer_brand_name: '',
-    footer_contact_phone: '',
-    footer_address: '',
-    rent_office_name: '',
-    hero_title: '',
   });
 
   const [pay, setPay] = useState({
@@ -118,7 +184,6 @@ export default function OfficeSetupWizard({
     beneficiary: '',
     iban: '',
     bic: '',
-    deposit_percent: 30,
   });
 
   const [fleet, setFleet] = useState({
@@ -131,11 +196,13 @@ export default function OfficeSetupWizard({
   });
 
   const [emailConnected, setEmailConnected] = useState(false);
+  const [fiscalConnected, setFiscalConnected] = useState(false);
   const [completed, setCompleted] = useState({
     office: false,
-    brand: false,
+    domain: false,
     email: false,
     payments: false,
+    fiscal: false,
     fleet: false,
   });
 
@@ -149,32 +216,74 @@ export default function OfficeSetupWizard({
     let cancelled = false;
     (async () => {
       try {
-        const [plat, appearance, payments] = await Promise.all([
+        const [plat, appearance, payments, branding] = await Promise.all([
           fetchPlatformSettings().catch(() => null),
-          fetchSiteAppearance().catch(() => null),
+          fetchAdminSiteAppearance().catch(() => null),
           fetchAdminPaymentSettings().catch(() => null),
+          fetchTenantBrandingSettings().catch(() => null),
         ]);
         if (cancelled) return;
-        if (plat) {
-          setOffice((o) => ({
-            ...o,
-            company_name: plat.company_name || o.company_name,
-            support_email: plat.support_email || o.support_email,
-            timezone: plat.timezone || o.timezone,
-            default_locale: plat.default_locale || o.default_locale,
-            smtp_from_email: plat.smtp_from_email || o.smtp_from_email,
-          }));
-        }
+        const brandName = pickOfficeName(
+          branding?.display_name,
+          appearance?.footer_brand_name,
+          appearance?.rent_office_name,
+          plat?.company_name,
+        );
+        const supportEmail = pickOfficeEmail(
+          branding?.support_email,
+          branding?.contact_email,
+          appearance?.footer_contact_email,
+          plat?.support_email,
+        );
+        const smtpFrom = pickOfficeEmail(plat?.smtp_from_email, supportEmail);
+
+        setOffice((o) => ({
+          ...o,
+          company_name: brandName || o.company_name,
+          support_email: supportEmail || o.support_email,
+          timezone: plat?.timezone || o.timezone,
+          default_locale: plat?.default_locale || o.default_locale,
+          smtp_from_email: smtpFrom || o.smtp_from_email,
+        }));
+
         if (appearance) {
           setBrand((b) => ({
             ...b,
-            footer_brand_name: appearance.footer_brand_name || b.footer_brand_name,
-            footer_contact_phone: appearance.footer_contact_phone || '',
-            footer_address: appearance.footer_address || '',
-            rent_office_name: appearance.rent_office_name || '',
-            hero_title: appearance.hero_title || '',
+            footer_brand_name:
+              pickOfficeName(
+                appearance.footer_brand_name,
+                appearance.rent_office_name,
+                brandName,
+              ) || b.footer_brand_name,
             accent: appearance.accent_color || b.accent,
+            logo_url: appearance.logo_url || '',
           }));
+        }
+        if (branding) {
+          const dns = branding.dns_instructions || {};
+          const code = branding.subdomain || branding.slug || '';
+          const fqdn =
+            branding.subdomain_fqdn ||
+            (code ? `${code}.${branding.platform_domain || getPlatformBaseDomain()}` : '');
+          setDomain((d) => ({
+            ...d,
+            subdomain_fqdn: fqdn || d.subdomain_fqdn,
+            office_code: code || d.office_code,
+            custom_domain: branding.custom_domain || '',
+            checkout_base_url: branding.checkout_base_url || '',
+            cname_host: dns.cname_host || branding.custom_domain || '',
+            cname_target: dns.cname_target || getDefaultIngressCname() || DEFAULT_INGRESS_CNAME,
+            notes: Array.isArray(dns.notes) ? dns.notes : [],
+            saved: Boolean(branding.custom_domain),
+          }));
+          if (brandName) {
+            setBrand((b) => ({
+              ...b,
+              footer_brand_name: pickOfficeName(b.footer_brand_name, brandName),
+              accent: branding.primary_color || b.accent,
+              logo_url: b.logo_url || branding.logo_url || '',
+            }));
+          }
         }
         const bank = payments?.bank_accounts?.find((a) => a.is_default) || payments?.bank_accounts?.[0];
         if (bank) {
@@ -184,7 +293,6 @@ export default function OfficeSetupWizard({
             beneficiary: bank.beneficiary || '',
             iban: bank.iban || '',
             bic: bank.bic || '',
-            deposit_percent: payments?.deposit?.percent || 30,
           }));
         }
       } finally {
@@ -231,27 +339,72 @@ export default function OfficeSetupWizard({
     }
   };
 
-  const saveBrand = async () => {
+  const normalizeCustomDomain = (raw) =>
+    String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .replace(/^www\./, '');
+
+  const saveDomain = async ({ requireCustom = false, customDomain } = {}) => {
+    // Prefer explicit override so «Μόνο subdomain» does not race setState.
+    const custom = normalizeCustomDomain(
+      customDomain !== undefined ? customDomain : domain.custom_domain,
+    );
+    if (requireCustom && !custom) {
+      toast.error('Συμπληρώστε το custom domain ή πατήστε «Μόνο subdomain»');
+      return false;
+    }
+    if (custom && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(custom)) {
+      toast.error('Μη έγκυρο domain (π.χ. bookings.myagency.gr)');
+      return false;
+    }
     setBusy(true);
     try {
-      const name = brand.footer_brand_name.trim() || office.company_name.trim();
-      await updateSiteAppearance({
-        footer_brand_name: name,
-        footer_contact_email: office.support_email.trim(),
-        footer_contact_phone: brand.footer_contact_phone.trim(),
-        footer_address: brand.footer_address.trim(),
-        rent_office_name: (brand.rent_office_name || name).trim(),
-        hero_title: brand.hero_title.trim() || undefined,
-        accent_color: brand.accent,
-      });
-      setCompleted((c) => ({ ...c, brand: true }));
+      const name = office.company_name.trim() || brand.footer_brand_name.trim();
+      const payload = {
+        display_name: name,
+        primary_color: brand.accent || '#0071e3',
+        logo_url: brand.logo_url || '',
+        custom_domain: custom || '',
+        checkout_base_url: custom
+          ? domain.checkout_base_url.trim() || `https://${custom}`
+          : domain.subdomain_fqdn
+            ? `https://${domain.subdomain_fqdn}`
+            : '',
+      };
+      const saved = await updateTenantBrandingSettings(payload);
+      const dns = saved?.dns_instructions || {};
+      setDomain((d) => ({
+        ...d,
+        custom_domain: saved?.custom_domain || custom || '',
+        checkout_base_url: saved?.checkout_base_url || payload.checkout_base_url,
+        subdomain_fqdn: saved?.subdomain_fqdn || d.subdomain_fqdn,
+        office_code: saved?.subdomain || saved?.slug || d.office_code,
+        cname_host: dns.cname_host || saved?.custom_domain || custom || '',
+        cname_target: dns.cname_target || getDefaultIngressCname() || DEFAULT_INGRESS_CNAME,
+        notes: Array.isArray(dns.notes) ? dns.notes : d.notes,
+        saved: true,
+      }));
+      setCompleted((c) => ({ ...c, domain: true }));
+      if (custom) toast.success('Domain αποθηκεύτηκε — ρυθμίστε το CNAME');
       return true;
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία αποθήκευσης εμφάνισης');
+      toast.error(err.message || 'Αποτυχία αποθήκευσης domain');
       return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  const copyDomainText = (value, okMsg) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    navigator.clipboard
+      ?.writeText(text)
+      .then(() => toast.success(okMsg || 'Αντιγράφηκε'))
+      .catch(() => toast.error('Αποτυχία αντιγραφής'));
   };
 
   const savePayments = async () => {
@@ -261,8 +414,8 @@ export default function OfficeSetupWizard({
     }
     setBusy(true);
     try {
+      // Deposit % stays out of onboarding — configure later in Πληρωμές.
       await updatePaymentSettings({
-        deposit: { enabled: true, percent: Number(pay.deposit_percent) || 30 },
         methods: {
           bank_transfer: { enabled: true },
           card: { enabled: true },
@@ -290,8 +443,6 @@ export default function OfficeSetupWizard({
         checkout_bank_beneficiary: pay.beneficiary.trim(),
         checkout_bank_iban: pay.iban.trim().replace(/\s+/g, ''),
         checkout_bank_bic: pay.bic.trim(),
-        checkout_deposit_enabled: true,
-        checkout_deposit_percent: Number(pay.deposit_percent) || 30,
       });
       setCompleted((c) => ({ ...c, payments: true }));
       return true;
@@ -342,31 +493,35 @@ export default function OfficeSetupWizard({
   const next = async () => {
     const id = STEPS[step].id;
     if (id === 'welcome') {
-      setStep(1);
+      setStep(stepIndex('office'));
       return;
     }
     if (id === 'office') {
       if (!(await saveOffice())) return;
-      setStep(2);
+      setStep(stepIndex('domain'));
       return;
     }
-    if (id === 'brand') {
-      if (!(await saveBrand())) return;
-      setStep(3);
+    if (id === 'domain') {
+      if (!(await saveDomain({ requireCustom: Boolean(domain.custom_domain.trim()) }))) return;
+      setStep(stepIndex('email'));
       return;
     }
     if (id === 'email') {
-      setStep(4);
+      setStep(stepIndex('payments'));
       return;
     }
     if (id === 'payments') {
       if (!(await savePayments())) return;
-      setStep(5);
+      setStep(stepIndex('fiscal'));
+      return;
+    }
+    if (id === 'fiscal') {
+      setStep(stepIndex('fleet'));
       return;
     }
     if (id === 'fleet') {
       if (!(await saveFleet())) return;
-      setStep(6);
+      setStep(stepIndex('done'));
       return;
     }
     if (id === 'done') {
@@ -415,14 +570,15 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Νέο γραφείο</p>
                 <h1 className="office-setup-title">Ας στήσουμε το γραφείο σας σε λίγα λεπτά</h1>
                 <p className="office-setup-subtitle">
-                  Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας ό,τι χρειάζεται για να
-                  λειτουργήσετε — επωνυμία, εμφάνιση, email, πληρωμές και πρώτο όχημα.
+                  Ένα wizard για όλα: επωνυμία, custom domain, email, πληρωμές και πρώτο όχημα —
+                  χωρίς να ψάχνετε στις ρυθμίσεις. Logo και θέμα ρυθμίζονται αργότερα στο
+                  Σχεδιασμός σελίδων.
                 </p>
                 <div className="office-setup-feature-row">
                   <div className="office-setup-feature">
                     <div className="office-setup-feature-icon">1</div>
-                    <strong>Ταυτότητα</strong>
-                    <p>Επωνυμία, επικοινωνία και ζώνη ώρας του γραφείου.</p>
+                    <strong>Ταυτότητα &amp; domain</strong>
+                    <p>Επωνυμία, email υποστήριξης και σύνδεση του δικού σας domain.</p>
                   </div>
                   <div className="office-setup-feature">
                     <div
@@ -431,8 +587,8 @@ export default function OfficeSetupWizard({
                     >
                       2
                     </div>
-                    <strong>Email & πληρωμές</strong>
-                    <p>Προσωπικό mailbox και IBAN χωρίς ticket σε hosting.</p>
+                    <strong>Email γραφείου</strong>
+                    <p>Προσωπικό mailbox για εισερχόμενα και ειδοποιήσεις.</p>
                   </div>
                   <div className="office-setup-feature">
                     <div
@@ -441,8 +597,8 @@ export default function OfficeSetupWizard({
                     >
                       3
                     </div>
-                    <strong>Στόλος</strong>
-                    <p>Το πρώτο σας {rentEnabled ? 'όχημα ενοικίασης' : 'λεωφορείο'}.</p>
+                    <strong>Πληρωμές &amp; στόλος</strong>
+                    <p>IBAN, πάροχος τιμολόγησης και πρώτο {rentEnabled ? 'όχημα' : 'λεωφορείο'}.</p>
                   </div>
                 </div>
               </>
@@ -453,7 +609,8 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Γραφείο</p>
                 <h2 className="office-setup-title">Πώς λέγεται η εταιρεία σας;</h2>
                 <p className="office-setup-subtitle">
-                  Αυτά εμφανίζονται σε αποδείξεις, emails και σελίδα κράτησης.
+                  Αυτά εμφανίζονται σε αποδείξεις, emails και σελίδα κράτησης. Στο επόμενο βήμα
+                  συνδέετε το domain σας.
                 </p>
                 <div className="office-setup-grid cols-2">
                   <div className="office-setup-field" style={{ gridColumn: '1 / -1' }}>
@@ -512,67 +669,111 @@ export default function OfficeSetupWizard({
               </>
             )}
 
-            {STEPS[step].id === 'brand' && (
+            {STEPS[step].id === 'domain' && (
               <>
-                <p className="office-setup-eyebrow">Εμφάνιση</p>
-                <h2 className="office-setup-title">Η πρώτη εντύπωση του brand σας</h2>
+                <p className="office-setup-eyebrow">Domain &amp; διεύθυνση</p>
+                <h2 className="office-setup-title">Η διεύθυνση του γραφείου σας στο web</h2>
                 <p className="office-setup-subtitle">
-                  Χρώμα και στοιχεία επικοινωνίας για storefront και Rent app.
+                  Το subdomain ανοίγει αυτόματα από το PoreiaGo DNS — ο πελάτης δεν ρυθμίζει
+                  τίποτα. Προαιρετικά συνδέστε δικό σας domain με ένα CNAME.
                 </p>
-                <div className="office-setup-grid cols-2">
-                  <div className="office-setup-field" style={{ gridColumn: '1 / -1' }}>
-                    <label>Χρώμα έμφασης</label>
-                    <div className="office-setup-swatches">
-                      {ACCENTS.map((a) => (
-                        <button
-                          key={a.id}
-                          type="button"
-                          title={a.label}
-                          className={`office-setup-swatch${brand.accent === a.color ? ' is-active' : ''}`}
-                          style={{ background: a.color }}
-                          onClick={() => setBrand((b) => ({ ...b, accent: a.color }))}
+
+                <div className="office-setup-domain-hero">
+                  <div className="office-setup-domain-orb" aria-hidden />
+                  <div className="office-setup-domain-ready">
+                    <span className="office-setup-domain-badge">Έτοιμο · SSL</span>
+                    <p className="office-setup-domain-kicker">Διεύθυνση πλατφόρμας</p>
+                    <p className="office-setup-domain-host">
+                      {domain.subdomain_fqdn || `….${getPlatformBaseDomain()}`}
+                    </p>
+                    {domain.subdomain_fqdn ? (
+                      <button
+                        type="button"
+                        className="office-setup-domain-copy"
+                        onClick={() => copyDomainText(domain.subdomain_fqdn, 'Subdomain αντιγράφηκε')}
+                      >
+                        Αντιγραφή subdomain
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="office-setup-domain-card">
+                  <div className="office-setup-domain-card-head">
+                    <span className="office-setup-domain-card-icon" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
+                        <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.7" />
+                        <path
+                          d="M4.5 12h15M12 4.5c2.4 2.4 3.6 5 3.6 7.5s-1.2 5.1-3.6 7.5M12 4.5C9.6 6.9 8.4 9.5 8.4 12s1.2 5.1 3.6 7.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
                         />
-                      ))}
+                      </svg>
+                    </span>
+                    <div>
+                      <strong>Δικό σας domain</strong>
+                      <p>Π.χ. bookings.myagency.gr — χωρίς www.</p>
                     </div>
                   </div>
                   <div className="office-setup-field">
-                    <label htmlFor="os-brand">Όνομα brand</label>
+                    <label htmlFor="os-custom-domain">Custom domain</label>
                     <input
-                      id="os-brand"
-                      value={brand.footer_brand_name}
-                      onChange={(e) => setBrand((b) => ({ ...b, footer_brand_name: e.target.value }))}
-                      placeholder={office.company_name || 'Brand name'}
+                      id="os-custom-domain"
+                      className="office-setup-mono"
+                      value={domain.custom_domain}
+                      onChange={(e) =>
+                        setDomain((d) => ({
+                          ...d,
+                          custom_domain: e.target.value
+                            .trim()
+                            .toLowerCase()
+                            .replace(/^https?:\/\//, '')
+                            .split('/')[0],
+                          saved: false,
+                        }))
+                      }
+                      placeholder="bookings.myagency.gr"
+                      autoComplete="off"
+                      spellCheck={false}
                     />
+                    <p className="office-setup-hint">
+                      Μπορείτε να το αφήσετε κενό και να χρησιμοποιείτε μόνο το subdomain PoreiaGo.
+                    </p>
                   </div>
-                  <div className="office-setup-field">
-                    <label htmlFor="os-phone">Τηλέφωνο επικοινωνίας</label>
-                    <input
-                      id="os-phone"
-                      value={brand.footer_contact_phone}
-                      onChange={(e) => setBrand((b) => ({ ...b, footer_contact_phone: e.target.value }))}
-                      placeholder="+30 …"
-                    />
-                  </div>
-                  <div className="office-setup-field" style={{ gridColumn: '1 / -1' }}>
-                    <label htmlFor="os-addr">Διεύθυνση γραφείου</label>
-                    <input
-                      id="os-addr"
-                      value={brand.footer_address}
-                      onChange={(e) => setBrand((b) => ({ ...b, footer_address: e.target.value }))}
-                      placeholder="Οδός, πόλη"
-                    />
-                  </div>
-                  {rentEnabled && (
-                    <div className="office-setup-field" style={{ gridColumn: '1 / -1' }}>
-                      <label htmlFor="os-rent-name">Όνομα Rent app</label>
-                      <input
-                        id="os-rent-name"
-                        value={brand.rent_office_name}
-                        onChange={(e) => setBrand((b) => ({ ...b, rent_office_name: e.target.value }))}
-                        placeholder="π.χ. Achillio Rent"
-                      />
+
+                  {domain.custom_domain.trim() || domain.saved ? (
+                    <div className="office-setup-cname">
+                      <p className="office-setup-cname-title">Οδηγίες DNS · CNAME</p>
+                      <pre className="office-setup-cname-code">
+                        {`${normalizeCustomDomain(domain.custom_domain) || domain.cname_host || 'your.domain'}  CNAME  ${domain.cname_target || DEFAULT_INGRESS_CNAME}`}
+                      </pre>
+                      <button
+                        type="button"
+                        className="office-setup-domain-copy"
+                        onClick={() =>
+                          copyDomainText(
+                            `${normalizeCustomDomain(domain.custom_domain) || domain.cname_host}  CNAME  ${domain.cname_target || DEFAULT_INGRESS_CNAME}`,
+                            'CNAME αντιγράφηκε',
+                          )
+                        }
+                      >
+                        Αντιγραφή CNAME
+                      </button>
+                      {domain.notes?.length ? (
+                        <ul className="office-setup-cname-notes">
+                          {domain.notes.map((note) => (
+                            <li key={note}>{note}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="office-setup-hint" style={{ marginTop: '0.75rem' }}>
+                          Μετά την αποθήκευση, προσθέστε την εγγραφή στον πάροχο DNS. Το SSL
+                          εκδίδεται αυτόματα όταν το CNAME δείξει σωστά.
+                        </p>
+                      )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </>
             )}
@@ -594,12 +795,12 @@ export default function OfficeSetupWizard({
                         ? 'info@achilliotravel.com'
                         : '')
                     }
-                    onCancel={() => setStep(4)}
+                    onCancel={() => setStep(stepIndex('payments'))}
                     onConnected={() => {
                       setEmailConnected(true);
                       setCompleted((c) => ({ ...c, email: true }));
                       toast.success('Email συνδέθηκε');
-                      setStep(4);
+                      setStep(stepIndex('payments'));
                     }}
                   />
                 </div>
@@ -611,7 +812,7 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Πληρωμές</p>
                 <h2 className="office-setup-title">Πού να πληρώνουν οι πελάτες;</h2>
                 <p className="office-setup-subtitle">
-                  Τραπεζικός λογαριασμός για καταθέσεις και προκαταβολή κράτησης.
+                  Τραπεζικός λογαριασμός για καταθέσεις. Η προκαταβολή ρυθμίζεται μετά από Πληρωμές.
                 </p>
                 <div className="office-setup-grid cols-2">
                   <div className="office-setup-field">
@@ -650,18 +851,28 @@ export default function OfficeSetupWizard({
                       placeholder="ERBKGRAA"
                     />
                   </div>
-                  <div className="office-setup-field">
-                    <label htmlFor="os-dep">Προκαταβολή %</label>
-                    <input
-                      id="os-dep"
-                      type="number"
-                      min={5}
-                      max={90}
-                      value={pay.deposit_percent}
-                      onChange={(e) => setPay((p) => ({ ...p, deposit_percent: e.target.value }))}
-                    />
-                    <p className="office-setup-hint">Συνήθως 30% για κρατήσεις.</p>
-                  </div>
+                </div>
+              </>
+            )}
+
+            {STEPS[step].id === 'fiscal' && (
+              <>
+                <p className="office-setup-eyebrow">Φορολογία</p>
+                <h2 className="office-setup-title">Ενεργοποιήστε πάροχο τιμολόγησης</h2>
+                <p className="office-setup-subtitle">
+                  SoftOne ή Impact (ΥΠΑΗΕΣ) για αυτόματη έκδοση με MARK μετά την πληρωμή.
+                </p>
+                <div className="office-setup-email-wrap">
+                  <FiscalProviderActivateWizard
+                    compact
+                    onCancel={() => setStep(stepIndex('fleet'))}
+                    onActivated={() => {
+                      setFiscalConnected(true);
+                      setCompleted((c) => ({ ...c, fiscal: true }));
+                      toast.success('Πάροχος ενεργοποιήθηκε');
+                      setStep(stepIndex('fleet'));
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -703,7 +914,7 @@ export default function OfficeSetupWizard({
                       id="os-model"
                       value={fleet.model}
                       onChange={(e) => setFleet((f) => ({ ...f, model: e.target.value }))}
-                      placeholder={rentEnabled ? 'Toyota Yaris' : 'Tourismo'}
+                      placeholder={rentEnabled ? 'Peugeot 208' : 'Tourismo'}
                     />
                   </div>
                   {rentEnabled && (
@@ -761,7 +972,12 @@ export default function OfficeSetupWizard({
                     <i>✓</i> {completed.office || office.company_name ? 'Γραφείο' : 'Γραφείο (παράλειψη)'}
                   </li>
                   <li>
-                    <i>✓</i> Εμφάνιση
+                    <i>✓</i>{' '}
+                    {completed.domain
+                      ? domain.custom_domain
+                        ? `Domain · ${domain.custom_domain}`
+                        : 'Domain · subdomain πλατφόρμας'
+                      : 'Domain'}
                   </li>
                   <li>
                     <i>✓</i>{' '}
@@ -769,6 +985,12 @@ export default function OfficeSetupWizard({
                   </li>
                   <li>
                     <i>✓</i> Πληρωμές
+                  </li>
+                  <li>
+                    <i>✓</i>{' '}
+                    {completed.fiscal || fiscalConnected
+                      ? 'Πάροχος ενεργός'
+                      : 'Πάροχος — μπορείτε αργότερα'}
                   </li>
                   <li>
                     <i>✓</i> Στόλος
@@ -784,25 +1006,55 @@ export default function OfficeSetupWizard({
                 </button>
               )}
               <div className="office-setup-actions-right">
+                {STEPS[step].id === 'domain' && (
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-secondary"
+                    disabled={busy}
+                    onClick={async () => {
+                      setDomain((d) => ({ ...d, custom_domain: '' }));
+                      if (
+                        !(await saveDomain({
+                          requireCustom: false,
+                          customDomain: '',
+                        }))
+                      ) {
+                        return;
+                      }
+                      setStep(stepIndex('email'));
+                    }}
+                  >
+                    Μόνο subdomain
+                  </button>
+                )}
                 {STEPS[step].id === 'email' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-secondary"
-                    onClick={() => setStep(4)}
+                    onClick={() => setStep(stepIndex('payments'))}
                   >
                     Παράλειψη email
+                  </button>
+                )}
+                {STEPS[step].id === 'fiscal' && (
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-secondary"
+                    onClick={() => setStep(stepIndex('fleet'))}
+                  >
+                    Παράλειψη παρόχου
                   </button>
                 )}
                 {STEPS[step].id === 'fleet' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-secondary"
-                    onClick={() => setStep(6)}
+                    onClick={() => setStep(stepIndex('done'))}
                   >
                     Παράλειψη στόλου
                   </button>
                 )}
-                {STEPS[step].id !== 'email' && (
+                {STEPS[step].id !== 'email' && STEPS[step].id !== 'fiscal' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-primary"
@@ -813,9 +1065,13 @@ export default function OfficeSetupWizard({
                       ? 'Αποθήκευση…'
                       : STEPS[step].id === 'welcome'
                         ? 'Ας ξεκινήσουμε'
-                        : STEPS[step].id === 'done'
-                          ? 'Μετάβαση στο Control Panel'
-                          : 'Συνέχεια'}
+                        : STEPS[step].id === 'domain'
+                          ? domain.custom_domain.trim()
+                            ? 'Αποθήκευση domain'
+                            : 'Συνέχεια'
+                          : STEPS[step].id === 'done'
+                            ? 'Μετάβαση στο Control Panel'
+                            : 'Συνέχεια'}
                   </button>
                 )}
               </div>

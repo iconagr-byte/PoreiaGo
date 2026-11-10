@@ -8,13 +8,9 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
+import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
-const CATEGORIES = [
-  { value: '', label: 'Όλες' },
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -274,9 +270,9 @@ export default function RentalCatalogPanel({
     }
     if (!validateDates()) return;
     const extras = [];
-    if (form.extra_insurance) extras.push('Extra insurance');
-    if (form.child_seat) extras.push('Child seat');
-    if (form.gps_pack) extras.push('GPS pack');
+    if (form.extra_insurance) extras.push('extra_insurance');
+    if (form.child_seat) extras.push('child_seat');
+    if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
       const created = await createCustomerRentalBooking({
@@ -287,7 +283,7 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
-        notes: extras.length ? `Extras: ${extras.join(', ')}` : null,
+        extras,
       });
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({

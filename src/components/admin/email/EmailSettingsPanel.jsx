@@ -14,12 +14,29 @@ import {
   parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
 import {
+  ACHILLIO_CPANEL_MAIL_HOST,
   isMailTimeoutMessage,
+  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
+  resolveWrongMailHost,
 } from '../../../lib/email/mailReachability.js';
-import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
+import {
+  buildEmailChecksFromResult,
+  buildPendingEmailChecks,
+} from '../../../lib/email/emailConnectionChecks.js';
+import {
+  PROVIDERS,
+  detectProvider,
+  normalizeMailPasswordForClient,
+} from '../../../lib/email/emailProviderPresets.js';
+import {
+  readActiveEmailAccountId,
+  writeActiveEmailAccountId,
+} from '../../../lib/email/activeEmailAccount.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
+import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
+import EmailConnectionResult from './EmailConnectionResult.jsx';
 
 const EMPTY = {
   label: '',
@@ -58,7 +75,7 @@ function Field({ id, label, hint, children }) {
 
 function syncErrorDisplay(error) {
   const msg = String(error || '');
-  if (/poreiago|intechs|34\.141\.98\.145|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
+  if (/poreiago|intechs|34\.141\.98\.145|169\.58\.199\.186|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
     return 'IMAP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server (θύρα 993/143). Ελέγξτε host, ότι ο λογαριασμός IMAP είναι ενεργός, και ότι ο πάροχος email επιτρέπει εξωτερικές συνδέσεις.';
   }
   return msg;
@@ -70,7 +87,10 @@ function syncErrorHint(error) {
     return 'Gmail: δημιουργήστε App Password (Google Account → Ασφάλεια → Κωδικοί εφαρμογών) και χρησιμοποιήστε αυτόν, όχι τον κανονικό κωδικό.';
   }
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
-    return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
+    return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login). Ξαναγράψτε τον κωδικό με «Εμφάνιση» ανοιχτό και πατήστε Αποθήκευση + Έλεγχος.';
+  }
+  if (/Incorrect authentication data|\b535\b/i.test(msg)) {
+    return 'Ο mail server απέρριψε τα credentials (535). Εφόσον το TCP ανοίγει, δεν είναι firewall — ξαναβάλτε τον κωδικό webmail και Αποθήκευση.';
   }
   if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση|poreiago|intechs|34\.141/i.test(msg)) {
     return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
@@ -84,6 +104,78 @@ function syncErrorHint(error) {
   return 'Ελέγξτε host / κωδικό και πατήστε Συγχρονισμός IMAP στο Mailbox.';
 }
 
+function formatAuthDebugHint(debug, diagnostics) {
+  if (!debug || typeof debug !== 'object') return '';
+  const user = String(debug.username || '—');
+  const len = Number(debug.password_len) || 0;
+  const space = debug.password_has_space ? 'ναι' : 'όχι';
+  const sha = String(debug.password_sha10 || '—');
+  const egress =
+    (diagnostics && diagnostics.egress_ip) || debug.egress_ip || '';
+  const egressLine = egress
+    ? ` IP εξόδου εφαρμογής: ${egress} — αν το webmail ανοίγει με τον ίδιο κωδικό, ζητήστε whitelist αυτού του IP στον πάροχο hosting.`
+    : '';
+  return (
+    `Έλεγχος με username «${user}», μήκος κωδικού ${len}, κενά μέσα στον κωδικό: ${space} ` +
+    `(sha10 ${sha}). Συγκρίνετε το μήκος με τον κωδικό webmail — αν διαφέρει, ο αποθηκευμένος κωδικός είναι λάθος.` +
+    egressLine
+  );
+}
+
+function authFailResult(r, fallbackMsg, { mailHost, imapPort, smtpPort } = {}) {
+  const parts = [];
+  if (r?.imap && !r.imap.ok) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
+  if (r?.smtp && !r.smtp.ok) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
+  const msg = parts.join(' · ') || fallbackMsg || 'Αποτυχία σύνδεσης';
+  const resolvedHost =
+    mailHost || r?.auth_debug?.imap_host || r?.auth_debug?.smtp_host || '';
+  const wrongHint =
+    (r?.diagnostics?.wrong_mail_host && {
+      suggestedHost:
+        r.diagnostics.suggested_mail_host || ACHILLIO_CPANEL_MAIL_HOST,
+    }) ||
+    resolveWrongMailHost(resolvedHost);
+  const debugHint = formatAuthDebugHint(r?.auth_debug, r?.diagnostics);
+  if (wrongHint) {
+    return {
+      ok: false,
+      wrongMailHost: true,
+      suggestedMailHost: wrongHint.suggestedHost || ACHILLIO_CPANEL_MAIL_HOST,
+      message: msg,
+      hint: debugHint,
+      authDebug: r?.auth_debug || null,
+      diagnostics: r?.diagnostics || null,
+      mailHost: resolvedHost,
+      imapPort: imapPort || 993,
+      smtpPort: smtpPort || 465,
+    };
+  }
+  const remoteAuth =
+    Boolean(r?.remote_auth) ||
+    isMailRemoteAuthPair(r?.imap?.error, r?.smtp?.error);
+  if (remoteAuth) {
+    return {
+      ok: false,
+      remoteAuth: true,
+      message: msg,
+      hint: debugHint,
+      authDebug: r?.auth_debug || null,
+      diagnostics: r?.diagnostics || null,
+      mailHost: resolvedHost,
+      imapPort: imapPort || 993,
+      smtpPort: smtpPort || 465,
+    };
+  }
+  const hint = [syncErrorHint(msg), debugHint].filter(Boolean).join('\n\n');
+  return {
+    ok: false,
+    message: msg,
+    hint,
+    authDebug: r?.auth_debug || null,
+    diagnostics: r?.diagnostics || null,
+  };
+}
+
 export default function EmailSettingsPanel({ onAccountChange, openConnectWizard = false }) {
   const [accounts, setAccounts] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -92,6 +184,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [testChecks, setTestChecks] = useState([]);
+  const [testingAccountId, setTestingAccountId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [showWizard, setShowWizard] = useState(Boolean(openConnectWizard));
   const fileInputRef = useRef(null);
@@ -100,7 +194,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     try {
       const list = await fetchEmailSettings();
       setAccounts(list);
-      if (list.length && onAccountChange && !localStorage.getItem('email_active_account')) {
+      if (list.length && onAccountChange && !readActiveEmailAccountId()) {
         onAccountChange(list[0].id);
       }
     } catch (err) {
@@ -139,6 +233,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           'imap.mail.yahoo.com',
           'outlook.office365.com',
           'mail.achilliotravel.com',
+          ACHILLIO_CPANEL_MAIL_HOST,
         ].includes(String(f.imap_host || '').toLowerCase());
         if (known && (hostEmpty || wasProviderHost || String(f.imap_host || '').startsWith('mail.'))) {
           next.imap_host = prov.imap_host;
@@ -155,7 +250,19 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     setTestResult(null);
   };
 
+  const applySuggestedMailHost = (host) => {
+    const next = String(host || ACHILLIO_CPANEL_MAIL_HOST).trim() || ACHILLIO_CPANEL_MAIL_HOST;
+    setForm((f) => ({
+      ...f,
+      imap_host: next,
+      smtp_host: next,
+    }));
+    setTestResult(null);
+    toast.success(`Host → ${next}`, { id: 'email-wrong-host-fix' });
+  };
+
   const applyImapPreset = (preset) => {
+
     if (preset === '993') {
       setForm((f) => ({ ...f, imap_port: 993, imap_secure: true }));
     } else if (preset === '143') {
@@ -217,7 +324,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     if (host === 'imap.gmail.com') return 'gmail';
     if (host === 'imap.mail.yahoo.com') return 'yahoo';
     if (host === 'outlook.office365.com') return 'outlook';
-    if (host === 'mail.achilliotravel.com') return 'achillio';
+    if (host === 'mail.achilliotravel.com' || host === ACHILLIO_CPANEL_MAIL_HOST) return 'achillio';
     if (host.startsWith('mail.')) return 'custom';
     return '';
   })();
@@ -227,6 +334,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     setEditingId('new');
     setForm({ ...EMPTY });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
   };
 
@@ -251,6 +360,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       is_active: acc.is_active !== false,
     });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
     requestAnimationFrame(() => {
       document.getElementById('email-settings-editor')?.scrollIntoView({
@@ -261,16 +372,40 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
   };
 
   const runTest = async () => {
+    const typedPassword = normalizeMailPasswordForClient(form.mail_password, {
+      host: form.imap_host || form.smtp_host,
+      email: form.email_address || form.mail_username,
+    });
+    // Editing a saved account with blank password field → test stored secret, not empty login.
+    if (!typedPassword && editingId && editingId !== 'new') {
+      await runTestSaved(editingId);
+      return;
+    }
+    if (!typedPassword) {
+      toast.error('Συμπληρώστε τον κωδικό mailbox για έλεγχο', { id: 'email-conn-test' });
+      return;
+    }
     setTesting(true);
     setTestResult(null);
+    const account = {
+      ...form,
+      imap_port: Number(form.imap_port),
+      smtp_port: Number(form.smtp_port),
+      mail_username: form.mail_username || form.email_address,
+      mail_password: typedPassword,
+    };
+    setTestingAccountId(editingId || 'editor');
+    setTestChecks(
+      buildPendingEmailChecks(account).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
-      const r = await testEmailConnection({
-        ...form,
-        imap_port: Number(form.imap_port),
-        smtp_port: Number(form.smtp_port),
-        mail_username: form.mail_username || form.email_address,
-        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
-      });
+      const r = await testEmailConnection(account);
+      const built = buildEmailChecksFromResult(account, r);
+      setTestChecks(built.checks);
       if (r.ok) {
         const msg = 'IMAP & SMTP: επιτυχής σύνδεση';
         setTestResult({ ok: true, message: msg });
@@ -281,48 +416,116 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const timeout =
           (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
           (smtpFail && isMailTimeoutMessage(r.smtp?.error));
+        const mailHost = form.imap_host || form.smtp_host;
+        const imapPort = Number(form.imap_port) || 993;
+        const smtpPort = Number(form.smtp_port) || 465;
         if (timeout) {
-          const hint = mailTimeoutHintEl({
-            mailHost: form.imap_host || form.smtp_host,
-            imapPort: Number(form.imap_port) || 993,
-            smtpPort: Number(form.smtp_port) || 465,
-          });
           setTestResult({
             ok: false,
             message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
-            hint,
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
             timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
         } else {
-          const parts = [];
-          if (imapFail) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
-          if (smtpFail) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
-          const msg = parts.join(' · ') || 'Αποτυχία σύνδεσης';
-          setTestResult({
-            ok: false,
-            message: msg,
-            hint: syncErrorHint(msg),
-          });
-          toast.error(msg, { id: 'email-conn-test' });
+          const fail = authFailResult(r, undefined, { mailHost, imapPort, smtpPort });
+          setTestResult(fail);
+          toast.error(
+            fail.wrongMailHost
+              ? `Λάθος mail host — βάλτε ${fail.suggestedMailHost || ACHILLIO_CPANEL_MAIL_HOST}`
+              : fail.remoteAuth
+                ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+                : fail.message,
+            {
+              id: 'email-conn-test',
+              duration: fail.wrongMailHost || fail.remoteAuth ? 6000 : 4000,
+            },
+          );
         }
       }
     } catch (err) {
       toast.error(err.message, { id: 'email-conn-test' });
       setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
   };
 
   const runTestSaved = async (id) => {
+    const acc = accounts.find((a) => a.id === id);
+    if (!acc) {
+      toast.error('Ο λογαριασμός δεν βρέθηκε');
+      return;
+    }
     setTesting(true);
+    setTestingAccountId(id);
+    setTestResult(null);
+    setTestChecks(
+      buildPendingEmailChecks(acc).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP για αυτό το γραφείο…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
       const r = await testSavedEmailConnection(id);
-      if (r.ok) toast.success('Σύνδεση OK');
-      else toast.error(r.imap?.error || r.smtp?.error || 'Αποτυχία');
+      const built = buildEmailChecksFromResult(acc, r);
+      setTestChecks(built.checks);
+      if (r.ok) {
+        setTestResult({ ok: true, message: 'IMAP & SMTP: επιτυχής σύνδεση' });
+        toast.success('Σύνδεση OK — δείτε τα βήματα παρακάτω', { id: 'email-conn-test' });
+      } else {
+        const timeout = built.imapHostFail || built.smtpHostFail;
+        const mailHost = acc.imap_host || acc.smtp_host;
+        const imapPort = Number(acc.imap_port) || 993;
+        const smtpPort = Number(acc.smtp_port) || 465;
+        if (timeout) {
+          setTestResult({
+            ok: false,
+            message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
+            timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
+          });
+          toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else {
+          const fail = authFailResult(r, 'Αποτυχία', { mailHost, imapPort, smtpPort });
+          setTestResult(fail);
+          toast.error(
+            fail.wrongMailHost
+              ? `Λάθος mail host — βάλτε ${fail.suggestedMailHost || ACHILLIO_CPANEL_MAIL_HOST}`
+              : fail.remoteAuth
+                ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+                : fail.message,
+            {
+              id: 'email-conn-test',
+              duration: fail.wrongMailHost || fail.remoteAuth ? 6000 : 4000,
+            },
+          );
+        }
+      }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.message, { id: 'email-conn-test' });
+      setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
@@ -339,9 +542,14 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         ...form,
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
+        // Port 465 is always implicit SSL — never persist STARTTLS for it.
+        smtp_secure:
+          Number(form.smtp_port) === 465 ? false : Boolean(form.smtp_secure),
         mail_username: form.mail_username || form.email_address,
-        // Gmail/Yahoo App Passwords are shown with spaces — strip before save/test.
-        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
+        mail_password: normalizeMailPasswordForClient(form.mail_password, {
+          host: form.imap_host || form.smtp_host,
+          email: form.email_address || form.mail_username,
+        }),
       };
       if (editingId === 'new') {
         if (!form.mail_password) {
@@ -352,7 +560,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const created = await createEmailSettings(payload);
         toast.success('Ο λογαριασμός αποθηκεύτηκε');
         onAccountChange?.(created.id);
-        localStorage.setItem('email_active_account', created.id);
+        writeActiveEmailAccountId(created.id);
       } else {
         const patch = { ...payload };
         if (!patch.mail_password) delete patch.mail_password;
@@ -389,6 +597,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       mail_password: account.mail_password || '',
     });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
     requestAnimationFrame(() => {
       document.getElementById('email-settings-editor')?.scrollIntoView({
@@ -428,7 +638,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             });
             toast.success('Ο λογαριασμός εισήχθη και αποθηκεύτηκε');
             onAccountChange?.(created.id);
-            localStorage.setItem('email_active_account', created.id);
+            writeActiveEmailAccountId(created.id);
             setEditingId(null);
             load();
             return;
@@ -555,7 +765,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           onConnected={(created) => {
             setShowWizard(false);
             onAccountChange?.(created.id);
-            localStorage.setItem('email_active_account', created.id);
+            writeActiveEmailAccountId(created.id);
             load();
           }}
         />
@@ -565,6 +775,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         <ul className="space-y-3">
           {accounts.map((a) => {
             const hasErr = Boolean(a.last_sync_error);
+            const syncTimeout = hasErr && isMailTimeoutMessage(a.last_sync_error);
             return (
               <li
                 key={a.id}
@@ -596,13 +807,21 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                         <span
                           className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                             hasErr
-                              ? 'bg-rose-100 text-rose-700'
+                              ? syncTimeout
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-rose-100 text-rose-700'
                               : a.is_active === false
                                 ? 'bg-surface-container-high text-on-surface-variant'
                                 : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
-                          {hasErr ? 'Σφάλμα sync' : a.is_active === false ? 'Ανενεργό' : 'Ενεργό'}
+                          {hasErr
+                            ? syncTimeout
+                              ? 'Χρειάζεται whitelist'
+                              : 'Σφάλμα sync'
+                            : a.is_active === false
+                              ? 'Ανενεργό'
+                              : 'Ενεργό'}
                         </span>
                       </div>
                       <p className="mt-0.5 truncate text-body-sm text-on-surface-variant">
@@ -611,14 +830,12 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       <p className="mt-1 text-label-sm text-on-surface-variant/80">
                         IMAP {a.imap_host}:{a.imap_port}
                         {a.imap_secure ? ' · SSL' : ''} · SMTP {a.smtp_host}:{a.smtp_port}
-                        {a.smtp_secure ? ' · STARTTLS' : Number(a.smtp_port) === 465 ? ' · SSL' : ''}
+                        {Number(a.smtp_port) === 465
+                          ? ' · SSL'
+                          : a.smtp_secure
+                            ? ' · STARTTLS'
+                            : ''}
                       </p>
-                      {hasErr && (
-                        <div className="mt-2 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
-                          <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
-                          <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -628,7 +845,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       disabled={testing}
                       className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-label-sm font-bold text-primary hover:bg-primary/10 disabled:opacity-60"
                     >
-                      Έλεγχος
+                      {testing && testingAccountId === a.id ? 'Έλεγχος…' : 'Έλεγχος'}
                     </button>
                     <button
                       type="button"
@@ -646,6 +863,54 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                     </button>
                   </div>
                 </div>
+                {hasErr && syncTimeout && !(testingAccountId === a.id && testChecks.length > 0) ? (
+                  <div className="mt-3">
+                    <EmailConnectionResult
+                      ok={false}
+                      timeout
+                      mailHost={a.imap_host || a.smtp_host}
+                      imapPort={a.imap_port}
+                      smtpPort={a.smtp_port}
+                    />
+                  </div>
+                ) : null}
+                {hasErr && !syncTimeout ? (
+                  <div className="mt-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
+                    <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
+                    <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
+                  </div>
+                ) : null}
+                {testingAccountId === a.id && testChecks.length > 0 ? (
+                  <div className="mt-3 border-t border-outline-variant/40 pt-3">
+                    <EmailConnectionCheckList
+                      checks={testChecks}
+                      testing={testing && testingAccountId === a.id}
+                      title={
+                        testing && testingAccountId === a.id
+                          ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται'
+                          : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                      }
+                    />
+                    {testResult && !testing ? (
+                      <div className="mt-2">
+                        <EmailConnectionResult
+                          ok={testResult.ok}
+                          message={testResult.message}
+                          hint={testResult.hint}
+                          timeout={testResult.timeout}
+                          remoteAuth={testResult.remoteAuth}
+                          wrongMailHost={testResult.wrongMailHost}
+                          suggestedMailHost={testResult.suggestedMailHost}
+                          onApplySuggestedHost={applySuggestedMailHost}
+                          egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
+                          mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
+                          imapPort={testResult.imapPort || a.imap_port}
+                          smtpPort={testResult.smtpPort || a.smtp_port}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -677,7 +942,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 { id: 'gmail', label: 'Gmail / Google' },
                 { id: 'yahoo', label: 'Yahoo Mail' },
                 { id: 'outlook', label: 'Outlook / Microsoft' },
-                { id: 'achillio', label: 'Achillio cPanel' },
                 { id: 'custom', label: 'Εταιρικό mail.domain' },
               ].map((p) => (
                 <button
@@ -820,20 +1084,26 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field id="imap-sent" label="Απεσταλμένα">
+                <Field
+                  id="imap-sent"
+                  label="Απεσταλμένα"
+                  hint="Στο cPanel συνήθως INBOX.Sent (όχι Sent)"
+                >
                   <input
                     id="imap-sent"
                     className={fieldClass}
                     value={form.imap_folder_sent}
                     onChange={set('imap_folder_sent')}
+                    placeholder="INBOX.Sent"
                   />
                 </Field>
-                <Field id="imap-spam" label="Spam">
+                <Field id="imap-spam" label="Spam" hint="Στο cPanel συχνά INBOX.spam ή INBOX.Junk">
                   <input
                     id="imap-spam"
                     className={fieldClass}
                     value={form.imap_folder_spam}
                     onChange={set('imap_folder_spam')}
+                    placeholder="INBOX.spam"
                   />
                 </Field>
               </div>
@@ -965,42 +1235,38 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             </div>
           </section>
 
-          {testResult && (
-            <div
-              className={`rounded-2xl border px-4 py-3 ${
-                testResult.ok
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-rose-200 bg-rose-50 text-rose-900'
-              }`}
-              role="status"
-            >
-              <p className="text-label-md font-bold">
-                {testResult.ok ? 'Έλεγχος επιτυχής' : 'Έλεγχος απέτυχε'}
-              </p>
-              <p className="mt-1 text-body-sm whitespace-pre-wrap">{testResult.message}</p>
-              {!testResult.ok && testResult.hint ? (
-                <p className="mt-1 text-label-sm opacity-90 whitespace-pre-wrap">{testResult.hint}</p>
+          {(testChecks.length > 0 &&
+            (testingAccountId === editingId || testingAccountId === 'editor')) ||
+          testResult ? (
+            <div className="space-y-2">
+              {testChecks.length > 0 &&
+              (testingAccountId === editingId || testingAccountId === 'editor') ? (
+                <EmailConnectionCheckList
+                  checks={testChecks}
+                  testing={testing}
+                  title={
+                    testing ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται' : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                  }
+                />
               ) : null}
-              {testResult.timeout && testResult.hint ? (
-                <button
-                  type="button"
-                  className="mt-2 text-label-sm font-bold underline"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(testResult.hint);
-                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
-                        id: 'email-conn-copy',
-                      });
-                    } catch {
-                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
-                    }
-                  }}
-                >
-                  Αντιγραφή κειμένου για hosting
-                </button>
+              {testResult ? (
+                <EmailConnectionResult
+                  ok={testResult.ok}
+                  message={testResult.message}
+                  hint={testResult.hint}
+                  timeout={testResult.timeout}
+                  remoteAuth={testResult.remoteAuth}
+                  wrongMailHost={testResult.wrongMailHost}
+                  suggestedMailHost={testResult.suggestedMailHost}
+                  onApplySuggestedHost={applySuggestedMailHost}
+                  egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
+                  mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
+                  imapPort={testResult.imapPort || form.imap_port}
+                  smtpPort={testResult.smtpPort || form.smtp_port}
+                />
               ) : null}
             </div>
-          )}
+          ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant/50 pt-4">
             <button

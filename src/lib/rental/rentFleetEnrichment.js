@@ -3,7 +3,12 @@
  * Matches known demo models; falls back gracefully for custom vehicles.
  */
 
-import { DEMO_RENT_FLEET, rentCategoryLabel } from './demoRentFleet.js';
+import { DEMO_RENT_FLEET } from './demoRentFleet.js';
+import {
+  normalizeRentVehicleCategory,
+  rentCategoryLabel,
+  rentCategoryMeta,
+} from './rentVehicleCategories.js';
 
 const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
   DEMO_RENT_FLEET.map((v) => [String(v.model || '').trim().toLowerCase(), v.photo_url]),
@@ -21,10 +26,60 @@ const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
 
 /** @type {Record<string, RentFleetCopy>} */
 const BY_MODEL = {
+  'toyota aygo x': {
+    headline: 'City crossover 2026',
+    blurb:
+      'Μοντέλο 2026 — μικρό city crossover, ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '1 βαλίτσα',
+    highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
+  },
+  'peugeot 208': {
+    headline: 'Compact hatchback 2026',
+    blurb:
+      'Μοντέλο 2026 — compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Πλήρως ηλεκτρικό',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['A/C', 'Bluetooth', 'Πλήρως ηλεκτρικό'],
+  },
+  'renault clio': {
+    headline: 'Ιδανικό για πόλη 2026',
+    blurb:
+      'Μοντέλο 2026 — compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Υβριδικό',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['Υβριδική οικονομία', 'Εύκολο πάρκινγκ', 'A/C'],
+  },
+  'hyundai i10': {
+    headline: 'City car',
+    blurb:
+      'Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
+  },
+  'citroen c3': {
+    headline: 'Compact hatchback',
+    blurb:
+      'Compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['A/C', 'Bluetooth', 'Οικονομικό'],
+  },
   'toyota yaris': {
     headline: 'Ιδανικό για πόλη',
     blurb:
-      'Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+      'Compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
     transmission: 'Χειροκίνητο',
     fuel: 'Βενζίνη',
     doors: 5,
@@ -51,6 +106,26 @@ const BY_MODEL = {
     luggage: '4 βαλίτσες',
     highlights: ['Υψηλή θέση οδήγησης', 'Μεγάλος χώρος', 'Cruise control'],
   },
+  'vw multivan': {
+    headline: 'Multivan 2026',
+    blurb:
+      'Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό.',
+    transmission: 'Αυτόματο',
+    fuel: 'Ντίζελ',
+    doors: 5,
+    luggage: '4 βαλίτσες',
+    highlights: ['7 θέσεις', 'Οικογενειακό', 'Ευρύχωρο'],
+  },
+  'volkswagen multivan': {
+    headline: 'Multivan 2026',
+    blurb:
+      'Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό.',
+    transmission: 'Αυτόματο',
+    fuel: 'Ντίζελ',
+    doors: 5,
+    luggage: '4 βαλίτσες',
+    highlights: ['7 θέσεις', 'Οικογενειακό', 'Ευρύχωρο'],
+  },
   'vw transporter': {
     headline: 'Van 9 θέσεων',
     blurb:
@@ -62,14 +137,24 @@ const BY_MODEL = {
     highlights: ['9 θέσεις', 'Ομαδικές μετακινήσεις', 'Ευρύχωρο'],
   },
   'mercedes vito': {
-    headline: 'Premium van',
+    headline: 'Premium van 2026',
     blurb:
-      'Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
+      'Μοντέλο 2026 — premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
     transmission: 'Αυτόματο',
     fuel: 'Ντίζελ',
     doors: 4,
     luggage: 'Μεγάλος χώρος φόρτωσης',
     highlights: ['Premium άνεση', '8 θέσεις', 'Ήσυχη καμπίνα'],
+  },
+  'ford transit custom': {
+    headline: 'Tour van 2026',
+    blurb:
+      'Μοντέλο 2026 — ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Ντίζελ',
+    doors: 4,
+    luggage: 'Μεγάλος χώρος φόρτωσης',
+    highlights: ['9 θέσεις', 'Airport transfers', 'Οικονομικό van'],
   },
   'renault trafic': {
     headline: 'Ευέλικτο tour van',
@@ -90,6 +175,29 @@ function modelKey(model) {
     .replace(/\s+/g, ' ');
 }
 
+function luggageCount(luggage) {
+  const m = String(luggage || '').match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function sizeAndGroup(category, seats, model) {
+  const id = normalizeRentVehicleCategory(category, { seats, model });
+  const meta = rentCategoryMeta(id);
+  const letter = meta?.acrissHint || 'C';
+  return {
+    group_code: `Ομάδα ${letter}`,
+    size_label: meta?.shortLabel || meta?.label || id,
+    category_id: id,
+  };
+}
+
+function transmissionLabel(raw) {
+  const t = String(raw || '').trim();
+  if (!t) return 'Χειροκίνητο';
+  if (/αυτόματο|automatic/i.test(t)) return 'Αυτόματο';
+  return 'Χειροκίνητο';
+}
+
 /**
  * @param {object} vehicle
  * @returns {object} vehicle + display enrichment fields
@@ -98,7 +206,8 @@ export function enrichRentVehicle(vehicle) {
   const v = vehicle && typeof vehicle === 'object' ? vehicle : {};
   const known = BY_MODEL[modelKey(v.model)] || null;
   const seats = Number(v.seating_capacity) || null;
-  const category = rentCategoryLabel(v.category);
+  const { group_code, size_label, category_id } = sizeAndGroup(v.category, seats, v.model);
+  const category = rentCategoryLabel(category_id);
   const description =
     (known && String(v.description || '').trim().length < 40 ? known.blurb : null) ||
     String(v.description || '').trim() ||
@@ -106,26 +215,51 @@ export function enrichRentVehicle(vehicle) {
     `${category || 'Όχημα'} έτοιμο για ενοικίαση — κράτηση online σε λίγα βήματα.`;
 
   const fallbackPhoto = DEMO_PHOTO_BY_MODEL[modelKey(v.model)] || '';
-  const photoUrl = String(v.photo_url || v.photo_urls?.[0] || '').trim() || fallbackPhoto;
-  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length
+  const rawPhoto = String(v.photo_url || v.photo_urls?.[0] || '').trim();
+  // Prefer accurate model photo when catalog still has mismatched Unsplash stock.
+  const photoUrl =
+    fallbackPhoto && (!rawPhoto || /images\.unsplash\.com/i.test(rawPhoto))
+      ? fallbackPhoto
+      : rawPhoto || fallbackPhoto;
+  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length && !/images\.unsplash\.com/i.test(rawPhoto)
     ? v.photo_urls
     : photoUrl
       ? [photoUrl]
       : [];
 
+  const luggage = known?.luggage || v.luggage || v.luggage_label || '';
+  const bags = luggageCount(luggage);
+  const transmission = transmissionLabel(known?.transmission || v.transmission);
+  const transmissionKey = /αυτόματο/i.test(transmission) ? 'automatic' : 'manual';
+  const fuel = known?.fuel || v.fuel || v.fuel_type || '';
+  const highlights =
+    (Array.isArray(known?.highlights) && known.highlights.length
+      ? known.highlights
+      : null) ||
+    (Array.isArray(v.highlights) ? v.highlights : []);
+
   return {
     ...v,
+    category: category_id,
     photo_url: photoUrl,
     photo_urls: photoUrls,
     category_label: category,
     display_headline: known?.headline || category || 'Όχημα',
     display_blurb: description,
-    transmission: known?.transmission || '',
-    fuel: known?.fuel || '',
-    doors: known?.doors || null,
-    luggage: known?.luggage || '',
-    highlights: known?.highlights || [],
-    seats_label: seats ? `${seats} θέσεις` : '',
+    transmission,
+    transmission_key: transmissionKey,
+    fuel,
+    fuel_type: v.fuel_type || fuel,
+    doors: known?.doors || v.doors || null,
+    luggage,
+    luggage_bags: bags || Number(v.luggage_bags) || 0,
+    luggage_label: bags ? `x${bags}` : luggage || 'Αποσκευές',
+    highlights,
+    seats_label: seats ? `${seats} επιβάτες` : '',
+    group_code,
+    size_label,
+    ac_label: 'Με κλιματισμό',
+    similar_label: 'ή παρόμοιο',
     price_label:
       v.daily_rate_eur != null && v.daily_rate_eur !== ''
         ? `από €${Number(v.daily_rate_eur).toFixed(0)}/ημέρα`
@@ -148,7 +282,7 @@ export const RENT_HOME_STEPS = [
     id: 'dates',
     icon: 'calendar_month',
     title: 'Ημερομηνίες & παραλαβή',
-    copy: 'Όρισε παραλαβή/επιστροφή στο γραφείο ή one-way — με ή χωρίς οδηγό.',
+    copy: 'Όρισε ημερομηνίες και σημείο παραλαβής από τα σημεία του γραφείου — ίδια επιστροφή ή one-way.',
   },
   {
     id: 'wallet',

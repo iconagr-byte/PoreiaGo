@@ -22,6 +22,7 @@ class RentalVehicle(Base, TenantScopedMixin, TimestampMixin):
     plate_number: Mapped[str] = mapped_column(String(32), nullable=False)
     category: Mapped[str] = mapped_column(String(32), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
+    year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     seating_capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     current_status: Mapped[str] = mapped_column(String(32), nullable=False, default="AVAILABLE")
     current_mileage: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

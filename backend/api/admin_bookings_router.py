@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from core.dependencies import get_tenant_id
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import String, cast, delete, or_, select, text
 
 router = APIRouter(tags=["admin-bookings"])
 
@@ -54,32 +54,129 @@ async def _resolve_tenant_id(tenant_id: UUID | None) -> UUID:
 
 
 async def _find_booking(session, tenant_id: UUID, booking_key: str):
+    from sqlalchemy import String, cast
+
     from app.models.booking import Booking
-    from api.admin_booking_mapper import normalize_reference
+    from api.admin_booking_mapper import booking_id_aliases, normalize_reference
+    from app.services.ensure_bookings_schema import (
+        ensure_bookings_schema,
+        is_bookings_schema_drift_error,
+    )
 
     key = booking_key.strip()
     filters = []
+    # Contabo often stores bookings.id as TEXT while the ORM maps UUID.
+    # Always compare via text cast so both UUID and TEXT PKs work.
     try:
-        filters.append(Booking.id == UUID(key))
+        as_uuid = str(UUID(key))
+        filters.append(cast(Booking.id, String) == as_uuid)
+        filters.append(cast(Booking.id, String) == as_uuid.upper())
+        filters.append(cast(Booking.id, String) == as_uuid.lower())
+        filters.append(cast(Booking.id, String) == key)
     except ValueError:
-        pass
+        filters.append(cast(Booking.id, String) == key)
     ref = normalize_reference(key)
     filters.append(Booking.reference_code == ref)
     filters.append(Booking.reference_code == key.upper())
-    if not filters:
+    # Local wallet ids look like B-HYDK37BA / B-BKHYDK37BA — also try peeled forms.
+    for alias in booking_id_aliases(key):
+        filters.append(Booking.reference_code == normalize_reference(alias))
+        filters.append(Booking.reference_code == alias.upper())
+        filters.append(Booking.reference_code == alias)
+        filters.append(cast(Booking.id, String) == alias)
+    # De-dupe while preserving order
+    seen: set[str] = set()
+    unique_filters = []
+    for f in filters:
+        sig = str(f)
+        if sig in seen:
+            continue
+        seen.add(sig)
+        unique_filters.append(f)
+    if not unique_filters:
         return None
-    stmt = select(Booking).where(Booking.tenant_id == tenant_id, or_(*filters)).limit(1)
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    stmt = select(Booking).where(Booking.tenant_id == tenant_id, or_(*unique_filters)).limit(1)
+    try:
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+    except Exception as exc:
+        if not is_bookings_schema_drift_error(exc) and not _is_booking_id_type_mismatch(exc):
+            raise
+        await session.rollback()
+        healed = await ensure_bookings_schema(session, force=True)
+        if not healed and not _is_booking_id_type_mismatch(exc):
+            raise
+        # DDL commit drops session GUCs (tenant RLS) — re-apply before retry.
+        try:
+            from app.core.auth_deps import apply_tenant_rls
+
+            await apply_tenant_rls(session, tenant_id)
+        except Exception:
+            pass
+        # Retry with text-only id match (no UUID bind) if type mismatch persists.
+        if _is_booking_id_type_mismatch(exc):
+            stmt = select(Booking).where(
+                Booking.tenant_id == tenant_id,
+                or_(
+                    cast(Booking.id, String) == key,
+                    Booking.reference_code == normalize_reference(key),
+                    Booking.reference_code == key.upper(),
+                ),
+            ).limit(1)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+def _is_booking_id_type_mismatch(exc: BaseException) -> bool:
+    """Contabo: bookings.id is TEXT but query binds UUID (text = uuid)."""
+    msg = f"{exc.__class__.__name__}: {exc}".lower()
+    return "text = uuid" in msg or (
+        "operator does not exist" in msg and "uuid" in msg and "text" in msg
+    )
+
+
+async def _hard_delete_booking(session, booking, tenant_id: UUID) -> None:
+    """
+    Permanently delete a booking row.
+
+    Contabo stores bookings.id as TEXT while the ORM maps UUID. Session
+    ``delete(booking)`` emits ``WHERE id = $1::UUID`` → text = uuid.
+    Always delete via text cast (FK CASCADE cleans fiscal_invoices).
+    """
+    from app.models.booking import Booking
+
+    booking_id = str(booking.id)
+    # Detach so commit cannot fall back to ORM UUID-bound DELETE.
+    try:
+        session.expunge(booking)
+    except Exception:
+        pass
+
+    result = await session.execute(
+        delete(Booking).where(
+            cast(Booking.id, String) == booking_id,
+            Booking.tenant_id == tenant_id,
+        )
+    )
+    if result.rowcount and result.rowcount > 0:
+        return
+
+    # Fallback: cast both sides in SQL (TEXT PK + possible TEXT tenant_id).
+    await session.execute(
+        text(
+            "DELETE FROM bookings "
+            "WHERE id::text = :bid AND tenant_id::text = :tid"
+        ),
+        {"bid": booking_id, "tid": str(tenant_id)},
+    )
 
 
 async def _sync_sqlite_cache(admin_dict: dict[str, Any]) -> None:
+    """Immediate desktop → My Wallet mirror (seats / status / passengers)."""
     try:
-        from ticketing.customer_bookings import upsert_booking
+        from ticketing.wallet_booking_reconcile import mirror_admin_booking_to_wallet
 
-        email = admin_dict.get("email") or "unknown@local.invalid"
-        tid = admin_dict.get("tenant_id") or admin_dict.get("tenantId")
-        await upsert_booking(admin_dict, customer_email=email, tenant_id=str(tid) if tid else None)
+        await mirror_admin_booking_to_wallet(admin_dict)
     except Exception:
         pass
 
@@ -120,6 +217,13 @@ async def list_admin_bookings(
             items = [
                 booking_to_admin_dict(b, fiscal_invoices=fiscal_by_booking.get(b.id, []))
                 for b in rows
+            ]
+            from ticketing.demo_catalog import is_demo_booking_ref
+
+            items = [
+                item
+                for item in items
+                if not is_demo_booking_ref(item.get("pnr") or item.get("id"))
             ]
             for item in items:
                 await _sync_sqlite_cache(item)
@@ -261,6 +365,87 @@ async def cancel_admin_booking(
 
             await _sync_sqlite_cache(data)
             return data
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.delete("/api/admin/platform/bookings/{booking_key}")
+async def delete_admin_booking(
+    booking_key: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Permanently remove a booking (test rows / mistakes). Frees seats; fiscal rows cascade."""
+    import logging
+
+    from app.core.auth_deps import apply_tenant_rls
+    from app.core.database import AsyncSessionLocal
+    from api.admin_booking_mapper import local_id_from_reference
+
+    log = logging.getLogger(__name__)
+    try:
+        async with AsyncSessionLocal() as db:
+            await apply_tenant_rls(db, tenant_id)
+            booking = await _find_booking(db, tenant_id, booking_key)
+            if not booking:
+                raise HTTPException(status_code=404, detail="Booking not found")
+
+            booking_id = str(booking.id)
+            reference_code = str(booking.reference_code or "")
+            local_id = local_id_from_reference(reference_code) if reference_code else booking_id
+            meta = dict(booking.metadata_json or {})
+            seats = list(meta.get("seats") or [])
+            trip_id = meta.get("external_trip_id") or getattr(booking, "trip_id", None)
+
+            try:
+                await _hard_delete_booking(db, booking, tenant_id)
+                await db.commit()
+            except Exception as exc:
+                if not _is_booking_id_type_mismatch(exc):
+                    raise
+                await db.rollback()
+                await apply_tenant_rls(db, tenant_id)
+                # Raw text delete only (no ORM UUID bind at all).
+                await db.execute(
+                    text(
+                        "DELETE FROM bookings "
+                        "WHERE id::text = :bid AND tenant_id::text = :tid"
+                    ),
+                    {"bid": booking_id, "tid": str(tenant_id)},
+                )
+                await db.commit()
+
+        try:
+            from ticketing.cancel_service import cancel_ticket_booking
+
+            await cancel_ticket_booking(local_id)
+            await cancel_ticket_booking(booking_id)
+            if reference_code:
+                await cancel_ticket_booking(reference_code)
+        except Exception:
+            log.debug("SQLite ticket cleanup after delete skipped", exc_info=True)
+
+        # Drop My Wallet cache so desktop delete vanishes from customer tickets immediately.
+        try:
+            from ticketing.wallet_booking_reconcile import purge_wallet_booking_aliases
+
+            await purge_wallet_booking_aliases(
+                aliases=[local_id, booking_id, reference_code],
+                tenant_id=str(tenant_id),
+            )
+        except Exception:
+            log.debug("Wallet cache purge after delete skipped", exc_info=True)
+
+        return {
+            "ok": True,
+            "deleted": True,
+            "id": local_id,
+            "saasBookingId": booking_id,
+            "pnr": reference_code,
+            "tripId": trip_id,
+            "seats": seats,
+        }
     except HTTPException:
         raise
     except Exception as exc:
