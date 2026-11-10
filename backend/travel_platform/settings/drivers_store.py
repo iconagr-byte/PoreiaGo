@@ -39,6 +39,21 @@ SEED_DRIVER_IDS = frozenset(
 _DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
 STORE_PATH = Path(os.getenv("FLEET_DRIVERS_STORE") or (_DATA_DIR / "fleet_drivers.json"))
 
+_CACHED_DEFAULT_PASSWORD_HASH: str | None = None
+
+
+def _hash_driver_password(password: str) -> str:
+    """Faster PBKDF2 for bus-app passwords (create/update must stay snappy)."""
+    return hash_password(str(password), iterations=DRIVER_PBKDF2_ITERATIONS)
+
+
+def _default_password_hash() -> str:
+    """Hash DEFAULT_DRIVER_PASSWORD once — never re-hash on every row load."""
+    global _CACHED_DEFAULT_PASSWORD_HASH
+    if _CACHED_DEFAULT_PASSWORD_HASH is None:
+        _CACHED_DEFAULT_PASSWORD_HASH = _hash_driver_password(DEFAULT_DRIVER_PASSWORD)
+    return _CACHED_DEFAULT_PASSWORD_HASH
+
 
 @dataclass
 class FleetDriver:
