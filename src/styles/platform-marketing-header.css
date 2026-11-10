@@ -467,11 +467,20 @@
   color: #fff;
 }
 
-/* Login + Συμβόλαια only beside the mark on desktop (≥901px) */
+/* Login beside the mark on desktop (≥901px) — Συμβόλαια / Υπηρεσίες not in top bar */
 @media (min-width: 901px) {
   .pm-header-login,
   .pm-header-desktop-only {
     display: inline-flex;
+  }
+
+  .pm-header-cta--contracts {
+    display: none !important;
+  }
+
+  .pm-nav,
+  .pm-nav--slim {
+    display: none !important;
   }
 }
 
@@ -513,10 +522,6 @@
 
 @media (min-width: 901px) {
   .pm-header-cta--wallet {
-    display: inline-flex;
-  }
-
-  .pm-header-cta--contracts {
     display: inline-flex;
   }
 
