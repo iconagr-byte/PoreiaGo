@@ -1,24 +1,24 @@
 import { API_BASE } from '../config/api.js';
+import {
+  ensurePushSubscription,
+  ensureServiceWorkerRegistration,
+  getRegistrationByScript,
+} from '../lib/push/webPushHelpers.js';
 import { customerAuthHeaders } from './customerAuthApi.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import {
+  isNativePushAvailable,
+  readStoredFcmToken,
+  registerNativePush,
+  unregisterNativePush,
+} from '../lib/capacitor/nativePush.js';
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
-  }
-  return output;
-}
+const CUSTOMER_SW = '/sw.js';
 
 export function isPushSupported() {
-  return (
-    typeof window !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window
-  );
+  if (typeof window === 'undefined') return false;
+  if (isNativeApp()) return isNativePushAvailable();
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
 export async function fetchPushConfig() {
@@ -40,14 +40,35 @@ export async function fetchPushStatus() {
 }
 
 async function registerServiceWorker() {
-  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-  await navigator.serviceWorker.ready;
-  return registration;
+  return ensureServiceWorkerRegistration(CUSTOMER_SW, { scope: '/' });
+}
+
+async function subscribeNativePush() {
+  const token = await registerNativePush();
+  const res = await fetch(`${API_BASE}/api/push/subscribe`, {
+    method: 'POST',
+    headers: { ...customerAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      channel: 'fcm',
+      token,
+      endpoint: `fcm:${token}`,
+      platform: 'android',
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία εγγραφής FCM');
+  }
+  return data;
 }
 
 export async function subscribePushNotifications() {
   if (!isPushSupported()) {
     throw new Error('Το browser δεν υποστηρίζει push ειδοποιήσεις');
+  }
+
+  if (isNativeApp()) {
+    return subscribeNativePush();
   }
 
   const config = await fetchPushConfig();
@@ -61,22 +82,17 @@ export async function subscribePushNotifications() {
   }
 
   const registration = await registerServiceWorker();
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.public_key),
-    });
-  }
+  const subscription = await ensurePushSubscription(registration, config.public_key);
 
   const json = subscription.toJSON();
   const res = await fetch(`${API_BASE}/api/push/subscribe`, {
     method: 'POST',
-    headers: customerAuthHeaders(),
+    headers: { ...customerAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       endpoint: json.endpoint,
       keys: json.keys,
       expirationTime: json.expirationTime ?? null,
+      channel: 'web',
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -87,11 +103,25 @@ export async function subscribePushNotifications() {
 }
 
 export async function unsubscribePushNotifications() {
+  if (isNativeApp()) {
+    const token = (await unregisterNativePush()) || readStoredFcmToken();
+    const endpoint = token ? `fcm:${token}` : '';
+    if (!endpoint) return { ok: true };
+    await fetch(`${API_BASE}/api/push/subscribe`, {
+      method: 'DELETE',
+      headers: customerAuthHeaders(),
+      body: JSON.stringify({ endpoint }),
+    }).catch(() => null);
+    return { ok: true };
+  }
+
   if (!isPushSupported()) {
     return { ok: true };
   }
 
-  const registration = await navigator.serviceWorker.getRegistration('/');
+  const registration =
+    (await getRegistrationByScript(CUSTOMER_SW)) ||
+    (await navigator.serviceWorker.getRegistration('/'));
   const subscription = registration ? await registration.pushManager.getSubscription() : null;
   if (!subscription) {
     return { ok: true };
