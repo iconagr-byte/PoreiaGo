@@ -8,6 +8,7 @@ import {
   updateRentalVehicle,
   uploadRentalInspectionPhoto,
 } from '../../services/fleetRentalApi.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import {
   normalizeRentVehicleCategory,
   RENT_CATEGORY_OPTIONS,
@@ -484,7 +485,7 @@ export default function RentalVehicleFormPage() {
                   key={url}
                   className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-black/[0.06] bg-gray-50"
                 >
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveSiteAssetUrl(url) || url} alt="" className="w-full h-full object-cover" />
                   {idx === 0 ? (
                     <span className="absolute left-2 top-2 text-[10px] font-bold uppercase tracking-wide bg-black/70 text-white px-2 py-0.5 rounded-full">
                       Κάλυμμα
@@ -536,7 +537,7 @@ export default function RentalVehicleFormPage() {
           <label className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full min-h-[3.25rem] px-4 py-3 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] text-primary font-bold cursor-pointer hover:bg-primary/[0.06] transition-colors">
             <span className="material-symbols-outlined text-[22px]">add_a_photo</span>
             <span>{uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη φωτογραφιών'}</span>
-            <span className="text-xs font-semibold text-primary/70">JPG, PNG · έως 12</span>
+            <span className="text-xs font-semibold text-primary/70">JPG, PNG, WebP · έως 12 · μέγ. 12 MB</span>
             <input
               type="file"
               accept="image/*"

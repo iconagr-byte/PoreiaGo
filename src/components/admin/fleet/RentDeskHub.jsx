@@ -6,6 +6,8 @@ import {
   sanitizeRentDeskTab,
 } from '../../../lib/admin/rentDeskNav.js';
 import FleetRentalPanel from './FleetRentalPanel.jsx';
+import AdminMenuFade from '../AdminMenuFade.jsx';
+import AdminResizableRail from '../AdminResizableRail.jsx';
 
 const RAIL_ACTIVE = {
   teal: 'border-teal-300 bg-teal-50 shadow-sm',
@@ -56,6 +58,9 @@ export default function RentDeskHub({
   onOpenLiveMap,
   onOpenCustomer,
   initialTab,
+  /** When set (e.g. rent CRM card), replace the desk panel but keep Γραφείο rail. */
+  children = null,
+  hideChromeHeader = false,
 }) {
   const [tab, setTab] = useState(() =>
     sanitizeRentDeskTab(controlledTab || initialTab || DEFAULT_RENT_DESK_TAB),
@@ -83,9 +88,15 @@ export default function RentDeskHub({
   };
 
   return (
-    <div className="rent-desk-hub animate-in fade-in duration-300 w-full">
+    <div className="rent-desk-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
+        <AdminResizableRail
+          storageKey="poreiago_rent_desk_rail_w"
+          defaultWidth={256}
+          minWidth={200}
+          maxWidth={420}
+          expandLabel="Μενού rent"
+        >
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-teal-700/80">
@@ -131,7 +142,7 @@ export default function RentDeskHub({
                           <button
                             type="button"
                             onClick={() => selectTab(t.id)}
-                            className={`w-full text-left flex items-center gap-2.5 rounded-2xl border px-2.5 py-2 transition ${
+                            className={`w-full text-left flex items-center gap-2.5 rounded-2xl border px-2.5 py-2 transition outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${
                               isActive
                                 ? RAIL_ACTIVE[accent] || RAIL_ACTIVE.teal
                                 : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
@@ -159,9 +170,11 @@ export default function RentDeskHub({
                               >
                                 {t.label}
                               </span>
-                              <span className="block text-[10px] text-on-surface-variant truncate mt-0.5 leading-snug">
-                                {t.description}
-                              </span>
+                              {t.description ? (
+                                <span className="block text-[10px] text-on-surface-variant truncate mt-0.5 leading-snug">
+                                  {t.description}
+                                </span>
+                              ) : null}
                             </span>
                           </button>
                         </li>
@@ -172,35 +185,43 @@ export default function RentDeskHub({
               ))}
             </div>
           </div>
-        </aside>
+        </AdminResizableRail>
 
-        <div className="min-w-0 flex-1 space-y-4 w-full">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                {active.label}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
-                {active.description}
-              </p>
+        <AdminMenuFade panelKey={tab || DEFAULT_RENT_DESK_TAB} className="min-w-0 flex-1 space-y-4 w-full">
+          {!hideChromeHeader ? (
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
+                  {active.label}
+                </h2>
+                {active.description ? (
+                  <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
+                    {active.description}
+                  </p>
+                ) : null}
+              </div>
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-teal-500/[0.08] border-teal-500/15">
+                <span className="material-symbols-outlined text-[20px] text-teal-700">
+                  {active.icon}
+                </span>
+                <span className="text-sm font-bold text-teal-800">{active.label}</span>
+              </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-teal-500/[0.08] border-teal-500/15">
-              <span className="material-symbols-outlined text-[20px] text-teal-700">
-                {active.icon}
-              </span>
-              <span className="text-sm font-bold text-teal-800">{active.label}</span>
-            </div>
-          </div>
+          ) : null}
 
-          <FleetRentalPanel
-            hideSideNav
-            activeTab={tab || DEFAULT_RENT_DESK_TAB}
-            onTabChange={selectTab}
-            initialTab={tab || DEFAULT_RENT_DESK_TAB}
-            onOpenLiveMap={onOpenLiveMap}
-            onOpenCustomer={onOpenCustomer}
-          />
-        </div>
+          {children != null ? (
+            children
+          ) : (
+            <FleetRentalPanel
+              hideSideNav
+              activeTab={tab || DEFAULT_RENT_DESK_TAB}
+              onTabChange={selectTab}
+              initialTab={tab || DEFAULT_RENT_DESK_TAB}
+              onOpenLiveMap={onOpenLiveMap}
+              onOpenCustomer={onOpenCustomer}
+            />
+          )}
+        </AdminMenuFade>
       </div>
     </div>
   );

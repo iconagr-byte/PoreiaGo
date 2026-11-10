@@ -15,13 +15,135 @@ from app.models.audit import AuditAction
 from app.models.tenant import Tenant
 from app.services.audit_service import AuditService
 
+# data: URLs larger than this poison settings_json and break logo saves.
+_MAX_INLINE_DATA_URL = 8_000
+
+
+def _is_oversized_data_url(value: Any) -> bool:
+    text = str(value or "")
+    return text.startswith("data:") and len(text) > _MAX_INLINE_DATA_URL
+
+
+def _prune_oversized_media(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop multi-hundred-KB data: URLs so Postgres appearance writes stay healthy."""
+    out = {**data}
+    for key in ("logo_url", "rent_logo_url", "hero_image_url"):
+        if _is_oversized_data_url(out.get(key)):
+            out[key] = ""
+    for slides_key in ("home_slider_slides", "rent_slider_slides"):
+        slides = out.get(slides_key)
+        if not isinstance(slides, list):
+            continue
+        cleaned = []
+        for slide in slides:
+            if not isinstance(slide, dict):
+                cleaned.append(slide)
+                continue
+            item = {**slide}
+            for img_key in ("image_url", "src", "url", "background_url"):
+                if _is_oversized_data_url(item.get(img_key)):
+                    item[img_key] = ""
+            cleaned.append(item)
+        out[slides_key] = cleaned
+    return out
+
+
+def _prune_oversized_data_urls_deep(value: Any) -> Any:
+    """Recursively strip huge data: URLs from any settings_json subtree (branding, etc.)."""
+    if isinstance(value, dict):
+        return {k: _prune_oversized_data_urls_deep(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_prune_oversized_data_urls_deep(v) for v in value]
+    if _is_oversized_data_url(value):
+        return ""
+    return value
+
+
+_MAX_SETTINGS_STRING = 20_000
+
+
+def _prune_huge_strings(value: Any, *, max_len: int = _MAX_SETTINGS_STRING) -> Any:
+    """Drop/truncate pathological strings (inline base64 HTML, etc.) that poison writes."""
+    if isinstance(value, dict):
+        return {k: _prune_huge_strings(v, max_len=max_len) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_prune_huge_strings(v, max_len=max_len) for v in value]
+    if isinstance(value, str):
+        # Postgres TEXT rejects NUL (0x00) bytes — strip before json.dumps.
+        if "\x00" in value:
+            value = value.replace("\x00", "")
+        if len(value) > max_len:
+            head = value[:80].lower()
+            if value.startswith("data:") or "base64" in head or ";base64," in value[:200]:
+                return ""
+            return value[:max_len]
+    return value
+
+
+def _safe_settings_json(settings: dict[str, Any]) -> str:
+    cleaned = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
+    return json.dumps(cleaned, ensure_ascii=False, default=str).replace("\x00", "")
+
+
+_BRAND_LOGO_PATCH_KEYS = frozenset(
+    {
+        "footer_brand_name",
+        "rent_office_name",
+        "logo_url",
+        "rent_logo_url",
+        "rent_logo_show_name",
+        "rent_logo_height_px",
+        "rent_logo_max_width_px",
+        "rent_logo_radius_px",
+        "rent_logo_padding_px",
+        "rent_logo_bg_mode",
+        "rent_logo_shadow",
+        "rent_header_compact",
+        "hero_image_url",
+        "logo_height_px",
+        "logo_max_width_px",
+        "logo_radius_px",
+        "logo_padding_px",
+        "logo_bg_mode",
+        "logo_shadow",
+        "logo_show_name",
+        "hero_image_focal",
+        "hero_overlay_opacity",
+        "hero_image_fit",
+        "hero_height_vh",
+    }
+)
+
+
+def _is_brand_logo_only_patch(patch: dict[str, Any]) -> bool:
+    """True when the client is only saving brand name / logo sizing / media URLs."""
+    if not patch:
+        return False
+    return set(patch).issubset(_BRAND_LOGO_PATCH_KEYS)
+
+
+def coerce_appearance_for_response(data: dict[str, Any] | None) -> dict[str, Any]:
+    """Replace nulls with defaults so response models never see None for required fields."""
+    merged = {**DEFAULT_SITE_APPEARANCE, **(data or {})}
+    for key, default in DEFAULT_SITE_APPEARANCE.items():
+        if merged.get(key) is None:
+            merged[key] = default
+    return merged
+
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
     "logo_height_px": 40,
     "logo_max_width_px": 180,
+    "logo_radius_px": 0,
+    "logo_padding_px": 0,
+    "logo_bg_mode": "none",
+    "logo_shadow": False,
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
+    "hero_overlay_opacity": 100,
+    "hero_image_fit": "cover",
+    "hero_height_vh": 88,
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
     "hero_title_accent": "Άνεση, ασφάλεια & θέση εξασφαλισμένη.",
@@ -39,16 +161,39 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "footer_hours": "",
+    "footer_tagline": "",
+    "footer_facebook_url": "",
+    "footer_instagram_url": "",
     "rent_office_name": "",
+    "rent_logo_url": "",
+    "rent_logo_show_name": True,
+    "rent_logo_height_px": 40,
+    "rent_logo_max_width_px": 160,
+    "rent_logo_radius_px": 0,
+    "rent_logo_padding_px": 0,
+    "rent_logo_bg_mode": "none",
+    "rent_logo_shadow": False,
+    "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
-    "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
+    "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
+    "rent_guest_hero_title_accent": "— αναζήτησε, σύγκρινε & κλείσε",
     "rent_guest_hero_copy": "",
+    "rent_guest_hero_benefits": [
+        "Δωρεάν ακύρωση στις περισσότερες κρατήσεις",
+        "Πολλαπλά σημεία παραλαβής",
+        "Υποστήριξη γραφείου & οδική βοήθεια",
+    ],
+    "rent_search_show_dropoff_toggle": True,
+    "rent_search_show_promo": True,
+    "rent_search_submit_label": "Αναζήτηση",
     "rent_cta_label": "Βρες όχημα",
     "rent_pickup_locations": [],
     "rent_coverage_options": [],
     "rent_included_defaults": [],
     "rent_upsell_coverage_id": "",
+    "trip_extra_options": [],
     "rent_notify_email_enabled": True,
     "rent_notify_sms_enabled": True,
     "rent_notify_email_label": "Θέλω προσφορές στο email",
@@ -76,12 +221,62 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_slider_slides": [],
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
+    "secondary_color": "#1e3a5f",
+    "surface_color": "#f8fafc",
     "show_fleet_section": True,
     "show_why_us_section": True,
+    "header_template": "glass_dark",
+    "hero_template": "fullscreen_overlay",
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
+    "footer_template": "classic_columns",
+    "intl_trips_layout_template": "editorial_stack",
+    "intl_trip_card_template": "abroad_horizontal",
     "rent_fleet_layout_template": "rent_grid_three",
     "rent_fleet_card_template": "rent_premium",
+    "rent_theme_id": "aegean_coast",
+    "rent_hero_style": "coastal",
+    "rent_hero_layout": "strip",
+    "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+    "rent_header_style": "glass",
+    "rent_accent_color": "#0a7a6c",
+    "rent_secondary_color": "#0b3d4a",
+    "rent_surface_color": "#f0fdfa",
+    "trips_section_eyebrow": "Ανακαλύψτε",
+    "trips_section_title": "Εκδρομές στην Ελλάδα",
+    "trips_section_subtitle": (
+        "Ημερήσιες και πολυήμερες διαδρομές με premium στόλο — κράτηση θέσης online."
+    ),
+    "intl_section_eyebrow": "Διεθνή δρομολόγια",
+    "intl_section_title": "Ταξίδια προς το Εξωτερικό",
+    "intl_section_subtitle": (
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
+    ),
+    # My Wallet «Αρχική» — empty → client falls back to hero / brand
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
 }
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
@@ -110,7 +305,11 @@ def _is_platform_logo(url: str | None) -> bool:
     if not value:
         return True
     # Real tenant uploads — never treat as platform placeholder.
-    if value.startswith("data:image/") or value.startswith("/api/site/assets/"):
+    if (
+        value.startswith("data:image/")
+        or value.startswith("/api/site/assets/")
+        or value.startswith("/api/site/office-assets/")
+    ):
         return False
     return bool(_PLATFORM_LOGO_RE.search(value))
 
@@ -140,6 +339,7 @@ def _is_opaque_uploaded_logo(url: str | None) -> bool:
     return (
         value.startswith("data:image/")
         or value.startswith("/api/site/assets/")
+        or value.startswith("/api/site/office-assets/")
         or "/uploads/site/" in value
         or value.startswith("uploads/site/")
     )
@@ -226,7 +426,7 @@ def _platform_appearance_needs_persist(
 
 def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str, Any]) -> dict[str, Any]:
     """Fill empty brand/logo from office legal name + branding settings."""
-    from app.services.tenant_modules import is_poreiago_platform_office
+    from app.services.tenant_modules import is_achillio_travel_office, is_poreiago_platform_office
 
     out = {**data}
     branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
@@ -239,11 +439,23 @@ def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str
         office_name = "PoreiaGo"
 
     branding_logo = str(theme_cfg.get("logoUrl") or branding.get("logo_url") or "").strip()
-    if _is_platform_logo(branding_logo) or _looks_like_achillio_brand(branding_logo):
+    # Achillio Travel may legitimately use URLs/paths containing "achillio".
+    # Only scrub Achillio-looking logos away from non-Achillio offices.
+    achillio_office = is_achillio_travel_office(tenant)
+    if (not achillio_office) and (
+        _is_platform_logo(branding_logo) or _looks_like_achillio_brand(branding_logo)
+    ):
+        branding_logo = ""
+    elif achillio_office and _is_platform_logo(branding_logo):
         branding_logo = ""
 
     current_logo = str(out.get("logo_url") or "").strip()
-    if _is_platform_logo(current_logo) or _looks_like_achillio_brand(current_logo):
+    if (not achillio_office) and (
+        _is_platform_logo(current_logo) or _looks_like_achillio_brand(current_logo)
+    ):
+        out["logo_url"] = ""
+        current_logo = ""
+    elif achillio_office and _is_platform_logo(current_logo):
         out["logo_url"] = ""
         current_logo = ""
 
@@ -279,7 +491,10 @@ class TenantSiteAppearanceService:
 
         # One-shot heal: persist scrubbed Achillio leftovers so admin sidebar
         # and public hosts stop reloading poison from Postgres.
-        from app.services.tenant_modules import is_poreiago_platform_office
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
 
         if is_poreiago_platform_office(tenant):
             persist = _platform_appearance_needs_persist(
@@ -292,6 +507,19 @@ class TenantSiteAppearanceService:
                 settings["site_appearance"] = base
                 tenant.settings_json = json.dumps(settings, ensure_ascii=False)
                 await self._session.flush()
+
+        # Achillio Travel: soft-fill public contact when empty so storefront
+        # «Επικοινωνία» is never blank. Do not flush here — update_appearance
+        # ends with get_appearance and an extra flush breaks brand-save retries.
+        if is_achillio_travel_office(tenant):
+            if not str(merged.get("footer_contact_email") or "").strip():
+                merged["footer_contact_email"] = "info@achilliotravel.com"
+            if not str(merged.get("footer_hours") or "").strip():
+                merged["footer_hours"] = "Δευτέρα – Παρασκευή, 09:00 – 18:00"
+            if not str(merged.get("footer_tagline") or "").strip():
+                merged["footer_tagline"] = (
+                    "Εκδρομές με λεωφορείο στην Ελλάδα — κράτηση θέσης online."
+                )
 
         merged["storage_source"] = "postgres"
         merged["tenant_slug"] = tenant.slug
@@ -308,13 +536,82 @@ class TenantSiteAppearanceService:
         settings = _parse_settings(tenant.settings_json)
         current = settings.get("site_appearance")
         base = current if isinstance(current, dict) else {}
+        # Strip legacy inline data: logos/heroes that blow up settings_json writes.
+        base = _prune_oversized_media(base)
+        patch = _prune_oversized_media(dict(patch or {}))
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
         updated = _sanitize_poreiago_platform_appearance(updated, tenant)
-        # Keep an explicit non-Achillio upload even if legal_name still drifted.
+        # Keep an explicit upload — Achillio Travel logos may contain "achillio" in the path.
+        from app.services.tenant_modules import is_achillio_travel_office
+
         if "logo_url" in patch:
             explicit = str(patch.get("logo_url") or "").strip()
-            if explicit and not _looks_like_achillio_brand(explicit):
+            if explicit and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit)
+                or explicit.startswith("/api/site/office-assets/")
+                or explicit.startswith("/api/site/assets/")
+            ):
                 updated["logo_url"] = explicit
+        if "rent_logo_url" in patch:
+            explicit_rent = str(patch.get("rent_logo_url") or "").strip()
+            if explicit_rent and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit_rent)
+                or explicit_rent.startswith("/api/site/office-assets/")
+                or explicit_rent.startswith("/api/site/assets/")
+            ):
+                updated["rent_logo_url"] = explicit_rent
+            elif "rent_logo_url" in patch and not explicit_rent:
+                updated["rent_logo_url"] = ""
+        if "rent_logo_show_name" in patch:
+            updated["rent_logo_show_name"] = bool(patch.get("rent_logo_show_name"))
+        if "rent_header_compact" in patch:
+            updated["rent_header_compact"] = bool(patch.get("rent_header_compact"))
+        try:
+            if "rent_logo_height_px" in updated:
+                updated["rent_logo_height_px"] = max(
+                    20, min(96, int(updated["rent_logo_height_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_height_px"] = 40
+        try:
+            if "rent_logo_max_width_px" in updated:
+                updated["rent_logo_max_width_px"] = max(
+                    60, min(400, int(updated["rent_logo_max_width_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_max_width_px"] = 160
+        try:
+            if "rent_logo_radius_px" in updated:
+                updated["rent_logo_radius_px"] = max(
+                    0, min(48, int(updated["rent_logo_radius_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_radius_px"] = 0
+        try:
+            if "rent_logo_padding_px" in updated:
+                updated["rent_logo_padding_px"] = max(
+                    0, min(24, int(updated["rent_logo_padding_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_padding_px"] = 0
+        if "rent_logo_bg_mode" in updated:
+            mode = str(updated.get("rent_logo_bg_mode") or "none").strip().lower()
+            updated["rent_logo_bg_mode"] = (
+                mode if mode in ("none", "white", "soft", "dark") else "none"
+            )
+        if "rent_logo_shadow" in updated:
+            updated["rent_logo_shadow"] = bool(updated["rent_logo_shadow"])
+        if "hero_image_url" in patch:
+            explicit_hero = str(patch.get("hero_image_url") or "").strip()
+            if explicit_hero and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit_hero)
+                or explicit_hero.startswith("/api/site/office-assets/")
+                or explicit_hero.startswith("/api/site/assets/")
+            ):
+                updated["hero_image_url"] = explicit_hero
         # Clamp logo sizing if present.
         try:
             if "logo_height_px" in updated:
@@ -326,26 +623,222 @@ class TenantSiteAppearanceService:
                 updated["logo_max_width_px"] = max(60, min(400, int(updated["logo_max_width_px"])))
         except (TypeError, ValueError):
             updated["logo_max_width_px"] = 180
+        try:
+            if "logo_radius_px" in updated:
+                updated["logo_radius_px"] = max(0, min(48, int(updated["logo_radius_px"])))
+        except (TypeError, ValueError):
+            updated["logo_radius_px"] = 0
+        try:
+            if "logo_padding_px" in updated:
+                updated["logo_padding_px"] = max(0, min(24, int(updated["logo_padding_px"])))
+        except (TypeError, ValueError):
+            updated["logo_padding_px"] = 0
+        if "logo_bg_mode" in updated:
+            mode = str(updated.get("logo_bg_mode") or "none").strip().lower()
+            updated["logo_bg_mode"] = mode if mode in ("none", "white", "soft", "dark") else "none"
+        if "logo_shadow" in updated:
+            updated["logo_shadow"] = bool(updated["logo_shadow"])
         if "logo_show_name" in updated:
             updated["logo_show_name"] = bool(updated["logo_show_name"])
+        try:
+            if "hero_overlay_opacity" in updated:
+                updated["hero_overlay_opacity"] = max(
+                    0, min(100, int(updated["hero_overlay_opacity"]))
+                )
+        except (TypeError, ValueError):
+            updated["hero_overlay_opacity"] = 100
+        try:
+            if "hero_height_vh" in updated:
+                updated["hero_height_vh"] = max(50, min(100, int(updated["hero_height_vh"])))
+        except (TypeError, ValueError):
+            updated["hero_height_vh"] = 88
+        if "hero_image_fit" in updated:
+            fit = str(updated.get("hero_image_fit") or "cover").strip().lower()
+            updated["hero_image_fit"] = "contain" if fit == "contain" else "cover"
+        if "hero_image_focal" in updated:
+            focal = str(updated.get("hero_image_focal") or "center").strip().lower()
+            allowed_focal = {"center", "top", "bottom", "left", "right"}
+            updated["hero_image_focal"] = focal if focal in allowed_focal else "center"
         # Persist only appearance keys — drop enrichment helpers.
         updated.pop("display_name", None)
         updated.pop("storage_source", None)
         updated.pop("tenant_slug", None)
+        updated = _prune_oversized_media(updated)
         settings["site_appearance"] = updated
-        tenant.settings_json = json.dumps(settings, ensure_ascii=False)
-        await self._session.flush()
-        await self._audit.record(
-            tenant_id=tenant_id,
-            actor_id=None,
-            actor_email=actor_email or "tenant_admin",
-            action=AuditAction.UPDATE,
-            resource_type="site_appearance",
-            resource_id=str(tenant_id),
-            detail="Updated homepage appearance",
+        # Also strip legacy data: blobs under branding/theme — they poison the
+        # whole settings_json column and make logo uploads return HTTP 500.
+        settings = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
+        if isinstance(settings.get("site_appearance"), dict):
+            settings["site_appearance"]["logo_url"] = updated.get("logo_url", "")
+            settings["site_appearance"]["rent_logo_url"] = updated.get("rent_logo_url", "")
+            settings["site_appearance"]["hero_image_url"] = updated.get("hero_image_url", "")
+            # Re-apply size toggles after deep prune (they are never huge).
+            for size_key in (
+                "logo_height_px",
+                "logo_max_width_px",
+                "logo_radius_px",
+                "logo_padding_px",
+                "logo_bg_mode",
+                "logo_shadow",
+                "logo_show_name",
+                "rent_logo_height_px",
+                "rent_logo_max_width_px",
+                "rent_logo_radius_px",
+                "rent_logo_padding_px",
+                "rent_logo_bg_mode",
+                "rent_logo_shadow",
+                "rent_logo_show_name",
+                "rent_header_compact",
+                "hero_image_focal",
+                "hero_overlay_opacity",
+                "hero_image_fit",
+                "hero_height_vh",
+            ):
+                if size_key in updated:
+                    settings["site_appearance"][size_key] = updated[size_key]
+        # Brand/logo-only saves: write a slim bag up front so poisoned slider/theme
+        # blobs in settings_json cannot 500 the «Αποθήκευση μάρκας» button.
+        if _is_brand_logo_only_patch(patch):
+            prev = _prune_huge_strings(
+                _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+            )
+            prev_appearance = prev.get("site_appearance")
+            appearance_full = _prune_oversized_media(
+                {
+                    **DEFAULT_SITE_APPEARANCE,
+                    **(prev_appearance if isinstance(prev_appearance, dict) else {}),
+                    **updated,
+                }
+            )
+            appearance_full.pop("display_name", None)
+            appearance_full.pop("storage_source", None)
+            appearance_full.pop("tenant_slug", None)
+            brand_name = str(appearance_full.get("footer_brand_name") or "").strip()
+            if brand_name and not str(appearance_full.get("rent_office_name") or "").strip():
+                appearance_full["rent_office_name"] = brand_name
+            slim: dict[str, Any] = {
+                "site_appearance": appearance_full,
+                "branding": {"logo_url": str(appearance_full.get("logo_url") or "")},
+            }
+            for key, val in prev.items():
+                if key in ("site_appearance", "branding"):
+                    continue
+                raw = json.dumps(val, ensure_ascii=False, default=str)
+                if len(raw) <= _MAX_SETTINGS_STRING:
+                    slim[key] = val
+            tenant.settings_json = _safe_settings_json(slim)
+            updated = appearance_full
+        else:
+            tenant.settings_json = _safe_settings_json(settings)
+        try:
+            await self._session.flush()
+        except Exception:
+            # Nuclear retry: never re-merge poisoned prev site_appearance — that was
+            # recreating the same failing row. Keep DEFAULT + this patch only.
+            await self._session.rollback()
+            tenant = await self._get_tenant(tenant_id)
+            appearance_full = _prune_oversized_media({**DEFAULT_SITE_APPEARANCE, **updated})
+            appearance_full.pop("display_name", None)
+            appearance_full.pop("storage_source", None)
+            appearance_full.pop("tenant_slug", None)
+            brand_name = str(appearance_full.get("footer_brand_name") or "").strip()
+            if brand_name and not str(appearance_full.get("rent_office_name") or "").strip():
+                appearance_full["rent_office_name"] = brand_name
+            slim = {
+                "site_appearance": appearance_full,
+                "branding": {
+                    "logo_url": str(appearance_full.get("logo_url") or ""),
+                },
+            }
+            # Preserve non-appearance keys that are small enough (modules, etc.).
+            prev = _prune_huge_strings(
+                _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+            )
+            for key, val in prev.items():
+                if key in ("site_appearance", "branding"):
+                    continue
+                raw = json.dumps(val, ensure_ascii=False, default=str)
+                if len(raw) <= _MAX_SETTINGS_STRING:
+                    slim[key] = val
+            tenant.settings_json = _safe_settings_json(slim)
+            await self._session.flush()
+            updated = appearance_full
+        try:
+            # Savepoint so a failed audit INSERT cannot poison this session
+            # (PendingRollbackError → false «Αποτυχία αποθήκευσης εμφάνισης»).
+            async with self._session.begin_nested():
+                await self._audit.record(
+                    tenant_id=tenant_id,
+                    actor_id=None,
+                    actor_email=actor_email or "tenant_admin",
+                    action=AuditAction.UPDATE,
+                    resource_type="site_appearance",
+                    resource_id=str(tenant_id),
+                    detail="Updated homepage appearance",
+                )
+        except Exception:
+            # Never block logo/theme saves on audit table issues.
+            pass
+        try:
+            return await self.get_appearance(tenant_id)
+        except Exception:
+            # File/URL already persisted — return a minimal successful payload.
+            return {
+                **DEFAULT_SITE_APPEARANCE,
+                **updated,
+                "storage_source": "postgres",
+                "tenant_slug": getattr(tenant, "slug", None),
+            }
+
+    async def force_set_media_url(
+        self,
+        tenant_id: UUID,
+        *,
+        logo_url: str | None = None,
+        rent_logo_url: str | None = None,
+        hero_image_url: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Minimal logo/hero URL write — prune poison, set short URL, skip heavy merges.
+
+        Used by multipart upload after disk save so Achillio Travel logos survive
+        even when a full appearance patch previously blew up settings_json.
+        """
+        tenant = await self._get_tenant(tenant_id)
+        settings = _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+        raw = settings.get("site_appearance")
+        appearance = _prune_oversized_media(
+            {**DEFAULT_SITE_APPEARANCE, **(raw if isinstance(raw, dict) else {})}
         )
-        result = await self.get_appearance(tenant_id)
-        return result
+        if logo_url is not None:
+            appearance["logo_url"] = str(logo_url).strip()
+        if rent_logo_url is not None:
+            appearance["rent_logo_url"] = str(rent_logo_url).strip()
+        if hero_image_url is not None:
+            appearance["hero_image_url"] = str(hero_image_url).strip()
+        # Do not run platform Achillio scrub here — upload already scoped to JWT tenant.
+        appearance.pop("display_name", None)
+        appearance.pop("storage_source", None)
+        appearance.pop("tenant_slug", None)
+        settings["site_appearance"] = appearance
+        branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
+        if logo_url is not None:
+            branding = {**branding, "logo_url": str(logo_url).strip()}
+            settings["branding"] = branding
+            theme = settings.get("theme") if isinstance(settings.get("theme"), dict) else {}
+            if theme:
+                settings["theme"] = {**theme, "logoUrl": str(logo_url).strip()}
+        tenant.settings_json = _safe_settings_json(settings)
+        await self._session.flush()
+        try:
+            return await self.get_appearance(tenant_id)
+        except Exception:
+            return {
+                **DEFAULT_SITE_APPEARANCE,
+                **appearance,
+                "storage_source": "postgres",
+                "tenant_slug": getattr(tenant, "slug", None),
+            }
 
     async def _get_tenant(self, tenant_id: UUID) -> Tenant:
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))

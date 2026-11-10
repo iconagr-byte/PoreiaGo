@@ -74,3 +74,4 @@ class DriverSosResponse(BaseModel):
     alert_id: str
     message: str
     published_redis: bool
+    push: dict | None = None

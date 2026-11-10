@@ -1,14 +1,21 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { deleteCustomer } from '../../lib/customers/customerStore.js';
+import { deleteCustomerFromServer } from '../../lib/customers/customerStore.js';
 import { isPaid, isConfirmed } from '../../lib/bookingDisplay.js';
 import CustomerBookingCard from './CustomerBookingCard.jsx';
 import AddCustomerModal from './AddCustomerModal.jsx';
+import OfficeExcursionBookingModal from './OfficeExcursionBookingModal.jsx';
+import { LOYALTY_UI_ENABLED } from '../../lib/admin/loyaltyUi.js';
 
 const TIERS = ['all', 'VIP', 'Platinum', 'Gold', 'Silver'];
-const ACTIVITY = [
+const ACTIVITY_BUSES = [
   { id: 'all', label: 'Όλοι' },
   { id: 'trips', label: 'Με εκδρομές' },
+  { id: 'active', label: 'Με δραστηριότητα' },
+  { id: 'idle', label: 'Χωρίς κρατήσεις' },
+];
+const ACTIVITY_RENT = [
+  { id: 'all', label: 'Όλοι' },
   { id: 'rentals', label: 'Με ενοικιάσεις' },
   { id: 'active', label: 'Με δραστηριότητα' },
   { id: 'idle', label: 'Χωρίς κρατήσεις' },
@@ -99,8 +106,7 @@ function exportCsv(rows) {
     'Email',
     'Τηλέφωνο',
     'Εταιρεία',
-    'Tier',
-    'AeroMiles',
+    ...(LOYALTY_UI_ENABLED ? ['Tier', 'AeroMiles'] : []),
     'Εκδρομές',
     'Ενοικιάσεις',
     'Τζίρος',
@@ -113,8 +119,7 @@ function exportCsv(rows) {
       c.email,
       c.phone,
       c.company,
-      c.tier,
-      c.points ?? 0,
+      ...(LOYALTY_UI_ENABLED ? [c.tier, c.points ?? 0] : []),
       c.tripCount,
       c.rentalCount,
       Number(c.totalSpend || 0).toFixed(2),
@@ -172,30 +177,36 @@ function CustomerDetail({
   customers,
   bookings,
   rentalBookings,
+  serviceScope = 'buses',
   onBack,
   openBookingTicket,
   onEdit,
   onDelete,
+  onAddExcursion,
 }) {
+  const isRent = serviceScope === 'rent';
   const customer =
     customers.find((c) => c.id === selectedCustomer.id) ||
-    loadAllCustomers().find((c) => c.id === selectedCustomer.id) ||
     selectedCustomer;
   const customerName = customer.name || 'Άγνωστος πελάτης';
-  const customerBookings = bookings.filter(
-    (b) =>
-      b.customerId === customer.id ||
-      b.customerName === customer.name ||
-      b.email === customer.email,
-  );
-  const customerRentals = rentalBookings.filter(
-    (b) =>
-      b.client_id === customer.id ||
-      (customer.email &&
-        String(b.client_email || '')
-          .trim()
-          .toLowerCase() === String(customer.email).trim().toLowerCase()),
-  );
+  const customerBookings = isRent
+    ? []
+    : bookings.filter(
+        (b) =>
+          b.customerId === customer.id ||
+          b.customerName === customer.name ||
+          b.email === customer.email,
+      );
+  const customerRentals = isRent
+    ? rentalBookings.filter(
+        (b) =>
+          b.client_id === customer.id ||
+          (customer.email &&
+            String(b.client_email || '')
+              .trim()
+              .toLowerCase() === String(customer.email).trim().toLowerCase()),
+      )
+    : [];
   const totalSpent = customerBookings.reduce((sum, b) => sum + (b.price || 0), 0);
   const rentalSpent = customerRentals
     .filter((b) => b.rental_status !== 'CANCELLED')
@@ -210,12 +221,12 @@ function CustomerDetail({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-600 hover:text-zinc-900 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-bold bg-white border border-zinc-200 text-zinc-800 shadow-sm hover:bg-zinc-50 transition-colors"
         >
-          <span className="w-9 h-9 rounded-full bg-white border border-zinc-200 shadow-sm flex items-center justify-center">
+          <span className="w-8 h-8 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           </span>
-          Πίσω στον κατάλογο
+          Πίσω
         </button>
         <div className="flex items-center gap-2">
           {customer.phone ? (
@@ -300,20 +311,29 @@ function CustomerDetail({
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'AeroMiles', value: customer.points ?? 0, tone: 'text-amber-700 bg-amber-50 border-amber-100', icon: 'stars' },
+          ...(LOYALTY_UI_ENABLED
+            ? [{ label: 'AeroMiles', value: customer.points ?? 0, tone: 'text-amber-700 bg-amber-50 border-amber-100', icon: 'stars' }]
+            : []),
           {
-            label: 'Επιβεβαιωμένες',
-            value: `${confirmedCount}/${customerBookings.length}`,
+            label: isRent ? 'Ενοικιάσεις' : 'Επιβεβαιωμένες',
+            value: isRent
+              ? String(customerRentals.length)
+              : `${confirmedCount}/${customerBookings.length}`,
             tone: 'text-emerald-700 bg-emerald-50 border-emerald-100',
-            icon: 'verified',
+            icon: isRent ? 'car_rental' : 'verified',
           },
-          { label: 'Εισπράχθηκαν', value: `€${paidTotal.toFixed(2)}`, tone: 'text-sky-800 bg-sky-50 border-sky-100', icon: 'payments' },
+          {
+            label: isRent ? 'Τζίρος rent' : 'Εισπράχθηκαν',
+            value: isRent ? `€${rentalSpent.toFixed(2)}` : `€${paidTotal.toFixed(2)}`,
+            tone: 'text-sky-800 bg-sky-50 border-sky-100',
+            icon: 'payments',
+          },
           {
             label: 'Σύνολο',
-            value: `€${(totalSpent + rentalSpent).toFixed(2)}`,
+            value: `€${(isRent ? rentalSpent : totalSpent).toFixed(2)}`,
             tone: 'text-zinc-900 bg-zinc-50 border-zinc-200',
             icon: 'receipt_long',
-            hint: pendingCount > 0 ? `${pendingCount} εκκρεμείς` : null,
+            hint: !isRent && pendingCount > 0 ? `${pendingCount} εκκρεμείς` : null,
           },
         ].map((card) => (
           <div key={card.label} className={`rounded-2xl border p-4 ${card.tone}`}>
@@ -327,17 +347,36 @@ function CustomerDetail({
         ))}
       </div>
 
+      {!isRent ? (
       <div className="space-y-4">
-        <h3 className="font-semibold text-lg flex items-center gap-2.5 px-1 tracking-tight">
-          <span className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
-          </span>
-          Εκδρομές
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          <h3 className="font-semibold text-lg flex items-center gap-2.5 tracking-tight">
+            <span className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
+            </span>
+            Εκδρομές
+          </h3>
+          <button
+            type="button"
+            onClick={() => onAddExcursion?.(customer)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Προσθήκη εκδρομής
+          </button>
+        </div>
         {customerBookings.length === 0 ? (
-          <p className="p-8 text-center text-zinc-500 bg-zinc-50 rounded-3xl border border-zinc-100">
-            Δεν υπάρχουν καταγεγραμμένες κρατήσεις εκδρομών.
-          </p>
+          <div className="p-8 text-center bg-zinc-50 rounded-3xl border border-zinc-100 space-y-3">
+            <p className="text-zinc-500">Δεν υπάρχουν καταγεγραμμένες κρατήσεις εκδρομών.</p>
+            <button
+              type="button"
+              onClick={() => onAddExcursion?.(customer)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-bold bg-sky-600 text-white hover:bg-sky-700"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Προσθήκη εκδρομής από το γραφείο
+            </button>
+          </div>
         ) : (
           customerBookings.map((b) => (
             <CustomerBookingCard
@@ -349,7 +388,9 @@ function CustomerDetail({
           ))
         )}
       </div>
+      ) : null}
 
+      {isRent ? (
       <div className="space-y-4">
         <h3 className="font-semibold text-lg flex items-center gap-2.5 px-1 tracking-tight">
           <span className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center">
@@ -405,6 +446,7 @@ function CustomerDetail({
           ))
         )}
       </div>
+      ) : null}
 
       <p className="text-xs text-zinc-400 text-center">Εγγραφή: {formatJoin(customer.joinDate)}</p>
     </div>
@@ -417,28 +459,36 @@ export default function CustomersCrmPanel({
   setSelectedCustomer,
   bookings = [],
   rentalBookings = [],
+  serviceScope = 'buses',
   onAddCustomer,
   onCustomersChange,
+  onBookingsChange,
   openBookingTicket,
 }) {
+  const isRent = serviceScope === 'rent';
+  const activityOptions = isRent ? ACTIVITY_RENT : ACTIVITY_BUSES;
   const [query, setQuery] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
   const [sortBy, setSortBy] = useState('activity');
   const [editCustomer, setEditCustomer] = useState(null);
+  const [addExcursionOpen, setAddExcursionOpen] = useState(false);
+
+  const scopedBookings = isRent ? [] : bookings;
+  const scopedRentals = isRent ? rentalBookings : [];
 
   const enriched = useMemo(() => {
     return customers.map((c) => {
       const email = String(c.email || '')
         .trim()
         .toLowerCase();
-      const tripBookings = bookings.filter(
+      const tripBookings = scopedBookings.filter(
         (b) =>
           b.customerId === c.id ||
           b.customerName === c.name ||
           (email && String(b.email || '').trim().toLowerCase() === email),
       );
-      const rentals = rentalBookings.filter(
+      const rentals = scopedRentals.filter(
         (b) =>
           b.client_id === c.id ||
           (email &&
@@ -457,14 +507,14 @@ export default function CustomersCrmPanel({
         totalSpend: tripSpend + rentalSpend,
       };
     });
-  }, [customers, bookings, rentalBookings]);
+  }, [customers, scopedBookings, scopedRentals]);
 
   const stats = useMemo(() => {
     const vipGold = enriched.filter((c) => ['VIP', 'Gold', 'Platinum'].includes(c.tier)).length;
-    const active = enriched.filter((c) => c.tripCount + c.rentalCount > 0).length;
+    const active = enriched.filter((c) => (isRent ? c.rentalCount > 0 : c.tripCount > 0)).length;
     const spend = enriched.reduce((s, c) => s + (c.totalSpend || 0), 0);
     return { total: enriched.length, vipGold, active, spend };
-  }, [enriched]);
+  }, [enriched, isRent]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -474,10 +524,14 @@ export default function CustomersCrmPanel({
     }
     if (activityFilter === 'trips') list = list.filter((c) => c.tripCount > 0);
     if (activityFilter === 'rentals') list = list.filter((c) => c.rentalCount > 0);
-    if (activityFilter === 'active') list = list.filter((c) => c.tripCount + c.rentalCount > 0);
-    if (activityFilter === 'idle') list = list.filter((c) => c.tripCount + c.rentalCount === 0);
+    if (activityFilter === 'active') {
+      list = list.filter((c) => (isRent ? c.rentalCount > 0 : c.tripCount > 0));
+    }
+    if (activityFilter === 'idle') {
+      list = list.filter((c) => (isRent ? c.rentalCount === 0 : c.tripCount === 0));
+    }
     return sortCustomers(list, sortBy);
-  }, [enriched, query, tierFilter, activityFilter, sortBy]);
+  }, [enriched, query, tierFilter, activityFilter, sortBy, isRent]);
 
   const clearFilters = () => {
     setQuery('');
@@ -493,11 +547,11 @@ export default function CustomersCrmPanel({
     setEditCustomer(null);
   };
 
-  const handleDelete = (customer) => {
+  const handleDelete = async (customer) => {
     if (!customer?.id && !customer?.email) return;
     const label = customer.name || customer.email || 'πελάτη';
     if (!window.confirm(`Διαγραφή πελάτη «${label}»;`)) return;
-    const ok = deleteCustomer(customer.id || customer.email);
+    const ok = await deleteCustomerFromServer(customer.id || customer.email, serviceScope);
     if (!ok) {
       toast.error('Δεν βρέθηκε ο πελάτης');
       return;
@@ -520,18 +574,31 @@ export default function CustomersCrmPanel({
         <CustomerDetail
           customer={selectedCustomer}
           customers={customers}
-          bookings={bookings}
-          rentalBookings={rentalBookings}
+          bookings={scopedBookings}
+          rentalBookings={scopedRentals}
+          serviceScope={serviceScope}
           onBack={() => setSelectedCustomer(null)}
           openBookingTicket={openBookingTicket}
           onEdit={setEditCustomer}
           onDelete={handleDelete}
+          onAddExcursion={isRent ? undefined : () => setAddExcursionOpen(true)}
         />
         <AddCustomerModal
           open={Boolean(editCustomer)}
           customer={editCustomer}
+          serviceScope={serviceScope}
           onClose={() => setEditCustomer(null)}
           onCreated={handleSaved}
+        />
+        <OfficeExcursionBookingModal
+          open={!isRent && addExcursionOpen}
+          customer={selectedCustomer}
+          bookings={scopedBookings}
+          onClose={() => setAddExcursionOpen(false)}
+          onCreated={() => {
+            onBookingsChange?.();
+            onCustomersChange?.(null);
+          }}
         />
       </>
     );
@@ -547,10 +614,12 @@ export default function CustomersCrmPanel({
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div className="space-y-1.5">
           <h2 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-zinc-900 leading-none">
-            Πελατολόγιο
+            {isRent ? 'Πελάτες ενοικιάσεων' : 'Πελάτες'}
           </h2>
           <p className="text-[15px] text-zinc-500 tracking-tight max-w-lg leading-relaxed">
-            Αναζήτηση, φίλτρα και γρήγορες ενέργειες. Miles+Bonus στο μενού Επιβραβεύσεις.
+            {isRent
+              ? 'Ξεχωριστό CRM ενοικιάσεων — δεν αναμειγνύεται με επιβάτες λεωφορείων.'
+              : 'Ξεχωριστό CRM εκδρομών — δεν αναμειγνύεται με πελάτες ενοικιάσεων.'}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -624,13 +693,13 @@ export default function CustomersCrmPanel({
               <option value="joined">Νεότεροι</option>
               <option value="name">Όνομα</option>
               <option value="tier">Tier</option>
-              <option value="points">AeroMiles</option>
+              {LOYALTY_UI_ENABLED ? <option value="points">AeroMiles</option> : null}
             </select>
           </label>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {ACTIVITY.map((a) => (
+          {activityOptions.map((a) => (
             <button
               key={a.id}
               type="button"
@@ -703,9 +772,14 @@ export default function CustomersCrmPanel({
                     </div>
                     <p className="text-sm text-zinc-500 truncate mt-0.5">{customer.email}</p>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] font-semibold text-zinc-500">
-                      <span>{customer.tripCount} εκδ.</span>
-                      <span>{customer.rentalCount} ενοικ.</span>
-                      <span className="text-amber-600">{customer.points ?? 0} mi</span>
+                      {isRent ? (
+                        <span>{customer.rentalCount} ενοικ.</span>
+                      ) : (
+                        <span>{customer.tripCount} εκδ.</span>
+                      )}
+                      {LOYALTY_UI_ENABLED ? (
+                        <span className="text-amber-600">{customer.points ?? 0} mi</span>
+                      ) : null}
                       <span className="text-zinc-800">{formatMoney(customer.totalSpend)}</span>
                     </div>
                   </div>
@@ -750,7 +824,10 @@ export default function CustomersCrmPanel({
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50/80">
-                {['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Miles', 'Εγγραφή', ''].map(
+                {(LOYALTY_UI_ENABLED
+                  ? ['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Miles', 'Εγγραφή', '']
+                  : ['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Εγγραφή', '']
+                ).map(
                   (h) => (
                     <th
                       key={h || 'actions'}
@@ -767,13 +844,13 @@ export default function CustomersCrmPanel({
             <tbody>
               {enriched.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={LOYALTY_UI_ENABLED ? 8 : 7}>
                     <EmptyState onAdd={onAddCustomer} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={LOYALTY_UI_ENABLED ? 8 : 7}>
                     <NoResults onClear={clearFilters} />
                   </td>
                 </tr>
@@ -812,22 +889,27 @@ export default function CustomersCrmPanel({
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-3 text-xs font-semibold text-zinc-600">
-                        <span className="inline-flex items-center gap-1" title="Εκδρομές">
-                          <span className="material-symbols-outlined text-[15px] text-sky-500">confirmation_number</span>
-                          {customer.tripCount}
-                        </span>
-                        <span className="inline-flex items-center gap-1" title="Ενοικιάσεις">
-                          <span className="material-symbols-outlined text-[15px] text-teal-600">car_rental</span>
-                          {customer.rentalCount}
-                        </span>
+                        {isRent ? (
+                          <span className="inline-flex items-center gap-1" title="Ενοικιάσεις">
+                            <span className="material-symbols-outlined text-[15px] text-teal-600">car_rental</span>
+                            {customer.rentalCount}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1" title="Εκδρομές">
+                            <span className="material-symbols-outlined text-[15px] text-sky-500">confirmation_number</span>
+                            {customer.tripCount}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-right font-bold text-zinc-900 tabular-nums text-sm">
                       {formatMoney(customer.totalSpend)}
                     </td>
+                    {LOYALTY_UI_ENABLED ? (
                     <td className="px-4 py-3.5 text-right font-bold text-amber-600 tabular-nums text-sm">
                       {customer.points ?? 0}
                     </td>
+                    ) : null}
                     <td className="px-4 py-3.5 text-right text-sm text-zinc-500 whitespace-nowrap">
                       {formatJoin(customer.joinDate)}
                     </td>
@@ -869,6 +951,7 @@ export default function CustomersCrmPanel({
       <AddCustomerModal
         open={Boolean(editCustomer)}
         customer={editCustomer}
+        serviceScope={serviceScope}
         onClose={() => setEditCustomer(null)}
         onCreated={handleSaved}
       />

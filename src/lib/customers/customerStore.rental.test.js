@@ -4,7 +4,7 @@ import {
   syncCustomersFromRentalBookings,
   getCustomerByEmail,
   deleteCustomer,
-  loadAllCustomers,
+  loadCustomersByService,
 } from './customerStore.js';
 
 // jsdom-less: customerStore uses localStorage — polyfill for node.
@@ -24,7 +24,9 @@ const person = ensureCustomerForRental({
   phone: '6900111222',
 });
 assert.ok(person?.id?.startsWith('CUST-'));
-assert.equal(getCustomerByEmail(email)?.name, 'Μαρία CRM');
+assert.equal(person.serviceScope, 'rent');
+assert.equal(getCustomerByEmail(email, 'rent')?.name, 'Μαρία CRM');
+assert.equal(getCustomerByEmail(email, 'buses'), null);
 
 const { people } = syncCustomersFromRentalBookings([
   {
@@ -45,8 +47,8 @@ assert.equal(people[0].rental_booking_count, 1);
 assert.ok(people[0].rental_channels.includes('WALLET'));
 
 assert.equal(deleteCustomer(person.id), true);
-assert.equal(getCustomerByEmail(email), null);
-assert.ok(!loadAllCustomers().some((c) => c.email === email));
+assert.equal(getCustomerByEmail(email, 'rent'), null);
+assert.ok(!loadCustomersByService('rent').some((c) => c.email === email));
 // Sync must not resurrect a deleted CRM row.
 const afterDelete = syncCustomersFromRentalBookings([
   {
@@ -60,6 +62,6 @@ const afterDelete = syncCustomersFromRentalBookings([
   },
 ]);
 assert.equal(afterDelete.people.length, 0);
-assert.equal(getCustomerByEmail(email), null);
+assert.equal(getCustomerByEmail(email, 'rent'), null);
 
 console.log('customerStore rental CRM: OK');

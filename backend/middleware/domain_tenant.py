@@ -44,9 +44,11 @@ PUBLIC_HOST_PATHS = (
     "/api/v1/billing/config",
     "/api/v1/aade/webhook",
     "/api/v1/auth/login",
+    "/api/v1/auth/google",
     "/api/v1/auth/dev-login",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
+    "/api/v1/bookings/occupied-seats",
     "/api/v1/telemetry/update",
 )
 

@@ -94,6 +94,45 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         self.assertIn("vehicle_plate", data)
         self.assertTrue(data.get("expires_at"))
 
+    def test_login_without_fleet_assignment_has_no_fake_trip(self):
+        """Password login must not invent demo Εκδρομή #1 when office opened nothing."""
+        with patch.object(self.portal, "_resolve_trip_for_driver", return_value=None):
+            res = self.client.post(
+                "/api/driver/session/login",
+                json={"username": self.driver.email, "password": "driver123"},
+            )
+        self.assertEqual(res.status_code, 200, res.text)
+        data = res.json()
+        self.assertIsNone(data.get("trip_id"))
+        self.assertEqual(data.get("schedule") or [], [])
+        self.assertFalse(data.get("trip_title"))
+
+    def test_legacy_jwt_trip_one_rejected_without_open_source(self):
+        """Old password sessions with trip_id=1 must not serve excursion/seat map."""
+        import jwt as pyjwt
+
+        token = pyjwt.encode(
+            {
+                "sub": self.driver.id,
+                "tenant_id": OFFICE,
+                "trip_id": 1,
+                "roles": ["driver"],
+                "driver_id": self.driver.id,
+                "exp": int(time.time()) + 3600,
+            },
+            TEST_JWT_SECRET,
+            algorithm="HS256",
+        )
+        headers = {"Authorization": f"Bearer {token}"}
+        with patch.object(self.portal, "_resolve_trip_for_driver", return_value=None):
+            trip = self.client.get("/api/driver/trip", headers=headers)
+            man = self.client.get("/api/driver/manifest", headers=headers)
+            me = self.client.get("/api/driver/me", headers=headers)
+        self.assertEqual(trip.status_code, 403)
+        self.assertEqual(man.status_code, 403)
+        self.assertEqual(me.status_code, 200)
+        self.assertIsNone(me.json().get("trip_id"))
+
     def test_login_stays_on_host_office_not_platform(self):
         from unittest.mock import AsyncMock
 

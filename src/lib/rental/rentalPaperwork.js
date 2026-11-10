@@ -8,7 +8,17 @@ export function inspectionsForBooking(inspections, bookingId) {
 }
 
 export function latestInspectionOfType(inspections, bookingId, type) {
-  return inspectionsForBooking(inspections, bookingId).find((i) => i.inspection_type === type) || null;
+  const matches = inspectionsForBooking(inspections, bookingId).filter(
+    (i) => i.inspection_type === type,
+  );
+  if (!matches.length) return null;
+  // Prefer a signed inspection; among equals, take the most recently updated/created.
+  const rank = (i) => {
+    const signed = i?.signature_url ? 1_000_000_000_000 : 0;
+    const t = Date.parse(i?.updated_at || i?.created_at || '') || 0;
+    return signed + t;
+  };
+  return matches.reduce((best, cur) => (rank(cur) >= rank(best) ? cur : best));
 }
 
 /**
