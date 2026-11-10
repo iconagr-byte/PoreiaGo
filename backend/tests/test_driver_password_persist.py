@@ -116,17 +116,17 @@ class DriverPasswordPersistTests(unittest.TestCase):
         raw = json.loads(self.store_path.read_text(encoding="utf-8"))
         self.assertEqual(raw.get("drivers"), [])
 
-    def test_seed_only_when_file_missing(self):
+    def test_empty_store_when_file_missing(self):
         if self.store_path.exists():
             self.store_path.unlink()
         self.store.reset_drivers_cache()
         self.assertFalse(self.store_path.exists())
         drivers = self.store.list_drivers()
-        self.assertGreaterEqual(len(drivers), 1)
+        self.assertEqual(drivers, [])
         self.assertTrue(self.store_path.exists())
-        # Seed passwords work
+        # Built-in demo accounts are gone — no Νίκος auto-login.
         nikos = self.store.authenticate_driver("nikos.driver@aerostride.com", "driver123")
-        self.assertIsNotNone(nikos)
+        self.assertIsNone(nikos)
 
     def test_inactive_driver_cannot_login(self):
         driver = self._create(password="ActiveOnly1", status="inactive")
@@ -145,6 +145,31 @@ class DriverPasswordPersistTests(unittest.TestCase):
         # Keep cache but newer mtime should reload.
         authed = self.store.authenticate_driver(driver.email, "ExternPass2")
         self.assertIsNotNone(authed)
+
+    def test_list_drivers_scoped_by_tenant(self):
+        demo = self._create(password="DemoPass1", tenant_id=self.store.DEMO_TENANT_ID)
+        other_tid = "11111111-1111-4111-8111-111111111111"
+        other = self._create(
+            password="OtherPass1",
+            tenant_id=other_tid,
+            email="other.office@example.com",
+            license_no="LICOTHER1",
+            vehicle_code="OTH-1",
+            license_plate="OTH-1",
+        )
+        demo_list = self.store.list_drivers(tenant_id=self.store.DEMO_TENANT_ID)
+        other_list = self.store.list_drivers(tenant_id=other_tid)
+        self.assertEqual([d.id for d in demo_list], [demo.id])
+        self.assertEqual([d.id for d in other_list], [other.id])
+
+    def test_no_seed_drivers_after_missing_file(self):
+        if self.store_path.exists():
+            self.store_path.unlink()
+        self.store.reset_drivers_cache()
+        demo = self.store.list_drivers(tenant_id=self.store.DEMO_TENANT_ID)
+        other = self.store.list_drivers(tenant_id="22222222-2222-4222-8222-222222222222")
+        self.assertEqual(demo, [])
+        self.assertEqual(other, [])
 
 
 if __name__ == "__main__":

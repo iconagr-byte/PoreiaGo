@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchFleetEtas } from '../../services/telemetryApi.js';
 import FleetPassengerTrackLinkButton from './FleetPassengerTrackLinkButton.jsx';
+import { LIVE_REFRESH_MS, LIVE_REFRESH_SEC } from '../../lib/liveRefresh.js';
 
 const TRAFFIC_LABELS = {
   light: { label: 'Ελαφριά κίνηση', tone: 'text-emerald-700 bg-emerald-50' },
@@ -121,8 +122,6 @@ export default function FleetEtaPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const pollMs = useMemo(() => (data?.push_seconds || 30) * 1000, [data?.push_seconds]);
-
   useEffect(() => {
     let cancelled = false;
     const load = () => {
@@ -144,12 +143,12 @@ export default function FleetEtaPanel({
         });
     };
     load();
-    const id = setInterval(load, pollMs);
+    const id = setInterval(load, LIVE_REFRESH_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [pollMs, vehicles.length]);
+  }, [activeTripCount]);
 
   const items = data?.items || [];
   const etaTripIds = useMemo(
@@ -184,33 +183,17 @@ export default function FleetEtaPanel({
       : 'Χωρίς online οδηγούς';
 
   return (
-    <aside className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] xl:max-h-[min(72vh,620px)]">
-      <header className="border-b border-slate-100 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-4 py-3.5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-900">
-              <span className="material-symbols-outlined text-[20px] text-[var(--color-primary,#0040df)]">
-                schedule
-              </span>
-              Live ETA
-            </h3>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Ανανέωση {data?.push_seconds || 30}δ
-              {trafficMode ? ` · ${trafficMode}` : ''}
-              {transport === 'poll' ? ' · poll' : transport === 'ws' ? ' · live feed' : ''}
-            </p>
-          </div>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusTone}`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                connected && vehicles.length ? 'bg-emerald-500 animate-pulse' : 'bg-current opacity-50'
-              }`}
-              aria-hidden
-            />
-            {statusLabel}
-          </span>
+    <aside className="rounded-[24px] border border-black/[0.08] bg-gradient-to-b from-slate-50 to-white p-4 h-full min-h-[280px] xl:max-h-[min(72vh,620px)] overflow-y-auto">
+      <div className="flex items-center justify-between gap-2 mb-4 sticky top-0 bg-gradient-to-b from-slate-50 to-slate-50/95 pb-2 z-10">
+        <div>
+          <h3 className="font-bold flex items-center gap-1">
+            <span className="material-symbols-outlined text-[18px] text-primary">schedule</span>
+            Ζωντανό ETA
+          </h3>
+          <p className="text-[10px] text-gray-500">
+            ανανέωση {LIVE_REFRESH_SEC}δ
+            {data?.google_maps_configured ? ' · Google Traffic' : ' · εκτίμηση'}
+          </p>
         </div>
       </header>
 
