@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,11 @@ from schemas.telemetry import (
     TelemetrySettingsUpdate,
     TripRouteCompareResponse,
     TripRouteResponse,
+    TeltonikaDeviceResponse,
+    TeltonikaDeviceUpsert,
+    TeltonikaServerStatusResponse,
+    TeltonikaTestPingRequest,
+    TeltonikaTestPingResponse,
 )
 from travel_platform.telemetry.alerts import TelemetryAlertBus
 from travel_platform.telemetry.fleet_eta_service import fetch_fleet_etas
@@ -136,6 +141,31 @@ async def admin_list_alerts(
 ):
     rows = TelemetryAlertBus.list_recent(str(tenant_id), limit=limit)
     return [TelemetryAlertResponse(**r) for r in rows]
+
+
+@router.post("/alerts/{alert_id}/clear")
+async def admin_clear_alert(
+    alert_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Απενεργοποίηση συναγερμού οδηγού (SOS) — φεύγει από τον live χάρτη."""
+    aid = str(alert_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="Λείπει alert_id")
+    cleared = TelemetryAlertBus.clear_alert(
+        aid,
+        tenant_id=str(tenant_id),
+        notify=True,
+        publish_redis=True,
+    )
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Ο συναγερμός δεν βρέθηκε")
+    return {
+        "ok": True,
+        "id": cleared.get("id"),
+        "cleared_at": cleared.get("cleared_at"),
+        "message": "Ο συναγερμός απενεργοποιήθηκε",
+    }
 
 
 @router.get("/heatmap", response_model=FleetHeatmapResponse)
@@ -249,6 +279,31 @@ async def admin_trip_route_playback(
     return TripRouteResponse(**payload)
 
 
+@router.get("/vehicles/{vehicle_id}/route", response_model=TripRouteResponse)
+async def admin_vehicle_route_playback(
+    vehicle_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    from_time: datetime | None = Query(default=None, alias="from"),
+    to_time: datetime | None = Query(default=None, alias="to"),
+    vehicle_code: str | None = Query(default=None),
+    limit: int = Query(5000, ge=1, le=10000),
+):
+    """Πλήρες ιστορικό κίνησης οχήματος (Teltonika / οδηγός) — χωρίς απαίτηση trip_id."""
+    from travel_platform.telemetry.trip_route_service import fetch_vehicle_route
+
+    payload = await fetch_vehicle_route(
+        session,
+        tenant_id=tenant_id,
+        vehicle_id=vehicle_id,
+        vehicle_code=(vehicle_code or "").strip().upper() or None,
+        from_time=from_time,
+        to_time=to_time,
+        limit=limit,
+    )
+    return TripRouteResponse(**payload)
+
+
 @router.get("/trips/{trip_id}/route/export")
 async def admin_trip_route_export(
     trip_id: int,
@@ -343,3 +398,158 @@ async def admin_planned_vs_actual_post(
         limit=limit,
     )
     return PlannedVsActualResponse(**payload)
+
+
+@router.get("/teltonika/status", response_model=TeltonikaServerStatusResponse)
+async def admin_teltonika_status(tenant_id: Annotated[UUID, Depends(get_tenant_id)]):
+    """TCP listener status (shared host). tenant_id required by auth middleware."""
+    del tenant_id
+    from travel_platform.telemetry.teltonika import get_teltonika_status
+
+    return TeltonikaServerStatusResponse(**get_teltonika_status())
+
+
+@router.get("/teltonika/devices", response_model=list[TeltonikaDeviceResponse])
+async def admin_list_teltonika_devices(
+    request: Request,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import (
+        ensure_office_default_trackers,
+        list_devices,
+    )
+
+    tid = str(tenant_id)
+    host = (request.headers.get("host") or request.headers.get("x-forwarded-host") or "").lower()
+    # Achillio Travel: if the dropdown went empty (redeploy / wrong-tenant bind),
+    # restore the known FTC961 IMEI so «Συσκευή» is never blank for that office.
+    if "achilliotravel" in host or "achillio" in host:
+        try:
+            ensure_office_default_trackers(tid)
+        except Exception:
+            pass
+
+    out: list[TeltonikaDeviceResponse] = []
+    for row in list_devices(tid):
+        try:
+            out.append(TeltonikaDeviceResponse.model_validate(row))
+        except Exception:
+            continue
+    return out
+
+
+@router.post("/teltonika/devices", response_model=TeltonikaDeviceResponse)
+async def admin_upsert_teltonika_device(
+    body: TeltonikaDeviceUpsert,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import upsert_device
+
+    try:
+        row = upsert_device(body.model_dump(), tenant_id=str(tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return TeltonikaDeviceResponse(**row)
+
+
+@router.delete("/teltonika/devices/{device_id}", status_code=204)
+async def admin_delete_teltonika_device(
+    device_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import delete_device
+
+    if not delete_device(device_id, tenant_id=str(tenant_id)):
+        raise HTTPException(status_code=404, detail="Device not found")
+
+
+@router.post(
+    "/teltonika/devices/{device_id}/test-ping",
+    response_model=TeltonikaTestPingResponse,
+)
+async def admin_teltonika_test_ping(
+    device_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    body: TeltonikaTestPingRequest | None = None,
+):
+    """Drop a test GPS fix for a bound IMEI so the live map / test map show a pin."""
+    from travel_platform.telemetry.processor import process_telemetry_payload
+    from travel_platform.telemetry.teltonika import get_device_by_imei, list_devices, touch_device
+
+    tid = str(tenant_id)
+    rows = list_devices(tid)
+    device = next((r for r in rows if str(r.get("id")) == str(device_id)), None)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    if not device.get("enabled"):
+        raise HTTPException(status_code=400, detail="Η συσκευή είναι ανενεργή")
+
+    req = body or TeltonikaTestPingRequest()
+    from travel_platform.telemetry.teltonika.device_store import resolve_hardware_fix
+
+    speed = float(req.speed_kmh or 0)
+    force_hw = bool(req.use_hardware) or (
+        req.latitude is None or req.longitude is None
+    )
+    fix_origin = "browser"
+
+    if force_hw:
+        # Δοκιμαστικό pin: Codec last_hw or live Teltonika fleet — never PC Lat/Lng.
+        resolved = resolve_hardware_fix(device, tenant_id=tid)
+        if not resolved:
+            # Stale last_lat (old PC/test) must not satisfy «Η θέση μου».
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Δεν βρέθηκε σήμα Teltonika (Codec TCP / live) για αυτό το IMEI. "
+                    "Ο tracker δεν έχει στείλει ακόμα fix στο VPS — "
+                    "έλεγξε Configurator IP+port 5027. Δεν χρησιμοποιείται θέση υπολογιστή."
+                ),
+            )
+        lat, lng, fix_origin = resolved
+        # Persist live Codec coords so the next click uses last_hw.
+        if fix_origin == "live_fleet":
+            touch_device(
+                str(device.get("imei")),
+                lat=lat,
+                lng=lng,
+                speed_kmh=speed,
+                points=1,
+                from_hardware=True,
+            )
+    else:
+        lat = float(req.latitude)
+        lng = float(req.longitude)
+        fix_origin = "browser"
+
+    vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
+    driver_name = str(device.get("label") or f"GPS {vehicle_code}")
+    payload = {
+        "tenant_id": tid,
+        "vehicle_code": vehicle_code,
+        "latitude": lat,
+        "longitude": lng,
+        "speed_kmh": speed,
+        "engine_status": "on",
+        "heading_deg": 0.0,
+        "bus_plate": vehicle_code,
+        "driver_name": driver_name,
+        "driver_id": device.get("driver_id") or None,
+        "imei": device.get("imei"),
+        # Hardware pin keeps teltonika provenance; browser stays test_ping.
+        "source": "teltonika" if force_hw else "teltonika_test_ping",
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await process_telemetry_payload(payload)
+    # Never write browser coords into the IMEI device store.
+    if force_hw and fix_origin != "live_fleet":
+        touch_device(str(device.get("imei")), points=1)
+    refreshed = get_device_by_imei(str(device.get("imei"))) or device
+    return TeltonikaTestPingResponse(
+        device=TeltonikaDeviceResponse.model_validate(refreshed),
+        vehicle_id=str(result.vehicle_id),
+        latitude=lat,
+        longitude=lng,
+        source="test_ping" if not force_hw else "teltonika",
+        fix_origin=fix_origin,
+    )

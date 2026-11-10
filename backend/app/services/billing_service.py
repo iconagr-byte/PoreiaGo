@@ -56,8 +56,9 @@ def stripe_readiness() -> dict:
             missing.append(env_name)
     checkout_ready = not missing
     portal_ready = bool(settings.stripe_secret_key)
-    # Demo signup/trial without real charge: explicit flag OR Stripe not configured.
-    demo_mode = bool(getattr(settings, "billing_demo_mode", False)) or not checkout_ready
+    # Demo signup only when explicitly enabled — never auto-fallback when Stripe
+    # is missing (that made /grafeia/signup always show «Demo πληρωμή» in prod).
+    demo_mode = bool(getattr(settings, "billing_demo_mode", False))
     plans = ["starter", "professional", "rent"]
     if settings.stripe_price_enterprise:
         plans.append("enterprise")
@@ -122,6 +123,23 @@ def _plan_base_cents(plan: TenantPlan, *, billing_interval: str = "month") -> in
     return monthly
 
 
+def _is_missing_subscription_plan_error(exc: BaseException) -> bool:
+    """True when Postgres/ORM choke on a missing or drifted subscriptions.plan."""
+    msg = str(exc or "").lower()
+    if "subscriptions" in msg and "plan" in msg:
+        return True
+    if "undefinedcolumn" in msg.replace(" ", "") or "undefined column" in msg:
+        return "plan" in msg or "subscription" in msg
+    # asyncpg / SQLAlchemy wrappers
+    orig = getattr(exc, "orig", None)
+    if orig is not None and orig is not exc:
+        return _is_missing_subscription_plan_error(orig)
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and cause is not exc:
+        return _is_missing_subscription_plan_error(cause)
+    return False
+
+
 def _status_from_stripe(raw: str | None) -> SubscriptionStatus:
     try:
         return SubscriptionStatus(raw or "incomplete")
@@ -147,6 +165,31 @@ class BillingService:
         return result.scalar_one_or_none()
 
     async def get_or_create_subscription(self, tenant: Tenant) -> Subscription:
+        """
+        Load or create the office subscription row.
+
+        Contabo DBs sometimes miss ``subscriptions.plan`` — ORM SELECT then
+        500s on Συμβόλαιο. Heal the column and retry once.
+        """
+        try:
+            return await self._get_or_create_subscription_once(tenant)
+        except Exception as exc:
+            if not _is_missing_subscription_plan_error(exc):
+                raise
+            logger.warning(
+                "subscriptions.plan missing/corrupt — healing then retry tenant=%s",
+                tenant.id,
+            )
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            from app.services.tenant_modules import _heal_subscription_plan_column
+
+            await _heal_subscription_plan_column(self._session)
+            return await self._get_or_create_subscription_once(tenant)
+
+    async def _get_or_create_subscription_once(self, tenant: Tenant) -> Subscription:
         sub = await self.get_subscription(tenant.id)
         if sub:
             return sub
@@ -454,31 +497,31 @@ class BillingService:
         )
         return sub
 
-    async def _apply_plan_module_settings(
-        self,
-        tenant: Tenant,
-        *,
-        plan: TenantPlan,
-        rent_addon: bool = False,
-    ) -> None:
-        """Keep tenants.settings_json modules/addons in sync with purchased plan."""
-        import json
-
-        bag = parse_tenant_settings(tenant.settings_json)
-        if plan == TenantPlan.RENT:
-            seeded = initial_settings_for_plan(plan, office_name=tenant.legal_name)
-            # Preserve unrelated keys (platform, branding, …) while applying rent-only seed.
-            for key, value in seeded.items():
-                if key in ("addons", "modules", "site_appearance"):
-                    if key == "site_appearance" and isinstance(bag.get("site_appearance"), dict):
-                        bag["site_appearance"] = {**bag["site_appearance"], **value}
-                    else:
-                        bag[key] = value
-                elif key not in bag:
-                    bag[key] = value
-        elif rent_addon:
-            bag = enable_rent_addon_in_settings(bag)
-        tenant.settings_json = json.dumps(bag, ensure_ascii=False)
+    async def cancel_stripe_subscription_best_effort(self, tenant_id: UUID) -> None:
+        """Cancel remote Stripe subscription before a hard tenant delete (no-op if none)."""
+        sub = await self.get_subscription(tenant_id)
+        if not sub:
+            return
+        stripe_sub_id = str(sub.stripe_subscription_id or "").strip()
+        if not stripe_sub_id or stripe_sub_id.startswith("demo_"):
+            if sub.status != SubscriptionStatus.CANCELED:
+                sub.status = SubscriptionStatus.CANCELED
+                sub.canceled_at = datetime.now(timezone.utc)
+            return
+        try:
+            _stripe_client()
+            stripe.Subscription.cancel(stripe_sub_id)
+            sub.status = SubscriptionStatus.CANCELED
+            sub.canceled_at = datetime.now(timezone.utc)
+            sub.cancel_at_period_end = False
+            logger.info("Stripe subscription canceled before tenant delete: %s", stripe_sub_id)
+        except Exception:
+            logger.warning(
+                "Stripe cancel failed for tenant %s sub %s — continuing local delete",
+                tenant_id,
+                stripe_sub_id,
+                exc_info=True,
+            )
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(
