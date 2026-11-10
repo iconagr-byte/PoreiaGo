@@ -245,6 +245,14 @@ if (-not $googleHit) {
 }
 Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
 
+$googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "ή με Google" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if (-not $googleHit) {
+  throw "Google Sign-In copy missing from android assets — wrong branch or stale build"
+}
+Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
+
 Pin-GradleJavaHome $env:JAVA_HOME
 Remove-Item Env:GRADLE_OPTS -ErrorAction SilentlyContinue
 

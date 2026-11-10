@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-DEFAULT_BUS_IMAGE = "/images/hero-bus-achillio.png"
+DEFAULT_BUS_IMAGE = "/images/fleet-bus-neutral.png"
 
 
 def _normalize_plate(value: str | None) -> str:
