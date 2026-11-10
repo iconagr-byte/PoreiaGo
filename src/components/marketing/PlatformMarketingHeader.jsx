@@ -5,6 +5,12 @@ import '../../styles/platform-marketing-header.css';
 
 const BUS_LINKS = [
   {
+    href: '#session-buses',
+    label: 'Εκδρομές & λεωφορεία',
+    hint: 'Κρατήσεις, GPS, στόλος',
+    icon: 'directions_bus',
+  },
+  {
     href: '#platform-trips',
     label: 'Εκδρομές',
     hint: 'Κάρτες ταξιδιών & κρατήσεις',
@@ -17,6 +23,12 @@ const BUS_LINKS = [
     icon: 'directions_bus',
   },
   {
+    href: '#session-wallet',
+    label: 'My Wallet',
+    hint: 'QR εισιτήριο στο κινητό',
+    icon: 'account_balance_wallet',
+  },
+  {
     href: '#features',
     label: 'Λειτουργίες',
     hint: 'GPS, QR, πίνακας, email',
@@ -25,7 +37,7 @@ const BUS_LINKS = [
 ];
 
 /**
- * PoreiaGo marketing homepage header — buses vs rent clearly separated.
+ * PoreiaGo marketing homepage header — desktop dropdown beside the mark.
  */
 export default function PlatformMarketingHeader() {
   const [busOpen, setBusOpen] = useState(false);
@@ -71,9 +83,9 @@ export default function PlatformMarketingHeader() {
   };
 
   return (
-    <header className="pm-header">
+    <header className="pm-header pm-header--light">
       <div className="pm-header-inner">
-        <PlatformBrand variant="dark" />
+        <PlatformBrand variant="light" />
 
         <nav className="pm-nav" aria-label="Κύριο μενού">
           <div className="pm-nav-cluster pm-nav-cluster--bus" ref={busWrapRef}>
@@ -127,21 +139,22 @@ export default function PlatformMarketingHeader() {
               Ενοικιάσεις
             </Link>
           </div>
-
-          <a href="#pricing" className="pm-nav-link" onClick={closeAll}>
-            Τιμές
-          </a>
         </nav>
 
         <div className="pm-header-actions">
-          <Link to="/admin/login" className="pm-header-login">
+          <Link to="/admin/login" className="pm-header-login pm-header-desktop-only">
             Σύνδεση
           </Link>
-          <Link to="/grafeia" className="pm-header-cta">
-            Συμβόλαια
+          <Link
+            to="/wallet"
+            className="pm-header-cta pm-header-cta--wallet"
+            onClick={closeAll}
+            aria-label="My Wallet"
+          >
             <span className="material-symbols-outlined" aria-hidden>
-              arrow_forward
+              account_balance_wallet
             </span>
+            <span className="pm-header-cta__label">My Wallet</span>
           </Link>
           <button
             type="button"
@@ -161,6 +174,24 @@ export default function PlatformMarketingHeader() {
       {mobileOpen ? (
         <div id="pm-mobile-panel" className="pm-mobile">
           <nav className="pm-mobile-nav" aria-label="Μενού κινητού">
+            <section className="pm-mobile-section">
+              <p className="pm-mobile-label">
+                <span className="material-symbols-outlined" aria-hidden>
+                  info
+                </span>
+                Ξεκινήστε εδώ
+              </p>
+              <a href="#choose-service" className="pm-mobile-link" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  door_open
+                </span>
+                <span>
+                  <strong>Διαλέξτε υπηρεσία</strong>
+                  <em>Λεωφορεία ή Ενοικιάσεις</em>
+                </span>
+              </a>
+            </section>
+
             <section className="pm-mobile-section">
               <p className="pm-mobile-label">
                 <span className="material-symbols-outlined" aria-hidden>
@@ -190,34 +221,40 @@ export default function PlatformMarketingHeader() {
               </p>
               <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
                 <span className="material-symbols-outlined" aria-hidden>
+                  car_rental
+                </span>
+                <span>
+                  <strong>Ενοικιάσεις οχημάτων</strong>
+                  <em>Ασφάλεια · οδική βοήθεια · συμβόλαιο</em>
+                </span>
+              </Link>
+              <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
                   open_in_new
                 </span>
                 <span>
                   <strong>Σελίδα ενοικιάσεων</strong>
-                  <em>Στόλος αυτοκινήτων · /rent</em>
+                  <em>Πλήρης εμπειρία · /rent</em>
                 </span>
               </Link>
             </section>
-
-            <a href="#pricing" className="pm-mobile-link" onClick={closeAll}>
-              <span className="material-symbols-outlined" aria-hidden>
-                payments
-              </span>
-              <span>
-                <strong>Τιμές</strong>
-                <em>Συμβόλαια πλατφόρμας</em>
-              </span>
-            </a>
 
             <div className="pm-mobile-footer">
               <Link to="/admin/login" className="pm-mobile-login" onClick={closeAll}>
                 Σύνδεση γραφείου
               </Link>
-              <Link to="/grafeia" className="pm-header-cta pm-mobile-cta" onClick={closeAll}>
-                Συμβόλαια
+              <Link
+                to="/wallet"
+                className="pm-header-cta pm-header-cta--wallet pm-mobile-cta"
+                onClick={closeAll}
+              >
                 <span className="material-symbols-outlined" aria-hidden>
-                  arrow_forward
+                  account_balance_wallet
                 </span>
+                My Wallet
+              </Link>
+              <Link to="/grafeia" className="pm-mobile-login" onClick={closeAll}>
+                Συμβόλαια
               </Link>
             </div>
           </nav>

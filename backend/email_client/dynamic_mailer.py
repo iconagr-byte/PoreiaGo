@@ -400,12 +400,16 @@ def _apply_headers(
     cc: str,
     priority: str,
     request_read_receipt: bool,
+    reply_to: str = "",
 ) -> None:
     msg["Subject"] = subject
     msg["From"] = from_addr
     msg["To"] = to
     if cc.strip():
         msg["Cc"] = cc.strip()
+    reply = (reply_to or "").strip()
+    if reply and "@" in reply:
+        msg["Reply-To"] = reply
     if priority == "high":
         msg["X-Priority"] = "1"
         msg["Importance"] = "high"
@@ -426,6 +430,7 @@ def _build_message(
     priority: str = "normal",
     request_read_receipt: bool = False,
     attachments: list[dict] | None = None,
+    reply_to: str = "",
 ) -> MIMEMultipart:
     files = normalize_attachments(attachments)
     if files:
@@ -438,6 +443,7 @@ def _build_message(
             cc=cc,
             priority=priority,
             request_read_receipt=request_read_receipt,
+            reply_to=reply_to,
         )
         alt = MIMEMultipart("alternative")
         alt.attach(MIMEText(body_html, "html", "utf-8"))
@@ -464,6 +470,7 @@ def _build_message(
         cc=cc,
         priority=priority,
         request_read_receipt=request_read_receipt,
+        reply_to=reply_to,
     )
     msg.attach(MIMEText(body_html, "html", "utf-8"))
     return msg
@@ -480,6 +487,7 @@ def _send_email_smtp_sync(
     priority: str = "normal",
     request_read_receipt: bool = False,
     attachments: list[dict] | None = None,
+    reply_to: str = "",
 ) -> str:
     cfg = settings_to_smtp_config(account)
     if not cfg["host"]:
@@ -495,6 +503,7 @@ def _send_email_smtp_sync(
         priority=priority,
         request_read_receipt=request_read_receipt,
         attachments=attachments,
+        reply_to=reply_to,
     )
 
     recipients = [a.strip() for a in to.split(",") if a.strip() and "@" in a]
@@ -524,6 +533,7 @@ async def send_email_smtp(
     priority: str = "normal",
     request_read_receipt: bool = False,
     attachments: list[dict] | None = None,
+    reply_to: str = "",
 ) -> str:
     """Async SMTP send — sync smtplib runs in a worker thread (awaitable)."""
     return await asyncio.to_thread(
@@ -537,4 +547,5 @@ async def send_email_smtp(
         priority=priority,
         request_read_receipt=request_read_receipt,
         attachments=attachments,
+        reply_to=reply_to,
     )

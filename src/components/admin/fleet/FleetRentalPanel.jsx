@@ -38,6 +38,7 @@ import RentNotificationsEditor from './RentNotificationsEditor.jsx';
 import RentDocumentsPanel from './RentDocumentsPanel.jsx';
 import RentExpensesPanel from './RentExpensesPanel.jsx';
 import RentAvailabilityPanel from './RentAvailabilityPanel.jsx';
+import RentalFocusedInspectionModal from './RentalFocusedInspectionModal.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchAdminSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -122,6 +123,7 @@ export default function FleetRentalPanel({
   const [inspections, setInspections] = useState([]);
   const [overlays, setOverlays] = useState([]);
   const [bookingFilter, setBookingFilter] = useState('ALL');
+  const [bookingQuery, setBookingQuery] = useState('');
   const [clientQuery, setClientQuery] = useState('');
   const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -173,6 +175,11 @@ export default function FleetRentalPanel({
   const [signaturePadKey, setSignaturePadKey] = useState(0);
   const [officeName, setOfficeName] = useState('Γραφείο ενοικιάσεων');
   const [paperworkFocusId, setPaperworkFocusId] = useState(null);
+  /** Focused check-in/out for one booking — not the bulk inspections desk. */
+  const [focusedInspection, setFocusedInspection] = useState(null); // { bookingId, type }
+  const [inspTypeFilter, setInspTypeFilter] = useState(''); // '' | PICKUP_CHECK | RETURN_CHECK
+  const [inspQuery, setInspQuery] = useState('');
+  const [expandedInspIds, setExpandedInspIds] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -188,14 +195,23 @@ export default function FleetRentalPanel({
     };
   }, []);
 
-  const openPaperworkCheckIn = (bookingId, inspectionType = 'PICKUP_CHECK') => {
-    setInsp((s) => ({
-      ...s,
-      rental_booking_id: bookingId,
-      inspection_type: inspectionType,
-    }));
-    setTab('inspections');
+  const openFocusedInspection = (bookingId, inspectionType = 'PICKUP_CHECK') => {
+    if (!bookingId) return;
+    setFocusedInspection({
+      bookingId,
+      type: inspectionType === 'RETURN_CHECK' ? 'RETURN_CHECK' : 'PICKUP_CHECK',
+    });
   };
+
+  /** From paperwork / agreement — open the single-customer sheet, not bulk desk. */
+  const openPaperworkCheckIn = (bookingId, inspectionType = 'PICKUP_CHECK') => {
+    openFocusedInspection(bookingId, inspectionType);
+  };
+
+  const focusedBooking = useMemo(() => {
+    if (!focusedInspection?.bookingId) return null;
+    return (bookings || []).find((b) => b.id === focusedInspection.bookingId) || null;
+  }, [bookings, focusedInspection]);
 
   const openPaperwork = (bookingId) => {
     setPaperworkFocusId(bookingId || null);
@@ -236,7 +252,7 @@ export default function FleetRentalPanel({
   // Soft live refresh on paperwork / inspections — signatures from tablet or remote
   // must appear without a full page reload.
   useEffect(() => {
-    if (tab !== 'paperwork' && tab !== 'inspections') return undefined;
+    if (tab !== 'paperwork' && tab !== 'inspections' && !focusedInspection) return undefined;
     let cancelled = false;
     const softReload = async () => {
       try {
@@ -254,25 +270,89 @@ export default function FleetRentalPanel({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [tab]);
+  }, [tab, focusedInspection]);
 
   const activeBookings = useMemo(
     () => bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status)),
     [bookings],
   );
 
-  const filteredBookings = useMemo(() => {
-    if (bookingFilter === 'ALL') return bookings;
-    if (bookingFilter === 'WALLET') return bookings.filter((b) => bookingSource(b) === 'Wallet');
-    if (bookingFilter === 'DESK') return bookings.filter((b) => bookingSource(b) === 'Γραφείο');
-    if (bookingFilter === 'ACTIVE') {
-      return bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status));
+  const bookingById = useMemo(() => {
+    const map = new Map();
+    for (const b of bookings) {
+      if (b?.id) map.set(b.id, b);
     }
-    return bookings.filter((b) => b.rental_status === bookingFilter);
-  }, [bookings, bookingFilter]);
+    return map;
+  }, [bookings]);
+
+  const filteredInspections = useMemo(() => {
+    const needle = inspQuery.trim().toLowerCase();
+    return (inspections || []).filter((i) => {
+      if (inspTypeFilter && i.inspection_type !== inspTypeFilter) return false;
+      if (!needle) return true;
+      const booking = bookingById.get(i.rental_booking_id);
+      const blob = [
+        i.inspector_name,
+        i.damage_notes,
+        i.inspection_type,
+        booking?.client_name,
+        booking?.vehicle_plate,
+        booking?.vehicle_model,
+        officeName,
+      ]
+        .map((x) => String(x || '').toLowerCase())
+        .join(' ');
+      return blob.includes(needle);
+    });
+  }, [inspections, inspTypeFilter, inspQuery, bookingById, officeName]);
+
+  const toggleInspExpand = (id) => {
+    setExpandedInspIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredBookings = useMemo(() => {
+    let list = bookings;
+    if (bookingFilter === 'WALLET') list = list.filter((b) => bookingSource(b) === 'Wallet');
+    else if (bookingFilter === 'DESK') list = list.filter((b) => bookingSource(b) === 'Γραφείο');
+    else if (bookingFilter === 'ACTIVE') {
+      list = list.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status));
+    } else if (bookingFilter !== 'ALL') {
+      list = list.filter((b) => b.rental_status === bookingFilter);
+    }
+    const needle = bookingQuery.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter((b) => {
+      const blob = [
+        b.client_name,
+        b.client_email,
+        b.client_phone,
+        b.vehicle_plate,
+        b.vehicle_model,
+        b.pickup_location,
+        b.dropoff_location,
+        b.rental_status,
+        b.payment_status,
+        bookingSource(b),
+        officeName,
+      ]
+        .map((x) => String(x || '').toLowerCase())
+        .join(' ');
+      return blob.includes(needle);
+    });
+  }, [bookings, bookingFilter, bookingQuery, officeName]);
 
   const walletBookingCount = useMemo(
     () => bookings.filter((b) => bookingSource(b) === 'Wallet').length,
+    [bookings],
+  );
+
+  const deskBookingCount = useMemo(
+    () => bookings.filter((b) => bookingSource(b) === 'Γραφείο').length,
     [bookings],
   );
 
@@ -461,6 +541,22 @@ export default function FleetRentalPanel({
 
   return (
     <div className="rental-apple-shell space-y-4 animate-in fade-in duration-300">
+      {focusedInspection && focusedBooking ? (
+        <RentalFocusedInspectionModal
+          booking={focusedBooking}
+          inspectionType={focusedInspection.type}
+          officeName={officeName}
+          onClose={() => setFocusedInspection(null)}
+          onSaved={async () => {
+            setFocusedInspection(null);
+            await reload();
+          }}
+          onToast={(kind, message) => {
+            if (kind === 'error') toast.error(message);
+            else toast.success(message);
+          }}
+        />
+      ) : null}
       <header className="rental-apple-hero">
         <div className="rental-apple-hero-inner">
           <div className="flex items-start gap-3.5 min-w-0">
@@ -516,9 +612,6 @@ export default function FleetRentalPanel({
           <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h3 className="font-bold text-gray-900">Πελάτες ενοικιάσεων</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Ξεχωριστό CRM rent — δεν αναμειγνύεται με λεωφορεία ({clients.length}).
-              </p>
             </div>
             <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
               Αναζήτηση
@@ -950,191 +1043,318 @@ export default function FleetRentalPanel({
 
       {tab === 'bookings' && (
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'ALL', label: `Όλες (${bookings.length})` },
-              { id: 'ACTIVE', label: `Ενεργές (${activeBookings.length})` },
-              { id: 'RESERVED', label: 'Εκκρεμεί πληρωμή' },
-              { id: 'WALLET', label: `Wallet (${walletBookingCount})` },
-              { id: 'DESK', label: 'Γραφείο' },
-              { id: 'COMPLETED', label: 'Ολοκληρωμένες' },
-              { id: 'CANCELLED', label: 'Ακυρωμένες' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setBookingFilter(f.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
-                  bookingFilter === f.id
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-gray-600 border-black/[0.08]'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="bg-white rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05]">
-            {filteredBookings.length === 0 ? (
-              <p className="p-6 text-sm text-gray-500">Καμία κράτηση σε αυτό το φίλτρο.</p>
-            ) : (
-              filteredBookings.map((b) => (
-                <article
-                  key={b.id}
-                  role="button"
-                  tabIndex={0}
-                  title="Διπλό κλικ για άνοιγμα χαρτούρας"
-                  onDoubleClick={() => openPaperwork(b.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      openPaperwork(b.id);
-                    }
-                  }}
-                  className="px-4 py-3 flex flex-wrap items-start justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-bold text-sm text-gray-900">
-                      {b.client_name} · {b.vehicle_plate || b.vehicle_model || '—'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
-                      {b.pickup_location
-                        ? ` · ${b.pickup_location}${
-                            b.dropoff_location && b.dropoff_location !== b.pickup_location
-                              ? ` → ${b.dropoff_location}`
-                              : ''
-                          }`
-                        : ''}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {euro(b.total_cost)}
-                      {b.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ' · self-drive'}
-                      {b.client_email ? ` · ${b.client_email}` : ''}
-                      {b.client_phone ? ` · ${b.client_phone}` : ''}
-                      {b.payment_status ? ` · ${b.payment_status}` : ''}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                        {bookingSource(b)}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(b.rental_status)}`}>
-                        {b.rental_status}
-                      </span>
-                      {b.pricing?.is_one_way ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                          One-way
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
+          <div className="rounded-[22px] border border-black/[0.06] bg-white/90 p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-[1.05rem] font-bold tracking-tight text-[#1d1d1f]">
+                  Κρατήσεις ενοικίασης
+                </h3>
+                <p className="mt-0.5 text-[0.8125rem] tracking-tight text-[#6e6e73]">
+                  {filteredBookings.length} εμφανίζονται · {bookings.length} σύνολο · {officeName}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1 rounded-full bg-[#f5f5f7] p-1">
+                {[
+                  { id: 'ALL', label: `Όλες (${bookings.length})` },
+                  { id: 'ACTIVE', label: `Ενεργές (${activeBookings.length})` },
+                  { id: 'RESERVED', label: 'Πληρωμή' },
+                  { id: 'WALLET', label: `Wallet (${walletBookingCount})` },
+                  { id: 'DESK', label: `Γραφείο (${deskBookingCount})` },
+                  { id: 'COMPLETED', label: 'Ολοκλ.' },
+                  { id: 'CANCELLED', label: 'Ακυρ.' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setBookingFilter(f.id)}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-tight transition ${
+                      bookingFilter === f.id
+                        ? 'bg-[#1d1d1f] text-white shadow-sm'
+                        : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+                    }`}
                   >
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-teal-800"
-                      onClick={() => openPaperwork(b.id)}
-                    >
-                      Χαρτούρα
-                    </button>
-                    {b.rental_status === 'RESERVED' ? (
-                      <>
-                        <button
-                          type="button"
-                          className="text-xs font-bold text-teal-800"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await updateRentalBookingStatus(b.id, 'CONFIRMED');
-                              toast.success('Πληρωμή επιβεβαιώθηκε');
-                              await reload();
-                            } catch (err) {
-                              toast.error(err.message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Επιβεβαίωση πληρωμής
-                        </button>
-                        <button
-                          type="button"
-                          className="text-xs font-bold text-rose-600"
-                          disabled={busy}
-                          onClick={async () => {
-                            if (!window.confirm('Ακύρωση κράτησης;')) return;
-                            setBusy(true);
-                            try {
-                              await updateRentalBookingStatus(b.id, 'CANCELLED');
-                              toast.success('Ακυρώθηκε');
-                              await reload();
-                            } catch (err) {
-                              toast.error(err.message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Ακύρωση
-                        </button>
-                      </>
-                    ) : null}
-                    {b.rental_status === 'CONFIRMED' ? (
-                      <>
-                        <button
-                          type="button"
-                          className="text-xs font-bold text-primary"
-                          onClick={() => {
-                            setInsp((s) => ({ ...s, rental_booking_id: b.id, inspection_type: 'PICKUP_CHECK' }));
-                            setTab('inspections');
-                          }}
-                        >
-                          Check-in
-                        </button>
-                        <button
-                          type="button"
-                          className="text-xs font-bold text-rose-600"
-                          disabled={busy}
-                          onClick={async () => {
-                            if (!window.confirm('Ακύρωση κράτησης;')) return;
-                            setBusy(true);
-                            try {
-                              await updateRentalBookingStatus(b.id, 'CANCELLED');
-                              toast.success('Ακυρώθηκε');
-                              await reload();
-                            } catch (err) {
-                              toast.error(err.message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Ακύρωση
-                        </button>
-                      </>
-                    ) : null}
-                    {b.rental_status === 'ACTIVE' ? (
-                      <button
-                        type="button"
-                        className="text-xs font-bold text-primary"
-                        onClick={() => {
-                          setInsp((s) => ({ ...s, rental_booking_id: b.id, inspection_type: 'RETURN_CHECK' }));
-                          setTab('inspections');
-                        }}
-                      >
-                        Check-out
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              ))
-            )}
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="relative mt-3">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#86868b]">
+                search
+              </span>
+              <input
+                type="search"
+                value={bookingQuery}
+                onChange={(e) => setBookingQuery(e.target.value)}
+                placeholder="Αναζήτηση πελάτη / πινακίδας / τηλεφώνου / γραφείου…"
+                className="w-full rounded-full border border-black/[0.08] bg-[#f5f5f7] py-2.5 pl-9 pr-3 text-sm tracking-tight text-[#1d1d1f] outline-none focus:border-[#0a7a6c]/40 focus:bg-white"
+              />
+            </div>
           </div>
+
+          {filteredBookings.length === 0 ? (
+            <div className="rounded-[22px] border border-black/[0.06] bg-white p-8 text-center">
+              <span className="material-symbols-outlined text-[32px] text-[#c7c7cc]">
+                event_note
+              </span>
+              <p className="mt-2 text-sm tracking-tight text-[#6e6e73]">
+                {bookings.length === 0
+                  ? 'Καμία κράτηση ακόμα.'
+                  : 'Κανένα αποτέλεσμα για τα φίλτρα.'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-2.5">
+              {filteredBookings.map((b) => {
+                const source = bookingSource(b);
+                const isWallet = source === 'Wallet';
+                const plate = b.vehicle_plate || b.vehicle_model || '—';
+                const pickup = b.pickup_location || officeName;
+                const dropoff =
+                  b.dropoff_location && b.dropoff_location !== b.pickup_location
+                    ? b.dropoff_location
+                    : null;
+                const payPending =
+                  String(b.payment_status || '').toUpperCase() === 'PENDING' ||
+                  b.rental_status === 'RESERVED';
+                return (
+                  <article
+                    key={b.id}
+                    role="button"
+                    tabIndex={0}
+                    title="Διπλό κλικ για άνοιγμα χαρτούρας"
+                    onDoubleClick={() => openPaperwork(b.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openPaperwork(b.id);
+                      }
+                    }}
+                    className="overflow-hidden rounded-[18px] border border-black/[0.07] bg-white shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition hover:border-black/[0.12] hover:shadow-[0_8px_24px_rgba(15,23,42,0.07)] cursor-pointer select-none"
+                  >
+                    <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-stretch sm:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <span
+                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-white ${
+                            isWallet ? 'bg-[#0071e3]' : 'bg-[#0a7a6c]'
+                          }`}
+                          title={source}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {isWallet ? 'account_balance_wallet' : 'storefront'}
+                          </span>
+                        </span>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-[0.95rem] font-bold tracking-tight text-[#1d1d1f]">
+                                {b.client_name || 'Πελάτης'}
+                              </p>
+                              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] tracking-tight text-[#6e6e73]">
+                                <span className="inline-flex items-center gap-1 font-mono text-[12px] font-semibold text-[#1d1d1f]">
+                                  <span className="material-symbols-outlined text-[15px] text-[#86868b]">
+                                    directions_car
+                                  </span>
+                                  {plate}
+                                </span>
+                                <span className="text-[#d2d2d7]">·</span>
+                                <span>
+                                  {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
+                                </span>
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <span className="text-[1.05rem] font-bold tabular-nums tracking-tight text-[#1d1d1f]">
+                                {euro(b.total_cost)}
+                              </span>
+                              {payPending ? (
+                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold tracking-tight text-amber-800">
+                                  {b.payment_status || 'PENDING'}
+                                </span>
+                              ) : b.payment_status ? (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold tracking-tight text-emerald-800">
+                                  {b.payment_status}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] tracking-tight text-[#6e6e73]">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[15px] text-[#86868b]">
+                                calendar_month
+                              </span>
+                              {formatWhen(b.start_time)}
+                              <span className="text-[#c7c7cc]">→</span>
+                              {formatWhen(b.end_time)}
+                            </span>
+                            <span className="inline-flex min-w-0 items-center gap-1">
+                              <span className="material-symbols-outlined text-[15px] text-[#86868b]">
+                                location_on
+                              </span>
+                              <span className="truncate">
+                                {pickup}
+                                {dropoff ? ` → ${dropoff}` : ''}
+                              </span>
+                            </span>
+                          </div>
+
+                          {(b.client_email || b.client_phone) && (
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] tracking-tight text-[#86868b]">
+                              {b.client_email ? (
+                                <span className="inline-flex min-w-0 items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px]">mail</span>
+                                  <span className="truncate">{b.client_email}</span>
+                                </span>
+                              ) : null}
+                              {b.client_phone ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px]">call</span>
+                                  {b.client_phone}
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-tight ${
+                                isWallet
+                                  ? 'bg-[#0071e3]/10 text-[#0071e3]'
+                                  : 'bg-[#0a7a6c]/12 text-[#0a7a6c]'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[12px]">
+                                {isWallet ? 'account_balance_wallet' : 'storefront'}
+                              </span>
+                              {source}
+                            </span>
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-tight ${statusChip(
+                                b.rental_status,
+                              )}`}
+                            >
+                              {b.rental_status}
+                            </span>
+                            {b.pricing?.is_one_way ? (
+                              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-tight text-amber-800">
+                                One-way
+                              </span>
+                            ) : null}
+                            <span className="rounded-full bg-[#f5f5f7] px-2.5 py-0.5 text-[10px] font-semibold tracking-tight text-[#6e6e73]">
+                              {officeName}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex shrink-0 flex-wrap items-center gap-2 border-t border-black/[0.05] pt-3 sm:w-[9.5rem] sm:flex-col sm:items-stretch sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center gap-1 rounded-full border border-black/[0.08] bg-[#f5f5f7] px-3 py-2 text-[11px] font-semibold tracking-tight text-[#1d1d1f] transition hover:bg-white"
+                          onClick={() => openPaperwork(b.id)}
+                        >
+                          <span className="material-symbols-outlined text-[15px]">description</span>
+                          Χαρτούρα
+                        </button>
+                        {b.rental_status === 'RESERVED' ? (
+                          <>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0a7a6c] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#08665b] disabled:opacity-45"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await updateRentalBookingStatus(b.id, 'CONFIRMED');
+                                  toast.success('Πληρωμή επιβεβαιώθηκε');
+                                  await reload();
+                                } catch (err) {
+                                  toast.error(err.message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">payments</span>
+                              Επιβεβαίωση
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-semibold tracking-tight text-rose-600 transition hover:bg-rose-50 disabled:opacity-45"
+                              disabled={busy}
+                              onClick={async () => {
+                                if (!window.confirm('Ακύρωση κράτησης;')) return;
+                                setBusy(true);
+                                try {
+                                  await updateRentalBookingStatus(b.id, 'CANCELLED');
+                                  toast.success('Ακυρώθηκε');
+                                  await reload();
+                                } catch (err) {
+                                  toast.error(err.message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Ακύρωση
+                            </button>
+                          </>
+                        ) : null}
+                        {b.rental_status === 'CONFIRMED' ? (
+                          <>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0a7a6c] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#08665b]"
+                              onClick={() => openFocusedInspection(b.id, 'PICKUP_CHECK')}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">login</span>
+                              Check-in
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-semibold tracking-tight text-rose-600 transition hover:bg-rose-50 disabled:opacity-45"
+                              disabled={busy}
+                              onClick={async () => {
+                                if (!window.confirm('Ακύρωση κράτησης;')) return;
+                                setBusy(true);
+                                try {
+                                  await updateRentalBookingStatus(b.id, 'CANCELLED');
+                                  toast.success('Ακυρώθηκε');
+                                  await reload();
+                                } catch (err) {
+                                  toast.error(err.message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Ακύρωση
+                            </button>
+                          </>
+                        ) : null}
+                        {b.rental_status === 'ACTIVE' ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0071e3] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#0062c4]"
+                            onClick={() => openFocusedInspection(b.id, 'RETURN_CHECK')}
+                          >
+                            <span className="material-symbols-outlined text-[15px]">logout</span>
+                            Check-out
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1316,76 +1536,99 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'inspections' && (
-        <div className="grid lg:grid-cols-5 gap-4">
+        <div className="grid gap-4 lg:grid-cols-5 lg:items-start">
           <form
             onSubmit={submitInspection}
-            className="lg:col-span-2 bg-white rounded-2xl border p-4 space-y-3"
+            className="lg:col-span-2 space-y-3 rounded-[22px] border border-black/[0.07] bg-white/90 p-4 shadow-[0_8px_28px_rgba(15,23,42,0.045)] backdrop-blur sm:p-5"
           >
-            <h3 className="font-bold">Digital check-in / check-out</h3>
-            <label className="block text-xs font-bold text-gray-500">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#0a7a6c] text-white">
+                <span className="material-symbols-outlined text-[20px]">fact_check</span>
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-[1.05rem] font-bold tracking-tight text-[#1d1d1f]">
+                  Digital check-in / out
+                </h3>
+                <p className="mt-0.5 text-[0.8125rem] tracking-tight text-[#6e6e73]">
+                  {officeName} · καύσιμο, χλμ., ζημιές και υπογραφή πελάτη
+                </p>
+              </div>
+            </div>
+
+            <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
               Κράτηση
               <select
                 required
-                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                className="mt-1 w-full rounded-2xl border border-black/[0.08] bg-[#f5f5f7] px-3 py-2.5 text-sm font-semibold tracking-tight text-[#1d1d1f] outline-none focus:border-[#0a7a6c]/40 focus:bg-white"
                 value={insp.rental_booking_id}
                 onChange={(e) => setInsp((s) => ({ ...s, rental_booking_id: e.target.value }))}
               >
                 <option value="">Επιλέξτε…</option>
-                {bookings
-                  .filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status))
-                  .map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.client_name} · {b.vehicle_plate} · {b.rental_status}
-                    </option>
-                  ))}
+                {activeBookings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.client_name} · {b.vehicle_plate} · {b.rental_status}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="block text-xs font-bold text-gray-500">
-              Τύπος
-              <select
-                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                value={insp.inspection_type}
-                onChange={(e) => setInsp((s) => ({ ...s, inspection_type: e.target.value }))}
-              >
-                <option value="PICKUP_CHECK">Παραλαβή (check-in)</option>
-                <option value="RETURN_CHECK">Επιστροφή (check-out)</option>
-              </select>
-            </label>
+
+            <div className="grid grid-cols-2 gap-1 rounded-full bg-[#f5f5f7] p-1">
+              {[
+                { id: 'PICKUP_CHECK', label: 'Παραλαβή' },
+                { id: 'RETURN_CHECK', label: 'Επιστροφή' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setInsp((s) => ({ ...s, inspection_type: opt.id }))}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold tracking-tight transition ${
+                    insp.inspection_type === opt.id
+                      ? 'bg-[#1d1d1f] text-white shadow-sm'
+                      : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-bold text-gray-500">
+              <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
                 Καύσιμο %
                 <input
                   type="number"
                   min={0}
                   max={100}
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                  className="mt-1 w-full rounded-2xl border border-black/[0.08] bg-[#f5f5f7] px-3 py-2.5 text-sm font-semibold tabular-nums text-[#1d1d1f] outline-none focus:bg-white"
                   value={insp.fuel_level}
                   onChange={(e) => setInsp((s) => ({ ...s, fuel_level: e.target.value }))}
                 />
               </label>
-              <label className="block text-xs font-bold text-gray-500">
+              <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
                 Χιλιόμετρα
                 <input
                   type="number"
                   min={0}
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                  className="mt-1 w-full rounded-2xl border border-black/[0.08] bg-[#f5f5f7] px-3 py-2.5 text-sm font-semibold tabular-nums text-[#1d1d1f] outline-none focus:bg-white"
                   value={insp.mileage}
                   onChange={(e) => setInsp((s) => ({ ...s, mileage: e.target.value }))}
                 />
               </label>
             </div>
-            <label className="block text-xs font-bold text-gray-500">
+
+            <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
               Ζημιές / σημειώσεις
               <textarea
                 rows={3}
-                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                className="mt-1 w-full rounded-2xl border border-black/[0.08] bg-[#f5f5f7] px-3 py-2.5 text-sm font-semibold tracking-tight text-[#1d1d1f] outline-none focus:bg-white"
                 value={insp.damage_notes}
                 onChange={(e) => setInsp((s) => ({ ...s, damage_notes: e.target.value }))}
                 placeholder="π.χ. γρατζουνιά πίσω δεξιά πόρτα"
               />
             </label>
-            <label className="block text-xs font-bold text-gray-500">
-              Damage selfie (πριν/μετά)
+
+            <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
+              Φωτογραφία ζημιάς
               <input
                 type="file"
                 accept="image/*"
@@ -1403,17 +1646,18 @@ export default function FleetRentalPanel({
                     href={resolveSiteAssetUrl(url)}
                     target="_blank"
                     rel="noreferrer"
-                    className="block w-16 h-16 rounded-lg overflow-hidden border"
+                    className="block h-16 w-16 overflow-hidden rounded-xl border border-black/[0.06]"
                   >
                     <img
                       src={resolveSiteAssetUrl(url)}
                       alt="Damage"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   </a>
                 ))}
               </div>
             ) : null}
+
             <RentalSignaturePad
               key={signaturePadKey}
               previewUrl={insp.signature_url ? resolveSiteAssetUrl(insp.signature_url) : null}
@@ -1422,78 +1666,202 @@ export default function FleetRentalPanel({
               disabled={busy}
               busy={uploadingSignature}
             />
-            <label className="block text-xs font-bold text-gray-500">
-              Υπεύθυνος
+
+            <label className="block text-[11px] font-semibold tracking-tight text-[#86868b]">
+              Υπεύθυνος γραφείου
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                className="mt-1 w-full rounded-2xl border border-black/[0.08] bg-[#f5f5f7] px-3 py-2.5 text-sm font-semibold tracking-tight text-[#1d1d1f] outline-none focus:bg-white"
                 value={insp.inspector_name}
                 onChange={(e) => setInsp((s) => ({ ...s, inspector_name: e.target.value }))}
+                placeholder="Όνομα υπαλλήλου"
               />
             </label>
+
             <button
               type="submit"
               disabled={busy || uploadingPhoto || uploadingSignature}
-              className="w-full py-2.5 rounded-xl bg-primary text-white font-bold"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1d1d1f] py-3 text-sm font-semibold tracking-tight text-white transition hover:bg-black disabled:opacity-45"
             >
-              Καταχώρηση επιθεώρησης
+              <span className="material-symbols-outlined text-[18px]">
+                {busy ? 'progress_activity' : 'save'}
+              </span>
+              {busy ? 'Αποθήκευση…' : 'Καταχώρηση επιθεώρησης'}
             </button>
           </form>
-          <div className="lg:col-span-3 space-y-2">
-            {inspections.length === 0 ? (
-              <p className="text-sm text-gray-500 bg-white rounded-2xl border p-6">
-                Καμία επιθεώρηση ακόμα.
-              </p>
-            ) : (
-              inspections.map((i) => (
-                <article key={i.id} className="bg-white rounded-2xl border px-4 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-bold text-sm">
-                      {i.inspection_type === 'PICKUP_CHECK' ? 'Check-in' : 'Check-out'}
-                    </p>
-                    <span className="text-[11px] text-gray-400">{formatWhen(i.created_at)}</span>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Καύσιμο {i.fuel_level}% · {i.mileage} km
-                    {i.inspector_name ? ` · ${i.inspector_name}` : ''}
+
+          <div className="lg:col-span-3 space-y-3">
+            <div className="rounded-[22px] border border-black/[0.06] bg-white/90 p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-[1.05rem] font-bold tracking-tight text-[#1d1d1f]">
+                    Ιστορικό επιθεωρήσεων
+                  </h3>
+                  <p className="mt-0.5 text-[0.8125rem] tracking-tight text-[#6e6e73]">
+                    {filteredInspections.length} από {inspections.length} · {officeName}
                   </p>
-                  {i.damage_notes ? (
-                    <p className="text-xs text-amber-800 mt-1 bg-amber-50 rounded-lg px-2 py-1">
-                      {i.damage_notes}
-                    </p>
-                  ) : null}
-                  {(i.photo_urls || []).length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {i.photo_urls.map((url) => (
-                        <a
-                          key={url}
-                          href={resolveSiteAssetUrl(url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block w-14 h-14 rounded-lg overflow-hidden border"
-                        >
-                          <img
-                            src={resolveSiteAssetUrl(url)}
-                            alt="Damage"
-                            className="w-full h-full object-cover"
-                          />
-                        </a>
-                      ))}
-                    </div>
-                  ) : null}
-                  {i.signature_url ? (
-                    <div className="mt-2 rounded-lg border bg-slate-50 px-2 py-1.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                        Υπογραφή
-                      </p>
-                      <img
-                        src={resolveSiteAssetUrl(i.signature_url)}
-                        alt="Υπογραφή"
-                        className="mt-1 h-12 w-full object-contain"
-                      />
-                    </div>
-                  ) : null}
-                </article>
-              ))
+                </div>
+                <div className="flex flex-wrap gap-1 rounded-full bg-[#f5f5f7] p-1">
+                  {[
+                    { id: '', label: 'Όλα' },
+                    { id: 'PICKUP_CHECK', label: 'Check-in' },
+                    { id: 'RETURN_CHECK', label: 'Check-out' },
+                  ].map((f) => (
+                    <button
+                      key={f.id || 'all'}
+                      type="button"
+                      onClick={() => setInspTypeFilter(f.id)}
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-tight transition ${
+                        inspTypeFilter === f.id
+                          ? 'bg-[#1d1d1f] text-white'
+                          : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="relative mt-3">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#86868b]">
+                  search
+                </span>
+                <input
+                  type="search"
+                  value={inspQuery}
+                  onChange={(e) => setInspQuery(e.target.value)}
+                  placeholder="Αναζήτηση πελάτη / πινακίδας / υπευθύνου…"
+                  className="w-full rounded-full border border-black/[0.08] bg-[#f5f5f7] py-2.5 pl-9 pr-3 text-sm tracking-tight text-[#1d1d1f] outline-none focus:border-[#0a7a6c]/40 focus:bg-white"
+                />
+              </div>
+            </div>
+
+            {filteredInspections.length === 0 ? (
+              <div className="rounded-[22px] border border-black/[0.06] bg-white p-8 text-center">
+                <span className="material-symbols-outlined text-[32px] text-[#c7c7cc]">
+                  fact_check
+                </span>
+                <p className="mt-2 text-sm tracking-tight text-[#6e6e73]">
+                  {inspections.length === 0
+                    ? 'Καμία επιθεώρηση ακόμα.'
+                    : 'Κανένα αποτέλεσμα για τα φίλτρα.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2.5">
+                {filteredInspections.map((i) => {
+                  const booking = bookingById.get(i.rental_booking_id);
+                  const isPickup = i.inspection_type === 'PICKUP_CHECK';
+                  const expanded = expandedInspIds.has(i.id);
+                  const hasExtras =
+                    Boolean(i.signature_url) ||
+                    Boolean(i.damage_notes) ||
+                    (i.photo_urls || []).length > 0;
+                  return (
+                    <article
+                      key={i.id}
+                      className="overflow-hidden rounded-[18px] border border-black/[0.07] bg-white shadow-[0_4px_18px_rgba(15,23,42,0.04)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => hasExtras && toggleInspExpand(i.id)}
+                        className={`flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left ${
+                          hasExtras ? 'hover:bg-[#fafafa]' : 'cursor-default'
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span
+                            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                              isPickup ? 'bg-[#0a7a6c]' : 'bg-[#0071e3]'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {isPickup ? 'login' : 'logout'}
+                            </span>
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-bold tracking-tight text-[#1d1d1f]">
+                                {isPickup ? 'Check-in' : 'Check-out'}
+                              </span>
+                              <span className="rounded-full bg-[#f5f5f7] px-2 py-0.5 text-[10px] font-semibold tracking-tight text-[#6e6e73]">
+                                {formatWhen(i.created_at)}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-[0.84rem] font-semibold tracking-tight text-[#1d1d1f]">
+                              {booking?.client_name || 'Κράτηση'}
+                              {booking?.vehicle_plate ? (
+                                <span className="font-mono text-[12px] font-medium text-[#6e6e73]">
+                                  {' '}
+                                  · {booking.vehicle_plate}
+                                </span>
+                              ) : null}
+                            </p>
+                            <p className="mt-0.5 text-[12px] tracking-tight text-[#6e6e73]">
+                              Καύσιμο {i.fuel_level ?? '—'}% · {Number(i.mileage || 0).toLocaleString('el-GR')} km
+                              {i.inspector_name ? ` · ${i.inspector_name}` : ''}
+                              {' · '}
+                              {officeName}
+                            </p>
+                          </div>
+                        </div>
+                        {hasExtras ? (
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#6e6e73] transition ${
+                              expanded ? 'rotate-180' : ''
+                            }`}
+                            aria-hidden
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              expand_more
+                            </span>
+                          </span>
+                        ) : null}
+                      </button>
+
+                      {expanded && hasExtras ? (
+                        <div className="space-y-2.5 border-t border-black/[0.04] bg-[#fafafa] px-4 py-3">
+                          {i.damage_notes ? (
+                            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs tracking-tight text-amber-900 ring-1 ring-amber-100">
+                              {i.damage_notes}
+                            </p>
+                          ) : null}
+                          {(i.photo_urls || []).length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {i.photo_urls.map((url) => (
+                                <a
+                                  key={url}
+                                  href={resolveSiteAssetUrl(url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block h-14 w-14 overflow-hidden rounded-xl border border-black/[0.06] bg-white"
+                                >
+                                  <img
+                                    src={resolveSiteAssetUrl(url)}
+                                    alt="Damage"
+                                    className="h-full w-full object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                          {i.signature_url ? (
+                            <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+                                Υπογραφή πελάτη
+                              </p>
+                              <img
+                                src={resolveSiteAssetUrl(i.signature_url)}
+                                alt="Υπογραφή"
+                                className="mt-1 h-14 w-full object-contain"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

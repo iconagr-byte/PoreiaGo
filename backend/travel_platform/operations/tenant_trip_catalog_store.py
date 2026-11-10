@@ -151,6 +151,13 @@ def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
         .upper(),
         "vehicleCode": str(raw.get("vehicleCode") or raw.get("vehicle_code") or "").strip().upper(),
         "additionalFleet": _normalize_additional_fleet(raw),
+        # Office starter catalog (e.g. Achillio seeded from PoreiaGo demo cards).
+        "officeSeed": bool(
+            raw.get("officeSeed")
+            or raw.get("office_seed")
+            or str(raw.get("catalogSource") or "").strip() == "office_seed"
+        ),
+        "catalogSource": str(raw.get("catalogSource") or raw.get("catalog_source") or "").strip(),
     }
 
 

@@ -145,12 +145,22 @@ export function loadAllCustomers() {
   return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, 'el'));
 }
 
+function isDiagnosticCustomerEmail(email) {
+  const key = String(email || '')
+    .trim()
+    .toLowerCase();
+  return key.startsWith('diagnose-reg-') || key.startsWith('diagnose-');
+}
+
 /** CRM list for one service — buses and rent never mix. */
 export function loadCustomersByService(serviceScope) {
   const scope = normalizeCustomerServiceScope(serviceScope);
-  return loadAllCustomers().filter(
-    (c) => normalizeCustomerServiceScope(c.serviceScope, c) === scope,
-  );
+  return loadAllCustomers().filter((c) => {
+    if (normalizeCustomerServiceScope(c.serviceScope, c) !== scope) return false;
+    // Hide smoke-test diagnose accounts from office Πελάτες.
+    if (isDiagnosticCustomerEmail(c.email)) return false;
+    return true;
+  });
 }
 
 export function getCustomerByEmail(email, serviceScope = CUSTOMER_SERVICE_BUSES) {
@@ -200,23 +210,29 @@ export function deleteCustomer(idOrEmail, serviceScope) {
   return true;
 }
 
-export function upsertCustomer(input) {
+export function upsertCustomer(input, { revive = true } = {}) {
   const email = String(input.email || '').trim().toLowerCase();
   if (!email) return null;
 
   const serviceScope = normalizeCustomerServiceScope(input.serviceScope, input);
 
-  // Manual create/edit brings the customer back for this service only.
   const deleted = loadDeletedEmails();
   const tombstone = deletedKey(email, serviceScope);
-  if (deleted.has(tombstone)) {
-    deleted.delete(tombstone);
-    saveDeletedEmails(deleted);
+  // Hydrate / booking sync must not clear tombstones or resurrect deletes.
+  if (!revive && (deleted.has(tombstone) || deleted.has(email))) {
+    return null;
   }
-  // Clearing a legacy unscoped tombstone so re-add works.
-  if (deleted.has(email)) {
-    deleted.delete(email);
-    saveDeletedEmails(deleted);
+  // Manual create/edit brings the customer back for this service only.
+  if (revive) {
+    if (deleted.has(tombstone)) {
+      deleted.delete(tombstone);
+      saveDeletedEmails(deleted);
+    }
+    // Clearing a legacy unscoped tombstone so re-add works.
+    if (deleted.has(email)) {
+      deleted.delete(email);
+      saveDeletedEmails(deleted);
+    }
   }
 
   const stored = loadStoredCustomers();
@@ -282,28 +298,55 @@ export function upsertCustomer(input) {
   return record;
 }
 
+/** Prefer the richer display name (wallet/Google over short booking surname). */
+export function preferDisplayName(a, b) {
+  const x = String(a || '').trim();
+  const y = String(b || '').trim();
+  if (!x) return y;
+  if (!y) return x;
+  if (x.toLowerCase() === y.toLowerCase()) return x;
+  const xt = x.split(/\s+/).filter(Boolean).length;
+  const yt = y.split(/\s+/).filter(Boolean).length;
+  if (yt > xt) return y;
+  if (xt > yt) return x;
+  if (y.includes(' ') && !x.includes(' ')) return y;
+  if (x.includes(' ') && !y.includes(' ')) return x;
+  return x;
+}
+
 export function ensureCustomerForPassenger({ name, email, phone }) {
   if (!email) return null;
-  return upsertCustomer({
-    name,
-    email,
-    phone,
-    serviceScope: CUSTOMER_SERVICE_BUSES,
-    source: 'booking',
-  });
+  if (isDeletedEmail(email, CUSTOMER_SERVICE_BUSES)) return null;
+  const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
+  return upsertCustomer(
+    {
+      name: preferDisplayName(existing?.name, name),
+      email,
+      phone: String(existing?.phone || '').trim() || phone || '',
+      serviceScope: CUSTOMER_SERVICE_BUSES,
+      source: existing?.source === 'wallet' || existing?.authProvider === 'google'
+        ? existing.source || 'wallet'
+        : 'booking',
+    },
+    { revive: false },
+  );
 }
 
 /** Δημιουργία/ενημέρωση φυσικού προσώπου από κράτηση ενοικίασης. */
 export function ensureCustomerForRental({ name, email, phone, id } = {}) {
   if (!email) return null;
-  return upsertCustomer({
-    id,
-    name,
-    email,
-    phone,
-    source: 'rental',
-    serviceScope: CUSTOMER_SERVICE_RENT,
-  });
+  if (isDeletedEmail(email, CUSTOMER_SERVICE_RENT)) return null;
+  return upsertCustomer(
+    {
+      id,
+      name,
+      email,
+      phone,
+      source: 'rental',
+      serviceScope: CUSTOMER_SERVICE_RENT,
+    },
+    { revive: false },
+  );
 }
 
 /**
@@ -315,14 +358,29 @@ export function syncCustomersFromBookings(bookings = []) {
     const email = String(booking.email || booking.customerEmail || '').trim();
     if (!email || !email.includes('@')) continue;
     if (isDeletedEmail(email, CUSTOMER_SERVICE_BUSES)) continue;
-    const existed = Boolean(getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES));
-    const row = upsertCustomer({
-      name: booking.customerName || booking.passenger_name || booking.passengerName || '',
-      email,
-      phone: booking.phone || booking.customerPhone || '',
-      serviceScope: CUSTOMER_SERVICE_BUSES,
-      source: 'booking',
-    });
+    const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
+    const existed = Boolean(existing);
+    const bookingName =
+      booking.customerName || booking.passenger_name || booking.passengerName || '';
+    const bookingPhone = booking.phone || booking.customerPhone || '';
+    // Never clobber wallet/Google full name with a short booking surname
+    // (e.g. «Dodopoulos» over «Axilleas Charalambidis»).
+    const keepWallet =
+      existing?.source === 'wallet' ||
+      existing?.authProvider === 'google' ||
+      String(existing?.source || '').toLowerCase() === 'google';
+    const row = upsertCustomer(
+      {
+        name: preferDisplayName(existing?.name, bookingName),
+        email,
+        phone: String(existing?.phone || '').trim() || bookingPhone || '',
+        serviceScope: CUSTOMER_SERVICE_BUSES,
+        source: keepWallet ? existing.source || 'wallet' : existing?.source || 'booking',
+        authProvider: existing?.authProvider,
+        picture: existing?.picture,
+      },
+      { revive: false },
+    );
     if (row && !existed) created += 1;
   }
   return created;
@@ -452,8 +510,44 @@ export async function deleteCustomerFromServer(idOrEmail, serviceScope) {
 }
 
 /**
+ * Drop local CRM rows missing from the server list and tombstone their emails
+ * so booking/wallet sync cannot resurrect deletes done on another PC.
+ */
+function pruneLocalCustomersMissingFromRemote(serviceScope, remoteRows) {
+  const scope = normalizeCustomerServiceScope(serviceScope);
+  const remoteEmails = new Set(
+    (remoteRows || [])
+      .map((r) => String(r.email || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const stored = loadStoredCustomers();
+  const deleted = loadDeletedEmails();
+  let changed = false;
+  const next = [];
+  for (const c of stored) {
+    const cScope = normalizeCustomerServiceScope(c.serviceScope, c);
+    if (cScope !== scope) {
+      next.push(c);
+      continue;
+    }
+    const email = String(c.email || '').trim().toLowerCase();
+    if (email && remoteEmails.has(email)) {
+      next.push(c);
+      continue;
+    }
+    changed = true;
+    if (email) deleted.add(deletedKey(email, scope));
+  }
+  if (changed) {
+    saveStoredCustomers(next);
+    saveDeletedEmails(deleted);
+  }
+}
+
+/**
  * Pull CRM customers from server into localStorage (authenticated offices).
- * Seeds server from local cache when server is empty.
+ * Seeds server from local cache only when the office has never had CRM rows.
+ * Otherwise server (incl. soft-deletes) is source of truth across PCs.
  */
 export async function hydrateCustomersFromServer(serviceScope) {
   if (!isAuthenticatedOfficeSession()) {
@@ -464,17 +558,39 @@ export async function hydrateCustomersFromServer(serviceScope) {
       fetchOfficeCustomers,
       replaceOfficeCustomers,
     } = await import('../../services/officeCustomersApi.js');
-    let remote = await fetchOfficeCustomers(serviceScope);
+    const fetched = await fetchOfficeCustomers(serviceScope);
+    let remote = Array.isArray(fetched?.customers)
+      ? fetched.customers
+      : Array.isArray(fetched)
+        ? fetched
+        : [];
+    const hasHistory = Boolean(fetched?.hasHistory) || remote.length > 0;
     const local = loadCustomersByService(serviceScope);
-    if ((!remote || remote.length === 0) && local.length > 0) {
+    if (!hasHistory && remote.length === 0 && local.length > 0) {
       // First run after deploy: push browser CRM up so nothing is lost.
       remote = await replaceOfficeCustomers(local);
+    } else {
+      // Server wins: remove locals that were deleted on another computer.
+      pruneLocalCustomersMissingFromRemote(serviceScope, remote);
     }
     for (const row of remote || []) {
-      upsertCustomer({
-        ...row,
-        serviceScope: row.serviceScope || serviceScope,
-      });
+      const scope = row.serviceScope || serviceScope;
+      if (isDeletedEmail(row.email, scope)) continue;
+      const existing = getCustomerByEmail(row.email, scope);
+      upsertCustomer(
+        {
+          ...row,
+          name: preferDisplayName(row.name, existing?.name),
+          phone: String(row.phone || '').trim() || existing?.phone || '',
+          serviceScope: scope,
+          source:
+            existing?.source === 'wallet' || row.source === 'wallet'
+              ? 'wallet'
+              : row.source || existing?.source,
+          authProvider: row.authProvider || existing?.authProvider,
+        },
+        { revive: false },
+      );
     }
     return loadCustomersByService(serviceScope);
   } catch (err) {

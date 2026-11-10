@@ -8,7 +8,7 @@ from uuid import UUID
 from app.core.data_paths import poreiago_data_dir
 from travel_platform.media.image_optimize import optimize_driver_photo
 
-_ALLOWED_KINDS = frozenset({"logo", "hero"})
+_ALLOWED_KINDS = frozenset({"logo", "hero", "rent_logo"})
 _MAX_BYTES = 4 * 1024 * 1024
 
 
@@ -43,8 +43,8 @@ def save_office_asset(
     if len(content) > _MAX_BYTES:
         raise ValueError("Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
 
-    max_side = 640 if kind == "logo" else 1600
-    quality = 86 if kind == "logo" else 84
+    max_side = 640 if kind in ("logo", "rent_logo") else 1600
+    quality = 86 if kind in ("logo", "rent_logo") else 84
     optimized = optimize_driver_photo(content, max_side=max_side, quality=quality)
     if optimized.ext in (".bin", ".heic"):
         raise ValueError("Μη έγκυρη εικόνα — δοκιμάστε JPG ή PNG")

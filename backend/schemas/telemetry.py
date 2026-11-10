@@ -45,7 +45,11 @@ class LiveVehicleResponse(BaseModel):
     driver_name: str | None = None
     bus_plate: str | None = None
     heading_deg: float | None = None
+    altitude_m: float | None = None
+    satellites: int | None = None
     driver_id: str | None = None
+    # Soft-ack: driver PWA id when Teltonika owns the pin (chat / photo).
+    app_driver_id: str | None = None
     photo_url: str | None = None
     vehicle_image_url: str | None = None
     trip_title: str | None = None
@@ -54,6 +58,11 @@ class LiveVehicleResponse(BaseModel):
     # Live GPS provenance for the map badge (driver_pwa | teltonika | …).
     source: str | None = None
     imei: str | None = None
+    # Active channels for the dual badge (e.g. ["teltonika", "app"]).
+    gps_sources: list[str] = Field(default_factory=list)
+    app_seen_at: str | None = None
+    tracker_signal_at: str | None = None
+    hydrated_from_store: bool = False
 
 
 class HeatmapPoint(BaseModel):
@@ -128,11 +137,13 @@ class TelemetryAlertResponse(BaseModel):
     id: str
     alert_type: str
     tenant_id: str
-    vehicle_id: str
-    trip_id: int | None
+    # Optional — NEW_BOOKING / office events have no vehicle.
+    vehicle_id: str | None = None
+    trip_id: int | None = None
     message: str
     metadata: dict | None = None
     created_at: str
+    severity: str | None = None
 
 
 class TripRoutePointResponse(BaseModel):
@@ -342,11 +353,11 @@ class TelemetrySettingsResponse(BaseModel):
     fuel_price_eur_per_liter: float = Field(1.85, ge=0.5, le=5)
     gforce_spike_threshold_g: float = Field(0.45, ge=0.1, le=2.0)
     prefer_tracker_events: bool = True
-    eta_refresh_seconds: int = Field(5, ge=5, le=5)
-    eta_ws_push_seconds: int = Field(5, ge=5, le=5)
+    eta_refresh_seconds: int = Field(1, ge=1, le=1)
+    eta_ws_push_seconds: int = Field(1, ge=1, le=1)
     driver_stale_seconds: int = Field(90, ge=30, le=600)
     gps_retention_days: int = Field(90, ge=0, le=3650)
-    driver_gps_max_per_minute: int = Field(60, ge=0, le=600)
+    driver_gps_max_per_minute: int = Field(120, ge=0, le=600)
     fleet_webhook_enabled: bool = True
     fleet_webhook_min_interval_sec: int = Field(30, ge=0, le=600)
     fleet_digest_enabled: bool = True
@@ -365,8 +376,8 @@ class TelemetrySettingsUpdate(BaseModel):
     fuel_price_eur_per_liter: float | None = Field(None, ge=0.5, le=5)
     gforce_spike_threshold_g: float | None = Field(None, ge=0.1, le=2.0)
     prefer_tracker_events: bool | None = None
-    eta_refresh_seconds: int | None = Field(None, ge=5, le=5)
-    eta_ws_push_seconds: int | None = Field(None, ge=5, le=5)
+    eta_refresh_seconds: int | None = Field(None, ge=1, le=1)
+    eta_ws_push_seconds: int | None = Field(None, ge=1, le=1)
     driver_stale_seconds: int | None = Field(None, ge=30, le=600)
     gps_retention_days: int | None = Field(None, ge=0, le=3650)
     driver_gps_max_per_minute: int | None = Field(None, ge=0, le=600)
@@ -402,6 +413,8 @@ class TeltonikaDeviceUpsert(BaseModel):
 
 
 class TeltonikaDeviceResponse(BaseModel):
+    model_config = {"extra": "ignore"}
+
     id: str
     imei: str
     tenant_id: str
@@ -416,6 +429,9 @@ class TeltonikaDeviceResponse(BaseModel):
     last_lng: float | None = None
     last_speed_kmh: float | None = None
     points_accepted: int = 0
+    last_hw_lat: float | None = None
+    last_hw_lng: float | None = None
+    last_fix_source: str | None = None
 
 
 class TeltonikaServerStatusResponse(BaseModel):
@@ -438,6 +454,8 @@ class TeltonikaTestPingRequest(BaseModel):
     latitude: float | None = Field(None, ge=-90, le=90)
     longitude: float | None = Field(None, ge=-180, le=180)
     speed_kmh: float = Field(0, ge=0, le=300)
+    # True = use last Codec/hardware fix only (never browser/PC geolocation).
+    use_hardware: bool = False
 
 
 class TeltonikaTestPingResponse(BaseModel):
@@ -446,3 +464,5 @@ class TeltonikaTestPingResponse(BaseModel):
     latitude: float
     longitude: float
     source: str = "test_ping"
+    # Where coords came from for Δοκιμαστικό pin (last_hw | live_fleet | browser).
+    fix_origin: str | None = None

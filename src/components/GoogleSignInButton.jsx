@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -153,70 +155,209 @@ function GoogleUnavailable({ disabled, text = 'signin_with' }) {
 }
 
 /**
- * Beautiful custom Google button. The official GIS iframe (often the ugly
- * “Sign in as …” personalized pill) sits invisible on top for clicks / OAuth.
+ * Custom shell + real click target.
+ *
+ * The previous opacity-0 GIS iframe overlay often swallowed / ignored taps on
+ * iOS Safari and FedCM browsers. We keep the Apple-style shell, trigger GIS
+ * One Tap / FedCM from a real button click, and fall back to a visible Google
+ * button modal when the prompt is blocked.
  */
 function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
-  const wrapRef = useRef(null);
-  const [width, setWidth] = useState(320);
+  const { clientId } = useGoogleAuthConfig();
+  const native = isNativeApp();
+  // FedCM / One Tap is unreliable inside Capacitor WebViews — use GIS button modal on tap.
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const label = googleButtonLabel(text);
+  const callbackRef = useRef({ onSuccess, onError });
+  callbackRef.current = { onSuccess, onError };
+  const useFedcm = !native;
 
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return undefined;
-    const measure = () => {
-      const w = Math.round(el.getBoundingClientRect().width);
-      if (w > 0) setWidth(Math.min(400, Math.max(240, w)));
-    };
-    measure();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    ro?.observe(el);
-    window.addEventListener('resize', measure);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', measure);
-    };
+  const handleCredential = useCallback((credential) => {
+    setBusy(false);
+    setFallbackOpen(false);
+    if (!credential) {
+      callbackRef.current.onError?.('Δεν ελήφθη διαπιστευτήριο Google');
+      return;
+    }
+    callbackRef.current.onSuccess?.(credential);
   }, []);
 
+  useEffect(() => {
+    const g = typeof window !== 'undefined' ? window.google?.accounts?.id : null;
+    if (!g || !clientId || native) return undefined;
+    try {
+      g.initialize({
+        client_id: clientId,
+        callback: (response) => handleCredential(response?.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        context: text === 'signup_with' ? 'signup' : 'signin',
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: useFedcm,
+      });
+    } catch {
+      /* GIS not ready yet — click handler will retry */
+    }
+    return undefined;
+  }, [clientId, handleCredential, text, native, useFedcm]);
+
+  const openFallback = () => {
+    setBusy(false);
+    setFallbackOpen(true);
+  };
+
+  const onClick = () => {
+    if (disabled || busy) return;
+    // Android/iOS: Credential Manager — never GIS inside WebView (origin_mismatch / disallowed_useragent).
+    if (native) {
+      setBusy(true);
+      void (async () => {
+        try {
+          const idToken = await nativeGoogleIdToken(clientId);
+          handleCredential(idToken);
+        } catch (err) {
+          setBusy(false);
+          const msg = String(err?.message || err || '');
+          if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
+            return;
+          }
+          // Never navigate out of the Capacitor app (bridge opened Chrome white page).
+          if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
+            onError?.(
+              'Google Console: λάθος SHA-1 ή package στο Android OAuth client (ή ακόμα διαδίδεται). Τρέξε wallet-google-sha1.ps1, σύγκρινε με το Console, βάλε Test user αν είναι Testing, περίμενε έως μερικές ώρες, ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/not implemented|SocialLogin/i.test(msg)) {
+            onError?.(
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-go.ps1 (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
+          if (/CANNOT use scopes|modifying the main activity/i.test(msg)) {
+            onError?.(
+              'Χρειάζεται νέο Wallet build (χωρίς custom Google scopes). Τρέξε wallet-go.ps1 και ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/audience mismatch/i.test(msg)) {
+            onError?.(
+              'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (ή Actions → Set Google Client ID) και ξαναδοκίμασε σε ~2 λεπτά.',
+            );
+            return;
+          }
+          if (/No credentials available|NoCredential/i.test(msg)) {
+            onError?.(
+              'Δεν υπάρχει Google λογαριασμός στο emulator. Settings → Passwords & accounts → Add account → Google, μετά ξανά Σύνδεση με Google.',
+            );
+            return;
+          }
+          onError?.(
+            msg
+              ? `Google: ${msg}`
+              : 'Η σύνδεση με Google απέτυχε. Μείνε μέσα στο app Wallet (όχι Chrome) και δοκίμασε ξανά.',
+          );
+        }
+      })();
+      return;
+    }
+    const g = window.google?.accounts?.id;
+    if (!g || !clientId) {
+      onError?.('Google Sign-In δεν φόρτωσε. Ανανεώστε τη σελίδα.');
+      return;
+    }
+    setBusy(true);
+    try {
+      g.initialize({
+        client_id: clientId,
+        callback: (response) => handleCredential(response?.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        context: text === 'signup_with' ? 'signup' : 'signin',
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: useFedcm,
+      });
+      g.prompt((notification) => {
+        // isDismissedMoment also fires after a successful credential — do not
+        // treat that as failure (would open a duplicate fallback modal).
+        const blocked =
+          Boolean(notification?.isNotDisplayed?.()) ||
+          Boolean(notification?.isSkippedMoment?.());
+        if (blocked) openFallback();
+        else setBusy(false);
+      });
+    } catch {
+      openFallback();
+    }
+  };
+
   return (
-    <div
-      ref={wrapRef}
-      className={`group relative w-full ${disabled ? 'pointer-events-none opacity-50' : ''}`}
-    >
-      <StyledGoogleShell label={label} disabled={disabled} />
-      {/* Invisible official GIS control — preserves id_token credential flow */}
-      <div
-        className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_iframe]:!h-full [&_iframe]:!min-h-full"
-        aria-hidden
+    <>
+      <button
+        type="button"
+        disabled={disabled || busy}
+        onClick={onClick}
+        className="group w-full disabled:cursor-not-allowed"
+        aria-label={label}
       >
-        <GoogleLogin
-          onSuccess={(response) => {
-            if (!response.credential) {
-              onError?.('Δεν ελήφθη διαπιστευτήριο Google');
-              return;
-            }
-            onSuccess(response.credential);
-          }}
-          onError={() => onError?.('Η σύνδεση με Google απέτυχε')}
-          theme="outline"
-          size="large"
-          text={text}
-          shape="pill"
-          locale="el"
-          width={String(width)}
-          useOneTap={false}
-          containerProps={{
-            style: {
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          }}
-        />
-      </div>
-    </div>
+        <StyledGoogleShell label={busy ? `${label}…` : label} disabled={disabled || busy} />
+      </button>
+
+      {fallbackOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Σύνδεση με Google"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f7]">
+                <GoogleLogo />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-[#1d1d1f]">Σύνδεση με Google</h2>
+                <p className="text-xs text-[#6e6e73]">Επιλέξτε τον λογαριασμό σας για συνέχεια</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFallbackOpen(false);
+                  setBusy(false);
+                }}
+                className="rounded-full p-2 text-[#6e6e73] hover:bg-black/[0.04]"
+                aria-label="Κλείσιμο"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-3 py-2">
+              <GoogleLogin
+                onSuccess={(response) => {
+                  if (!response.credential) {
+                    onError?.('Δεν ελήφθη διαπιστευτήριο Google');
+                    return;
+                  }
+                  handleCredential(response.credential);
+                }}
+                onError={() => {
+                  setBusy(false);
+                  onError?.('Η σύνδεση με Google απέτυχε. Δοκιμάστε ξανά.');
+                }}
+                theme="outline"
+                size="large"
+                text={text}
+                shape="pill"
+                locale="el"
+                width="320"
+                useOneTap={false}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

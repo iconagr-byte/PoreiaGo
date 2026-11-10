@@ -178,4 +178,46 @@ describe('shouldShowRentStorefront', () => {
       ),
     ).toBe(false);
   });
+
+  it('hides Rent on native Achillio even when hostname is localhost (marketing)', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'achillio_travel',
+          tenant_slug: 'admin-achillio-gr',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native customer office without rent contract despite localhost', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'customer',
+          tenant_slug: 'sunny-buses',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('shows Rent on native only when rent_enabled for sealed office', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: true,
+          office_kind: 'customer',
+          tenant_slug: 'rent-office',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(true);
+  });
 });

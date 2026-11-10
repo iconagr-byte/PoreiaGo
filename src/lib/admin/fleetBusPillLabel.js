@@ -31,6 +31,14 @@ export function formatFleetExcursionBadge(vehicle) {
   return resolveVehicleTripTitle(vehicle);
 }
 
+/** True when the bus is bound to an active excursion (live blue trail allowed). */
+export function vehicleHasActiveExcursion(vehicle) {
+  if (!vehicle || vehicle.is_rental || vehicle.rental_overlay) return false;
+  const tripId = Number(vehicle.trip_id ?? vehicle.tripId);
+  if (Number.isFinite(tripId) && tripId > 0) return true;
+  return Boolean(resolveVehicleTripTitle(vehicle));
+}
+
 export function formatFleetBusPillLabel(vehicle, { shortDriver = true } = {}) {
   const speed = Math.round(Number(vehicle?.speed) || Number(vehicle?.speed_kmh) || 0);
   if (vehicle?.is_rental || vehicle?.rental_overlay) {
