@@ -190,13 +190,25 @@ function networkLoginError(err) {
   return err instanceof Error ? err : new Error(raw || 'Αποτυχία σύνδεσης');
 }
 
+function officeHostHeader() {
+  try {
+    const host = String(window.location?.hostname || '')
+      .trim()
+      .toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1') return {};
+    return { 'X-Office-Host': host };
+  } catch {
+    return {};
+  }
+}
+
 /** POST /api/v1/auth/login — email + password; tenant resolved by backend. */
 export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode }) {
   let res;
   try {
-    res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+    res = await fetch(`${apiBase()}/api/v1/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...officeHostHeader() },
       body: JSON.stringify({
         email,
         password,
@@ -237,9 +249,9 @@ function emailFromGoogleIdToken(idToken) {
 export async function saasGoogleLogin({ idToken, tenantSlug, tenantId, email }) {
   let res;
   try {
-    res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+    res = await fetch(`${apiBase()}/api/v1/auth/google`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...officeHostHeader() },
       body: JSON.stringify({
         id_token: idToken,
         tenant_slug: tenantSlug || undefined,

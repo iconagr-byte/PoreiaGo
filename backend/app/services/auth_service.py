@@ -67,6 +67,13 @@ class AuthService:
         password: str,
         mfa_code: str | None = None,
     ) -> tuple[str, str, User]:
+        # Contabo RLS can hide the office admin row even after set_config —
+        # same SET LOCAL off pattern as email+password multi-tenant match.
+        try:
+            await self._session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+
         tenant_result = await self._session.execute(
             select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == tenant_id),
         )
@@ -75,11 +82,18 @@ class AuthService:
             raise ValueError("Invalid credentials")
 
         result = await self._session.execute(
-            select(User).where(User.tenant_id == tenant_id, User.email == email.lower()),
+            select(User).where(
+                User.tenant_id == tenant_id,
+                func.lower(User.email) == email.strip().lower(),
+            ),
         )
         user = result.scalar_one_or_none()
-        if not user or not user.is_active or not verify_password(password, user.password_hash):
-            raise ValueError("Invalid credentials")
+        if not user or not user.is_active:
+            raise ValueError(
+                "Δεν βρέθηκε λογαριασμός διαχείρισης με αυτό το email σε αυτό το γραφείο"
+            )
+        if not verify_password(password, user.password_hash or ""):
+            raise ValueError("Λάθος email ή κωδικός")
 
         user = await self._ensure_dev_superadmin(user)
 

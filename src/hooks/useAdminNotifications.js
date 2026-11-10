@@ -11,15 +11,27 @@ import {
 import { fetchDriverChatUnread, fetchDriverChatThreads } from '../services/platformApi.js';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
+import { notifyBookingsChanged } from '../lib/ticketing/bookingSyncEvents.js';
 
-const STORAGE_KEY = 'admin_notif_inbox_v1';
-const CHAT_BASELINE_KEY = 'admin_notif_chat_baseline_v1';
+const STORAGE_KEY_BASE = 'admin_notif_inbox_v1';
+const CHAT_BASELINE_KEY_BASE = 'admin_notif_chat_baseline_v1';
+const LEGACY_STORAGE_KEY = 'admin_notif_inbox_v1';
 const MAX_ITEMS = 40;
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
-function readChatBaseline() {
+function storageKeyFor(tenantId) {
+  const tid = String(tenantId || '').trim() || 'anonymous';
+  return `${STORAGE_KEY_BASE}::${tid}`;
+}
+
+function chatBaselineKeyFor(tenantId) {
+  const tid = String(tenantId || '').trim() || 'anonymous';
+  return `${CHAT_BASELINE_KEY_BASE}::${tid}`;
+}
+
+function readChatBaseline(tenantId) {
   try {
-    const raw = sessionStorage.getItem(CHAT_BASELINE_KEY);
+    const raw = sessionStorage.getItem(chatBaselineKeyFor(tenantId));
     if (raw == null || raw === '') return null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
@@ -28,10 +40,11 @@ function readChatBaseline() {
   }
 }
 
-function writeChatBaseline(value) {
+function writeChatBaseline(tenantId, value) {
   try {
-    if (value == null) sessionStorage.removeItem(CHAT_BASELINE_KEY);
-    else sessionStorage.setItem(CHAT_BASELINE_KEY, String(value));
+    const key = chatBaselineKeyFor(tenantId);
+    if (value == null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, String(value));
   } catch {
     /* ignore */
   }
@@ -47,9 +60,36 @@ function normalizeItem(partial) {
     url: partial.url || null,
     tab: partial.tab || null,
     driverId: partial.driverId || null,
+    tenantId: partial.tenantId || partial.tenant_id || null,
     at: partial.at || new Date().toISOString(),
     read: Boolean(partial.read),
   };
+}
+
+/** True for the old shared demo ROUTE_DEVIATION that leaked into every office bell. */
+export function isDemoFleetMockAlert(rowOrItem) {
+  if (!rowOrItem) return false;
+  const id = String(rowOrItem.id || '');
+  if (id === 'mock-1' || id === 'alert-mock-1' || id.includes('mock-1')) return true;
+  const vehicle = String(rowOrItem.vehicle_id || rowOrItem.vehicleId || '');
+  if (vehicle === 'demo-vehicle-1') return true;
+  const tenant = String(rowOrItem.tenant_id || rowOrItem.tenantId || '');
+  const body = String(rowOrItem.body || rowOrItem.message || '');
+  if (
+    tenant === DEMO_TENANT &&
+    /Αποκλίνουσα διαδρομή/i.test(body) &&
+    /120m/i.test(body)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function alertBelongsToTenant(row, tenantId) {
+  const rowTid = String(row?.tenant_id || row?.tenantId || '').trim();
+  const tid = String(tenantId || '').trim();
+  if (!rowTid || !tid) return true;
+  return rowTid === tid;
 }
 
 /** Collapse legacy chat-${Date.now()} duplicates into one row per driver. */
@@ -72,19 +112,44 @@ export function dedupeStoredItems(items) {
   return out.slice(0, MAX_ITEMS);
 }
 
-function loadStored() {
+export function scrubInboxForTenant(items, tenantId) {
+  const tid = String(tenantId || '').trim();
+  return dedupeStoredItems(items).filter((item) => {
+    if (isDemoFleetMockAlert(item) && tid !== DEMO_TENANT) return false;
+    if (!alertBelongsToTenant(item, tid)) return false;
+    return true;
+  });
+}
+
+function loadStored(tenantId) {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const key = storageKeyFor(tenantId);
+    let raw = sessionStorage.getItem(key);
+    // One-time: drop the unscoped legacy inbox that leaked demo alerts
+    // across every γραφείο in the same browser tab.
+    if (!raw) {
+      const legacy = sessionStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        try {
+          sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     const parsed = raw ? JSON.parse(raw) : [];
-    return dedupeStoredItems(Array.isArray(parsed) ? parsed : []);
+    return scrubInboxForTenant(Array.isArray(parsed) ? parsed : [], tenantId);
   } catch {
     return [];
   }
 }
 
-function persist(items) {
+function persist(tenantId, items) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
+    sessionStorage.setItem(
+      storageKeyFor(tenantId),
+      JSON.stringify(scrubInboxForTenant(items, tenantId).slice(0, MAX_ITEMS)),
+    );
   } catch {
     /* ignore */
   }
@@ -104,6 +169,16 @@ function alertToItem(row) {
   } else if (type === 'NEW_BOOKING' || type === 'BOOKING_PAID') {
     title = 'Νέα κράτηση';
     tab = row.metadata?.tab || 'bookings';
+  } else if (type === 'BOOKING_DELETED') {
+    title = 'Διαγραφή εισιτηρίου';
+    tab = row.metadata?.tab || 'bookings';
+  }
+  if (type === 'NEW_BOOKING' || type === 'BOOKING_PAID' || type === 'BOOKING_DELETED') {
+    try {
+      notifyBookingsChanged({ reason: type.toLowerCase(), alertId: row.id });
+    } catch {
+      /* ignore */
+    }
   }
   return normalizeItem({
     id: `alert-${row.id}`,
@@ -112,6 +187,7 @@ function alertToItem(row) {
     type: type.toLowerCase(),
     tab,
     driverId: row.driver_id || row.metadata?.driver_id || null,
+    tenantId: row.tenant_id || null,
     at: row.created_at || new Date().toISOString(),
     read: false,
   });
@@ -145,16 +221,26 @@ function isChatInboxItem(item) {
 }
 
 export function useAdminNotifications({ tenantId, enabled = true } = {}) {
-  const resolvedTenantId = tenantId || getSaasTenantId() || DEMO_TENANT;
+  // Never fall back to DEMO tenant — that sealed Achillio/demo alerts into rent offices.
+  const resolvedTenantId = String(tenantId || getSaasTenantId() || '').trim();
   const [items, setItems] = useState(() => {
-    const cleaned = loadStored();
-    // Rewrite session inbox so legacy chat-${Date.now()} spam collapses immediately.
-    persist(cleaned);
+    const cleaned = loadStored(resolvedTenantId);
+    persist(resolvedTenantId, cleaned);
     return cleaned;
   });
   const [open, setOpen] = useState(false);
-  const seenRef = useRef(new Set(loadStored().map((i) => i.id)));
+  const seenRef = useRef(new Set(loadStored(resolvedTenantId).map((i) => i.id)));
   const wsRef = useRef(null);
+  const tenantRef = useRef(resolvedTenantId);
+  tenantRef.current = resolvedTenantId;
+
+  // Reload inbox when the logged-in office changes (same browser tab).
+  useEffect(() => {
+    const cleaned = loadStored(resolvedTenantId);
+    persist(resolvedTenantId, cleaned);
+    setItems(cleaned);
+    seenRef.current = new Set(cleaned.map((i) => i.id));
+  }, [resolvedTenantId]);
 
   // Keep WebAudio unlockable for the whole admin session (browsers re-suspend).
   useEffect(() => {
@@ -170,6 +256,9 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
 
   const pushItem = useCallback((raw, { silent = false, upsert = false } = {}) => {
     const item = normalizeItem(raw);
+    const tid = tenantRef.current;
+    if (isDemoFleetMockAlert(item) && tid !== DEMO_TENANT) return;
+    if (!alertBelongsToTenant(item, tid)) return;
     // Chat rows always upsert on a stable id — never stack duplicates.
     const forceUpsert =
       upsert || String(item.type || '') === 'driver_office_chat' || String(item.id).startsWith('chat-');
@@ -185,11 +274,11 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
     seenRef.current.add(item.id);
     if (isNew || forceUpsert) {
       setItems((prev) => {
-        const next = dedupeStoredItems([item, ...prev.filter((x) => x.id !== item.id)]).slice(
-          0,
-          MAX_ITEMS,
-        );
-        persist(next);
+        const next = scrubInboxForTenant(
+          [item, ...prev.filter((x) => x.id !== item.id)],
+          tid,
+        ).slice(0, MAX_ITEMS);
+        persist(tid, next);
         return next;
       });
     }
@@ -242,24 +331,27 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
   }, []);
 
   const markAllRead = useCallback(() => {
+    const tid = tenantRef.current;
     setItems((prev) => {
       const next = prev.map((i) => ({ ...i, read: true }));
-      persist(next);
+      persist(tid, next);
       return next;
     });
   }, []);
 
   const markRead = useCallback((id) => {
+    const tid = tenantRef.current;
     setItems((prev) => {
       const next = prev.map((i) => (i.id === id ? { ...i, read: true } : i));
-      persist(next);
+      persist(tid, next);
       return next;
     });
   }, []);
 
   const clearAll = useCallback(() => {
+    const tid = tenantRef.current;
     setItems([]);
-    persist([]);
+    persist(tid, []);
     seenRef.current = new Set();
     // Keep chat baseline at current unread so clearing the bell does not
     // immediately recreate «Νέο μήνυμα οδηγού» on the next poll.
@@ -268,7 +360,7 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
   // Seed + poll telemetry alerts (silent). Poll catches NEW_BOOKING that
   // arrived on another worker via Redis while the WS was briefly down.
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled || !resolvedTenantId) return undefined;
     let cancelled = false;
     const ingest = async ({ playSound = false } = {}) => {
       try {
@@ -277,11 +369,13 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
         rows
           .slice()
           .reverse()
-          .forEach((row) =>
+          .forEach((row) => {
+            if (isDemoFleetMockAlert(row) && resolvedTenantId !== DEMO_TENANT) return;
+            if (!alertBelongsToTenant(row, resolvedTenantId)) return;
             pushItem(alertToItem(row), {
               silent: !playSound || String(row.alert_type || '').toUpperCase() !== 'NEW_BOOKING',
-            }),
-          );
+            });
+          });
       } catch {
         /* ignore */
       }
@@ -292,11 +386,11 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [enabled, pushItem]);
+  }, [enabled, resolvedTenantId, pushItem]);
 
   // Live alerts WebSocket — tenant from JWT only (query must match office or be omitted).
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled || !resolvedTenantId) return undefined;
     const token = getSaasToken() || '';
     if (!token) return undefined;
     const url = buildWsUrl('/ws/admin/telemetry/alerts', {
@@ -316,12 +410,18 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
           try {
             const data = JSON.parse(ev.data);
             if (data.type === 'telemetry_alert') {
+              if (isDemoFleetMockAlert(data) && resolvedTenantId !== DEMO_TENANT) return;
+              if (!alertBelongsToTenant(data, resolvedTenantId)) return;
               pushItem(alertToItem(data));
             } else if (data.type === 'alerts_snapshot' && Array.isArray(data.alerts)) {
               data.alerts
                 .slice()
                 .reverse()
-                .forEach((row) => pushItem(alertToItem(row), { silent: true }));
+                .forEach((row) => {
+                  if (isDemoFleetMockAlert(row) && resolvedTenantId !== DEMO_TENANT) return;
+                  if (!alertBelongsToTenant(row, resolvedTenantId)) return;
+                  pushItem(alertToItem(row), { silent: true });
+                });
             }
           } catch {
             /* ignore */
@@ -346,9 +446,13 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
   // null = not baselined yet (office connect must NOT re-fire existing unread).
   // Persist baseline in sessionStorage so remount / StrictMode does not reset to 0
   // and re-spam. Never treat a failed poll as unread=0 (that re-fires on recovery).
-  const chatUnreadRef = useRef(readChatBaseline());
+  const chatUnreadRef = useRef(readChatBaseline(resolvedTenantId));
   useEffect(() => {
-    if (!enabled) return undefined;
+    chatUnreadRef.current = readChatBaseline(resolvedTenantId);
+  }, [resolvedTenantId]);
+
+  useEffect(() => {
+    if (!enabled || !resolvedTenantId) return undefined;
     let cancelled = false;
     const poll = async () => {
       let u;
@@ -369,12 +473,12 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       if (chatUnreadRef.current === null) {
         // First successful poll after office login — baseline only, no fresh row.
         chatUnreadRef.current = unread;
-        writeChatBaseline(unread);
+        writeChatBaseline(resolvedTenantId, unread);
         return;
       }
       const prev = Number(chatUnreadRef.current) || 0;
       chatUnreadRef.current = unread;
-      writeChatBaseline(unread);
+      writeChatBaseline(resolvedTenantId, unread);
       if (unread > prev) {
         const top = (t.threads || []).find((x) => Number(x.unread_office || 0) > 0);
         const driverId = top?.driver_id || 'office';
@@ -390,6 +494,7 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
             type: 'driver_office_chat',
             tab: 'driver_chat',
             driverId: top?.driver_id || null,
+            tenantId: resolvedTenantId,
             url: top?.driver_id
               ? `/admin?tab=driver_chat&driverId=${encodeURIComponent(top.driver_id)}`
               : '/admin?tab=driver_chat',
@@ -406,7 +511,7 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [enabled, pushItem]);
+  }, [enabled, resolvedTenantId, pushItem]);
 
   // Service worker push → fill bell while admin tab is open.
   useEffect(() => {
@@ -418,6 +523,8 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       if (!data || data.type !== 'ADMIN_PUSH_RECEIVED') return;
       const payload = data.payload || {};
       const pushType = String(payload.data?.type || payload.type || 'push');
+      const pushTenant = String(payload.data?.tenant_id || payload.tenant_id || '').trim();
+      if (pushTenant && resolvedTenantId && pushTenant !== resolvedTenantId) return;
       // Chat pushes use a stable tag/id so login redelivery does not stack rows.
       const driverId = payload.data?.driver_id || null;
       const stableChatId =
@@ -439,6 +546,7 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
           title: payload.title || 'Ειδοποίηση',
           body: payload.body || '',
           type: pushType,
+          tenantId: pushTenant || resolvedTenantId || null,
           tab:
             payload.data?.tab ||
             (stableChatId ? 'driver_chat' : isNewBooking ? 'bookings' : null),
@@ -452,7 +560,7 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
-  }, [enabled, pushItem]);
+  }, [enabled, resolvedTenantId, pushItem]);
 
   useEffect(() => {
     const unlock = () => unlockNotificationAudio();

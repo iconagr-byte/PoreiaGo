@@ -46,4 +46,11 @@ describe('rent desk nav vs bus fleet', () => {
       expect(nav.type).toBe('fleet_rental_subtab');
     }
   });
+
+  it('clients button shows only the label (no CRM subtitle)', () => {
+    const clients = RENT_DESK_TABS.find((t) => t.id === 'clients');
+    expect(clients.label).toBe('Πελάτες ενοικιάσεων');
+    expect(String(clients.description || '').trim()).toBe('');
+    expect(String(clients.description || '')).not.toMatch(/CRM/i);
+  });
 });

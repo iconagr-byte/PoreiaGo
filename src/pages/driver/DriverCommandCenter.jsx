@@ -459,7 +459,21 @@ export default function DriverCommandCenter() {
 
           <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
             {tab === 'home' && (
-              <>
+              <div className="driver-home">
+                <div className="driver-home-hero">
+                  <p className="driver-home-hello">
+                    Γεια σου,{' '}
+                    <span className="driver-home-hello-name">
+                      {(session?.driverName || 'οδηγέ').split(/\s+/)[0]}
+                    </span>
+                  </p>
+                  <p className="driver-home-hello-sub">
+                    {telemetryOnline
+                      ? 'Η βάρδια τρέχει · GPS στο γραφείο'
+                      : 'Ξεκίνα βάρδια όταν είσαι έτοιμος'}
+                  </p>
+                </div>
+
                 {!telemetryOnline ? (
                   <button
                     type="button"
@@ -493,46 +507,76 @@ export default function DriverCommandCenter() {
                         Βάρδια ενεργή
                       </span>
                       <span className="block text-xs text-emerald-800/80 mt-0.5">
-                        GPS στον χάρτη του γραφείου · πατήστε για λεπτομέρειες
+                        GPS στον χάρτη · πάτα για λεπτομέρειες
                       </span>
                     </span>
                     <span className="material-symbols-outlined text-emerald-700">share_location</span>
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setTab('chat')}
-                  className="driver-card flex items-center gap-3 text-left w-full !py-3.5"
-                  aria-label={
-                    chatUnread > 0
-                      ? `Άνοιγμα chat με το γραφείο, ${chatUnread} νέα`
-                      : 'Άνοιγμα chat με το γραφείο'
-                  }
-                >
-                  <span className="relative shrink-0">
-                    <span className="material-symbols-outlined text-[28px] text-[var(--driver-accent)]">
-                      forum
+
+                <div className="driver-quick-grid" role="navigation" aria-label="Γρήγορες ενέργειες">
+                  <button
+                    type="button"
+                    className="driver-quick-tile driver-quick-tile--scan"
+                    onClick={() => setTab('scan')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">qr_code_scanner</span>
                     </span>
-                    {chatUnread > 0 ? (
-                      <span className="driver-inline-badge">
-                        {chatUnread > 99 ? '99+' : chatUnread}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-extrabold text-base text-slate-900">Chat γραφείου</span>
-                    <span className="block text-xs text-slate-500 mt-0.5">
-                      {chatUnread > 0
-                        ? `${chatUnread} νέο${chatUnread === 1 ? '' : 'α'} μήνυμα${chatUnread === 1 ? '' : 'τα'}`
-                        : 'Μηνύματα με το γραφείο · παράδοση & ανάγνωση'}
+                    <span className="driver-quick-label">Σάρωση</span>
+                    <span className="driver-quick-hint">Εισιτήρια</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile driver-quick-tile--chat"
+                    onClick={() => setTab('chat')}
+                    aria-label={
+                      chatUnread > 0
+                        ? `Chat γραφείου, ${chatUnread} νέα`
+                        : 'Chat γραφείου'
+                    }
+                  >
+                    <span className="driver-quick-icon relative" aria-hidden>
+                      <span className="material-symbols-outlined">forum</span>
+                      {chatUnread > 0 ? (
+                        <span className="driver-inline-badge">
+                          {chatUnread > 99 ? '99+' : chatUnread}
+                        </span>
+                      ) : null}
                     </span>
-                  </span>
-                  <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-                </button>
+                    <span className="driver-quick-label">Chat</span>
+                    <span className="driver-quick-hint">
+                      {chatUnread > 0 ? `${chatUnread} νέα` : 'Γραφείο'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile"
+                    onClick={() => setTab('gps')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">share_location</span>
+                    </span>
+                    <span className="driver-quick-label">Θέση</span>
+                    <span className="driver-quick-hint">GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="driver-quick-tile"
+                    onClick={() => setTab('summary')}
+                  >
+                    <span className="driver-quick-icon" aria-hidden>
+                      <span className="material-symbols-outlined">event_seat</span>
+                    </span>
+                    <span className="driver-quick-label">Κρατήσεις</span>
+                    <span className="driver-quick-hint">Ημέρα</span>
+                  </button>
+                </div>
+
                 {/* Must be mounted — without this the phone never registers for Web Push. */}
                 <DriverPushPanel />
                 <DailyManifest />
-              </>
+              </div>
             )}
             {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
             <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>

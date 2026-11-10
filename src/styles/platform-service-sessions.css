@@ -15,9 +15,9 @@
 .pg-session--buses {
   position: relative;
   overflow: hidden;
-  /* White so sky accents pop and the gray trip preview below stays distinct. */
-  background: #ffffff;
-  color: var(--pg-session-ink);
+  /* Match Apple contracts stage fill so the page reads as one surface. */
+  background: #f5f5f7;
+  color: #1d1d1f;
 }
 
 .pg-buses-atmosphere {
@@ -30,20 +30,11 @@
 .pg-buses-atmosphere-glow {
   position: absolute;
   inset: 0;
-  /* Soft depth only — no blue wash competing with the next section. */
-  background: radial-gradient(ellipse 55% 40% at 50% 0%, rgba(15, 23, 42, 0.035), transparent 62%);
+  background: radial-gradient(ellipse 50% 36% at 50% 0%, rgba(0, 0, 0, 0.03), transparent 65%);
 }
 
 .pg-buses-atmosphere-grid {
-  position: absolute;
-  inset: 0;
-  opacity: 0.45;
-  background-image:
-    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, black 0%, transparent 68%);
-  -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 68%);
+  display: none;
 }
 
 .pg-session--rent {
@@ -76,7 +67,7 @@
 }
 
 .pg-session--buses .pg-session-kicker {
-  color: var(--pg-session-sky);
+  color: #0071e3;
 }
 
 .pg-session--rent .pg-session-kicker {
@@ -92,7 +83,9 @@
 }
 
 .pg-session--buses .pg-session-hook {
-  color: #0f172a;
+  color: #1d1d1f;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .pg-session--rent .pg-session-hook {
@@ -107,7 +100,7 @@
 }
 
 .pg-session--buses .pg-session-support {
-  color: var(--pg-session-muted);
+  color: #86868b;
 }
 
 .pg-session--rent .pg-session-support {
@@ -134,7 +127,7 @@
 }
 
 .pg-session--buses .pg-session-points li {
-  color: #334155;
+  color: #424245;
 }
 
 .pg-session--rent .pg-session-points li {
@@ -146,7 +139,7 @@
 }
 
 .pg-session--buses .pg-session-points .material-symbols-outlined {
-  color: var(--pg-session-sky);
+  color: #0071e3;
 }
 
 /* Buses journey — sell / board / run (no card chrome) */
@@ -163,10 +156,7 @@
 
 .pg-buses-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #0284c7 0%, #0ea5e9 55%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #0071e3;
 }
 
 .pg-session--buses .pg-session-support {
@@ -181,7 +171,7 @@
   padding: 1.75rem 0 0.25rem;
   text-align: left;
   max-width: 58rem;
-  border-top: 1px solid rgba(14, 165, 233, 0.14);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 @media (min-width: 860px) {
@@ -194,7 +184,7 @@
   .pg-buses-journey-col + .pg-buses-journey-col {
     padding-left: 1.6rem;
     margin-left: 0.35rem;
-    border-left: 1px solid rgba(14, 165, 233, 0.14);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -212,12 +202,12 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #0284c7;
+  color: #0071e3;
 }
 
 .pg-buses-journey-label span {
   font-variant-numeric: tabular-nums;
-  color: rgba(2, 132, 199, 0.45);
+  color: rgba(0, 113, 227, 0.45);
 }
 
 .pg-buses-journey-col ul {
@@ -243,9 +233,9 @@
   height: 2.4rem;
   border-radius: 0.85rem;
   font-size: 1.2rem !important;
-  color: #0284c7;
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px solid rgba(14, 165, 233, 0.16);
+  color: #0071e3;
+  background: rgba(0, 113, 227, 0.08);
+  border: 1px solid rgba(0, 113, 227, 0.14);
 }
 
 .pg-buses-journey-col strong {
@@ -424,61 +414,107 @@
 /* ——— My Wallet session (buses homepage) ——— */
 
 .pg-session--wallet {
-  --pg-wallet-ink: #0b1220;
-  --pg-wallet-sky: #0ea5e9;
+  --pg-wallet-ink: #0a2540;
+  --pg-wallet-sky: #0284c7;
   position: relative;
   overflow: hidden;
+  /* Same shell as hub hero: white + soft edge glow + peach→cyan ribbon */
   background:
-    radial-gradient(ellipse 70% 55% at 85% 20%, rgba(14, 165, 233, 0.16), transparent 58%),
-    radial-gradient(ellipse 50% 45% at 8% 80%, rgba(2, 132, 199, 0.1), transparent 55%),
-    linear-gradient(165deg, #07111f 0%, #0c1a2e 42%, #10243a 100%);
-  color: #f8fafc;
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: var(--pg-wallet-ink);
+  border-block: 1px solid rgba(10, 37, 64, 0.06);
 }
 
-.pg-wallet-atmosphere {
+.pg-wallet-wave {
   position: absolute;
-  inset: 0;
+  top: 8%;
+  right: -6%;
+  bottom: 4%;
+  left: 42%;
+  border-radius: 42% 58% 48% 52% / 42% 38% 62% 58%;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.92) 0%,
+    rgba(251, 146, 60, 0.88) 18%,
+    rgba(56, 189, 248, 0.85) 48%,
+    rgba(34, 211, 238, 0.9) 68%,
+    rgba(20, 184, 166, 0.95) 100%
+  );
+  filter: blur(0.5px);
+  transform: rotate(-8deg) scale(1.05);
+  animation: pgWalletWave 16s ease-in-out infinite alternate;
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 0 28px 60px rgba(14, 165, 233, 0.18);
+}
+
+.pg-wallet-wave--soft {
+  top: 18%;
+  right: 8%;
+  bottom: 18%;
+  left: 52%;
+  opacity: 0.35;
+  filter: blur(36px);
+  box-shadow: none;
+  animation-duration: 22s;
+  animation-direction: alternate-reverse;
+}
+
+.pg-wallet-orbit {
+  position: absolute;
+  left: 78%;
+  top: 46%;
+  width: 24rem;
+  height: 24rem;
+  margin: -12rem 0 0 -12rem;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 165, 233, 0.1);
+  animation: pgWalletSpin 36s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
 
-.pg-wallet-atmosphere-glow {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+.pg-wallet-orbit--slow {
+  width: 32rem;
+  height: 32rem;
+  margin: -16rem 0 0 -16rem;
+  border-color: rgba(14, 165, 233, 0.06);
+  animation-duration: 52s;
+  animation-direction: reverse;
 }
 
-.pg-wallet-atmosphere-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.55;
-  animation: pgWalletOrb 12s ease-in-out infinite alternate;
-}
-
-.pg-wallet-atmosphere-orb--a {
-  width: 18rem;
-  height: 18rem;
-  top: -4rem;
-  right: 8%;
-  background: rgba(14, 165, 233, 0.35);
-}
-
-.pg-wallet-atmosphere-orb--b {
-  width: 14rem;
-  height: 14rem;
-  bottom: 6%;
-  left: 4%;
-  background: rgba(56, 189, 248, 0.22);
-  animation-delay: -4s;
-}
-
-@keyframes pgWalletOrb {
+@keyframes pgWalletWave {
   from {
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: rotate(-8deg) scale(1.05) translate3d(0, 0, 0);
   }
   to {
-    transform: translate3d(12px, 18px, 0) scale(1.08);
+    transform: rotate(-5deg) scale(1.08) translate3d(-1.5%, 1%, 0);
+  }
+}
+
+@keyframes pgWalletSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .pg-wallet-wave {
+    left: 8%;
+    right: -12%;
+    top: auto;
+    bottom: -8%;
+    height: 42%;
+    opacity: 0.55;
+  }
+
+  .pg-wallet-wave--soft,
+  .pg-wallet-orbit,
+  .pg-wallet-orbit--slow {
+    display: none;
   }
 }
 
@@ -508,19 +544,32 @@
   text-align: left;
 }
 
+.pg-wallet-glass {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
 .pg-session--wallet .pg-session-kicker {
-  color: #7dd3fc;
+  color: #0284c7;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
 }
 
 .pg-session--wallet .pg-session-hook {
-  color: #fff;
-  font-size: clamp(1.85rem, 4.2vw, 2.85rem);
-  max-width: 18ch;
+  color: var(--pg-wallet-ink);
+  font-size: clamp(1.95rem, 4.2vw, 2.95rem);
+  max-width: 16ch;
+  letter-spacing: -0.04em;
 }
 
 .pg-wallet-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #7dd3fc 0%, #38bdf8 50%, #e0f2fe 100%);
+  background: linear-gradient(105deg, #0284c7 0%, #0ea5e9 55%, #0891b2 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -529,7 +578,8 @@
 .pg-session--wallet .pg-session-support {
   margin: 0 0 1.6rem;
   max-width: 34rem;
-  color: rgba(226, 232, 240, 0.78);
+  color: #475569;
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
 }
 
 .pg-wallet-points {
@@ -541,50 +591,42 @@
 }
 
 .pg-wallet-points li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.85rem;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(10, 37, 64, 0.08);
 }
 
-.pg-wallet-point-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.45rem;
-  height: 2.45rem;
-  border-radius: 0.9rem;
-  font-size: 1.2rem !important;
-  color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.14);
-  border: 1px solid rgba(125, 211, 252, 0.22);
+.pg-wallet-points li:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .pg-wallet-points strong {
   display: block;
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--pg-wallet-ink);
   line-height: 1.25;
 }
 
-.pg-wallet-points li > div > span {
+.pg-wallet-points li > span {
   display: block;
-  margin-top: 0.22rem;
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.45;
-  color: rgba(203, 213, 225, 0.78);
+  color: #64748b;
 }
 
 .pg-session-cta--wallet {
-  background: #fff;
-  color: #0b1220;
+  background: #0a2540;
+  color: #fff;
 }
 
 .pg-session-cta--wallet:hover {
-  background: #e0f2fe;
+  background: #133556;
 }
 
 .pg-wallet-visual {
@@ -594,7 +636,7 @@
 
 .pg-wallet-phone {
   width: min(100%, 280px);
-  filter: drop-shadow(0 28px 48px rgba(2, 8, 23, 0.55));
+  filter: drop-shadow(0 22px 40px rgba(10, 37, 64, 0.16));
 }
 
 .pg-wallet-phone-bezel {
@@ -796,15 +838,16 @@
 }
 
 .pg-wallet-pass-qr {
+  display: block;
   width: 5.25rem;
   height: 5.25rem;
   margin: 0 auto;
+  padding: 0.35rem;
+  box-sizing: border-box;
   border-radius: 0.75rem;
-  background:
-    linear-gradient(90deg, #0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    linear-gradient(#0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    #f8fafc;
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.12);
+  shape-rendering: crispEdges;
 }
 
 .pg-wallet-rise {
@@ -821,11 +864,12 @@
   width: 100%;
   opacity: 1;
   scroll-margin-top: 5.75rem;
+  /* Match Rent showcase hero wash */
   background:
-    radial-gradient(ellipse 65% 50% at 90% 15%, rgba(45, 212, 191, 0.18), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 5% 85%, rgba(13, 148, 136, 0.14), transparent 55%),
-    linear-gradient(165deg, #042f2e 0%, #0b3d4a 45%, #062a30 100%);
-  color: #f8fafc;
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(13, 148, 136, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(14, 165, 233, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: #0a2540;
 }
 
 /* Guest /rent: sit between fleet and landing bands, edge-to-edge inside the app. */
@@ -844,14 +888,14 @@
 .pg-rent-contracts-atmosphere-glow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 42%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 48%);
 }
 
 .pg-rent-contracts-orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(42px);
-  opacity: 0.5;
+  filter: blur(48px);
+  opacity: 0.55;
   animation: pgWalletOrb 11s ease-in-out infinite alternate;
 }
 
@@ -860,7 +904,7 @@
   height: 16rem;
   top: -3rem;
   right: 10%;
-  background: rgba(45, 212, 191, 0.4);
+  background: rgba(13, 148, 136, 0.16);
 }
 
 .pg-rent-contracts-orb--b {
@@ -868,7 +912,7 @@
   height: 13rem;
   bottom: 8%;
   left: 6%;
-  background: rgba(20, 184, 166, 0.28);
+  background: rgba(14, 165, 233, 0.12);
   animation-delay: -3.5s;
 }
 
@@ -899,18 +943,18 @@
 }
 
 .pg-session--rent-contracts .pg-session-kicker {
-  color: #5eead4;
+  color: #0d9488;
 }
 
 .pg-session--rent-contracts .pg-session-hook {
-  color: #fff;
+  color: #0a2540;
   font-size: clamp(1.85rem, 4.2vw, 2.85rem);
   max-width: 16ch;
 }
 
 .pg-rent-contracts-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #99f6e4 0%, #5eead4 45%, #ccfbf1 100%);
+  background: linear-gradient(100deg, #0f766e 0%, #0ea5e9 55%, #0891b2 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -919,7 +963,7 @@
 .pg-session--rent-contracts .pg-session-support {
   margin: 0 0 1.6rem;
   max-width: 34rem;
-  color: rgba(204, 251, 241, 0.78);
+  color: #425466;
 }
 
 .pg-rent-contracts-points {
@@ -945,9 +989,9 @@
   height: 2.45rem;
   border-radius: 0.9rem;
   font-size: 1.2rem !important;
-  color: #5eead4;
-  background: rgba(45, 212, 191, 0.12);
-  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.18);
 }
 
 .pg-rent-contracts-points strong {
@@ -955,7 +999,7 @@
   font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: #0a2540;
   line-height: 1.25;
 }
 
@@ -965,16 +1009,17 @@
   font-size: 0.86rem;
   font-weight: 500;
   line-height: 1.45;
-  color: rgba(167, 243, 208, 0.78);
+  color: #64748b;
 }
 
 .pg-session-cta--rent-contracts {
-  background: #fff;
-  color: #042f2e;
+  background: #0f766e;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.28);
 }
 
 .pg-session-cta--rent-contracts:hover {
-  background: #ccfbf1;
+  background: #0d9488;
 }
 
 .pg-rent-contracts-visual {
@@ -991,8 +1036,9 @@
   color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 28px 50px rgba(2, 44, 34, 0.38);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(15, 23, 42, 0.1),
+    0 2px 8px rgba(15, 23, 42, 0.04);
   animation: pgRentContractsDocFloat 6s ease-in-out infinite;
 }
 
@@ -1136,7 +1182,8 @@
   .pg-buses-rise,
   .pg-buses-journey-col,
   .pg-wallet-rise,
-  .pg-wallet-atmosphere-orb,
+  .pg-wallet-wave,
+  .pg-wallet-orbit,
   .pg-wallet-pass--back,
   .pg-wallet-pass--mid,
   .pg-wallet-pass--front,

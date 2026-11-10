@@ -634,6 +634,24 @@ async def main():
 asyncio.run(main())
 PY
 
+echo "==> Ensure Dodopoulos office /admin/login (axilleas0)"
+$COMPOSE exec -T api-blue python - <<'PY' \
+  || echo "WARNING: office admin bootstrap failed (API lifespan will retry)"
+import asyncio
+from travel_platform.settings.office_admin_bootstrap import repair_office_admin_bootstraps
+
+async def main():
+    print(await repair_office_admin_bootstraps())
+
+asyncio.run(main())
+PY
+
+echo "==> Platform wildcard DNS (*.poreiago.com → Contabo) — customers never set DNS"
+bash "$DEPLOY_DIR/scripts/ensure-platform-wildcard-dns.sh" || true
+if [[ "$EDGE_PROXY" == "npm" ]]; then
+  bash "$DEPLOY_DIR/scripts/ensure-npm-platform-wildcard.sh" || true
+fi
+
 echo "==> Custom domain / edge check"
 if [[ "$EDGE_PROXY" == "npm" ]]; then
   echo "  NPM owns TLS — check proxy hosts in NPM UI (api→:${NPM_API_PORT}, www+achillio→:${NPM_APP_PORT})"

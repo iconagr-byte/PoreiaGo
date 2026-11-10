@@ -4,7 +4,6 @@ import {
   AUDIENCE,
   FEATURES,
   FEATURE_LANES,
-  FEATURES_BACKGROUND_IMAGE,
   HERO,
   HERO_BACKGROUND_IMAGE,
   PLATFORM_TAGLINE,
@@ -113,37 +112,28 @@ export function HeroSection() {
 export function PainPointsSection() {
   return (
     <section className="pg-rest pg-audience" aria-labelledby="audience-title">
+      <div className="pg-audience-wave" aria-hidden />
+      <div className="pg-audience-wave pg-audience-wave--soft" aria-hidden />
+      <div className="pg-audience-orbit" aria-hidden />
+
       <div className="pg-audience-inner">
-        <div className="pg-audience-head">
-          <p className="pg-audience-kicker">
-            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
-              groups
-            </span>
-            {AUDIENCE.kicker}
-          </p>
+        <div className="pg-audience-head pg-audience-glass">
+          <p className="pg-audience-kicker">{AUDIENCE.kicker}</p>
           <h2 id="audience-title">{AUDIENCE.title}</h2>
           <p>{AUDIENCE.support}</p>
         </div>
 
         <div className="pg-audience-grid">
           {[
-            { key: 'buses', lane: AUDIENCE.buses, mod: 'buses', icon: 'directions_bus' },
-            { key: 'rent', lane: AUDIENCE.rent, mod: 'rent', icon: 'car_rental' },
-          ].map(({ key, lane, mod, icon }) => (
+            { key: 'buses', lane: AUDIENCE.buses, mod: 'buses' },
+            { key: 'rent', lane: AUDIENCE.rent, mod: 'rent' },
+          ].map(({ key, lane, mod }) => (
             <article key={key} className={`pg-audience-lane pg-audience-lane--${mod}`}>
-              <p className="pg-audience-lane-kicker">
-                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 15 }}>
-                  {icon}
-                </span>
-                {lane.kicker}
-              </p>
+              <p className="pg-audience-lane-kicker">{lane.kicker}</p>
               <h3>{lane.title}</h3>
               <ul>
                 {lane.points.map((point) => (
                   <li key={point.text}>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {point.icon}
-                    </span>
                     <span>{point.text}</span>
                   </li>
                 ))}
@@ -189,16 +179,14 @@ export function FeaturesSection() {
 
   return (
     <section id="features" className="pg-rest pg-features-rest" aria-labelledby="features-title">
-      <div className="pg-features-rest-bg" aria-hidden>
-        <img src={FEATURES_BACKGROUND_IMAGE} alt="" />
-      </div>
+      <div className="pg-features-wave" aria-hidden />
+      <div className="pg-features-wave pg-features-wave--soft" aria-hidden />
+      <div className="pg-features-orbit" aria-hidden />
 
       <div className="pg-features-rest-inner">
-        <div className="pg-features-rest-head">
-          <p className="pg-audience-kicker">Δυνατότητες</p>
-          <h2 id="features-title">
-            Δύο πόρτες. Ένας πίνακας.
-          </h2>
+        <div className="pg-features-rest-head pg-features-glass">
+          <p className="pg-features-kicker">Δυνατότητες</p>
+          <h2 id="features-title">Δύο υπηρεσίες. Ένας πίνακας.</h2>
           <p>
             Λεωφορεία για εκδρομές, ενοικιάσεις για αυτοκίνητα — και κοινά εργαλεία brand, email και
             συμβολαίου.
@@ -213,13 +201,8 @@ export function FeaturesSection() {
               <ul>
                 {lane.items.map((item) => (
                   <li key={item.id}>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <span>{item.body}</span>
-                    </div>
+                    <strong>{item.title}</strong>
+                    <span>{item.body}</span>
                   </li>
                 ))}
               </ul>
@@ -278,7 +261,7 @@ export function HowItWorksSection() {
 
 export function PricingTeaserSection() {
   return (
-    <section id="pricing" className="py-20 md:py-24 px-4 md:px-8 max-w-6xl mx-auto">
+    <section id="pricing" className="pg-rest pg-plans" aria-labelledby="agency-saas-title">
       <AgencyPlansHook />
     </section>
   );
@@ -390,8 +373,12 @@ export function RentProductSection() {
 export function FinalCtaSection() {
   return (
     <section className="pg-rest pg-final" aria-labelledby="final-cta-title">
-      <div className="pg-final-panel">
-        <h2 id="final-cta-title">Έτοιμοι να ανοίξετε τις πόρτες σας;</h2>
+      <div className="pg-final-wave" aria-hidden />
+      <div className="pg-final-wave pg-final-wave--soft" aria-hidden />
+      <div className="pg-final-orbit" aria-hidden />
+
+      <div className="pg-final-panel pg-final-glass">
+        <h2 id="final-cta-title">Έτοιμοι να ξεκινήσετε;</h2>
         <p>
           Επιλέξτε συμβόλαιο για λεωφορεία, ενοικιάσεις, ή και τα δύο — με το brand του γραφείου σας
           από την πρώτη μέρα.

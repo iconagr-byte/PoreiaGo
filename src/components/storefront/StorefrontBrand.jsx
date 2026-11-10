@@ -20,10 +20,10 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
     >
       {logoUrl ? (
         <>
-          <img src={logoUrl} alt="" style={logoStyle} className="object-contain" />
+          <img src={logoUrl} alt="" style={logoStyle} className="object-contain shrink-0" />
           {brand.showName && (
             <span
-              className={`font-bold text-[17px] leading-none tracking-[-0.02em] ${
+              className={`sf-brand-name min-w-0 truncate font-bold text-[17px] leading-none tracking-[-0.02em] ${
                 isDark ? 'text-white' : 'text-slate-900'
               }`}
             >
@@ -34,7 +34,7 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
       ) : (
         <>
           <span
-            className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[12px] text-[15px] font-bold tracking-tight shadow-[0_8px_20px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-[1.03] ${
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] text-[15px] font-bold tracking-tight shadow-[0_8px_20px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-[1.03] ${
               isDark
                 ? 'bg-gradient-to-br from-sky-400 via-cyan-500 to-teal-700 text-white'
                 : 'bg-gradient-to-br from-sky-500 via-cyan-600 to-teal-800 text-white'
@@ -46,7 +46,7 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
           </span>
           <span className="min-w-0">
             <span
-              className={`block truncate text-[17px] font-bold leading-none tracking-[-0.02em] ${
+              className={`sf-brand-name block truncate text-[17px] font-bold leading-none tracking-[-0.02em] ${
                 isDark ? 'text-white' : 'text-slate-900'
               }`}
             >
@@ -54,7 +54,7 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
             </span>
             {isGeneric ? (
               <span
-                className={`mt-1 block text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                className={`sf-brand-subtitle mt-1 block text-[10px] font-semibold uppercase tracking-[0.08em] ${
                   isDark ? 'text-white/55' : 'text-slate-500'
                 }`}
               >

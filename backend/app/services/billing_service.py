@@ -462,6 +462,32 @@ class BillingService:
         logger.info("Local trial started: tenant=%s plan=%s", tenant.slug, plan.value)
         return sub
 
+    async def cancel_stripe_subscription_best_effort(self, tenant_id: UUID) -> None:
+        """Cancel remote Stripe subscription before a hard tenant delete (no-op if none)."""
+        sub = await self.get_subscription(tenant_id)
+        if not sub:
+            return
+        stripe_sub_id = str(sub.stripe_subscription_id or "").strip()
+        if not stripe_sub_id or stripe_sub_id.startswith("demo_"):
+            if sub.status != SubscriptionStatus.CANCELED:
+                sub.status = SubscriptionStatus.CANCELED
+                sub.canceled_at = datetime.now(timezone.utc)
+            return
+        try:
+            _stripe_client()
+            stripe.Subscription.cancel(stripe_sub_id)
+            sub.status = SubscriptionStatus.CANCELED
+            sub.canceled_at = datetime.now(timezone.utc)
+            sub.cancel_at_period_end = False
+            logger.info("Stripe subscription canceled before tenant delete: %s", stripe_sub_id)
+        except Exception:
+            logger.warning(
+                "Stripe cancel failed for tenant %s sub %s — continuing local delete",
+                tenant_id,
+                stripe_sub_id,
+                exc_info=True,
+            )
+
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(
             select(Tenant).where(Tenant.id == tenant_id),

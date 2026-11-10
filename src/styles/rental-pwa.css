@@ -1160,6 +1160,29 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+.rent-top-menu-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0.15rem 0.35rem 0.25rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, 0.08);
+}
+
+.rent-top-menu-lang-label {
+  font-size: 0.8125rem;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+}
+
+.rent-top-lang--menu {
+  flex-shrink: 0;
+  background: rgba(118, 118, 128, 0.14);
+}
+
 .rent-top-menu-item--static {
   cursor: default;
   color: #248a3d;
@@ -1264,8 +1287,13 @@
   }
 }
 
-@media (max-width: 360px) {
-  .rent-top-lang {
+@media (max-width: 900px) {
+  /* Phone/tablet header: language lives in Μενού → Περιήγηση */
+  .rent-top-lang--bar {
+    display: none;
+  }
+
+  .rent-top-actions .rent-top-icon-btn--soft:not([href^='tel']) {
     display: none;
   }
 }
@@ -1633,6 +1661,29 @@
   gap: 0.75rem;
   overflow: visible;
   padding-bottom: 0.2rem;
+}
+
+/* —— Search + fleet as one mid booking unit —— */
+.rent-book-mid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: #f5f5f7;
+}
+
+.rent-book-mid > .rent-hero--booking {
+  flex: 0 0 auto;
+}
+
+.rent-home-stack--book-mid {
+  flex: 0 0 auto;
+  margin-top: -0.35rem;
+  padding-top: 0.35rem;
+  background: #f5f5f7;
+}
+
+.rent-book-mid .rent-fleet-shell {
+  scroll-margin-top: 4.5rem;
 }
 
 /* —— Platform-form landing bands (guest /rent body) —— */
@@ -8202,4 +8253,348 @@
 .rent-app[data-rent-theme='deal_flash'] .rent-pick-head-title,
 .rent-app[data-rent-theme='deal_flash'] .rent-pick-head-sub {
   color: #1d1d1f;
+}
+
+/* Discreet office admin entry — bottom of tenant /rent only. */
+.rent-office-staff-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1.25rem 1.25rem 1.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  background: #fafafa;
+}
+
+.rent-phone-stage--desktop .rent-office-staff-foot {
+  padding-inline: 1.75rem;
+  max-width: 72rem;
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Guest /rent — MOBILE ONLY (all offices)
+   Desktop keeps `.rent-phone-stage--desktop` rules untouched.
+   ========================================================================== */
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero--booking {
+  min-height: auto;
+  padding: 1.1rem 1rem 1.35rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-inner {
+  gap: 0.75rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-brand {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-title {
+  font-size: clamp(1.4rem, 6.2vw, 1.85rem);
+  max-width: 100%;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-title .rent-hero-title-main,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-title .rent-hero-accent {
+  white-space: normal;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-booking-copy {
+  font-size: 0.92rem;
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-benefits {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.15rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-benefits li {
+  font-size: 0.84rem;
+}
+
+/* Stack Hertz-style strip into touch-friendly cards on phones. */
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-row,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-row--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-field,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-field--place,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-field--date,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-field--time {
+  flex: none;
+  min-width: 0;
+  min-height: 3.85rem;
+  border-radius: 14px;
+  border-right: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.18);
+  padding: 0.55rem 0.75rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-field--place {
+  grid-column: 1 / -1;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-submit {
+  grid-column: 1 / -1;
+  min-height: 3.4rem;
+  border-radius: 14px;
+  min-width: 0;
+  width: 100%;
+  box-shadow: 0 10px 28px rgba(0, 88, 176, 0.35);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search--hero .rent-search-footer {
+  margin-top: 0.7rem;
+  gap: 0.65rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search-check,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-search-promo {
+  font-size: 0.8rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-fleet-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  padding: 0.85rem 0.85rem 1.5rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-fleet-shell > .rent-side-filters {
+  position: static;
+  padding: 0;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-card {
+  border-radius: 16px;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-head {
+  padding: 0.75rem 0.9rem;
+  gap: 0.5rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-toggle h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-chevron {
+  margin-left: auto;
+  color: #6e6e73;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-side-filters-body {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-land-band--pick {
+  padding: 0.15rem 0 0;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-head {
+  padding: 0.35rem 0.15rem 0.75rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-toolbar {
+  display: grid;
+  gap: 0.65rem;
+  position: static;
+  background: transparent;
+  backdrop-filter: none;
+  padding: 0;
+  margin: 0;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-cats {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.15rem;
+  scrollbar-width: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-cats::-webkit-scrollbar {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-cat {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-pick-filters {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar--guest {
+  padding: 0.5rem 0.65rem 0.5rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-row {
+  position: relative;
+  gap: 0.35rem;
+  min-height: 3.35rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Menu far left · brand true-center · wallet right */
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-start {
+  display: contents;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip-wrap--left {
+  position: relative;
+  z-index: 2;
+  margin-right: auto;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-topbar-brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  max-width: min(58vw, 15.5rem);
+  min-height: 2.85rem;
+  justify-content: center;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-actions {
+  position: relative;
+  z-index: 2;
+  gap: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-quick,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-lang--bar,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-actions .rent-top-icon-btn--soft {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--menu .rent-top-chip-label {
+  display: none;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--menu {
+  padding: 0.35rem 0.48rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip-wallet-label {
+  display: inline !important;
+  font-size: 0.78rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-top-chip--wallet {
+  padding: 0.35rem 0.72rem 0.35rem 0.55rem;
+  gap: 0.28rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark {
+  gap: 0.55rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-badge {
+  width: 3.15rem;
+  height: 3.15rem;
+  border-radius: 0.9rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-icon {
+  font-size: 1.55rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo-wrap {
+  max-width: min(46vw, 11.5rem);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo {
+  height: calc(var(--rent-logo-h, 2.55rem) * 1.42);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-name {
+  font-size: 1.22rem;
+  max-width: min(46vw, 12.5rem);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-badge {
+  width: 2.85rem;
+  height: 2.85rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-logo {
+  height: calc(var(--rent-logo-h, 2.55rem) * 1.32);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-name {
+  font-size: 1.12rem;
+  max-width: min(44vw, 11.5rem);
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-home-stack--book-mid {
+  padding-top: 0.35rem;
+}
+
+/* Force stacked layouts even when a hero layout variant wants side-by-side. */
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--side_search .rent-hero-booking-inner,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--split_card .rent-hero-booking-inner,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--asymmetric .rent-hero-booking-inner {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--side_search .rent-search--hero .rent-search-row,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--split_card .rent-search--hero .rent-search-row,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--cinematic .rent-search--hero .rent-search-row,
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-hero-layout--island_float .rent-search--hero .rent-search-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }

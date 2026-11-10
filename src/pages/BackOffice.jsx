@@ -15,6 +15,8 @@ import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRental
 import { loadBookings, cancelBooking, deleteBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
+import { subscribeOfficeCatalogSync } from '../lib/ticketing/bookingSyncEvents.js';
+import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 import { ensureDriverSession } from '../services/ticketingApi.js';
 import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
@@ -224,9 +226,15 @@ export default function BackOffice() {
   const [brandRefreshKey, setBrandRefreshKey] = useState(0);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [rentSummary, setRentSummary] = useState(null);
-  const [showOfficeSetup, setShowOfficeSetup] = useState(
-    () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
-  );
+  const [showOfficeSetup, setShowOfficeSetup] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+    } catch {
+      /* ignore */
+    }
+    return Boolean(location.state?.officeSetup) || !isOfficeSetupComplete();
+  });
   const officeMode = officeModeFromModules(officeModules);
   const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
@@ -409,8 +417,15 @@ export default function BackOffice() {
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
     }
-    if (location.state?.officeSetup) {
-      setShowOfficeSetup(true);
+    {
+      let forceSetup = Boolean(location.state?.officeSetup);
+      try {
+        const q = new URLSearchParams(location.search || '');
+        if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') forceSetup = true;
+      } catch {
+        /* ignore */
+      }
+      if (forceSetup) setShowOfficeSetup(true);
     }
     if (
       location.state?.routesMarket === MARKET_DOMESTIC ||
@@ -436,6 +451,76 @@ export default function BackOffice() {
       cancelled = true;
     };
   }, [activeTab, location.key]);
+
+  // Live sync: wallet/native/other-PC deletes appear here without hard refresh.
+  useEffect(() => {
+    if (activeTab !== 'bookings' && activeTab !== 'dashboard' && activeTab !== 'trips') {
+      return undefined;
+    }
+    let cancelled = false;
+    let busy = false;
+    const softReloadBookings = async () => {
+      if (cancelled || busy) return;
+      busy = true;
+      try {
+        const merged = await loadMergedBookings();
+        if (cancelled) return;
+        setBookings(merged);
+        // Wallet/app delete: close open detail if the row is gone from Postgres.
+        setSelectedBooking((prev) => {
+          if (!prev) return null;
+          const aliases = [prev.id, prev.saasBookingId, prev.pnr, prev.ticketRef]
+            .filter(Boolean)
+            .map(String);
+          const still = merged.find((b) => {
+            const keys = [b.id, b.saasBookingId, b.pnr, b.ticketRef]
+              .filter(Boolean)
+              .map(String);
+            return aliases.some((a) => keys.includes(a));
+          });
+          return still || null;
+        });
+      } catch {
+        /* keep last good list */
+      } finally {
+        busy = false;
+      }
+    };
+    const softReloadTrips = async () => {
+      if (cancelled) return;
+      try {
+        const result = await hydrateTripsFromServer();
+        if (!cancelled && result?.trips) setTrips(result.trips);
+        else if (!cancelled) setTrips(loadTrips());
+      } catch {
+        if (!cancelled) setTrips(loadTrips());
+      }
+    };
+    const unsub = subscribeOfficeCatalogSync({
+      onBookings: () => {
+        void softReloadBookings();
+      },
+      onTrips: () => {
+        void softReloadTrips();
+      },
+    });
+    // Poll while the office list is open (wallet delete → desktop within ~2s).
+    const pollMs = Math.max(2000, LIVE_REFRESH_MS * 2);
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (activeTab === 'bookings' || activeTab === 'dashboard') {
+        void softReloadBookings();
+      }
+      if (activeTab === 'bookings' || activeTab === 'trips' || activeTab === 'dashboard') {
+        void softReloadTrips();
+      }
+    }, pollMs);
+    return () => {
+      cancelled = true;
+      unsub();
+      window.clearInterval(pollId);
+    };
+  }, [activeTab]);
 
   // Πελατολόγιο: hydrate buses vs rent CRM separately (never mix lists).
   useEffect(() => {
@@ -1877,7 +1962,34 @@ export default function BackOffice() {
     };
 
     if (selectedBooking) {
-      const currentSelectedBooking = bookings.find(b => b.id === selectedBooking.id) || selectedBooking;
+      const currentSelectedBooking = bookings.find(
+        (b) =>
+          b.id === selectedBooking.id ||
+          (selectedBooking.saasBookingId &&
+            b.saasBookingId === selectedBooking.saasBookingId) ||
+          (selectedBooking.pnr && b.pnr === selectedBooking.pnr),
+      );
+      // Never fall back to a stale selectedBooking — wallet deletes left the
+      // detail pane open with a deleted ticket (BK-F15C6C28 still on screen).
+      if (!currentSelectedBooking) {
+        return (
+          <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in duration-300">
+            <div className="rounded-2xl border border-black/[0.06] bg-white p-8 text-center shadow-sm">
+              <p className="text-lg font-bold text-slate-900">Η κράτηση διαγράφηκε</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Δεν υπάρχει πλέον στη λίστα του γραφείου (διαγραφή από Wallet ή άλλη συσκευή).
+              </p>
+              <button
+                type="button"
+                className="mt-5 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-bold text-white"
+                onClick={() => setSelectedBooking(null)}
+              >
+                Πίσω στις κρατήσεις
+              </button>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
@@ -2013,7 +2125,12 @@ export default function BackOffice() {
             type="button"
             onClick={() => {
               setBookingsLoading(true);
-              setTrips(loadTrips());
+              void hydrateTripsFromServer()
+                .then((result) => {
+                  if (result?.trips) setTrips(result.trips);
+                  else setTrips(loadTrips());
+                })
+                .catch(() => setTrips(loadTrips()));
               loadMergedBookings()
                 .then(setBookings)
                 .finally(() => setBookingsLoading(false));
@@ -2421,9 +2538,39 @@ export default function BackOffice() {
       {showOfficeSetup && (
         <OfficeSetupWizard
           rentEnabled={rentMenuVisible}
-          forceOpen={Boolean(location.state?.officeSetup)}
-          onFinished={() => setShowOfficeSetup(false)}
-          onDismiss={() => setShowOfficeSetup(false)}
+          forceOpen={(() => {
+            try {
+              const q = new URLSearchParams(location.search || '');
+              if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+            } catch {
+              /* ignore */
+            }
+            return Boolean(location.state?.officeSetup);
+          })()}
+          onFinished={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
+          onDismiss={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
         />
       )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">

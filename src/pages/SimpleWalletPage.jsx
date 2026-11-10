@@ -28,7 +28,13 @@ import {
   dismissWalletPass,
   loadDismissedWalletPassIds,
 } from '../lib/wallet/walletPassLifecycle.js';
-import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
+import { deleteMyBookingOnServer } from '../services/customerBookingsApi.js';
+import { notifyBookingsChanged } from '../lib/ticketing/bookingSyncEvents.js';
+import {
+  getBookingById,
+  loadBookingsForCustomer,
+  removeBookingFromStore,
+} from '../lib/ticketing/bookingStore.js';
 import {
   expandWalletTickets,
   selectWalletPassBookings,
@@ -291,9 +297,18 @@ function WalletAuthenticatedApp() {
       // Κρατήσεις + pass feeds: earliest excursion first (date+time).
       let sorted = sortWalletBookingsByDeparture(list);
       const focus = focusId || peekWalletFocusBooking();
-      if (focus && !sorted.some((b) => b.id === focus)) {
+      const dismissed = new Set(loadDismissedWalletPassIds().map(String));
+      if (focus && !sorted.some((b) => b.id === focus) && !dismissed.has(String(focus))) {
         const local = getBookingById(focus);
-        if (local && String(local.email || '').toLowerCase() === email) {
+        const localAliases = [local?.id, local?.saasBookingId, local?.pnr]
+          .filter(Boolean)
+          .map(String);
+        const locallyRemoved = localAliases.some((a) => dismissed.has(a));
+        if (
+          local &&
+          !locallyRemoved &&
+          String(local.email || '').toLowerCase() === email
+        ) {
           sorted = sortWalletBookingsByDeparture([...sorted, local]);
         }
       }
@@ -413,8 +428,11 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // Rent passes share this shell when the sealed office has Rent.
-  const rentAvailable = shouldShowRentStorefront(officeModules);
+  // Rent only with active contract — native localhost must not unlock marketing demo Rent
+  // (Achillio Travel stays bus-only even on Capacitor).
+  const rentAvailable = shouldShowRentStorefront(officeModules, {
+    native: nativeWallet,
+  });
   const tabs = useMemo(
     () => (rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals')),
     [rentAvailable],
@@ -537,19 +555,84 @@ function WalletAuthenticatedApp() {
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   };
 
-  /** Apple Wallet «Remove Pass» — hide on this device only (does not cancel office booking). */
+  /**
+   * Delete ticket everywhere — Postgres office booking + this Wallet.
+   * Desktop «Κρατήσεις ανά Ταξίδι» drops it on the next live sync.
+   */
   const handleRemovePass = useCallback(
-    (booking) => {
+    async (booking) => {
       if (!booking) return;
-      const aliases = [booking.id, booking.saasBookingId, booking.pnr].filter(Boolean);
+      const aliases = [
+        booking.id,
+        booking.saasBookingId,
+        booking.pnr,
+        booking.ticketRef,
+      ].filter(Boolean);
       if (!aliases.length) return;
+      // Prefer UUID, then local B- id, then PNR — retry so Contabo TEXT PKs still match.
+      const deleteKeys = [
+        booking.saasBookingId,
+        booking.id,
+        booking.pnr,
+        booking.ticketRef,
+      ]
+        .filter(Boolean)
+        .map(String);
+      const uniqueKeys = [...new Set(deleteKeys)];
+      let deleted = false;
+      let lastErr = null;
+      for (const deleteKey of uniqueKeys) {
+        try {
+          await deleteMyBookingOnServer(deleteKey);
+          deleted = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          const msg = String(err?.message || '');
+          if (/404|not found|δεν βρέθηκε/i.test(msg)) {
+            continue;
+          }
+          // 503 / ownership / network — stop and surface the error.
+          throw err;
+        }
+      }
+      if (!deleted && lastErr) {
+        const msg = String(lastErr?.message || '');
+        if (!/404|not found|δεν βρέθηκε/i.test(msg)) {
+          throw lastErr;
+        }
+      }
+      // Drop every alias from localStorage so the 20s poll cannot reinject it.
+      for (const alias of aliases) {
+        removeBookingFromStore(alias);
+      }
       const next = dismissWalletPass(aliases);
       setDismissedPassIds(next);
+      setBookings((prev) =>
+        prev.filter((b) => {
+          const keys = [b.id, b.saasBookingId, b.pnr, b.ticketRef]
+            .filter(Boolean)
+            .map(String);
+          return !aliases.map(String).some((a) => keys.includes(a));
+        }),
+      );
+      notifyBookingsChanged({
+        reason: 'wallet-delete',
+        bookingId: booking.id,
+      });
       const snap = loadLastPass();
       const snapId = snap?.booking?.id;
+      const snapAliases = [
+        snap?.booking?.id,
+        snap?.booking?.saasBookingId,
+        snap?.booking?.pnr,
+      ]
+        .filter(Boolean)
+        .map(String);
       if (
         snapId &&
-        aliases.map(String).includes(String(snapId))
+        (aliases.map(String).includes(String(snapId)) ||
+          snapAliases.some((a) => aliases.map(String).includes(a)))
       ) {
         clearLastPass();
         setOfflineSnap(null);
@@ -864,12 +947,13 @@ function WalletAuthenticatedApp() {
           />
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-8"
+              className="h-7 max-w-[14.5rem]"
               variant="light"
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
               tenantId={sealedTenantId}
+              compact={Boolean(nativeWallet || isPhone)}
             />
           </div>
           <WalletNotificationBell

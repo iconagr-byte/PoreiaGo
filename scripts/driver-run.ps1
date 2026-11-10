@@ -1,8 +1,8 @@
-# DEPRECATED: separate com.poreiago.driver package.
+﻿# DEPRECATED: separate com.poreiago.driver package.
 # Canonical native app is ONE install: com.poreiago.wallet (role-routed).
 # By default this script forwards to wallet-run.ps1.
 #
-# Usage (unified app — preferred):
+# Usage (unified app - preferred):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1
 #   (same as wallet-run.ps1)
 #

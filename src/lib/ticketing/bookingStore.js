@@ -760,6 +760,15 @@ export async function deleteBooking(bookingId) {
   for (const alias of [booking?.id, booking?.saasBookingId, booking?.pnr, bookingId]) {
     if (alias) removeBookingFromStore(alias);
   }
+  try {
+    const { notifyBookingsChanged } = await import('./bookingSyncEvents.js');
+    notifyBookingsChanged({
+      reason: 'delete',
+      bookingId: booking?.id || bookingId,
+    });
+  } catch {
+    /* ignore */
+  }
   dispatchPartnerEvent('booking.deleted', {
     booking_id: booking?.id || bookingId,
     trip_id: booking?.tripId,

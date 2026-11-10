@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
+import { isPlatformMarketingHost } from '../../lib/platform/tenantHost.js';
 
-const QUICK_NAV = [
-  { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search' },
-  { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet' },
-  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
-  { id: 'session-rent-contracts', el: 'Συμβόλαιο', en: 'Contract' },
-  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works' },
-];
-
-const NAV_ITEMS = [
+/** Browse items live only in the Μενού dropdown (no duplicate top-bar links). */
+const BOOKING_NAV_ITEMS = [
   { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
   { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
+];
+
+const MARKETING_NAV_ITEMS = [
+  {
+    id: 'session-rent-capabilities',
+    el: 'Τι μπορείς',
+    en: 'Capabilities',
+    icon: 'auto_awesome',
+  },
   {
     id: 'session-rent-contracts',
     el: 'Συμβόλαιο',
@@ -48,7 +51,8 @@ function scrollToSection(id) {
 }
 
 /**
- * Guest header — Menu (left, beside brand) + quick links / lang / Sign in / My Wallet.
+ * Guest header — Menu (left, beside brand) + lang / Sign in / My Wallet.
+ * Browse links (Αναζήτηση, Στόλος, …) live only in the Μενού dropdown.
  * Pass `brand` to place the logo immediately before the menu control.
  * My Wallet opens unified /wallet?tab=rentals — same shell as bus tickets.
  */
@@ -63,6 +67,12 @@ export default function RentGuestTopActions({
   const rootRef = useRef(null);
   const menuBtnRef = useRef(null);
   const tel = phoneHref(phone);
+  const showMarketingNav = isPlatformMarketingHost();
+  const navItems = useMemo(
+    () =>
+      showMarketingNav ? [...BOOKING_NAV_ITEMS, ...MARKETING_NAV_ITEMS] : BOOKING_NAV_ITEMS,
+    [showMarketingNav],
+  );
 
   useEffect(() => {
     markPreferRentLookup();
@@ -137,7 +147,7 @@ export default function RentGuestTopActions({
       {menuOpen ? (
         <div className="rent-top-menu rent-top-menu--guest rent-top-menu--left" role="menu">
           <p className="rent-top-menu-kicker">{browseKicker}</p>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -151,6 +161,34 @@ export default function RentGuestTopActions({
               {el ? item.el : item.en}
             </button>
           ))}
+
+          <div
+            className="rent-top-menu-lang"
+            role="group"
+            aria-label={el ? 'Γλώσσα' : 'Language'}
+          >
+            <span className="rent-top-menu-lang-label">
+              {el ? 'Γλώσσα' : 'Language'}
+            </span>
+            <div className="rent-top-lang rent-top-lang--menu">
+              <button
+                type="button"
+                className={lang === 'el' ? 'is-active' : ''}
+                aria-pressed={lang === 'el'}
+                onClick={() => switchLang('el')}
+              >
+                ΕΛ
+              </button>
+              <button
+                type="button"
+                className={lang === 'en' ? 'is-active' : ''}
+                aria-pressed={lang === 'en'}
+                onClick={() => switchLang('en')}
+              >
+                EN
+              </button>
+            </div>
+          </div>
 
           <div className="rent-top-menu-sep" role="separator" />
 
@@ -241,20 +279,11 @@ export default function RentGuestTopActions({
       </div>
 
       <div className="rent-top-actions">
-        <nav className="rent-top-quick" aria-label={el ? 'Γρήγορη πλοήγηση' : 'Quick navigation'}>
-          {QUICK_NAV.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="rent-top-quick-link"
-              onClick={() => scrollToSection(item.id)}
-            >
-              {el ? item.el : item.en}
-            </button>
-          ))}
-        </nav>
-
-        <div className="rent-top-lang" role="group" aria-label={el ? 'Γλώσσα' : 'Language'}>
+        <div
+          className="rent-top-lang rent-top-lang--bar"
+          role="group"
+          aria-label={el ? 'Γλώσσα' : 'Language'}
+        >
           <button
             type="button"
             className={lang === 'el' ? 'is-active' : ''}

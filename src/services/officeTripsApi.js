@@ -52,26 +52,34 @@ export async function fetchPublicOfficeTrips(hostOrOpts) {
     if (saasTid) tenantId = String(saasTid).trim();
   }
 
-  try {
-    const params = new URLSearchParams();
-    // Prefer sealed tenant_id (API honors it for published catalogs).
-    // Always include browser host too — NPM often rewrites Request Host to
-    // 127.0.0.1, so ?host=www.achilliotravel.com is the reliable fallback.
-    if (tenantId) params.set('tenant_id', tenantId);
-    if (effectiveHost) params.set('host', effectiveHost);
-    const qs = params.toString() ? `?${params}` : '';
-    const headers = {};
-    const token = getSaasToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${apiBase()}/api/site/trips${qs}`, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        return data.map((t) => normalizeTrip(t));
+  const params = new URLSearchParams();
+  // Prefer sealed tenant_id (API honors it for published catalogs).
+  // Always include browser host too — NPM often rewrites Request Host to
+  // 127.0.0.1, so ?host=www.achilliotravel.com is the reliable fallback.
+  if (tenantId) params.set('tenant_id', tenantId);
+  if (effectiveHost) params.set('host', effectiveHost);
+  const qs = params.toString() ? `?${params}` : '';
+  const headers = {};
+  const token = getSaasToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  // Brief retries — brief 502s during deploy left phones with an empty catalog.
+  const attempts = 3;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const res = await fetch(`${apiBase()}/api/site/trips${qs}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          return data.map((t) => normalizeTrip(t));
+        }
       }
+    } catch {
+      /* offline / API down — try again */
     }
-  } catch {
-    /* offline / API down — empty list (never bleed another office) */
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 350 * (i + 1)));
+    }
   }
   return [];
 }

@@ -340,6 +340,9 @@ class PlatformTenantUpdateRequest(BaseModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     admin_notes: str | None = None
+    # SuperAdmin: set / reset the office admin login password (min 8).
+    admin_password: str | None = Field(default=None, min_length=8, max_length=128)
+    admin_email: EmailStr | None = None
 
 
 class PlatformOverviewResponse(BaseModel):

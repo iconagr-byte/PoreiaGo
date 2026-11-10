@@ -7,54 +7,58 @@ import {
   PreviewBuilderControl,
   usePreviewDesignMode,
 } from './preview/PreviewDesignMode.jsx';
+import '../../styles/storefront-header.css';
+
+const HEADER_INNER =
+  'sf-header-inner max-w-container-max mx-auto px-3 sm:px-4 md:px-margin-desktop h-16 md:h-20 flex items-center justify-between gap-2 sm:gap-3 md:gap-4 min-w-0';
 
 const HEADER_STYLES = {
   glass_dark: {
-    wrap: 'fixed top-0 w-full z-50 border-b transition-[background-color,border-color,box-shadow] duration-300',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 border-b transition-[background-color,border-color,box-shadow] duration-300',
     wrapTop: 'border-white/10 bg-slate-950/35 backdrop-blur-lg',
     wrapScrolled: 'border-white/15 bg-slate-950/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.25)]',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-20 flex items-center justify-between gap-4',
+    inner: HEADER_INNER,
     variant: 'dark',
-    demoOffset: 'top-20',
+    demoOffset: 'top-16 md:top-20',
   },
   solid_light: {
-    wrap: 'fixed top-0 w-full z-50 border-b transition-[background-color,box-shadow] duration-300',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 border-b transition-[background-color,box-shadow] duration-300',
     wrapTop: 'border-black/[0.06] bg-white/95 backdrop-blur-md',
     wrapScrolled: 'border-black/[0.08] bg-white shadow-md',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-20 flex items-center justify-between gap-4',
+    inner: HEADER_INNER,
     variant: 'light',
-    demoOffset: 'top-20',
+    demoOffset: 'top-16 md:top-20',
   },
   transparent_minimal: {
-    wrap: 'fixed top-0 w-full z-50 transition-[background-color,border-color] duration-300 border-b',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 transition-[background-color,border-color] duration-300 border-b',
     wrapTop: 'border-transparent bg-transparent',
     wrapScrolled: 'border-white/10 bg-slate-950/80 backdrop-blur-xl',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-16 flex items-center justify-between gap-4',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-16'),
     variant: 'dark',
     demoOffset: 'top-16',
   },
   bordered_elegant: {
-    wrap: 'fixed top-0 w-full z-50 bg-white border-b-2 border-slate-200',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 bg-white border-b-2 border-slate-200',
     wrapTop: '',
     wrapScrolled: 'shadow-sm',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-[72px] flex items-center justify-between gap-4',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-[72px]'),
     variant: 'light',
     demoOffset: 'top-[72px]',
   },
   floating_pill: {
-    wrap: 'fixed top-4 left-0 right-0 z-50 px-4 md:px-8 pointer-events-none',
+    wrap: 'sf-header-shell fixed top-4 left-0 right-0 z-50 px-3 sm:px-4 md:px-8 pointer-events-none',
     wrapTop: '',
     wrapScrolled: '',
     inner:
-      'max-w-3xl mx-auto h-14 px-6 flex items-center justify-between gap-4 rounded-full bg-white/90 backdrop-blur-xl shadow-lg border border-black/[0.06] pointer-events-auto',
+      'sf-header-inner max-w-3xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 rounded-full bg-white/90 backdrop-blur-xl shadow-lg border border-black/[0.06] pointer-events-auto min-w-0',
     variant: 'light',
     demoOffset: 'top-24',
   },
   gradient_bar: {
-    wrap: 'fixed top-0 w-full z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-sky-900 shadow-lg',
+    wrap: 'sf-header-shell fixed top-0 w-full z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-sky-900 shadow-lg',
     wrapTop: '',
     wrapScrolled: '',
-    inner: 'max-w-container-max mx-auto px-margin-desktop h-16 flex items-center justify-between gap-4',
+    inner: HEADER_INNER.replace('md:h-20', 'md:h-16'),
     variant: 'dark',
     demoOffset: 'top-16',
   },
@@ -110,8 +114,8 @@ export default function StorefrontHeader({
     : 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors';
 
   const menuBtn = isDark
-    ? 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white'
-    : 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.08] bg-black/[0.03] text-slate-800';
+    ? 'sf-header-menu-btn md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white'
+    : 'sf-header-menu-btn md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.1] bg-black/[0.04] text-slate-800';
 
   const preview = usePreviewDesignMode();
   const previewFocused =
@@ -183,9 +187,9 @@ export default function StorefrontHeader({
               Στόλος
             </a>
           ) : null}
-          <a href="#contact" className={navLink}>
+          <Link to="/contact" className={navLink}>
             Επικοινωνία
-          </a>
+          </Link>
           {tripsEnabled ? (
             <Link to="/my-booking" className={navLink}>
               Η κράτησή μου
@@ -202,7 +206,7 @@ export default function StorefrontHeader({
           <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
         </nav>
 
-        <div className="flex md:hidden items-center gap-2">
+        <div className="sf-header-actions flex md:hidden items-center">
           <StorefrontAccountMenu isDark={isDark} compact onOpenLogin={openLogin} />
           <button
             type="button"
@@ -226,50 +230,99 @@ export default function StorefrontHeader({
             isDark ? 'border-white/10 bg-slate-950/95 text-white' : 'border-black/[0.06] bg-white text-slate-900'
           }`}
         >
-          <nav className="max-w-container-max mx-auto px-margin-desktop py-4 flex flex-col gap-1" aria-label="Μενού κινητού">
+          <nav
+            className="sf-header-mobile-nav max-w-container-max mx-auto px-3 sm:px-4 md:px-margin-desktop py-4 flex flex-col gap-1"
+            aria-label="Μενού κινητού"
+          >
             {tripsEnabled ? (
-              <a href="#search-results" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#search-results"
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  map
+                </span>
                 Εκδρομές
               </a>
             ) : null}
+            {tripsEnabled ? (
+              <Link
+                to="/my-booking"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  confirmation_number
+                </span>
+                Η κράτησή μου
+              </Link>
+            ) : null}
+            <Link
+              to="/contact"
+              onClick={closeMenu}
+              className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                mail
+              </span>
+              Επικοινωνία
+            </Link>
             {rentEnabled ? (
-              <Link to="/rent" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <Link
+                to="/rent"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_car
+                </span>
                 Rent
               </Link>
             ) : null}
             {rentEnabled ? (
-              <a href="#rent-services" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#rent-services"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  verified_user
+                </span>
                 Υπηρεσίες
               </a>
             ) : null}
             {showFleet ? (
-              <a href="#our-fleet" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#our-fleet"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_bus
+                </span>
                 Στόλος
               </a>
             ) : null}
-            <a href="#contact" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
-              Επικοινωνία
-            </a>
             {tel ? (
-              <a href={tel} onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+              <a
+                href={tel}
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
                   call
                 </span>
                 {phone}
               </a>
             ) : null}
-            <div className="px-3 py-2">
+            <div className="px-1 pt-2 pb-1">
               <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
             </div>
-            {tripsEnabled ? (
-              <Link
-                to="/my-booking"
-                onClick={closeMenu}
-                className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
-              >
-                Η κράτησή μου
-              </Link>
-            ) : null}
           </nav>
         </div>
       ) : null}

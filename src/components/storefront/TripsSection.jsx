@@ -30,7 +30,7 @@ export default function TripsSection({
   return (
     <section
       id={id}
-      className={`${dense ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
+      className={`sf-trips-section ${dense ? 'py-10 md:py-12' : 'py-16 md:py-24'} px-4 sm:px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
     >
       <div className={`text-center ${dense ? (abroadStrip ? 'mb-8' : 'mb-6') : 'mb-16'}`}>
         {eyebrow && (
@@ -77,11 +77,11 @@ export default function TripsSection({
       {trips.length === 0 ? (
         <p className="text-center text-on-surface-variant py-12 font-body-md">{emptyMessage}</p>
       ) : (
-        <div className={gridClass}>
+        <div className={`sf-trips-grid ${gridClass}`}>
           {trips.map((trip, index) => (
             <div
               key={String(trip.id ?? index)}
-              className={tripCardWrapperClass(layoutId, tripCount, index, cardId)}
+              className={`sf-trips-card-wrap ${tripCardWrapperClass(layoutId, tripCount, index, cardId)}`}
             >
               <TripCard
                 trip={trip}

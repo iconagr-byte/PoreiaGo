@@ -37,7 +37,7 @@ const BUS_LINKS = [
 ];
 
 /**
- * PoreiaGo marketing homepage header — buses vs rent clearly separated.
+ * PoreiaGo marketing homepage header — desktop dropdown beside the mark.
  */
 export default function PlatformMarketingHeader() {
   const [busOpen, setBusOpen] = useState(false);
@@ -83,9 +83,9 @@ export default function PlatformMarketingHeader() {
   };
 
   return (
-    <header className="pm-header">
+    <header className="pm-header pm-header--light">
       <div className="pm-header-inner">
-        <PlatformBrand variant="dark" />
+        <PlatformBrand variant="light" />
 
         <nav className="pm-nav" aria-label="Κύριο μενού">
           <div className="pm-nav-cluster pm-nav-cluster--bus" ref={busWrapRef}>
@@ -142,14 +142,19 @@ export default function PlatformMarketingHeader() {
         </nav>
 
         <div className="pm-header-actions">
-          <Link to="/admin/login" className="pm-header-login">
+          <Link to="/admin/login" className="pm-header-login pm-header-desktop-only">
             Σύνδεση
           </Link>
-          <Link to="/grafeia" className="pm-header-cta">
-            Συμβόλαια
+          <Link
+            to="/wallet"
+            className="pm-header-cta pm-header-cta--wallet"
+            onClick={closeAll}
+            aria-label="My Wallet"
+          >
             <span className="material-symbols-outlined" aria-hidden>
-              arrow_forward
+              account_balance_wallet
             </span>
+            <span className="pm-header-cta__label">My Wallet</span>
           </Link>
           <button
             type="button"
@@ -169,6 +174,24 @@ export default function PlatformMarketingHeader() {
       {mobileOpen ? (
         <div id="pm-mobile-panel" className="pm-mobile">
           <nav className="pm-mobile-nav" aria-label="Μενού κινητού">
+            <section className="pm-mobile-section">
+              <p className="pm-mobile-label">
+                <span className="material-symbols-outlined" aria-hidden>
+                  info
+                </span>
+                Ξεκινήστε εδώ
+              </p>
+              <a href="#choose-service" className="pm-mobile-link" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  door_open
+                </span>
+                <span>
+                  <strong>Διαλέξτε υπηρεσία</strong>
+                  <em>Λεωφορεία ή Ενοικιάσεις</em>
+                </span>
+              </a>
+            </section>
+
             <section className="pm-mobile-section">
               <p className="pm-mobile-label">
                 <span className="material-symbols-outlined" aria-hidden>
@@ -220,11 +243,18 @@ export default function PlatformMarketingHeader() {
               <Link to="/admin/login" className="pm-mobile-login" onClick={closeAll}>
                 Σύνδεση γραφείου
               </Link>
-              <Link to="/grafeia" className="pm-header-cta pm-mobile-cta" onClick={closeAll}>
-                Συμβόλαια
+              <Link
+                to="/wallet"
+                className="pm-header-cta pm-header-cta--wallet pm-mobile-cta"
+                onClick={closeAll}
+              >
                 <span className="material-symbols-outlined" aria-hidden>
-                  arrow_forward
+                  account_balance_wallet
                 </span>
+                My Wallet
+              </Link>
+              <Link to="/grafeia" className="pm-mobile-login" onClick={closeAll}>
+                Συμβόλαια
               </Link>
             </div>
           </nav>

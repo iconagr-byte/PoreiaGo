@@ -201,6 +201,10 @@ export function isSessionValid() {
  * Cold-open gate.
  * - Native (unified or legacy driver package): valid persisted JWT → command center.
  * - Web/PWA: only right after login/QR in this visit (fresh marker).
+ *
+ * Peek the fresh marker — do not consume here. React StrictMode double-invokes
+ * useState initializers; consuming once then clearing the session on the second
+ * call bounced drivers straight back to /login after a successful sign-in.
  */
 export function resolveDriverAuthOnLaunch() {
   if (persistNativeDriver()) {
@@ -219,7 +223,13 @@ export function resolveDriverAuthOnLaunch() {
     return false;
   }
   purgeStickyDriverSession();
-  if (consumeDriverAuthFresh() && isSessionValid()) {
+  let fresh = false;
+  try {
+    fresh = sessionStorage.getItem(FRESH_AUTH_KEY) === '1';
+  } catch {
+    fresh = false;
+  }
+  if (fresh && isSessionValid()) {
     return true;
   }
   clearDriverSession();

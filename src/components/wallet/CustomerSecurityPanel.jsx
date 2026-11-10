@@ -1,6 +1,15 @@
 import { useEffect, useId, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
+  getAuthProvider,
+  getCustomerId,
+  getCustomerName,
+  getCustomerPhone,
+  getCustomerPicture,
+  getCustomerToken,
+} from '../../lib/auth.js';
+import { getWalletTenantId } from '../../lib/wallet/walletTenantSeal.js';
+import {
   changeCustomerEmailApi,
   changeCustomerPasswordApi,
   fetchCustomerMe,
@@ -8,24 +17,24 @@ import {
 import {
   getWalletDeviceSecurity,
   isBiometricsAvailable,
-  setBiometricsEnabled,
+  setQuickLoginEnabled,
   setWalletPin,
 } from '../../lib/wallet/walletDeviceSecurity.js';
 
 const ACTIONS = [
   {
-    id: 'biometrics',
-    icon: 'fingerprint',
+    id: 'quick',
+    icon: 'lock_open',
     tone: 'is-mint',
-    label: 'Βιομετρικά',
-    hint: 'Face ID / δακτυλικό σε αυτή τη συσκευή',
+    label: 'Γρήγορη σύνδεση',
+    hint: 'Είσοδος με PIN σε αυτή τη συσκευή',
   },
   {
     id: 'pin',
     icon: 'pin',
     tone: '',
-    label: 'Αλλαγή PIN',
-    hint: 'Κλείδωμα εφαρμογής σε αυτή τη συσκευή',
+    label: 'PIN συσκευής',
+    hint: 'Απαιτείται για Γρήγορη σύνδεση',
   },
   {
     id: 'password',
@@ -43,6 +52,18 @@ const ACTIONS = [
   },
 ];
 
+function currentSessionSnapshot() {
+  return {
+    accessToken: getCustomerToken(),
+    name: getCustomerName(),
+    picture: getCustomerPicture(),
+    provider: getAuthProvider() || 'email',
+    phone: getCustomerPhone(),
+    customerId: getCustomerId(),
+    tenantId: getWalletTenantId(),
+  };
+}
+
 export default function CustomerSecurityPanel({
   email,
   authProvider,
@@ -51,7 +72,9 @@ export default function CustomerSecurityPanel({
 }) {
   const baseId = useId();
   const isGoogle = authProvider === 'google';
-  const [openAction, setOpenAction] = useState(initialAction || null);
+  const [openAction, setOpenAction] = useState(
+    initialAction === 'biometrics' ? 'quick' : initialAction || null,
+  );
   const [hasPassword, setHasPassword] = useState(null);
   const [deviceSec, setDeviceSec] = useState(() => getWalletDeviceSecurity(email));
   const [saving, setSaving] = useState(false);
@@ -69,7 +92,8 @@ export default function CustomerSecurityPanel({
   }, [email]);
 
   useEffect(() => {
-    if (initialAction) setOpenAction(initialAction);
+    if (!initialAction) return;
+    setOpenAction(initialAction === 'biometrics' ? 'quick' : initialAction);
   }, [initialAction]);
 
   useEffect(() => {
@@ -79,25 +103,35 @@ export default function CustomerSecurityPanel({
   }, [email]);
 
   const passwordSet = hasPassword === true;
-  const biometricsOn = Boolean(deviceSec.biometricsEnabled);
+  const quickOn = Boolean(deviceSec.quickLoginEnabled || deviceSec.biometricsEnabled);
   const biometricsOk = isBiometricsAvailable();
 
   const toggleAction = (id) => {
     setOpenAction((prev) => (prev === id ? null : id));
   };
 
-  const handleBiometricsToggle = async () => {
+  const handleQuickLoginToggle = async () => {
     try {
-      const next = !biometricsOn;
-      const updated = await setBiometricsEnabled(email, next);
+      const next = !quickOn;
+      if (next && !deviceSec.hasPin) {
+        toast.error('Ορίστε πρώτα PIN για τη Γρήγορη σύνδεση');
+        setOpenAction('pin');
+        return;
+      }
+      const updated = await setQuickLoginEnabled(
+        email,
+        next,
+        next ? currentSessionSnapshot() : null,
+      );
       setDeviceSec(updated);
       toast.success(
         next
-          ? 'Βιομετρικά ενεργά σε αυτή τη συσκευή'
-          : 'Βιομετρικά απενεργοποιήθηκαν σε αυτή τη συσκευή',
+          ? 'Γρήγορη σύνδεση ενεργή — είσοδος με PIN σε αυτή τη συσκευή'
+          : 'Η Γρήγορη σύνδεση απενεργοποιήθηκε',
       );
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
+      if (/PIN/i.test(String(err?.message || ''))) setOpenAction('pin');
     }
   };
 
@@ -159,11 +193,14 @@ export default function CustomerSecurityPanel({
       const updated = await setWalletPin(email, {
         currentPin: pinForm.current,
         newPin: pinForm.next,
+        session: currentSessionSnapshot(),
       });
       setDeviceSec(updated);
       setPinForm({ current: '', next: '', confirm: '' });
       toast.success(
-        deviceSec.hasPin ? 'Το PIN ενημερώθηκε σε αυτή τη συσκευή' : 'Το PIN ορίστηκε σε αυτή τη συσκευή',
+        deviceSec.hasPin
+          ? 'Το PIN ενημερώθηκε — Γρήγορη σύνδεση ενεργή'
+          : 'Το PIN ορίστηκε — Γρήγορη σύνδεση ενεργή στην πλατφόρμα',
       );
       setOpenAction(null);
     } catch (err) {
@@ -174,8 +211,8 @@ export default function CustomerSecurityPanel({
   };
 
   const actionStatus = (id) => {
-    if (id === 'biometrics') {
-      return biometricsOn ? 'Ενεργά' : 'Ανενεργά';
+    if (id === 'quick') {
+      return quickOn && deviceSec.hasPin ? 'Ενεργή' : quickOn ? 'Χρειάζεται PIN' : 'Ανενεργή';
     }
     if (id === 'pin') {
       return deviceSec.hasPin ? 'Ορισμένο' : 'Δεν έχει οριστεί';
@@ -196,7 +233,7 @@ export default function CustomerSecurityPanel({
         </span>
         <div>
           <h2>Ασφάλεια λογαριασμού</h2>
-          <p>Βιομετρικά, PIN συσκευής, κωδικός και email σύνδεσης.</p>
+          <p>Γρήγορη σύνδεση με PIN, κωδικός και email.</p>
         </div>
       </div>
 
@@ -224,8 +261,8 @@ export default function CustomerSecurityPanel({
                 aria-expanded={expanded}
                 aria-controls={`${baseId}-${action.id}`}
                 onClick={() => {
-                  if (action.id === 'biometrics') {
-                    handleBiometricsToggle();
+                  if (action.id === 'quick') {
+                    handleQuickLoginToggle();
                     return;
                   }
                   toggleAction(action.id);
@@ -240,8 +277,8 @@ export default function CustomerSecurityPanel({
                   <span className="wallet-account-row-hint">{action.hint}</span>
                 </div>
                 <span className="material-symbols-outlined wallet-account-row-chevron" aria-hidden>
-                  {action.id === 'biometrics'
-                    ? biometricsOn
+                  {action.id === 'quick'
+                    ? quickOn && deviceSec.hasPin
                       ? 'toggle_on'
                       : 'toggle_off'
                     : expanded
@@ -375,7 +412,8 @@ export default function CustomerSecurityPanel({
                   onSubmit={handlePinSubmit}
                 >
                   <p className="wallet-panel-lead">
-                    Το PIN αποθηκεύεται μόνο σε αυτή τη συσκευή (όχι στον server).
+                    Το PIN ενεργοποιεί τη Γρήγορη σύνδεση σε αυτή τη συσκευή. Μετά την αποσύνδεση
+                    θα μπορείτε να μπείτε με το PIN αντί για κωδικό.
                   </p>
                   {deviceSec.hasPin ? (
                     <div className="wallet-field">
@@ -437,7 +475,11 @@ export default function CustomerSecurityPanel({
                     disabled={saving}
                     className="wallet-btn wallet-btn-primary wallet-btn-block"
                   >
-                    {saving ? 'Αποθήκευση…' : deviceSec.hasPin ? 'Αλλαγή PIN' : 'Ορισμός PIN'}
+                    {saving
+                      ? 'Αποθήκευση…'
+                      : deviceSec.hasPin
+                        ? 'Αλλαγή PIN'
+                        : 'Ορισμός PIN & ενεργοποίηση'}
                   </button>
                 </form>
               ) : null}
@@ -448,8 +490,8 @@ export default function CustomerSecurityPanel({
 
       {!biometricsOk ? (
         <p className="wallet-field-hint" style={{ marginTop: '0.75rem' }}>
-          Τα βιομετρικά αποθηκεύονται ως προτίμηση συσκευής· το native Face ID / δακτυλικό
-          ενεργοποιείται όταν διαθέσιμο στο app.
+          Η Γρήγορη σύνδεση χρησιμοποιεί PIN σε αυτή τη συσκευή. Face ID / δακτυλικό θα προστεθεί
+          όταν είναι διαθέσιμο στο native app.
         </p>
       ) : null}
     </section>

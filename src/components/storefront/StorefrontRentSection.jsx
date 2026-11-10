@@ -139,7 +139,8 @@ export default function StorefrontRentSection({
   loading = false,
   rentOnly = false,
   brandName = '',
-  showServices = true,
+  // Platform capability copy stays on www landing — not office storefronts.
+  showServices = false,
   siteAppearance = {},
 }) {
   const title = rentOnly ? 'Ενοικιάσεις οχημάτων' : 'Ενοικίαση αυτοκινήτου';

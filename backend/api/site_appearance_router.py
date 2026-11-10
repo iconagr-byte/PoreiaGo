@@ -115,6 +115,10 @@ DEFAULT_SITE_APPEARANCE = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "footer_hours": "",
+    "footer_tagline": "",
+    "footer_facebook_url": "",
+    "footer_instagram_url": "",
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
@@ -262,6 +266,10 @@ class SiteAppearanceResponse(BaseModel):
     footer_contact_email: str = ""
     footer_contact_phone: str = ""
     footer_address: str = ""
+    footer_hours: str = ""
+    footer_tagline: str = ""
+    footer_facebook_url: str = ""
+    footer_instagram_url: str = ""
     rent_office_name: str = ""
     rent_logo_url: str = ""
     rent_logo_show_name: bool = True
@@ -399,6 +407,10 @@ class SiteAppearanceUpdate(BaseModel):
     footer_contact_email: str | None = None
     footer_contact_phone: str | None = None
     footer_address: str | None = None
+    footer_hours: str | None = None
+    footer_tagline: str | None = None
+    footer_facebook_url: str | None = None
+    footer_instagram_url: str | None = None
     rent_office_name: str | None = None
     rent_logo_url: str | None = None
     rent_logo_show_name: bool | None = None

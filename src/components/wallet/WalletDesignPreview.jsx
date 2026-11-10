@@ -101,10 +101,11 @@ export default function WalletDesignPreview() {
         <header className="wallet-topbar">
           <div className="wallet-topbar-brand" style={{ marginInline: 'auto' }}>
             <OfficeBrandMark
-              className="h-8"
+              className="h-7 max-w-[14.5rem]"
               variant="light"
               fallbackLabel={brandLabel}
               asLink={false}
+              compact={Boolean(isPhone)}
             />
           </div>
         </header>

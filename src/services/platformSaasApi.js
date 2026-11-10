@@ -67,6 +67,10 @@ export async function reactivatePlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/reactivate`, { method: 'POST' });
 }
 
+export async function deletePlatformTenant(tenantId) {
+  return saasFetch(`/api/v1/platform/tenants/${tenantId}`, { method: 'DELETE' });
+}
+
 export async function impersonatePlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/impersonate`, { method: 'POST' });
 }

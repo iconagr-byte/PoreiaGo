@@ -90,7 +90,7 @@ export default function StorefrontAccountMenu({
     ? 'inline-flex items-center gap-1.5 rounded-full bg-white text-slate-900 shadow-sm hover:bg-white/90 transition-colors'
     : 'inline-flex items-center gap-1.5 rounded-full bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition-colors';
 
-  const pad = compact ? 'px-2.5 py-1.5 text-xs font-bold' : 'px-3.5 py-2 text-sm font-bold';
+  const pad = compact ? 'sf-header-login' : 'px-3.5 py-2 text-sm font-bold';
   const menuPanel = isDark
     ? 'bg-slate-950/95 text-white border border-white/12 shadow-[0_16px_40px_rgba(0,0,0,0.45)]'
     : 'bg-white text-slate-900 border border-black/[0.08] shadow-[0_16px_40px_rgba(15,23,42,0.14)]';
@@ -106,14 +106,14 @@ export default function StorefrontAccountMenu({
       <button
         type="button"
         className={`${pill} ${pad}`}
-        title="Log in to your account"
-        aria-label="Log in to your account"
+        title="Είσοδος στον λογαριασμό"
+        aria-label="Είσοδος στον λογαριασμό"
         onClick={() => onOpenLogin?.()}
       >
-        <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        <span className="material-symbols-outlined sf-header-login__icon text-[18px]" aria-hidden>
           login
         </span>
-        Log in
+        <span className="sf-header-login__label">{compact ? 'Είσοδος' : 'Log in'}</span>
       </button>
     );
   }

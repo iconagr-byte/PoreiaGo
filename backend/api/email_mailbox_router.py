@@ -214,6 +214,31 @@ async def get_mailbox_message(message_id: str, request: Request):
     if not msg["is_read"]:
         await mailbox_store.update_message(message_id, {"is_read": True})
         msg = await _require_owned_message(message_id, request)
+        # Push \\Seen to IMAP so the 5s poll does not revive the unread blue dot.
+        try:
+            import asyncio
+
+            from email_client.dynamic_mailer import settings_to_imap_config
+            from email_client.imap_trash import imap_mark_message_seen
+            from email_client.settings_store import get_settings_for_send
+
+            sid = str(msg.get("email_settings_id") or "").strip()
+            if sid:
+                account = await get_settings_for_send(sid)
+                cfg = settings_to_imap_config(account) if account else None
+                if cfg:
+
+                    def _mark():
+                        return imap_mark_message_seen(
+                            cfg,
+                            message_id=str(msg.get("message_id") or ""),
+                            local_folder=str(msg.get("folder") or "Inbox"),
+                            imap_uid=str(msg.get("imap_uid") or "") or None,
+                        )
+
+                    asyncio.create_task(asyncio.to_thread(_mark))
+        except Exception:
+            pass
     for key in ("body_html", "subject", "sender", "recipient", "date"):
         if msg.get(key) is None:
             msg[key] = ""

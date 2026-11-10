@@ -35,6 +35,12 @@ import {
   clearPreferRentLookup,
   markPreferRentLookup,
 } from '../lib/rental/preferRentLookup.js';
+import {
+  getQuickLoginCandidate,
+  unlockQuickLogin,
+} from '../lib/wallet/walletDeviceSecurity.js';
+import { getApiBase } from '../config/api.js';
+import BookingLookupEntryLink from '../components/BookingLookupEntryLink.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -85,6 +91,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [quickCandidate, setQuickCandidate] = useState(() => getQuickLoginCandidate());
+  const [useQuickLogin, setUseQuickLogin] = useState(() => Boolean(getQuickLoginCandidate()));
+  const [quickPin, setQuickPin] = useState('');
 
   const claim = useMemo(() => {
     const fromState = location.state?.walletClaim
@@ -111,6 +120,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
+  }, []);
+
+  useEffect(() => {
+    const candidate = getQuickLoginCandidate();
+    setQuickCandidate(candidate);
+    if (candidate) setUseQuickLogin(true);
   }, []);
 
   useEffect(() => {
@@ -206,13 +221,73 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   const finishDriverLogin = () => {
     try {
+      // Clears customer JWT / userRole — restore driver role after (saveDriverSession
+      // may have set it earlier, then parallel customer auth left a customer token).
       logoutCustomer();
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem('userRole', 'driver');
     } catch {
       /* ignore */
     }
     clearDriverShiftLaunchState();
     rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
     navigate('/driver', { replace: true });
+  };
+
+  const handleQuickUnlock = async (e) => {
+    e.preventDefault();
+    setError('');
+    const candidate = quickCandidate || getQuickLoginCandidate();
+    if (!candidate?.email) {
+      setUseQuickLogin(false);
+      setError('Δεν υπάρχει Γρήγορη σύνδεση σε αυτή τη συσκευή.');
+      return;
+    }
+    if (!String(quickPin || '').trim()) {
+      setError('Εισάγετε το PIN σας.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const unlocked = await unlockQuickLogin(candidate.email, quickPin);
+      // Confirm the vaulted JWT is still accepted by the platform.
+      const meRes = await fetch(`${getApiBase()}/api/auth/me`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${unlocked.accessToken}`,
+        },
+      });
+      if (!meRes.ok) {
+        setUseQuickLogin(false);
+        setQuickPin('');
+        setError('Η αποθηκευμένη συνεδρία έληξε. Συνδεθείτε με κωδικό για να ανανεώσετε τη Γρήγορη σύνδεση.');
+        return;
+      }
+      const surface = await resolveCustomerSurface({
+        preferRent: preferRentHint,
+        preferWallet: preferWalletHint || Boolean(claim),
+      });
+      finishCustomerLogin(
+        unlocked.email,
+        {
+          name: unlocked.name,
+          picture: unlocked.picture,
+          provider: unlocked.provider || 'email',
+          phone: unlocked.phone,
+          customerId: unlocked.customerId,
+          tenant_id: unlocked.tenantId,
+        },
+        unlocked.accessToken,
+        surface,
+      );
+    } catch (err) {
+      setError(err.message || 'Αποτυχία Γρήγορης σύνδεσης');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -344,23 +419,36 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const homeHref = rentIntent ? '/rent' : '/';
   const registerHref = rentIntent ? '/rent/register' : '/register';
 
+  const showQuick = Boolean(useQuickLogin && quickCandidate?.email);
+
   const formBody = (
     <>
       <div className="text-center wallet-auth-hero">
         <span className={iconClass} aria-hidden>
-          account_balance_wallet
+          {showQuick ? 'lock_open' : 'account_balance_wallet'}
         </span>
         <h1>
-          {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : 'My Wallet'}
+          {bookingPayContinue
+            ? 'Ολοκλήρωση πληρωμής'
+            : showQuick
+              ? 'Γρήγορη σύνδεση'
+              : 'My Wallet'}
         </h1>
         {bookingPayContinue ? (
           <p className={leadClass}>
             Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.
           </p>
+        ) : showQuick ? (
+          <p className={leadClass}>
+            Εισάγετε το PIN για{' '}
+            <span className="font-semibold text-[#1d1d1f]">
+              {quickCandidate.displayName || quickCandidate.email}
+            </span>
+          </p>
         ) : null}
       </div>
 
-      {claim ? (
+      {claim && !showQuick ? (
         <div className="mb-5 rounded-2xl border border-[#0071e3]/20 bg-[#0071e3]/8 px-4 py-3 text-sm">
           <p className="font-bold text-[#0071e3] mb-1">Κράτηση έτοιμη για το Wallet</p>
           <p className="text-[#6e6e73]">
@@ -370,139 +458,204 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         </div>
       ) : null}
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        {backendOk === false ? (
-          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            {import.meta.env.PROD
-              ? 'Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.'
-              : (
-                <>
-                  Ο server δεν τρέχει. Σε νέο terminal:{' '}
-                  <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
-                </>
-              )}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="space-y-2">
-          <label htmlFor="email">Email / χρήστης</label>
-          <div className="relative">
-            <span
-              className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
-              aria-hidden
-            >
-              mail
-            </span>
-            <input
-              id="email"
-              name="email"
-              type="text"
-              inputMode="email"
-              autoComplete="username"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              enterKeyHint="next"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email ή όνομα χρήστη"
-              required
-              disabled={loading || googleLoading}
-            />
+      {showQuick ? (
+        <form onSubmit={handleQuickUnlock} className="space-y-4">
+          {error ? (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              {error}
+            </p>
+          ) : null}
+          <div className="rounded-2xl border border-[#d2d2d7]/80 bg-[#f5f5f7] px-4 py-3 text-sm text-center">
+            <p className="font-semibold text-[#1d1d1f]">{quickCandidate.email}</p>
+            <p className="text-xs text-[#6e6e73] mt-1">PIN αυτής της συσκευής</p>
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label htmlFor="password">Κωδικός</label>
-            <Link to="/forgot-password" className={`${linkClass} text-xs`}>
-              Ξέχασα τον κωδικό
-            </Link>
+          <div className="space-y-2">
+            <label htmlFor="quick-pin">PIN</label>
+            <div className="relative">
+              <span
+                className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
+                aria-hidden
+              >
+                pin
+              </span>
+              <input
+                id="quick-pin"
+                name="quick-pin"
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                enterKeyHint="go"
+                value={quickPin}
+                onChange={(e) => setQuickPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="4–6 ψηφία"
+                required
+                disabled={loading}
+              />
+            </div>
           </div>
-          <div className="relative">
-            <span
-              className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
-              aria-hidden
-            >
-              lock
-            </span>
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              enterKeyHint="go"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Κωδικός πρόσβασης"
-              required
-              disabled={loading || googleLoading}
-              style={{ paddingRight: '2.75rem' }}
-            />
+          <button type="submit" disabled={loading || quickPin.length < 4} className={submitClass}>
+            {loading ? 'Ξεκλείδωμα…' : 'Είσοδος με PIN'}
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </button>
+          <button
+            type="button"
+            className={`${linkClass} w-full text-center text-sm py-2`}
+            onClick={() => {
+              setUseQuickLogin(false);
+              setQuickPin('');
+              setError('');
+              if (quickCandidate?.email) setEmail(quickCandidate.email);
+            }}
+            disabled={loading}
+          >
+            Σύνδεση με κωδικό / άλλο λογαριασμό
+          </button>
+        </form>
+      ) : (
+        <>
+          <form onSubmit={handleLogin} className="space-y-4">
+            {backendOk === false ? (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                {import.meta.env.PROD
+                  ? 'Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.'
+                  : (
+                    <>
+                      Ο server δεν τρέχει. Σε νέο terminal:{' '}
+                      <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
+                    </>
+                  )}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="space-y-2">
+              <label htmlFor="email">Email / χρήστης</label>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
+                  aria-hidden
+                >
+                  mail
+                </span>
+                <input
+                  id="email"
+                  name="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email ή όνομα χρήστη"
+                  required
+                  disabled={loading || googleLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label htmlFor="password">Κωδικός</label>
+                <Link to="/forgot-password" className={`${linkClass} text-xs`}>
+                  Ξέχασα τον κωδικό
+                </Link>
+              </div>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg pointer-events-none"
+                  aria-hidden
+                >
+                  lock
+                </span>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  enterKeyHint="go"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Κωδικός πρόσβασης"
+                  required
+                  disabled={loading || googleLoading}
+                  style={{ paddingRight: '2.75rem' }}
+                />
+                <button
+                  type="button"
+                  className={`${linkClass} absolute right-3 top-1/2 -translate-y-1/2 p-1`}
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+                  aria-pressed={showPassword}
+                  tabIndex={-1}
+                >
+                  <span className="material-symbols-outlined text-lg text-[#8e8e93]" aria-hidden>
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading || googleLoading} className={submitClass}>
+              {loading ? 'Σύνδεση…' : 'Είσοδος'}
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+          </form>
+
+          {quickCandidate?.email ? (
             <button
               type="button"
-              className={`${linkClass} absolute right-3 top-1/2 -translate-y-1/2 p-1`}
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
-              aria-pressed={showPassword}
-              tabIndex={-1}
+              className={`${linkClass} w-full text-center text-sm mt-4`}
+              onClick={() => {
+                setUseQuickLogin(true);
+                setError('');
+                setQuickPin('');
+              }}
             >
-              <span className="material-symbols-outlined text-lg text-[#8e8e93]" aria-hidden>
-                {showPassword ? 'visibility_off' : 'visibility'}
-              </span>
+              Γρήγορη σύνδεση με PIN
             </button>
+          ) : null}
+
+          {/* Always show Google — GoogleSignInButton handles loading / unavailable.
+              Native packaged app previously hid this when /api/google/config failed on localhost. */}
+          <div className={`${dividerClass} mt-5`}>ή με Google</div>
+          <div className="space-y-3 mt-2">
+            <GoogleSignInButton
+              disabled={googleLoading || loading}
+              onSuccess={handleGoogleCredential}
+              onDemoProfile={handleGoogleDemo}
+              onError={setError}
+            />
+            {googleLoading ? (
+              <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+            ) : null}
           </div>
-        </div>
 
-        <button type="submit" disabled={loading || googleLoading} className={submitClass}>
-          {loading ? 'Σύνδεση…' : 'Είσοδος'}
-          <span className="material-symbols-outlined text-sm">arrow_forward</span>
-        </button>
-      </form>
-
-      {/* Always show Google — GoogleSignInButton handles loading / unavailable.
-          Native packaged app previously hid this when /api/google/config failed on localhost. */}
-      <div className={`${dividerClass} mt-5`}>ή με Google</div>
-      <div className="space-y-3 mt-2">
-        <GoogleSignInButton
-          disabled={googleLoading || loading}
-          onSuccess={handleGoogleCredential}
-          onDemoProfile={handleGoogleDemo}
-          onError={setError}
-        />
-        {googleLoading ? (
-          <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-        ) : null}
-      </div>
-
-      <p className="text-sm text-center text-[#6e6e73] mt-5">
-        Δεν έχετε λογαριασμό;{' '}
-        <Link
-          to={registerHref}
-          state={rentIntent ? { from: '/wallet?tab=rentals' } : registerState}
-          className={linkClass}
-        >
-          Εγγραφή
-        </Link>
-      </p>
-      {!isNativeApp() ? (
-        <p className="text-xs text-center mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-          <Link to="/my-booking" className={linkClass}>
-            Εύρεση κράτησης λεωφορείου
-          </Link>
-          <span className="text-[#d2d2d7]" aria-hidden>
-            ·
-          </span>
-          <Link to="/rent/my-booking" className={linkClass}>
-            Εύρεση κράτησης ενοικίασης
-          </Link>
-        </p>
-      ) : null}
+          <p className="text-sm text-center text-[#6e6e73] mt-5">
+            Δεν έχετε λογαριασμό;{' '}
+            <Link
+              to={registerHref}
+              state={rentIntent ? { from: '/wallet?tab=rentals' } : registerState}
+              className={linkClass}
+            >
+              Εγγραφή
+            </Link>
+          </p>
+          {!isNativeApp() ? (
+            <p className="text-xs text-center mt-3">
+              <BookingLookupEntryLink preferRent={rentIntent} className={linkClass} />
+            </p>
+          ) : null}
+        </>
+      )}
     </>
   );
 
