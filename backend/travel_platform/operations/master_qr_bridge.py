@@ -43,13 +43,15 @@ async def resolve_platform_tenant_id() -> str:
     """
     Tenant UUID that admin JWT / live map / driver GPS remap use.
 
+    This is the **PoreiaGo platform / demo office** — never Achillio Travel
+    (admin-achillio-gr / achilliotravel.com).
+
     Priority:
     1. SAAS_DEFAULT_TENANT_ID / DEFAULT_TENANT_ID env
-    2. Tenant that owns PLATFORM_CUSTOM_DOMAINS (default: achilliotravel.com)
-       — the real Achillio office is slug ``admin-achillio-gr``, while an older
-       seed slug ``achillio`` still exists and previously stole GPS pins
-    3. DEFAULT_TENANT_SLUG (default: achillio)
-    4. Local demo UUID when DB is unavailable
+    2. ``resolve_poreiago_platform_tenant_id()`` (classifier: slug achillio/poreiago)
+    3. Explicit PLATFORM_CUSTOM_DOMAINS (must NOT default to achilliotravel.com)
+    4. DEFAULT_TENANT_SLUG (default: achillio = historic PoreiaGo seed)
+    5. Local demo UUID when DB is unavailable
     """
     global _PLATFORM_TENANT_CACHE
     now = time.time()
@@ -67,19 +69,31 @@ async def resolve_platform_tenant_id() -> str:
 
     tid = DEFAULT_TENANT
     slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
-    domain_csv = (
-        os.getenv("PLATFORM_CUSTOM_DOMAINS") or "achilliotravel.com"
-    ).strip()
+    # Never default to achilliotravel.com — that domain is Achillio Travel office.
+    domain_csv = (os.getenv("PLATFORM_CUSTOM_DOMAINS") or "poreiago.com").strip()
     preferred_domains = [
         d.strip().lower().removeprefix("www.")
         for d in domain_csv.split(",")
-        if d.strip()
+        if d.strip() and "achilliotravel.com" not in d.strip().lower()
     ]
     try:
         from sqlalchemy import or_, select
 
         from app.core.database import AsyncSessionLocal
         from app.models.tenant import Tenant
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        # Prefer the classifier-backed PoreiaGo office (never Achillio Travel).
+        platform_tid = await resolve_poreiago_platform_tenant_id()
+        if platform_tid:
+            _PLATFORM_TENANT_CACHE = (now, platform_tid)
+            return platform_tid
 
         async with AsyncSessionLocal() as db:
             for apex in preferred_domains:
@@ -94,7 +108,9 @@ async def resolve_platform_tenant_id() -> str:
                     .limit(1),
                 )
                 tenant = result.scalar_one_or_none()
-                if tenant:
+                if tenant and is_poreiago_platform_office(tenant) and not is_achillio_travel_office(
+                    tenant
+                ):
                     tid = str(tenant.id)
                     logger.info(
                         "resolve_platform_tenant_id via custom_domain=%s → %s (%s)",
@@ -106,7 +122,7 @@ async def resolve_platform_tenant_id() -> str:
             else:
                 result = await db.execute(select(Tenant).where(Tenant.slug == slug).limit(1))
                 tenant = result.scalar_one_or_none()
-                if tenant:
+                if tenant and not is_achillio_travel_office(tenant):
                     tid = str(tenant.id)
     except Exception as exc:
         logger.debug("resolve_platform_tenant_id DB lookup failed: %s", exc)

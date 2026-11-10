@@ -52,7 +52,20 @@ export async function fetchPublicRentalCatalog(category) {
   return data.vehicles || [];
 }
 
-export async function fetchCustomerRentalAvailability({
+/** Guest rental booking lookup — email + RB-… (or booking id). */
+export async function lookupPublicRentalBooking({ email, reference }) {
+  const data = await publicRentalFetch('/public/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      reference: String(reference || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
+
+function availabilityParams({
   startTime,
   endTime,
   category,
@@ -71,7 +84,17 @@ export async function fetchCustomerRentalAvailability({
   if (pickupLocation) params.set('pickup_location', pickupLocation);
   if (dropoffLocation) params.set('dropoff_location', dropoffLocation);
   if (driverMode) params.set('driver_mode', driverMode);
-  if (branch) params.set('branch', branch);
+  return params;
+}
+
+export async function fetchPublicRentalAvailability(args) {
+  const params = availabilityParams(args);
+  const data = await publicRentalFetch(`/public/availability?${params}`);
+  return data.vehicles || [];
+}
+
+export async function fetchCustomerRentalAvailability(args) {
+  const params = availabilityParams(args);
   const data = await customerRentalFetch(`/availability?${params}`);
   return data.vehicles || [];
 }

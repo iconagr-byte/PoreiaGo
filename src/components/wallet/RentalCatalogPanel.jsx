@@ -15,35 +15,9 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
-import { fetchPublicPaymentSettings } from '../../services/paymentSettingsApi.js';
-import { toLegacyCheckoutShape } from '../../lib/payments/paymentSettings.js';
-import {
-  amountDueAtCheckout,
-  computeDepositSplit,
-  PAYMENT_PLAN_DEPOSIT,
-  PAYMENT_PLAN_FULL,
-} from '../../lib/payments/depositPayment.js';
-import { getCheckoutPaymentMethods } from '../../lib/payments/bankTransfer.js';
-import {
-  getRentalPaymentPlans,
-  paymentStatusLabel,
-} from '../../lib/rental/rentalPayment.js';
-import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
-import RentalStripePay from '../rental/RentalStripePay.jsx';
-import { FALLBACK_CONTRACT } from '../../lib/rental/rentalContract.js';
-import {
-  cancelBlockedMessage,
-  FREE_CANCEL_HOURS,
-  isFreeCancelEligible,
-} from '../../lib/rental/rentalCancel.js';
-import { getRentLang, t } from '../../lib/rental/rentI18n.js';
+import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
-const CATEGORIES = [
-  { value: '', labelKey: 'all_categories' },
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
 const AGE_BY_CATEGORY = { CAR: 21, VAN: 23, MINIBUS: 25 };
 
@@ -363,6 +337,8 @@ export default function RentalCatalogPanel({
         dropoff_location: raw.dropoff_location || f.dropoff_location,
         driver_mode: raw.driver_mode || f.driver_mode,
         client_phone: raw.client_phone || f.client_phone,
+        start_time: raw.start_time || f.start_time,
+        end_time: raw.end_time || f.end_time,
       }));
       if (raw.sortBy) setSortBy(raw.sortBy);
       if (raw.priceCap) setPriceCap(Number(raw.priceCap));
@@ -373,15 +349,19 @@ export default function RentalCatalogPanel({
 
   useEffect(() => {
     try {
+      const prev = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       localStorage.setItem(
         PREFS_KEY,
         JSON.stringify({
+          ...prev,
           category: form.category,
           min_seats: form.min_seats,
           pickup_location: form.pickup_location,
           dropoff_location: form.dropoff_location,
           driver_mode: form.driver_mode,
           client_phone: form.client_phone,
+          start_time: form.start_time,
+          end_time: form.end_time,
           sortBy,
           priceCap,
         }),
@@ -514,23 +494,10 @@ export default function RentalCatalogPanel({
       return;
     }
     if (!validateDates()) return;
-    if (!validateIdentity()) return;
-    if (!paymentMethods.length) {
-      toast.error('Δεν υπάρχουν διαθέσιμοι τρόποι πληρωμής');
-      return;
-    }
-    if (!contractAccepted) {
-      toast.error('Αποδεχτείτε τους όρους μίσθωσης');
-      return;
-    }
-    if (form.driver_mode === 'SELF_DRIVE' && !insuranceAck) {
-      toast.error(t('insurance_ack', lang));
-      return;
-    }
-    if (!signatureUrl) {
-      toast.error('Υπογράψτε τη σύμβαση πριν την κράτηση');
-      return;
-    }
+    const extras = [];
+    if (form.extra_insurance) extras.push('extra_insurance');
+    if (form.child_seat) extras.push('child_seat');
+    if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
       if (form.client_afm && !/^\d{9}$/.test(String(form.client_afm).trim())) {
@@ -556,23 +523,7 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
-        client_afm: form.client_afm?.trim() || null,
-        extras: {
-          extra_insurance: Boolean(form.extra_insurance),
-          scdw: Boolean(form.scdw),
-          child_seat: Boolean(form.child_seat),
-          gps_pack: Boolean(form.gps_pack),
-          airport_pickup: Boolean(form.airport_pickup),
-          young_driver: Boolean(form.young_driver),
-        },
-        payment_plan: paymentPlan,
-        payment_method: paymentMethod,
-        deposit_percent: depositPercent,
-        ...identity,
-        contract_accepted: true,
-        contract_signature_url: signatureUrl,
-        contract_signer_name: getCustomerName() || getCustomerEmail() || 'Πελάτης',
-        contract_version: contract.version,
+        extras,
       });
       if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
         try {
