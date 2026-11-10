@@ -8,9 +8,20 @@ function apiBase() {
   }
 }
 
+function detailMessage(data, fallback) {
+  const detail = data && (data.detail ?? data.message);
+  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (Array.isArray(detail) && detail.length) {
+    const first = detail[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first.msg === 'string') return first.msg;
+  }
+  return fallback;
+}
+
 /**
  * Submit guest contact form to the current office Host mailbox.
- * @param {{ name: string, email: string, phone?: string, subject?: string, message: string }} payload
+ * @param {{ name: string, email: string, phone?: string, subject?: string, message: string, website?: string }} payload
  */
 export async function submitOfficeContact(payload) {
   const host =
@@ -40,10 +51,14 @@ export async function submitOfficeContact(payload) {
     data = null;
   }
   if (!res.ok) {
-    const detail =
-      (data && (data.detail || data.message)) ||
-      'Αποτυχία αποστολής. Δοκιμάστε ξανά.';
-    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία αποστολής.');
+    throw new Error(
+      detailMessage(data, 'Αποτυχία αποστολής. Δοκιμάστε ξανά.'),
+    );
+  }
+  if (data && data.ok === false) {
+    throw new Error(
+      detailMessage(data, 'Αποτυχία αποστολής. Δοκιμάστε ξανά.'),
+    );
   }
   return data || { ok: true };
 }

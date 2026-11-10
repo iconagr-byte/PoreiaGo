@@ -5,6 +5,9 @@ from __future__ import annotations
 import html
 import logging
 import re
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
@@ -94,6 +97,80 @@ async def _resolve_office(request: Request, host: str | None) -> tuple[str, str,
     return tenant_id, office_email, office_name or "Γραφείο"
 
 
+def _plain_from_fields(
+    *,
+    office_name: str,
+    name: str,
+    email: str,
+    phone: str,
+    topic: str,
+    message: str,
+) -> str:
+    phone_line = phone or "—"
+    return (
+        f"Νέο μήνυμα επικοινωνίας για {office_name}\n\n"
+        f"Όνομα: {name}\n"
+        f"Email: {email}\n"
+        f"Τηλέφωνο: {phone_line}\n"
+        f"Θέμα: {topic}\n\n"
+        f"Μήνυμα:\n{message}\n"
+    )
+
+
+async def _deliver_to_office_inbox(
+    *,
+    tenant_id: str,
+    office_email: str,
+    name: str,
+    email: str,
+    subject: str,
+    body_html: str,
+    body_text: str,
+) -> str | None:
+    """Drop the contact message straight into the office Email Hub Inbox."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return None
+    try:
+        from email_client.constants import FOLDER_INBOX
+        from email_client.settings_store import list_settings
+        from email_client.store import upsert_message
+
+        accounts = await list_settings(owner_key=f"tenant:{tid}", active_only=True)
+        if not accounts:
+            logger.info("Contact inbox skip — no mailbox for tenant=%s", tid)
+            return None
+        sid = str(accounts[0]["id"])
+        mid = f"<contact-{uuid.uuid4().hex}@poreiago.local>"
+        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        row, created = await upsert_message(
+            {
+                "email_settings_id": sid,
+                "message_id": mid,
+                "subject": subject,
+                "sender": f"{name} <{email}>",
+                "recipient": office_email,
+                "body_html": body_html,
+                "body_text": body_text,
+                "folder": FOLDER_INBOX,
+                "is_read": False,
+                "date": now,
+            }
+        )
+        pk = (row or {}).get("id") if isinstance(row, dict) else None
+        logger.info(
+            "Contact inbox delivered tenant=%s settings=%s created=%s id=%s",
+            tid,
+            sid,
+            created,
+            pk or "-",
+        )
+        return str(pk) if pk else mid
+    except Exception:
+        logger.exception("Contact inbox upsert failed tenant=%s", tid)
+        return None
+
+
 @router.post("/api/site/contact", response_model=ContactFormResponse)
 async def submit_public_contact(
     request: Request,
@@ -146,28 +223,65 @@ async def submit_public_contact(
       <p style="margin:16px 0 0;font-size:12px;color:#94a3b8">Απαντήστε απευθείας στο {safe_email}</p>
     </div>
     """
+    body_text = _plain_from_fields(
+        office_name=office_name,
+        name=name,
+        email=email,
+        phone=phone,
+        topic=topic,
+        message=message,
+    )
 
+    # 1) Always try Email Hub Inbox first so staff see the message even when
+    # SMTP self-delivery (info@ → info@) never arrives as new mail.
+    inbox_id = await _deliver_to_office_inbox(
+        tenant_id=tenant_id,
+        office_email=office_email,
+        name=name,
+        email=email,
+        subject=mail_subject,
+        body_html=body_html,
+        body_text=body_text,
+    )
+
+    smtp_ok = False
+    ref = ""
     try:
-        from ticketing.email_dispatch import send_email
+        from ticketing.email_dispatch import is_delivered_email_ref, send_email
 
         ref = await send_email(
             office_email,
             mail_subject,
             body_html,
             tenant_id=tenant_id or None,
+            reply_to=email,
+            allow_tenant_self_send=False,
+            skip_spam_filter=True,
         )
+        smtp_ok = is_delivered_email_ref(ref)
         logger.info(
-            "Public contact form sent to=%s tenant=%s ref=%s from=%s",
+            "Public contact form smtp to=%s tenant=%s ref=%s delivered=%s from=%s inbox=%s",
             office_email,
             tenant_id or "-",
             ref,
+            smtp_ok,
             email,
+            inbox_id or "-",
         )
     except Exception as exc:
-        logger.exception("Public contact form failed to=%s: %s", office_email, exc)
-        raise HTTPException(
-            status_code=502,
-            detail="Αποτυχία αποστολής. Δοκιμάστε ξανά σε λίγο ή στείλτε email απευθείας.",
-        ) from exc
+        logger.exception("Public contact form SMTP failed to=%s: %s", office_email, exc)
+        ref = f"email-error-{office_email}"
 
-    return ContactFormResponse()
+    if inbox_id or smtp_ok:
+        return ContactFormResponse()
+
+    logger.error(
+        "Public contact form undelivered to=%s tenant=%s ref=%s",
+        office_email,
+        tenant_id or "-",
+        ref,
+    )
+    raise HTTPException(
+        status_code=502,
+        detail="Αποτυχία αποστολής. Δοκιμάστε ξανά σε λίγο ή στείλτε email απευθείας.",
+    )
