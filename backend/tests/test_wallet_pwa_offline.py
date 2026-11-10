@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class WalletPwaOfflineContractTests(unittest.TestCase):
     def test_wallet_sw_and_manifest_exist(self):
         sw = (ROOT / "public" / "wallet-pwa" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("poreiago-wallet-v3", sw)
+        self.assertIn("poreiago-wallet-v4", sw)
         self.assertIn("/wallet-pwa/offline.html", sw)
         self.assertIn("pathname.startsWith('/wallet')", sw)
 
@@ -49,19 +49,41 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         )
         self.assertIn("/wallet-pwa/sw.js", reg)
 
+    def test_wallet_primary_nav_has_no_kratisi_search_tab(self):
+        """Regression: #799 — Κράτηση (search) must not return as a primary nav tab."""
+        page = (ROOT / "src" / "pages" / "SimpleWalletPage.jsx").read_text(encoding="utf-8")
+        shell = (ROOT / "src" / "components" / "wallet" / "WalletNativeShell.jsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("id: 'lookup'", page)
+        self.assertNotIn("label: 'Κράτηση'", page)
+        self.assertNotIn("icon: 'search'", page)
+        self.assertIn("label: 'Αρχική'", page)
+        self.assertIn("label: 'Εισιτήριο'", page)
+        self.assertIn("label: 'Κρατήσεις'", page)
+        self.assertIn("label: 'Περισσότερα'", page)
+        self.assertNotIn("label: 'Κράτηση'", shell)
+        self.assertNotIn("icon: 'search'", shell)
+        self.assertNotIn("to: '/my-booking'", shell)
+
     def test_nginx_avoids_wallet_directory_trap(self):
         conf = (ROOT / "deploy" / "nginx" / "frontend.conf").read_text(encoding="utf-8")
         shared = (ROOT / "deploy" / "nginx" / "frontend-shared.inc").read_text(encoding="utf-8")
         # Host/XFH-based SPA shell (NPM may not preserve Host for server_name).
+        # Default index.html = PoreiaGo; Achillio is index.achillio.html only.
         self.assertIn("map $http_x_forwarded_host $spa_from_xfh", conf)
-        self.assertIn("index.poreiago.html", conf)
+        self.assertIn("index.achillio.html", conf)
+        self.assertIn("~*achilliotravel\\.com /index.achillio.html;", conf)
         self.assertIn("set $spa_shell /index.html;", conf)
         self.assertIn("try_files $uri @seo_shell;", conf)
         self.assertIn("location @seo_shell", conf)
         self.assertIn("/api/site/seo-shell", conf)
-        self.assertIn("achillio_force_www", conf)
-        self.assertIn('map "$host|$http_x_forwarded_host" $achillio_force_www', conf)
-        self.assertIn("https://www.achilliotravel.com", conf)
+        self.assertIn("apex-www-redirect.map", conf)
+        self.assertIn("$apex_to_www", conf)
+        self.assertIn("https://$apex_to_www", conf)
+        apex_map = (ROOT / "deploy" / "nginx" / "apex-www-redirect.map").read_text(encoding="utf-8")
+        self.assertIn('map "$host|$http_x_forwarded_host" $apex_to_www', apex_map)
+        self.assertIn("www.achilliotravel.com", apex_map)
         # Nested if+set for the redirect must stay gone (silently no-op on Contabo).
         self.assertNotIn("achillio_apex_from_host", conf)
         self.assertNotIn("achillio_apex_from_xfh", conf)

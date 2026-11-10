@@ -58,8 +58,13 @@ def db_roles_from_ui(role: UiRole, *, preserve_superadmin: bool = False) -> list
     return [UserRole.AUDITOR.value]
 
 
-def user_to_platform_dict(user: User) -> dict[str, Any]:
-    return {
+def user_to_platform_dict(
+    user: User,
+    *,
+    tenant_name: str | None = None,
+    tenant_slug: str | None = None,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
         "id": str(user.id),
         "email": user.email,
         "name": user.full_name or user.email,
@@ -68,6 +73,14 @@ def user_to_platform_dict(user: User) -> dict[str, Any]:
         "last_login_at": None,
         "created_at": getattr(user, "created_at", None) or datetime.now(timezone.utc),
     }
+    tid = getattr(user, "tenant_id", None)
+    if tid is not None:
+        out["tenant_id"] = str(tid)
+    if tenant_name:
+        out["tenant_name"] = tenant_name
+    if tenant_slug:
+        out["tenant_slug"] = tenant_slug
+    return out
 
 
 async def _disable_rls(session: AsyncSession) -> None:
@@ -90,6 +103,34 @@ async def list_tenant_users(session: AsyncSession, tenant_id: UUID) -> list[User
         if roles & _STAFF_ROLES:
             users.append(u)
     return users
+
+
+async def list_all_staff_users_with_tenants(session: AsyncSession) -> list[dict[str, Any]]:
+    """Superadmin: every office staff account, labeled by tenant."""
+    from app.models.tenant import Tenant
+
+    await _disable_rls(session)
+    result = await session.execute(
+        select(User, Tenant.legal_name, Tenant.slug)
+        .outerjoin(Tenant, Tenant.id == User.tenant_id)
+        .order_by(
+            func.lower(func.coalesce(Tenant.legal_name, Tenant.slug, "")),
+            func.lower(User.email),
+        )
+    )
+    out: list[dict[str, Any]] = []
+    for user, legal_name, slug in result.all():
+        roles = {str(r).lower() for r in (user.roles or [])}
+        if not (roles & _STAFF_ROLES):
+            continue
+        out.append(
+            user_to_platform_dict(
+                user,
+                tenant_name=str(legal_name or "").strip() or None,
+                tenant_slug=str(slug or "").strip() or None,
+            )
+        )
+    return out
 
 
 async def get_tenant_user(

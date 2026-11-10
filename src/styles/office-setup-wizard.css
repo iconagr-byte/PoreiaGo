@@ -652,6 +652,183 @@
   max-width: none !important;
 }
 
+/* Domain step — platform subdomain + custom domain */
+.office-setup-domain-hero {
+  position: relative;
+  margin-top: 0.35rem;
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #0b4f6c 0%, #0071e3 48%, #0a7a6c 100%);
+  color: #fff;
+  padding: 1.35rem 1.35rem 1.45rem;
+  box-shadow: 0 18px 40px rgba(0, 71, 171, 0.22);
+}
+
+.office-setup-domain-orb {
+  position: absolute;
+  inset: auto -18% -55% auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 68%);
+  pointer-events: none;
+  animation: officeSetupDomainOrb 7s ease-in-out infinite;
+}
+
+@keyframes officeSetupDomainOrb {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(-12px, -10px) scale(1.08);
+    opacity: 1;
+  }
+}
+
+.office-setup-domain-ready {
+  position: relative;
+  z-index: 1;
+}
+
+.office-setup-domain-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.office-setup-domain-kicker {
+  margin: 0.85rem 0 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
+.office-setup-domain-host {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  word-break: break-all;
+}
+
+.office-setup-domain-copy {
+  margin-top: 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0b4f6c;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+}
+
+.office-setup-domain-copy:hover {
+  background: #fff;
+}
+
+.office-setup-domain-card {
+  margin-top: 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 1.15rem 1.2rem 1.25rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.office-setup-domain-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.office-setup-domain-card-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #0a7a6c;
+  background: linear-gradient(145deg, rgba(10, 122, 108, 0.14), rgba(0, 113, 227, 0.1));
+  border: 1px solid rgba(10, 122, 108, 0.12);
+  flex-shrink: 0;
+}
+
+.office-setup-domain-card-head strong {
+  display: block;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+
+.office-setup-domain-card-head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--os-secondary);
+}
+
+.office-setup-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+.office-setup-cname {
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.16);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.06), rgba(255, 255, 255, 0.9));
+  padding: 0.9rem 1rem 1rem;
+}
+
+.office-setup-cname-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0a7a6c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.office-setup-cname-code {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  color: #1d1d1f;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.office-setup-cname .office-setup-domain-copy {
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.office-setup-cname .office-setup-domain-copy:hover {
+  background: #08665b;
+}
+
+.office-setup-cname-notes {
+  margin: 0.75rem 0 0;
+  padding: 0 0 0 1.1rem;
+  font-size: 0.8rem;
+  color: var(--os-secondary);
+  display: grid;
+  gap: 0.35rem;
+}
+
 @media (max-width: 640px) {
   .office-setup-shell {
     padding-bottom: 6rem;

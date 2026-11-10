@@ -146,7 +146,11 @@ async def record_cash_payment_saas(
             send_payment_confirmation_notifications,
         )
 
-        await send_payment_confirmation_notifications(merged, event=EVENT_CASH_PAYMENT)
+        await send_payment_confirmation_notifications(
+            merged,
+            event=EVENT_CASH_PAYMENT,
+            require_office=True,
+        )
     except Exception:
         pass
 

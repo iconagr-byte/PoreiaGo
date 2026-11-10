@@ -20,7 +20,15 @@ router = APIRouter(tags=["site-appearance"])
 logger = logging.getLogger(__name__)
 
 _LEGACY_DATA = Path(__file__).resolve().parents[1] / "data"
-_ALLOWED_KINDS = frozenset({"logo", "hero"})
+_ALLOWED_KINDS = frozenset({"logo", "hero", "rent_logo"})
+
+
+def _url_key_for_kind(kind: str) -> str:
+    if kind == "logo":
+        return "logo_url"
+    if kind == "rent_logo":
+        return "rent_logo_url"
+    return "hero_image_url"
 _MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 # Only legacy PoreiaGo/AeroStride brand marks — not /api/site/assets/logo
 # (that path is the real uploaded office logo from the upload API).
@@ -87,6 +95,9 @@ DEFAULT_SITE_APPEARANCE = {
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
+    "hero_overlay_opacity": 100,
+    "hero_image_fit": "cover",
+    "hero_height_vh": 88,
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
     "hero_title_accent": "Άνεση, ασφάλεια & θέση εξασφαλισμένη.",
@@ -104,7 +115,20 @@ DEFAULT_SITE_APPEARANCE = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "footer_hours": "",
+    "footer_tagline": "",
+    "footer_facebook_url": "",
+    "footer_instagram_url": "",
     "rent_office_name": "",
+    "rent_logo_url": "",
+    "rent_logo_show_name": True,
+    "rent_logo_height_px": 40,
+    "rent_logo_max_width_px": 160,
+    "rent_logo_radius_px": 0,
+    "rent_logo_padding_px": 0,
+    "rent_logo_bg_mode": "none",
+    "rent_logo_shadow": False,
+    "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -154,6 +178,16 @@ DEFAULT_SITE_APPEARANCE = {
     "accent_color": "#0ea5e9",
     "secondary_color": "#1e3a5f",
     "surface_color": "#f8fafc",
+    "rent_fleet_layout_template": "rent_grid_three",
+    "rent_fleet_card_template": "rent_premium",
+    "rent_theme_id": "aegean_coast",
+    "rent_hero_style": "coastal",
+    "rent_hero_layout": "strip",
+    "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+    "rent_header_style": "glass",
+    "rent_accent_color": "#0a7a6c",
+    "rent_secondary_color": "#0b3d4a",
+    "rent_surface_color": "#f0fdfa",
     "show_fleet_section": True,
     "show_why_us_section": True,
     "header_template": "glass_dark",
@@ -173,6 +207,30 @@ DEFAULT_SITE_APPEARANCE = {
     "intl_section_subtitle": (
         "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     ),
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
     "updated_at": None,
 }
 
@@ -188,6 +246,9 @@ class SiteAppearanceResponse(BaseModel):
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
+    hero_overlay_opacity: int = 100
+    hero_image_fit: str = "cover"
+    hero_height_vh: int = 88
     hero_badge: str = "Premium Ταξιδιωτική Εμπειρία"
     hero_title: str = "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"
     hero_title_accent: str = "Άνεση, ασφάλεια & θέση εξασφαλισμένη."
@@ -205,7 +266,20 @@ class SiteAppearanceResponse(BaseModel):
     footer_contact_email: str = ""
     footer_contact_phone: str = ""
     footer_address: str = ""
+    footer_hours: str = ""
+    footer_tagline: str = ""
+    footer_facebook_url: str = ""
+    footer_instagram_url: str = ""
     rent_office_name: str = ""
+    rent_logo_url: str = ""
+    rent_logo_show_name: bool = True
+    rent_logo_height_px: int = 40
+    rent_logo_max_width_px: int = 160
+    rent_logo_radius_px: int = 0
+    rent_logo_padding_px: int = 0
+    rent_logo_bg_mode: str = "none"
+    rent_logo_shadow: bool = False
+    rent_header_compact: bool = False
     rent_hero_title: str = "Το όχημά σας, σε λίγα βήματα"
     rent_hero_copy: str = (
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -247,6 +321,16 @@ class SiteAppearanceResponse(BaseModel):
     accent_color: str = "#0ea5e9"
     secondary_color: str = "#1e3a5f"
     surface_color: str = "#f8fafc"
+    rent_fleet_layout_template: str = "rent_grid_three"
+    rent_fleet_card_template: str = "rent_premium"
+    rent_theme_id: str = "aegean_coast"
+    rent_hero_style: str = "coastal"
+    rent_hero_layout: str = "strip"
+    rent_hero_image_url: str = "/images/rent-hero-coastal-v2.jpg"
+    rent_header_style: str = "glass"
+    rent_accent_color: str = "#0a7a6c"
+    rent_secondary_color: str = "#0b3d4a"
+    rent_surface_color: str = "#f0fdfa"
     show_fleet_section: bool = True
     show_why_us_section: bool = True
     header_template: str = "glass_dark"
@@ -266,6 +350,17 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = []
+    wallet_home_news: list[dict] = []
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
+    # Needed by native Wallet scrub guard — without slug, localhost treated Achillio
+    # office branding as platform poison and cleared the logo.
+    tenant_slug: str | None = None
     updated_at: str | None = None
 
 
@@ -295,6 +390,9 @@ class SiteAppearanceUpdate(BaseModel):
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
+    hero_overlay_opacity: int | None = None
+    hero_image_fit: str | None = None
+    hero_height_vh: int | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None
@@ -309,7 +407,20 @@ class SiteAppearanceUpdate(BaseModel):
     footer_contact_email: str | None = None
     footer_contact_phone: str | None = None
     footer_address: str | None = None
+    footer_hours: str | None = None
+    footer_tagline: str | None = None
+    footer_facebook_url: str | None = None
+    footer_instagram_url: str | None = None
     rent_office_name: str | None = None
+    rent_logo_url: str | None = None
+    rent_logo_show_name: bool | None = None
+    rent_logo_height_px: int | None = None
+    rent_logo_max_width_px: int | None = None
+    rent_logo_radius_px: int | None = None
+    rent_logo_padding_px: int | None = None
+    rent_logo_bg_mode: str | None = None
+    rent_logo_shadow: bool | None = None
+    rent_header_compact: bool | None = None
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
@@ -349,6 +460,16 @@ class SiteAppearanceUpdate(BaseModel):
     accent_color: str | None = None
     secondary_color: str | None = None
     surface_color: str | None = None
+    rent_fleet_layout_template: str | None = None
+    rent_fleet_card_template: str | None = None
+    rent_theme_id: str | None = None
+    rent_hero_style: str | None = None
+    rent_hero_layout: str | None = None
+    rent_hero_image_url: str | None = None
+    rent_header_style: str | None = None
+    rent_accent_color: str | None = None
+    rent_secondary_color: str | None = None
+    rent_surface_color: str | None = None
     show_fleet_section: bool | None = None
     show_why_us_section: bool | None = None
     header_template: str | None = None
@@ -364,6 +485,14 @@ class SiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 def _clamp_logo_fields(data: dict) -> dict:
@@ -395,6 +524,52 @@ def _clamp_logo_fields(data: dict) -> dict:
         out["logo_shadow"] = bool(out["logo_shadow"])
     if "logo_show_name" in out and out["logo_show_name"] is not None:
         out["logo_show_name"] = bool(out["logo_show_name"])
+    if "hero_overlay_opacity" in out and out["hero_overlay_opacity"] is not None:
+        try:
+            out["hero_overlay_opacity"] = max(0, min(100, int(out["hero_overlay_opacity"])))
+        except (TypeError, ValueError):
+            out["hero_overlay_opacity"] = 100
+    if "hero_height_vh" in out and out["hero_height_vh"] is not None:
+        try:
+            out["hero_height_vh"] = max(50, min(100, int(out["hero_height_vh"])))
+        except (TypeError, ValueError):
+            out["hero_height_vh"] = 88
+    if "hero_image_fit" in out and out["hero_image_fit"] is not None:
+        fit = str(out.get("hero_image_fit") or "cover").strip().lower()
+        out["hero_image_fit"] = "contain" if fit == "contain" else "cover"
+    if "hero_image_focal" in out and out["hero_image_focal"] is not None:
+        focal = str(out.get("hero_image_focal") or "center").strip().lower()
+        allowed = {"center", "top", "bottom", "left", "right"}
+        out["hero_image_focal"] = focal if focal in allowed else "center"
+    if "rent_logo_height_px" in out and out["rent_logo_height_px"] is not None:
+        try:
+            out["rent_logo_height_px"] = max(20, min(96, int(out["rent_logo_height_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_height_px"] = 40
+    if "rent_logo_max_width_px" in out and out["rent_logo_max_width_px"] is not None:
+        try:
+            out["rent_logo_max_width_px"] = max(60, min(400, int(out["rent_logo_max_width_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_max_width_px"] = 160
+    if "rent_logo_radius_px" in out and out["rent_logo_radius_px"] is not None:
+        try:
+            out["rent_logo_radius_px"] = max(0, min(48, int(out["rent_logo_radius_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_radius_px"] = 0
+    if "rent_logo_padding_px" in out and out["rent_logo_padding_px"] is not None:
+        try:
+            out["rent_logo_padding_px"] = max(0, min(24, int(out["rent_logo_padding_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_padding_px"] = 0
+    if "rent_logo_bg_mode" in out and out["rent_logo_bg_mode"] is not None:
+        mode = str(out.get("rent_logo_bg_mode") or "none").strip().lower()
+        out["rent_logo_bg_mode"] = mode if mode in ("none", "white", "soft", "dark") else "none"
+    if "rent_logo_shadow" in out and out["rent_logo_shadow"] is not None:
+        out["rent_logo_shadow"] = bool(out["rent_logo_shadow"])
+    if "rent_logo_show_name" in out and out["rent_logo_show_name"] is not None:
+        out["rent_logo_show_name"] = bool(out["rent_logo_show_name"])
+    if "rent_header_compact" in out and out["rent_header_compact"] is not None:
+        out["rent_header_compact"] = bool(out["rent_header_compact"])
     return out
 
 
@@ -581,12 +756,44 @@ async def get_public_checkout_settings(request: Request):
     return CheckoutSettingsResponse(**_read_checkout_settings(tid))
 
 
+async def _appearance_for_tenant_id(tenant_id: str) -> SiteAppearanceResponse | None:
+    """Load public office branding by sealed wallet / office UUID."""
+    try:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+
+        tid = UUID(str(tenant_id).strip())
+    except Exception:
+        return None
+    try:
+        async with AsyncSessionLocal() as session:
+            data = await TenantSiteAppearanceService(session).get_appearance(tid)
+            clean = {k: v for k, v in data.items() if k in SiteAppearanceResponse.model_fields}
+            return SiteAppearanceResponse(**{**DEFAULT_SITE_APPEARANCE, **clean})
+    except Exception:
+        logger.debug("appearance by tenant_id failed", exc_info=True)
+        return None
+
+
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)
 async def get_public_site_appearance(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     purge_mistaken_platform_logo()
+
+    # Native My Wallet: Host is localhost — resolve branding from sealed tenant_id.
+    explicit_tid = (tenant_id or "").strip()
+    if explicit_tid:
+        by_tid = await _appearance_for_tenant_id(explicit_tid)
+        if by_tid is not None:
+            return by_tid
 
     # Prefer explicit ?host=, else the browser Host (custom domains like achilliotravel.com).
     effective_host = (host or "").strip() or (
@@ -829,7 +1036,7 @@ async def upload_site_asset(kind: str, request: Request, file: UploadFile = File
     out_path = _upload_dir() / f"{kind}{ext}"
     out_path.write_bytes(content)
     current = _read_appearance()
-    url_key = "logo_url" if kind == "logo" else "hero_image_url"
+    url_key = _url_key_for_kind(kind)
     current[url_key] = _asset_api_url(kind)
     saved = _write_appearance(current)
     return {
@@ -848,10 +1055,11 @@ async def clear_site_asset(kind: str, request: Request):
     for old in _upload_dir().glob(f"{kind}.*"):
         old.unlink(missing_ok=True)
     current = _read_appearance()
-    if kind == "logo":
-        current["logo_url"] = ""
+    url_key = _url_key_for_kind(kind)
+    if kind == "hero":
+        current[url_key] = DEFAULT_SITE_APPEARANCE["hero_image_url"]
     else:
-        current["hero_image_url"] = DEFAULT_SITE_APPEARANCE["hero_image_url"]
+        current[url_key] = ""
     saved = _write_appearance(current)
     return {"ok": True, "appearance": SiteAppearanceResponse(**saved)}
 
@@ -904,6 +1112,10 @@ class OfficeModulesResponse(BaseModel):
 async def get_public_office_modules(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     """
     Public storefront modules for an office host.
@@ -912,6 +1124,58 @@ async def get_public_office_modules(
     effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
     if effective_host and "," in effective_host:
         effective_host = effective_host.split(",")[0].strip()
+
+    explicit_tid = (tenant_id or "").strip()
+    if explicit_tid:
+        try:
+            from uuid import UUID
+
+            from app.core.database import AsyncSessionLocal
+            from app.services.tenant_modules import (
+                apply_known_office_rent_policy,
+                is_achillio_travel_office,
+                is_poreiago_platform_office,
+                modules_for_tenant,
+            )
+            from sqlalchemy import select
+            from app.models.tenant import Tenant
+
+            tid = UUID(explicit_tid)
+            async with AsyncSessionLocal() as session:
+                row = await session.execute(select(Tenant).where(Tenant.id == tid))
+                tenant = row.scalar_one_or_none()
+                if tenant:
+                    try:
+                        updated = apply_known_office_rent_policy(tenant)
+                        if updated is not None:
+                            tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+                            await session.commit()
+                            await session.refresh(tenant)
+                    except Exception:
+                        logger.debug(
+                            "apply_known_office_rent_policy skipped on /site/modules?tenant_id",
+                            exc_info=True,
+                        )
+                    mods = modules_for_tenant(tenant)
+                    if is_achillio_travel_office(tenant):
+                        kind = "achillio_travel"
+                    elif is_poreiago_platform_office(tenant):
+                        kind = "poreiago_platform"
+                        mods = {
+                            **mods,
+                            "rent_enabled": True,
+                            "trips_enabled": True,
+                            "mode": "both",
+                        }
+                    else:
+                        kind = "customer"
+                    return OfficeModulesResponse(
+                        **mods,
+                        tenant_slug=tenant.slug,
+                        office_kind=kind,
+                    )
+        except Exception:
+            logger.debug("modules by tenant_id failed", exc_info=True)
 
     if effective_host:
         try:
@@ -1175,6 +1439,8 @@ class PublicTripResponse(BaseModel):
     totalSeats: int = 0
     description: str = ""
     image: str = ""
+    # Gallery for Wallet / storefront covers when primary image is empty.
+    images: list[str] = Field(default_factory=list)
     hook: str = ""
     durationLabel: str = ""
     badge: str = ""
@@ -1186,18 +1452,46 @@ class PublicTripResponse(BaseModel):
     market: str | None = None
     vehicleType: str = ""
     currency: str = "EUR"
+    # Office starter catalog (Achillio seed) — Back Office must not strip these.
+    officeSeed: bool = False
+    catalogSource: str = ""
 
 
 @router.get("/api/site/trips", response_model=list[PublicTripResponse])
 async def get_public_office_trips(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / desktop Wallet). "
+        "Published catalog only — same trust model as /api/site/appearance?tenant_id=.",
+    ),
 ):
     """
-    Published trips for an office Host — strictly scoped by tenant_id.
+    Published trips for an office — strictly scoped by tenant_id.
     Never returns another office's catalog or shared demo trips.
+
+    Resolution order (matches appearance / modules for sealed Wallet):
+    1. Explicit ?tenant_id= (My Wallet seal — Host may be localhost or 127.0.0.1
+       behind NPM, so Host alone is unreliable).
+    2. Host / X-Forwarded-Host → DomainResolver.
+    3. Office Bearer JWT tenant (Back Office hydrate on marketing host).
     """
+    from travel_platform.operations.achillio_seed_trips import (
+        refresh_achillio_seed_and_heal_bookings,
+    )
     from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
+
+    # Sealed My Wallet (desktop + native): prefer explicit office UUID.
+    # Published trips are public per office — same as appearance/modules.
+    explicit_tid = (tenant_id or "").strip() or None
+    if explicit_tid:
+        try:
+            await refresh_achillio_seed_and_heal_bookings(explicit_tid)
+        except Exception:
+            logger.debug("achillio seed refresh skipped", exc_info=True)
+        rows = list_tenant_trips(explicit_tid, published_only=True)
+        return [PublicTripResponse(**row) for row in rows]
 
     effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
     if effective_host and "," in effective_host:
@@ -1205,7 +1499,7 @@ async def get_public_office_trips(
     if effective_host and ":" in effective_host:
         effective_host = effective_host.split(":")[0].strip()
 
-    tenant_id: str | None = None
+    resolved_tenant: str | None = None
     if effective_host:
         try:
             from app.core.database import AsyncSessionLocal
@@ -1214,13 +1508,38 @@ async def get_public_office_trips(
             async with AsyncSessionLocal() as session:
                 resolved = await DomainResolver(session).resolve(effective_host)
                 if resolved:
-                    tenant_id = str(resolved.tenant_id)
+                    resolved_tenant = str(resolved.tenant_id)
         except Exception:
             logger.exception("public trips resolve failed for host=%s", effective_host)
-            tenant_id = None
+            resolved_tenant = None
 
-    if not tenant_id:
+    tid = resolved_tenant
+    if not tid:
+        # Fallback: office JWT on marketing host (admin hydrate).
+        jwt_tid: str | None = None
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                import jwt
+                from middleware.tenant import _jwt_settings
+
+                secret, algorithm, _ = _jwt_settings()
+                if secret:
+                    payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+                    raw = payload.get("tenant_id")
+                    if raw:
+                        jwt_tid = str(raw).strip()
+            except Exception:
+                jwt_tid = None
+        if jwt_tid:
+            tid = jwt_tid
+
+    if not tid:
         return []
 
-    rows = list_tenant_trips(tenant_id, published_only=True)
+    try:
+        await refresh_achillio_seed_and_heal_bookings(tid)
+    except Exception:
+        logger.debug("achillio seed refresh skipped", exc_info=True)
+    rows = list_tenant_trips(tid, published_only=True)
     return [PublicTripResponse(**row) for row in rows]

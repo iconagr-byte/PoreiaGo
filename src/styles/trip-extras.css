@@ -103,8 +103,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
   background: #e0f2fe;
   color: #0369a1;
+}
+
+.trip-extras-card-icon .material-symbols-outlined {
+  font-size: 1.35rem;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .trip-extras-card-body {

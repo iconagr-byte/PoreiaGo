@@ -17,6 +17,18 @@ def web_push_configured() -> bool:
     return bool(_vapid_private_key() and _vapid_public_key())
 
 
+def push_configured() -> bool:
+    """True when at least one delivery channel is ready (Web Push and/or FCM)."""
+    if web_push_configured():
+        return True
+    try:
+        from travel_platform.notifications.fcm_push_service import fcm_configured
+
+        return fcm_configured()
+    except Exception:
+        return False
+
+
 def _vapid_public_key() -> str:
     return os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
 
@@ -46,6 +58,27 @@ def _vapid_subject() -> str:
 def get_public_vapid_key() -> str | None:
     key = _vapid_public_key()
     return key or None
+
+
+def _vapid_private_key_for_webpush() -> Any:
+    """
+    Value accepted by pywebpush.webpush(vapid_private_key=...).
+
+    pywebpush only treats a string as PEM when it is a *filesystem path*
+    (Vapid.from_file). Inline PEM content goes through Vapid.from_string,
+    which expects raw/DER base64 — not ``-----BEGIN PRIVATE KEY-----`` —
+    and every send fails (attempted>0, sent=0 on admin push test).
+    Prefer the durable key file; otherwise load PEM via Vapid.from_pem.
+    """
+    key_file = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "").strip()
+    if key_file and Path(key_file).is_file():
+        return key_file
+    private = _vapid_private_key()
+    if private and "BEGIN" in private:
+        from py_vapid import Vapid
+
+        return Vapid.from_pem(private.encode("utf-8"))
+    return private
 
 
 def _data_dir() -> Path:
@@ -99,6 +132,14 @@ def ensure_web_push_keys() -> bool:
         logger.warning("Cannot create VAPID data dir %s: %s", data, exc)
         return web_push_configured()
 
+    # Contabo host bootstrap sometimes created a ghost directory named like the PEM file.
+    for ghost in (public_path, private_path):
+        if ghost.is_dir():
+            try:
+                ghost.rmdir()
+            except OSError:
+                logger.warning("VAPID path is a non-empty directory: %s", ghost)
+
     if public_path.is_file() and private_path.is_file():
         public_key = public_path.read_text(encoding="utf-8").strip()
         private_pem = private_path.read_text(encoding="utf-8").strip()
@@ -117,6 +158,13 @@ def ensure_web_push_keys() -> bool:
         except OSError as exc:
             logger.warning("Could not persist VAPID keys into %s: %s", data, exc)
         return True
+
+    # Stale public-only env (missing private file) blocks nothing — regenerate a matching pair.
+    if _vapid_public_key() and not _vapid_private_key():
+        logger.warning(
+            "WEB_PUSH_VAPID_PUBLIC_KEY set without readable private key — regenerating pair in %s",
+            data,
+        )
 
     try:
         from cryptography.hazmat.primitives import serialization
@@ -179,13 +227,18 @@ def _send_sync(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[st
     webpush(
         subscription_info=sub_info,
         data=body,
-        vapid_private_key=_vapid_private_key(),
+        vapid_private_key=_vapid_private_key_for_webpush(),
         vapid_claims={"sub": _vapid_subject()},
     )
     return {"sent": True, "endpoint": subscription.get("endpoint")}
 
 
 async def send_push_to_subscription(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    from travel_platform.notifications.fcm_push_service import is_fcm_subscription, send_fcm_to_subscription
+
+    if is_fcm_subscription(subscription):
+        return await send_fcm_to_subscription(subscription, payload)
+
     if not web_push_configured():
         ensure_web_push_keys()
     if not web_push_configured():
@@ -212,10 +265,9 @@ async def send_push_to_subscription(subscription: dict[str, Any], payload: dict[
 async def send_push_to_email(email: str, payload: dict[str, Any]) -> dict[str, Any]:
     from travel_platform.notifications.push_subscription_store import list_subscriptions_for_email
 
-    if not web_push_configured():
-        ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    ensure_web_push_keys()
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
     subs = list_subscriptions_for_email(email)
     if not subs:

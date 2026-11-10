@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUsableGoogleClientId } from './googleClientId.js';
+import { isUsableGoogleClientId, PRODUCTION_GOOGLE_CLIENT_ID } from './googleClientId.js';
 
 describe('isUsableGoogleClientId', () => {
   it('rejects empty and non-google ids', () => {
@@ -21,5 +21,6 @@ describe('isUsableGoogleClientId', () => {
         '987654321-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com',
       ),
     ).toBe(true);
+    expect(isUsableGoogleClientId(PRODUCTION_GOOGLE_CLIENT_ID)).toBe(true);
   });
 });

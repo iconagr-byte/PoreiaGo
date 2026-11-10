@@ -153,8 +153,9 @@ def parse_reset_token(token: str) -> dict[str, Any]:
     }
 
 
-def build_reset_url(token: str) -> str:
-    return f"{_public_base_url()}/admin/reset-password?token={token}"
+def build_reset_url(token: str, *, public_base: str | None = None) -> str:
+    base = (public_base or _public_base_url()).rstrip("/")
+    return f"{base}/admin/reset-password?token={token}"
 
 
 def allow_confirm_attempt(client_key: str) -> bool:
@@ -171,9 +172,32 @@ def allow_confirm_attempt(client_key: str) -> bool:
         return True
 
 
+# Public forgot-password request: tighter than confirm (email spam risk).
+_REQUEST_WINDOW_SEC = 60
+_REQUEST_MAX_PER_WINDOW = 5
+_request_hits: dict[str, deque[float]] = defaultdict(deque)
+_request_lock = threading.Lock()
+
+
+def allow_request_attempt(client_key: str) -> bool:
+    """Sliding-window rate limit for public forgot-password requests."""
+    key = (client_key or "unknown").strip()[:128] or "unknown"
+    now = time.time()
+    with _request_lock:
+        q = _request_hits[key]
+        while q and now - q[0] > _REQUEST_WINDOW_SEC:
+            q.popleft()
+        if len(q) >= _REQUEST_MAX_PER_WINDOW:
+            return False
+        q.append(now)
+        return True
+
+
 def reset_confirm_rate_limits_for_tests() -> None:
     with _confirm_lock:
         _confirm_hits.clear()
+    with _request_lock:
+        _request_hits.clear()
 
 
 def memory_fallback_allowed() -> bool:

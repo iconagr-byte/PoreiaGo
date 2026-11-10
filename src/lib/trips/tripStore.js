@@ -146,6 +146,12 @@ export async function deleteTrip(tripId) {
   } catch (err) {
     console.warn('[tripStore] delete sync failed', err);
   }
+  try {
+    const { notifyTripsChanged } = await import('../ticketing/bookingSyncEvents.js');
+    notifyTripsChanged({ reason: 'delete', tripId: id });
+  } catch {
+    /* ignore */
+  }
   return trips;
 }
 
@@ -335,26 +341,40 @@ export function catalogTripToLocal(row) {
     market: row.market || null,
     vehicleType: row.vehicleType || row.vehicle_type || '',
     currency: row.currency || 'EUR',
+    officeSeed:
+      Boolean(row.officeSeed || row.office_seed) ||
+      (Number.isFinite(id) && id >= 91001 && id <= 91099),
+    catalogSource:
+      row.catalogSource ||
+      row.catalog_source ||
+      (Number.isFinite(id) && id >= 91001 && id <= 91099 ? 'office_seed' : ''),
   });
 }
 
 /**
  * Merge server catalog trips into localStorage without dropping richer local rows.
  * Local wins on field conflicts; server fills missing ids (recovery after cache wipe).
- * @returns {{ trips: object[], added: number, total: number }}
+ *
+ * When `pruneMissing` is true (authenticated office hydrate), drop local trips
+ * that are no longer on the server so a delete on another device/PC vanishes here
+ * without a hard refresh.
+ *
+ * @returns {{ trips: object[], added: number, removed: number, total: number }}
  */
-export function mergeServerTripsIntoStore(serverTrips) {
+export function mergeServerTripsIntoStore(serverTrips, { pruneMissing = false } = {}) {
   const local = loadTrips();
   const byId = new Map();
   for (const t of local) {
     if (t?.id != null) byId.set(Number(t.id), t);
   }
+  const serverIds = new Set();
   let added = 0;
   for (const raw of serverTrips || []) {
     const mapped = catalogTripToLocal(raw);
     if (!mapped) continue;
     const id = Number(mapped.id);
     if (recentlyDeletedTripIds.has(id)) continue;
+    serverIds.add(id);
     if (!byId.has(id)) {
       byId.set(id, mapped);
       added += 1;
@@ -368,7 +388,17 @@ export function mergeServerTripsIntoStore(serverTrips) {
       byId.set(id, normalizeTrip(merged));
     }
   }
+  let removed = 0;
+  if (pruneMissing && isAuthenticatedOfficeSession()) {
+    // Empty server catalog is still authoritative (office deleted every trip).
+    for (const id of [...byId.keys()]) {
+      if (!serverIds.has(id)) {
+        byId.delete(id);
+        removed += 1;
+      }
+    }
+  }
   const trips = stripDemoTrips([...byId.values()].sort((a, b) => Number(a.id) - Number(b.id)));
   saveTrips(trips);
-  return { trips, added, total: trips.length };
+  return { trips, added, removed, total: trips.length };
 }
