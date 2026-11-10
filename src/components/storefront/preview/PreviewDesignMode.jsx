@@ -1,0 +1,460 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
+import {
+  isStorefrontPreviewMode,
+  pushHomepagePreviewDraft,
+  readHomepagePreviewDraft,
+  subscribeHomepagePreviewDraft,
+} from '../../../lib/homepage/homepagePreview.js';
+import {
+  PDW_BRIDGE,
+  postPdwBridge,
+  scrollPreviewToSection,
+  subscribePdwBridge,
+} from '../../../lib/homepage/pageDesignBridge.js';
+import PageDesignBuilderPanel from '../../admin/homepage/PageDesignBuilderPanel.jsx';
+import '../../../styles/page-design-wizard.css';
+import '../../../styles/storefront-preview-builder.css';
+
+const PreviewDesignCtx = createContext(null);
+
+const SECTION_LABELS = {
+  general: 'Γενικά',
+  header: 'Header',
+  hero: 'Hero',
+  slider: 'Slider',
+  trips: 'Καρτέλες',
+  branding: 'Μάρκα',
+  footer: 'Footer',
+};
+
+/** Nav sections that should outline the hero block when focused. */
+const HERO_FOCUS_ALIASES = new Set(['slider', 'themes', 'general']);
+/** Nav sections that should outline the header / brand when focused. */
+const HEADER_FOCUS_ALIASES = new Set(['branding']);
+
+export function usePreviewDesignMode() {
+  return useContext(PreviewDesignCtx);
+}
+
+/**
+ * Enables Divi-like section overlays only when `?preview=1`.
+ * Outside preview mode this is a no-op passthrough.
+ */
+export function PreviewDesignModeProvider({ children, appearance }) {
+  const enabled = isStorefrontPreviewMode();
+  const [form, setFormState] = useState(() => {
+    const draft = readHomepagePreviewDraft();
+    return draft || appearance || {};
+  });
+  const [focusedSection, setFocusedSection] = useState(null);
+  /** `{ section, instance }` — instance distinguishes multiple Builders for the same section (fleet cards). */
+  const [openBuilderState, setOpenBuilderState] = useState({ section: null, instance: null });
+  const openSection = openBuilderState.section;
+  const openInstance = openBuilderState.instance;
+  const syncingFromParent = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    return subscribeHomepagePreviewDraft((draft) => {
+      if (!draft || typeof draft !== 'object') return;
+      syncingFromParent.current = true;
+      setFormState((prev) => {
+        const next = { ...prev, ...draft };
+        return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+      });
+      queueMicrotask(() => {
+        syncingFromParent.current = false;
+      });
+    });
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled || !appearance) return;
+    setFormState((prev) => ({ ...prev, ...appearance }));
+  }, [enabled, appearance]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    return subscribePdwBridge((msg) => {
+      if (msg.type === PDW_BRIDGE.SECTION_FOCUS && msg.section) {
+        setFocusedSection(msg.section);
+      }
+      // Left-nav → live preview: smooth-scroll to the mapped storefront section.
+      // Re-fires when the same nav item is clicked again (parent always posts SCROLL).
+      if (msg.type === PDW_BRIDGE.SCROLL_TO_SECTION && msg.section) {
+        scrollPreviewToSection(msg.section, { behavior: 'smooth', block: 'start' });
+      }
+    });
+  }, [enabled]);
+
+  const setForm = useCallback((updater) => {
+    setFormState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      if (!syncingFromParent.current) {
+        pushHomepagePreviewDraft(next);
+        postPdwBridge({ type: PDW_BRIDGE.APPEARANCE_SYNC, appearance: next });
+      }
+      return next;
+    });
+  }, []);
+
+  const selectSection = useCallback((sectionId) => {
+    if (!sectionId) return;
+    setFocusedSection(sectionId);
+    postPdwBridge({ type: PDW_BRIDGE.SELECT_SECTION, section: sectionId });
+  }, []);
+
+  const openBuilder = useCallback(
+    (sectionId, instanceId = null) => {
+      if (!sectionId) return;
+      // Highlight left-nav only — parent must not scrollPreviewToSection here
+      // (Γενικά → hero was jumping the preview to the top on every Builder click).
+      selectSection(sectionId);
+      setOpenBuilderState((cur) => {
+        if (cur.section === sectionId && cur.instance === instanceId) {
+          return { section: null, instance: null };
+        }
+        return { section: sectionId, instance: instanceId };
+      });
+    },
+    [selectSection],
+  );
+
+  const closeBuilder = useCallback(() => {
+    setOpenBuilderState({ section: null, instance: null });
+  }, []);
+
+  const requestThemes = useCallback(() => {
+    postPdwBridge({ type: PDW_BRIDGE.REQUEST_THEMES });
+    closeBuilder();
+  }, [closeBuilder]);
+
+  const value = useMemo(() => {
+    if (!enabled) return null;
+    return {
+      enabled: true,
+      form,
+      setForm,
+      focusedSection,
+      openSection,
+      openInstance,
+      openBuilder,
+      closeBuilder,
+      selectSection,
+      requestThemes,
+      sectionLabel: (id) => SECTION_LABELS[id] || id,
+      isBuilderOpen: (sectionId, instanceId = null) =>
+        openSection === sectionId && openInstance === instanceId,
+    };
+  }, [
+    enabled,
+    form,
+    setForm,
+    focusedSection,
+    openSection,
+    openInstance,
+    openBuilder,
+    closeBuilder,
+    selectSection,
+    requestThemes,
+  ]);
+
+  if (!enabled) return children;
+
+  return <PreviewDesignCtx.Provider value={value}>{children}</PreviewDesignCtx.Provider>;
+}
+
+/**
+ * Compact Builder control — place inline (e.g. right of ΠΡΟΓΡΑΜΜΑ ΕΚΔΡΟΜΩΝ)
+ * or as a floating bar on a section overlay. Opens a fixed studio drawer
+ * (not an absolute dropdown) so the preview never jumps.
+ */
+export function PreviewBuilderControl({
+  sectionId,
+  label,
+  variant = 'inline',
+  className = '',
+  /** Unique key when several controls share the same sectionId (one drawer at a time). */
+  instanceId = null,
+  /** Button caption. Defaults to section title in dock, else «Επεξεργασία». */
+  buttonLabel,
+}) {
+  const ctx = usePreviewDesignMode();
+  const wrapRef = useRef(null);
+  if (!ctx?.enabled || !sectionId) return null;
+
+  const isOpen = ctx.isBuilderOpen
+    ? ctx.isBuilderOpen(sectionId, instanceId)
+    : ctx.openSection === sectionId && ctx.openInstance === instanceId;
+  const title = label || ctx.sectionLabel(sectionId);
+  const chipLabel =
+    buttonLabel ||
+    (variant === 'dock' ? title : 'Επεξεργασία');
+
+  return (
+    <div
+      ref={wrapRef}
+      className={`sf-preview-builder ${variant === 'bar' ? 'is-bar' : ''} ${
+        variant === 'inline' || variant === 'dock' ? 'is-inline' : ''
+      } ${variant === 'card' ? 'is-card' : ''} ${variant === 'dock' ? 'is-dock' : ''} ${
+        isOpen ? 'is-open' : ''
+      } ${className}`.trim()}
+      data-pdw-section={sectionId}
+      data-pdw-instance={instanceId || undefined}
+    >
+      <button
+        type="button"
+        className={`sf-preview-builder__btn${isOpen ? ' is-open' : ''}`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        title={`Studio · ${title}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const y = typeof window !== 'undefined' ? window.scrollY : 0;
+          ctx.openBuilder(sectionId, instanceId);
+          // Opening the portal must not change scroll position.
+          if (typeof window !== 'undefined') {
+            requestAnimationFrame(() => {
+              window.scrollTo(0, y);
+            });
+          }
+        }}
+      >
+        <span className="material-symbols-outlined sf-preview-builder__icon" aria-hidden>
+          {isOpen ? 'close' : 'edit_square'}
+        </span>
+        <span className="sf-preview-builder__label">{isOpen ? 'Κλείσιμο' : chipLabel}</span>
+      </button>
+      {isOpen ? (
+        <PreviewBuilderStudio
+          sectionId={sectionId}
+          title={title}
+          form={ctx.form}
+          setForm={ctx.setForm}
+          onClose={ctx.closeBuilder}
+          onSelectThemes={ctx.requestThemes}
+          anchorRef={wrapRef}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Optional per-card Builder chip (hover-reveal). Prefer section-level
+ * PreviewBuilderControl for shared card templates (trips / fleet / rent).
+ * Renders nothing outside ?preview=1.
+ */
+export function PreviewCardBuilder({
+  sectionId,
+  label,
+  instanceId,
+  className = '',
+}) {
+  const ctx = usePreviewDesignMode();
+  if (!ctx?.enabled || !sectionId || !instanceId) return null;
+  return (
+    <div className={`sf-preview-card-builder ${className}`.trim()}>
+      <PreviewBuilderControl
+        sectionId={sectionId}
+        label={label}
+        variant="card"
+        instanceId={instanceId}
+      />
+    </div>
+  );
+}
+
+/**
+ * Fixed right-side studio drawer (portal). Replaces the old absolute dropdown
+ * that jumped with the section and felt unreliable on long pages.
+ */
+function PreviewBuilderStudio({
+  sectionId,
+  title,
+  form,
+  setForm,
+  onClose,
+  onSelectThemes,
+  anchorRef,
+}) {
+  const panelRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const scrollYRef = useRef(
+    typeof window !== 'undefined' ? window.scrollY : 0,
+  );
+
+  useEffect(() => {
+    scrollYRef.current = typeof window !== 'undefined' ? window.scrollY : 0;
+    closeBtnRef.current?.focus?.({ preventScroll: true });
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    const onDoc = (e) => {
+      const t = e.target;
+      if (panelRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
+      // Backdrop / outside click closes without scrolling the host page.
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDoc);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDoc);
+      if (typeof window !== 'undefined') {
+        window.scrollTo({
+          top: scrollYRef.current,
+          left: 0,
+          behavior: 'auto',
+        });
+      }
+    };
+  }, [onClose, anchorRef]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="sf-studio" role="presentation">
+      <button
+        type="button"
+        className="sf-studio__backdrop"
+        aria-label="Κλείσιμο studio"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <aside
+        ref={panelRef}
+        className="sf-studio__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Studio · ${title}`}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <header className="sf-studio__chrome">
+          <div className="sf-studio__chrome-copy min-w-0">
+            <p className="sf-studio__eyebrow">Page Studio</p>
+            <h2 className="sf-studio__heading truncate">{title}</h2>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            className="sf-studio__close"
+            aria-label="Κλείσιμο"
+            onClick={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              close
+            </span>
+          </button>
+        </header>
+        <div className="sf-studio__scroll">
+          <PageDesignBuilderPanel
+            section={sectionId}
+            form={form}
+            setForm={setForm}
+            onSelectThemes={onSelectThemes}
+            onClose={onClose}
+            studio
+          />
+        </div>
+        <footer className="sf-studio__footer">
+          <p className="sf-studio__hint">
+            Οι αλλαγές φαίνονται αμέσως στο preview · πάτα «Αποθήκευση» στη γραμμή εργαλείων.
+          </p>
+        </footer>
+      </aside>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Divi-like section wrapper: hover/selected outline + optional floating Builder bar.
+ * Use `inlineControl` when the Builder sits inside the module header instead.
+ */
+export function PreviewEditableSection({
+  sectionId,
+  label,
+  children,
+  className = '',
+  /** Hide the floating top-right bar (caller renders PreviewBuilderControl inline). */
+  hideFloatingBar = false,
+  as: Tag = 'div',
+}) {
+  const ctx = usePreviewDesignMode();
+  if (!ctx?.enabled) {
+    return Tag === 'div' && !className ? (
+      children
+    ) : (
+      <Tag className={className || undefined}>{children}</Tag>
+    );
+  }
+
+  // Slider / themes / general map onto the hero canvas for outline + scroll.
+  const focused =
+    ctx.focusedSection === sectionId ||
+    (sectionId === 'hero' && HERO_FOCUS_ALIASES.has(ctx.focusedSection)) ||
+    (sectionId === 'header' && HEADER_FOCUS_ALIASES.has(ctx.focusedSection));
+  const open =
+    ctx.openSection === sectionId ||
+    (sectionId === 'hero' && ctx.openSection === 'slider');
+  const title = label || ctx.sectionLabel(sectionId);
+  // Stable anchors for left-nav → preview scrollIntoView (also keep data-pdw-editable).
+  const anchorId =
+    sectionId === 'hero' || sectionId === 'footer' || sectionId === 'trips'
+      ? sectionId
+      : `pdw-${sectionId}`;
+
+  return (
+    <Tag
+      id={anchorId}
+      className={`sf-preview-section ${className}`.trim()}
+      data-pdw-editable={sectionId}
+      data-pdw-focused={focused || open ? '1' : undefined}
+      onMouseEnter={() => {
+        /* outline via CSS :hover; keep focus sync soft */
+      }}
+      onClick={(e) => {
+        // Clicking empty section chrome focuses it in the left nav (Divi click-to-edit).
+        if (e.target.closest?.('a, button, input, select, textarea, label, [role="dialog"]')) {
+          return;
+        }
+        ctx.selectSection(sectionId);
+      }}
+    >
+      {!hideFloatingBar ? (
+        <div className="sf-preview-section__bar" aria-hidden={false}>
+          <span className="sf-preview-section__bar-label">{title}</span>
+          <PreviewBuilderControl
+            sectionId={sectionId}
+            label={title}
+            variant="bar"
+            instanceId={`section-bar-${sectionId}`}
+          />
+        </div>
+      ) : null}
+      {children}
+    </Tag>
+  );
+}

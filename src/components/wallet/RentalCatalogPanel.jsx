@@ -10,20 +10,9 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
-import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
-import { FALLBACK_CONTRACT } from '../../lib/rental/rentalContract.js';
-import {
-  cancelBlockedMessage,
-  FREE_CANCEL_HOURS,
-  isFreeCancelEligible,
-} from '../../lib/rental/rentalCancel.js';
+import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
-const CATEGORIES = [
-  { value: '', label: 'Όλες' },
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -204,6 +193,8 @@ export default function RentalCatalogPanel({
         dropoff_location: raw.dropoff_location || f.dropoff_location,
         driver_mode: raw.driver_mode || f.driver_mode,
         client_phone: raw.client_phone || f.client_phone,
+        start_time: raw.start_time || f.start_time,
+        end_time: raw.end_time || f.end_time,
       }));
       if (raw.sortBy) setSortBy(raw.sortBy);
       if (raw.priceCap) setPriceCap(Number(raw.priceCap));
@@ -214,15 +205,19 @@ export default function RentalCatalogPanel({
 
   useEffect(() => {
     try {
+      const prev = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       localStorage.setItem(
         PREFS_KEY,
         JSON.stringify({
+          ...prev,
           category: form.category,
           min_seats: form.min_seats,
           pickup_location: form.pickup_location,
           dropoff_location: form.dropoff_location,
           driver_mode: form.driver_mode,
           client_phone: form.client_phone,
+          start_time: form.start_time,
+          end_time: form.end_time,
           sortBy,
           priceCap,
         }),
@@ -304,9 +299,9 @@ export default function RentalCatalogPanel({
       return;
     }
     const extras = [];
-    if (form.extra_insurance) extras.push('Extra insurance');
-    if (form.child_seat) extras.push('Child seat');
-    if (form.gps_pack) extras.push('GPS pack');
+    if (form.extra_insurance) extras.push('extra_insurance');
+    if (form.child_seat) extras.push('child_seat');
+    if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
       const created = await createCustomerRentalBooking({
@@ -317,11 +312,7 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
-        notes: extras.length ? `Extras: ${extras.join(', ')}` : null,
-        contract_accepted: true,
-        contract_signature_url: signatureUrl,
-        contract_signer_name: getCustomerName() || getCustomerEmail() || 'Πελάτης',
-        contract_version: contract.version,
+        extras,
       });
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({

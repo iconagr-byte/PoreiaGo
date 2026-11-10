@@ -50,9 +50,14 @@ class TraefikDomainsTests(unittest.TestCase):
     def test_apex_points_to_platform(self):
         with patch(
             "travel_platform.growth.traefik_domains.socket.getaddrinfo",
-            return_value=[(None, None, None, None, ("34.141.98.145", 0))],
+            return_value=[(None, None, None, None, ("169.58.199.186", 0))],
         ):
             self.assertTrue(apex_points_to_platform("achilliotravel.com"))
+        with patch(
+            "travel_platform.growth.traefik_domains.socket.getaddrinfo",
+            return_value=[(None, None, None, None, ("34.141.98.145", 0))],
+        ):
+            self.assertFalse(apex_points_to_platform("achilliotravel.com"))
         with patch(
             "travel_platform.growth.traefik_domains.socket.getaddrinfo",
             return_value=[(None, None, None, None, ("185.104.144.132", 0))],

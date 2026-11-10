@@ -30,6 +30,7 @@ class DriverSessionJwtClaimsTests(unittest.TestCase):
                             driver_id="drv-1",
                             tenant_id="81ce186d-40fd-4f51-8e62-1353a9e68f33",
                             trip_id=42,
+                            trip_source="live_fleet",
                             expires_at=int(time.time()) + 3600,
                         )
         payload = jwt.decode(session.access_token, "test-secret-32chars-minimum!!", algorithms=["HS256"])
@@ -37,6 +38,7 @@ class DriverSessionJwtClaimsTests(unittest.TestCase):
         self.assertEqual(payload["driver_name"], "Achilleas")
         self.assertEqual(payload["tenant_id"], "81ce186d-40fd-4f51-8e62-1353a9e68f33")
         self.assertEqual(payload["trip_id"], 42)
+        self.assertEqual(payload["trip_source"], "live_fleet")
 
 
 if __name__ == "__main__":

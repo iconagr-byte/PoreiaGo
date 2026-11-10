@@ -1,169 +1,362 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
-  AGENCY_PLANS,
   BILLING_INTERVALS,
+  DEFAULT_AGENCY_SECTION_TITLE,
+  DEFAULT_RENT_SECTION_TITLE,
+  RENT_ADDON,
+  RENT_STANDALONE_PLAN,
   displayPrice,
+  isBillablePlanId,
+  listVisibleAgencyPlans,
+  mergeAgencyPlanCatalog,
+  mergeRentPlanCatalog,
+  rentAddonDisplayPrice,
+  rentStandaloneDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { CAMPAIGN_TEMPLATE_COUNT } from '../lib/marketing/platformCopy.js';
 import { getSaasToken } from '../services/saasApi.js';
+import { fetchPublicAgencyPlanCatalog } from '../services/agencyPlanCatalogApi.js';
+import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
+import '../styles/platform-contracts.css';
 
 export default function AgencyPlansPage() {
   const navigate = useNavigate();
   const [interval, setInterval] = useState('month');
   const loggedIn = Boolean(getSaasToken());
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
+  const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAll = () => {
+      Promise.all([fetchPublicRentPlanCatalog(), fetchPublicAgencyPlanCatalog()]).then(
+        ([rent, agency]) => {
+          if (!cancelled) {
+            setRentCatalog(rent);
+            setAgencyCatalog(agency);
+          }
+        },
+      );
+    };
+    loadAll();
+    const onAgency = () => {
+      fetchPublicAgencyPlanCatalog().then((agency) => {
+        if (!cancelled) setAgencyCatalog(agency);
+      });
+    };
+    const onRent = () => {
+      fetchPublicRentPlanCatalog().then((rent) => {
+        if (!cancelled) setRentCatalog(rent);
+      });
+    };
+    window.addEventListener('agency-plan-catalog-changed', onAgency);
+    window.addEventListener('rent-plan-catalog-changed', onRent);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('agency-plan-catalog-changed', onAgency);
+      window.removeEventListener('rent-plan-catalog-changed', onRent);
+    };
+  }, []);
+
+  const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
+  const addon = rentCatalog.addon || RENT_ADDON;
+  const agencyPlans = listVisibleAgencyPlans(agencyCatalog);
+  const rentStandalonePrice = rentStandaloneDisplayPrice(interval, standalone);
+  const rentAddonPrice = rentAddonDisplayPrice(interval, addon);
+  const visibleCards = [standalone.visible !== false, addon.visible !== false].filter(Boolean)
+    .length;
 
   const choosePlan = (planId) => {
-    if (planId === 'enterprise') {
-      window.location.href = 'mailto:sales@travelos.app?subject=Enterprise%20συμβόλαιο';
+    const selected = agencyPlans.find((p) => p.id === planId);
+    if (
+      selected?.contactSales ||
+      planId === 'enterprise' ||
+      (planId !== 'rent' && !isBillablePlanId(planId))
+    ) {
+      window.location.href = `mailto:sales@travelos.app?subject=${encodeURIComponent(
+        `${selected?.name || planId} συμβόλαιο`,
+      )}`;
       return;
     }
     if (loggedIn) {
       navigate('/admin', {
-        state: { activeTab: 'settings', settingsSubTab: 'contracts', plan: planId, interval },
+        state: {
+          activeTab: 'settings',
+          settingsSubTab: 'contracts',
+          plan: planId,
+          interval,
+          focusRentModule: planId === 'rent',
+        },
       });
       return;
     }
     navigate(`/grafeia/signup?plan=${planId}&interval=${interval}`);
   };
 
+  const openRentAddon = () => {
+    if (loggedIn) {
+      navigate('/admin', {
+        state: {
+          activeTab: 'settings',
+          settingsSubTab: 'contracts',
+          interval,
+          focusRentModule: true,
+        },
+      });
+      return;
+    }
+    navigate(`/grafeia/signup?plan=professional&interval=${interval}&addon=rent`);
+  };
+
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
-      <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/90 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+    <div className="pg-contracts">
+      <header className="pg-contracts-header">
+        <div className="pg-contracts-header-inner">
           <PlatformBrand variant="light" />
-          <nav className="flex items-center gap-3">
-            <Link to="/" className="text-sm font-semibold text-gray-600 hover:text-primary hidden sm:inline">
+          <nav className="pg-contracts-nav">
+            <Link to="/" className="pg-contracts-nav-link">
               Αρχική
             </Link>
-            <Link
-              to="/admin/login"
-              className="text-sm font-bold px-4 py-2 rounded-full bg-gray-900 text-white hover:opacity-90"
-            >
+            <Link to="/rent" className="pg-contracts-nav-link pg-contracts-nav-link--rent">
+              Υπηρεσία Rent
+            </Link>
+            <Link to="/admin/login" className="pg-contracts-nav-cta">
               Σύνδεση γραφείου
             </Link>
           </nav>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-12 md:py-16 space-y-12">
-        <div className="text-center max-w-2xl mx-auto space-y-4">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
-            <span className="material-symbols-outlined text-[16px]">description</span>
-            Συμβόλαια SaaS
-          </span>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Επιλέξτε το συμβόλαιο του ταξιδιωτικού σας γραφείου
-          </h1>
-          <p className="text-on-surface-variant text-sm md:text-base">
-            Μηνιαία ή ετήσια χρέωση · 14 ημέρες δοκιμή στο Professional · ακύρωση από το Stripe portal
-          </p>
+      <section className="pg-contracts-hero" aria-label="Συμβόλαια PoreiaGo">
+        <div className="pg-contracts-wave" aria-hidden />
+        <div className="pg-contracts-wave pg-contracts-wave--soft" aria-hidden />
+        <div className="pg-contracts-orbit" aria-hidden />
+        <div className="pg-contracts-orbit pg-contracts-orbit--slow" aria-hidden />
 
-          <div className="inline-flex p-1 rounded-full bg-surface-container-low border border-black/[0.06] mt-6">
-            {Object.values(BILLING_INTERVALS).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setInterval(opt.id)}
-                className={`relative px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
-                  interval === opt.id
-                    ? 'bg-white text-primary shadow-md'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {opt.label}
-                {opt.badge && interval === opt.id && (
-                  <span className="absolute -top-2 -right-1 text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                    -17%
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          {interval === 'year' && (
-            <p className="text-xs text-emerald-700 font-semibold">
-              Ετήσιο = 10 μηνιαίες δόσεις (2 μήνες δωρεάν)
+        <div className="pg-contracts-hero-inner">
+          <div className="pg-contracts-hero-copy">
+            <span className="pg-contracts-badge">
+              <span className="material-symbols-outlined" aria-hidden>
+                description
+              </span>
+              Συμβόλαια SaaS
+            </span>
+            <h1>Λεωφορεία · Rent μόνο · ή και τα δύο</h1>
+            <p>
+              Ένα σύστημα, δικό σας brand. Core πλάνα για εκδρομές & στόλο · αυτόνομο Rent · ή add-on
+              Ενοικιάσεις πάνω στα λεωφορεία.
             </p>
-          )}
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {AGENCY_PLANS.map((plan) => {
-            const price = displayPrice(plan, interval);
-            return (
-              <article
-                key={plan.id}
-                className={`relative flex flex-col rounded-[28px] border p-6 md:p-8 ${
-                  plan.highlighted
-                    ? 'border-primary/40 bg-white shadow-xl ring-2 ring-primary/20 scale-[1.02]'
-                    : 'border-black/[0.06] bg-surface-container-lowest shadow-sm'
-                }`}
-              >
-                {plan.highlighted && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                    Προτεινόμενο
-                  </span>
-                )}
-                <h2 className="text-xl font-bold">{plan.name}</h2>
-                <p className="text-sm text-on-surface-variant mt-1 mb-6">{plan.tagline}</p>
-                <div className="mb-6">
-                  {plan.contactSales ? (
-                    <p className="text-2xl font-bold">Enterprise</p>
-                  ) : (
-                    <>
-                      <p className="text-3xl font-bold tracking-tight">
-                        {price.label}
-                        <span className="text-base font-medium text-gray-500">{price.suffix}</span>
-                      </p>
-                      {price.compareAt && (
-                        <p className="text-xs text-gray-400 line-through mt-1">
-                          €{price.compareAt}/έτος χωρίς έκπτωση
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <ul className="space-y-2 flex-1 text-sm text-on-surface-variant mb-8">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
-                        check_circle
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+            <div className="pg-contracts-toggle" role="group" aria-label="Περίοδος χρέωσης">
+              {Object.values(BILLING_INTERVALS).map((opt) => (
                 <button
+                  key={opt.id}
                   type="button"
-                  onClick={() => choosePlan(plan.id)}
-                  className={`w-full py-3.5 rounded-full font-bold text-sm transition-all ${
-                    plan.highlighted
-                      ? 'bg-primary text-white hover:opacity-90'
-                      : 'border border-primary/30 text-primary hover:bg-primary/5'
-                  }`}
+                  className={interval === opt.id ? 'is-on' : ''}
+                  onClick={() => setInterval(opt.id)}
                 >
-                  {plan.contactSales ? 'Επικοινωνία πωλήσεων' : loggedIn ? 'Επιλογή συμβολαίου' : 'Ξεκινήστε εγγραφή'}
+                  {opt.label}
+                  {opt.badge && interval === opt.id ? (
+                    <span className="pg-contracts-toggle-badge">-17%</span>
+                  ) : null}
                 </button>
-              </article>
-            );
-          })}
+              ))}
+            </div>
+          </div>
         </div>
+      </section>
 
-        <div className="rounded-[24px] border border-black/[0.06] bg-surface-container-low p-6 md:p-8 text-sm text-on-surface-variant space-y-3">
-          <h3 className="font-bold text-on-surface flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">info</span>
-            Τι περιλαμβάνει το συμβόλαιο
-          </h3>
-          <ul className="list-disc list-inside space-y-1">
-            <li>Πρόσβαση στο Control Panel για το γραφείο σας (όχι platform console)</li>
-            <li>Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ έτοιμα πρότυπα καμπάνιας (προσφορές, εκδρομές, lifecycle)</li>
-            <li>Metered χρέωση για ενεργά λεωφορεία & εκδρομές μετά τη βασική συνδρομή</li>
-            <li>GDPR εργαλεία για τους πελάτες σας · διαχείριση από Ρυθμίσεις → Συμβόλαιο</li>
-            <li>Η πλατφόρμα (super admin, backups, SaaS infra) είναι μόνο για τον διαχειριστή συστήματος</li>
-          </ul>
-        </div>
+      <main className="pg-contracts-main">
+        <section className="pg-contracts-section">
+          <h2>{agencyCatalog.sectionTitle || DEFAULT_AGENCY_SECTION_TITLE}</h2>
+          <div className="pg-contracts-grid pg-contracts-grid--agency">
+            {agencyPlans.map((plan) => {
+              const price = displayPrice(plan, interval);
+              return (
+                <article
+                  key={plan.id}
+                  className={`pg-contracts-card${plan.highlighted ? ' pg-contracts-card--featured' : ''}`}
+                >
+                  {plan.highlighted ? <span className="pg-contracts-pill">Προτεινόμενο</span> : null}
+                  <div className="pg-contracts-card-head">
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {plan.icon || 'workspace_premium'}
+                    </span>
+                    <h3>{plan.name}</h3>
+                  </div>
+                  <p className="pg-contracts-card-tag">{plan.tagline}</p>
+                  <div className="pg-contracts-price">
+                    {plan.contactSales ? (
+                      <strong style={{ fontSize: '1.45rem' }}>Κατόπιν συνεννόησης</strong>
+                    ) : (
+                      <>
+                        <strong>
+                          {price.label}
+                          <em>{price.suffix}</em>
+                        </strong>
+                        {price.compareAt ? <s>€{price.compareAt}/έτος χωρίς έκπτωση</s> : null}
+                      </>
+                    )}
+                  </div>
+                  <ul className="pg-contracts-features">
+                    {(plan.features || []).map((f) => (
+                      <li key={f}>
+                        <span className="material-symbols-outlined" aria-hidden>
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                    {addon.visible !== false ? (
+                      <li className="is-addon">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          add_circle
+                        </span>
+                        Προαιρετικό add-on Ενοικιάσεις (+{rentAddonPrice.label}
+                        {rentAddonPrice.suffix})
+                      </li>
+                    ) : null}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => choosePlan(plan.id)}
+                    className={`pg-contracts-btn${
+                      plan.highlighted
+                        ? ' pg-contracts-btn--sky'
+                        : plan.contactSales
+                          ? ''
+                          : ' pg-contracts-btn--ghost'
+                    }`}
+                  >
+                    {plan.contactSales
+                      ? 'Επικοινωνία πωλήσεων'
+                      : loggedIn
+                        ? 'Επιλογή συμβολαίου'
+                        : 'Ξεκινήστε εγγραφή'}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       </main>
+
+        <section id="contracts-rent" className="pg-contracts-rent-stage" aria-label="Ενοικιάσεις">
+          <div className="pg-contracts-rent-wave" aria-hidden />
+          <div className="pg-contracts-rent-wave pg-contracts-rent-wave--soft" aria-hidden />
+          <div className="pg-contracts-rent-orbit" aria-hidden />
+
+          <div className="pg-contracts-rent-inner">
+            <header className="pg-contracts-rent-head">
+              <p className="pg-contracts-rent-kicker">Rent module</p>
+              <h2>{rentCatalog.sectionTitle || DEFAULT_RENT_SECTION_TITLE}</h2>
+              <p>
+                Αυτόνομο συμβόλαιο ή add-on πάνω στα λεωφορεία — ίδιο app, ίδιο brand, δική σας
+                εμπειρία ενοικίασης.
+              </p>
+            </header>
+
+            <div
+              className={`pg-contracts-grid ${
+                visibleCards <= 1 ? 'pg-contracts-grid--rent-1' : 'pg-contracts-grid--rent-2'
+              }`}
+            >
+              {standalone.visible !== false ? (
+                <article className="pg-contracts-card pg-contracts-card--rent pg-contracts-card--on-stage">
+                  <span className="pg-contracts-card-badge">{standalone.badge}</span>
+                  <h3 style={{ marginTop: '0.9rem' }}>{standalone.name}</h3>
+                  <p className="pg-contracts-card-tag">{standalone.tagline}</p>
+                  <div className="pg-contracts-price">
+                    <strong>
+                      {rentStandalonePrice.label}
+                      <em>{rentStandalonePrice.suffix}</em>
+                    </strong>
+                  </div>
+                  <ul className="pg-contracts-features">
+                    {standalone.features.map((f) => (
+                      <li key={f}>
+                        <span className="material-symbols-outlined" aria-hidden>
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => choosePlan('rent')}
+                    className="pg-contracts-btn pg-contracts-btn--teal"
+                  >
+                    {loggedIn ? standalone.ctaLoggedIn : standalone.ctaGuest}
+                  </button>
+                </article>
+              ) : null}
+
+              {addon.visible !== false ? (
+                <article className="pg-contracts-card pg-contracts-card--on-stage">
+                  <span className="pg-contracts-card-badge pg-contracts-card-badge--dark">
+                    {addon.badge}
+                  </span>
+                  <h3 style={{ marginTop: '0.9rem' }}>{addon.name}</h3>
+                  <p className="pg-contracts-card-tag">{addon.tagline}</p>
+                  <div className="pg-contracts-price">
+                    <strong>
+                      {rentAddonPrice.label}
+                      <em>{rentAddonPrice.suffix}</em>
+                    </strong>
+                  </div>
+                  <ul className="pg-contracts-features">
+                    {addon.features.map((f) => (
+                      <li key={f}>
+                        <span className="material-symbols-outlined" aria-hidden>
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" onClick={openRentAddon} className="pg-contracts-btn">
+                    {loggedIn ? addon.ctaLoggedIn : addon.ctaGuest}
+                  </button>
+                  {addon.servicesLinkLabel ? (
+                    <Link to="/rent" className="pg-contracts-extra-link">
+                      {addon.servicesLinkLabel}
+                    </Link>
+                  ) : null}
+                </article>
+              ) : null}
+            </div>
+
+            <div className="pg-contracts-info pg-contracts-info--glass">
+              <h3>
+                <span className="material-symbols-outlined" aria-hidden>
+                  info
+                </span>
+                Πώς χωρίζονται
+              </h3>
+              <ul>
+                <li>
+                  <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — η αρχική του
+                  domain δείχνει εκδρομές
+                </li>
+                <li>
+                  <strong>Rent μόνο:</strong> συμβόλαιο {standalone.name} ({rentStandalonePrice.label}
+                  {rentStandalonePrice.suffix}) — η αρχική του domain δείχνει μόνο Rent, χωρίς
+                  λεωφορεία
+                </li>
+                <li>
+                  <strong>Και τα δύο:</strong> πλάνο λεωφορείων + add-on Ενοικιάσεις (
+                  {rentAddonPrice.label}
+                  {rentAddonPrice.suffix}) — εκδρομές και Rent στην ίδια αρχική
+                </li>
+                <li>
+                  Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ πρότυπα · GDPR · διαχείριση από Συμβόλαιο
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
     </div>
   );
 }

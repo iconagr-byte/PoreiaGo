@@ -1,8 +1,13 @@
 import { PLATFORM_NAME } from '../marketing/platformCopy.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { officeStorageKey } from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'poreiago_branding_v2';
-const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1'];
+const STORAGE_KEY_BASE = 'poreiago_branding_v2';
+const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1', 'poreiago_branding_v2'];
+
+function brandingStorageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 /** Only obsolete platform QA leftovers — never real office names like «Achillio Travel». */
 const PLATFORM_PLACEHOLDER_NAME_RE = /^(aerostride|olympus|poreiago)(\s+(travel|platform))?$/i;
@@ -13,8 +18,45 @@ export function isPlatformMarketingContext() {
   return isPlatformMarketingHost(window.location.hostname);
 }
 
+/** Known custom-domain offices — never show PoreiaGo in the browser / SERP title. */
+export const KNOWN_TENANT_DOCUMENT_TITLES = {
+  'achilliotravel.com': 'Achillio Travel — Εκδρομές με λεωφορείο',
+};
+
 export function platformDocumentTitle() {
-  return `${PLATFORM_NAME} — Travel Operations Platform`;
+  return `${PLATFORM_NAME} — Πλατφόρμα για ταξιδιωτικά γραφεία`;
+}
+
+function apexHostname(hostname = '') {
+  return String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .toLowerCase()
+    .replace(/^www\./, '');
+}
+
+/** Sync <title> + og/twitter/description meta for office SERP snippets. */
+export function syncDocumentMetaTitle(title, description = '') {
+  const next = String(title || '').trim();
+  if (!next || typeof document === 'undefined') return;
+  document.title = next;
+  const ensureMeta = (attr, key, content) => {
+    if (!content) return;
+    let el = document.head.querySelector(`meta[${attr}="${key}"]`);
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+  };
+  ensureMeta('property', 'og:title', next);
+  ensureMeta('name', 'twitter:title', next);
+  ensureMeta('name', 'application-name', next.split('—')[0].trim() || next);
+  ensureMeta('property', 'og:site_name', next.split('—')[0].trim() || next);
+  const desc = String(description || '').trim();
+  if (desc) {
+    ensureMeta('name', 'description', desc);
+    ensureMeta('property', 'og:description', desc);
+  }
 }
 
 /**
@@ -24,11 +66,12 @@ export function platformDocumentTitle() {
 export function tenantDocumentTitle(displayName, hostname = '') {
   const name = String(displayName || '').trim();
   if (name && !PLATFORM_PLACEHOLDER_NAME_RE.test(name)) {
-    return name.includes('—') ? name : name;
+    return name;
   }
-  const host = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
-    .toLowerCase()
-    .replace(/^www\./, '');
+  const host = apexHostname(hostname);
+  if (KNOWN_TENANT_DOCUMENT_TITLES[host]) {
+    return KNOWN_TENANT_DOCUMENT_TITLES[host];
+  }
   if (host && !isPlatformMarketingHost(host)) {
     // achilliotravel.com → Achilliotravel (better than PoreiaGo)
     const label = host.split('.')[0] || host;
@@ -78,13 +121,17 @@ export function purgeLegacyBrandingCache() {
 export function cacheBranding(branding) {
   const clean = sanitizeBranding(branding);
   if (!clean) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+  try {
+    localStorage.setItem(brandingStorageKey(), JSON.stringify(clean));
+  } catch {
+    /* quota */
+  }
   applyBrandingToDocument(clean);
 }
 
 export function loadCachedBranding() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(brandingStorageKey());
     return raw ? sanitizeBranding(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -103,9 +150,9 @@ export function applyBrandingToDocument(branding) {
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   if (isTenantStorefrontHost(host) || !isPlatformMarketingHost(host)) {
-    document.title = tenantDocumentTitle(clean.display_name, host);
+    syncDocumentMetaTitle(tenantDocumentTitle(clean.display_name, host));
   } else {
-    document.title = platformDocumentTitle();
+    syncDocumentMetaTitle(platformDocumentTitle());
   }
 
   let styleEl = document.getElementById('tenant-branding-css');

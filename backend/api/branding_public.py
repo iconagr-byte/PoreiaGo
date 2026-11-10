@@ -54,5 +54,15 @@ async def get_current_branding(
         except Exception:
             pass
 
-    branding = resolve_by_host(effective_host) if effective_host else get_branding("default")
+    branding = resolve_by_host(effective_host) if effective_host else None
+    if branding is None:
+        # Platform-safe fallback — never serve another office's stolen default bag.
+        branding = get_branding("default")
+        data = branding.to_dict()
+        # Strip office-specific identity when host did not match a verified domain.
+        data["display_name"] = "PoreiaGo"
+        data["logo_url"] = ""
+        data["custom_domain"] = ""
+        data["slug"] = "poreiago"
+        return BrandingAdminResponse(**data)
     return BrandingAdminResponse(**branding.to_dict())
