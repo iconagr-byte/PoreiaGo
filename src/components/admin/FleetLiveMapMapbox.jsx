@@ -74,7 +74,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
       <button
         type="button"
-        className="relative cursor-pointer border-0 bg-transparent p-0"
+        className="fleet-apple-bus-pin border-0 bg-transparent p-0"
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
@@ -136,7 +136,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
           longitude={vehicle.lng}
           latitude={vehicle.lat}
           anchor="top"
-          offset={28}
+          offset={34}
           onClose={() => setOpen(false)}
           closeOnClick={false}
         >

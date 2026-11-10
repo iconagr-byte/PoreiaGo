@@ -79,6 +79,7 @@ const busIcon = (vehicle) => {
         <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
+      <div class="fleet-apple-bus-pill">${name} · ${speed} km/h</div>
     </div>`,
     iconSize: [52, iconH],
     iconAnchor: [26, anchorY],
