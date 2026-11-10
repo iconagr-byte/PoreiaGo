@@ -62,7 +62,7 @@ export function isImpersonating(token = getSaasToken()) {
 }
 
 /**
- * True platform operator UI (Tenants/MRR, SaaS Infra, Backup, debug Live GPS).
+ * True platform operator UI (Tenants/MRR, SaaS Infra, Backup).
  * Hidden while impersonating a tenant office so the view matches that office.
  */
 export function canAccessPlatformOperatorUi(token = getSaasToken()) {

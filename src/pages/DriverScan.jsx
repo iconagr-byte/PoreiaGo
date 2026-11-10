@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BusQrScanner from '../components/BusQrScanner.jsx';
-import AchillioLogo from '../components/AchillioLogo.jsx';
+import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import toast, { Toaster } from 'react-hot-toast';
 import {
   adminScanTicket,
@@ -104,7 +104,7 @@ export default function DriverScan() {
         />
         <div className="relative max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <AchillioLogo className="h-10 w-auto min-w-[160px] drop-shadow-lg" />
+            <OfficeBrandMark className="h-10 w-auto min-w-[120px] drop-shadow-lg" variant="dark" asLink={false} />
             <div className="h-10 w-px bg-white/20 hidden sm:block" />
             <div>
               <h1 className="text-white font-bold text-lg flex items-center gap-2">

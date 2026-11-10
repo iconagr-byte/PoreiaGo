@@ -1,0 +1,18 @@
+# Nginx Proxy Manager edge — Contabo / shared VPS where NPM owns :80/:443.
+# Usage (auto from vm-deploy-all.sh when USE_NPM=1 or nginx-proxy is detected):
+#   docker compose --env-file .env.prod \
+#     -f docker-compose.prod.yml -f docker-compose.npm.yml \
+#     --profile bundled-db up -d
+#
+# NPM proxy hosts:
+#   api.poreiago.com          → host:8004
+#   poreiago.com / www        → host:8003
+
+services:
+  api-blue:
+    ports:
+      - "8004:8000"
+
+  frontend:
+    ports:
+      - "8003:80"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -12,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tenant import Tenant
 from olympus.config import get_olympus_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,20 @@ def parse_theme(settings_json: str | None, theme_config: dict | None) -> dict[st
     return theme
 
 
+def _tenant_to_resolved(tenant: Tenant) -> ResolvedTenant:
+    theme_cfg = getattr(tenant, "theme_config", None)
+    whitelist = getattr(tenant, "admin_ip_whitelist", None)
+    return ResolvedTenant(
+        tenant_id=tenant.id,
+        slug=tenant.slug,
+        subdomain=tenant.subdomain,
+        custom_domain=tenant.custom_domain,
+        theme=parse_theme(tenant.settings_json, theme_cfg),
+        is_active=tenant.is_active,
+        admin_ip_whitelist=whitelist if isinstance(whitelist, list) else None,
+    )
+
+
 class DomainResolver:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -90,33 +107,69 @@ class DomainResolver:
 
         result = await self._session.execute(stmt.limit(1))
         tenant = result.scalar_one_or_none()
+        if tenant:
+            return _tenant_to_resolved(tenant)
+
+        # File branding often has custom_domain before Postgres is updated —
+        # map Host → branding slug/subdomain → tenants row, then backfill DB.
+        if not subdomain:
+            tenant = await self._resolve_via_file_branding(normalized)
+            if tenant:
+                return _tenant_to_resolved(tenant)
+        return None
+
+    async def _resolve_via_file_branding(self, normalized_host: str) -> Tenant | None:
+        try:
+            from travel_platform.growth.branding_store import resolve_by_host
+        except Exception:
+            return None
+
+        branding = resolve_by_host(normalized_host)
+        if not branding:
+            return None
+        apex = normalized_host.removeprefix("www.")
+        brand_domain = (branding.custom_domain or "").lower().removeprefix("www.")
+        if not brand_domain or brand_domain != apex:
+            return None
+        if not branding.verified_domain:
+            return None
+
+        slug = (branding.slug or "").strip()
+        if not slug or slug in ("poreiago", "default"):
+            return None
+
+        result = await self._session.execute(
+            select(Tenant)
+            .where(
+                Tenant.is_active.is_(True),
+                or_(Tenant.slug == slug, Tenant.subdomain == slug),
+            )
+            .limit(1)
+        )
+        tenant = result.scalar_one_or_none()
         if not tenant:
             return None
 
-        theme_cfg = getattr(tenant, "theme_config", None) or tenant.theme_config if hasattr(tenant, "theme_config") else None
-        whitelist = getattr(tenant, "admin_ip_whitelist", None)
-        return ResolvedTenant(
-            tenant_id=tenant.id,
-            slug=tenant.slug,
-            subdomain=tenant.subdomain,
-            custom_domain=tenant.custom_domain,
-            theme=parse_theme(tenant.settings_json, theme_cfg),
-            is_active=tenant.is_active,
-            admin_ip_whitelist=whitelist if isinstance(whitelist, list) else None,
-        )
+        # Heal Postgres so Traefik TLS validate + future resolves work without the file store.
+        if not (tenant.custom_domain or "").strip():
+            try:
+                tenant.custom_domain = apex
+                await self._session.commit()
+                await self._session.refresh(tenant)
+                logger.info(
+                    "Backfilled tenants.custom_domain=%s for slug=%s from file branding",
+                    apex,
+                    slug,
+                )
+            except Exception as exc:
+                await self._session.rollback()
+                logger.warning("custom_domain backfill failed for %s: %s", slug, exc)
+        return tenant
 
     async def is_custom_domain_allowed(self, domain: str) -> bool:
         """Traefik on-demand TLS ask endpoint — only issue cert for mapped domains."""
         normalized = normalize_host(domain)
         if not normalized:
             return False
-        result = await self._session.execute(
-            select(Tenant.id).where(
-                Tenant.is_active.is_(True),
-                or_(
-                    Tenant.custom_domain == normalized,
-                    Tenant.custom_domain == f"www.{normalized}",
-                ),
-            ).limit(1),
-        )
-        return result.scalar_one_or_none() is not None
+        resolved = await self.resolve(normalized)
+        return resolved is not None

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
+import { clearTelemetryAlert, fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { buildWsUrl } from '../lib/wsUrl.js';
+import { getSaasToken } from '../services/saasApi.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
@@ -12,12 +13,34 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
 
+  const dropAlert = useCallback((alertId) => {
+    const id = String(alertId || '').trim();
+    if (!id) return;
+    setAlerts((prev) => prev.filter((a) => String(a.id) !== id));
+  }, []);
+
+  const clearAlert = useCallback(
+    async (alertId) => {
+      const id = String(alertId || '').trim();
+      if (!id) throw new Error('Λείπει alert id');
+      const data = await clearTelemetryAlert(id);
+      dropAlert(id);
+      toast.success(data.message || 'Ο συναγερμός απενεργοποιήθηκε', {
+        id: `sos-cleared-${id}`,
+        duration: 4000,
+      });
+      return data;
+    },
+    [dropAlert],
+  );
+
   const mergeAlert = useCallback((row) => {
     setAlerts((prev) => {
       if (prev.some((a) => a.id === row.id)) return prev;
       return [row, ...prev].slice(0, limit);
     });
     const type = String(row.alert_type || '').toUpperCase();
+    // Click sound + inbox are handled by AdminNotificationBell (BackOffice header).
     if (type === 'SOS') {
       toast.error(row.message || 'SOS από οδηγό!', {
         duration: 12000,
@@ -30,17 +53,26 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
           requireInteraction: true,
         });
       }
-    } else if (type === 'DRIVER_ONLINE') {
-      toast.success(row.message || 'Οδηγός ξεκίνησε βάρδια', {
-        duration: 5000,
-        id: `driver-online-${row.id}`,
-      });
-    } else if (type === 'DRIVER_OFFLINE') {
-      toast(row.message || 'Οδηγός έκλεισε βάρδια', {
-        duration: 5000,
-        icon: '🛑',
-        id: `driver-offline-${row.id}`,
-      });
+    } else if (type === 'DRIVER_ONLINE' || type === 'DRIVER_OFFLINE') {
+      // Floating banner + chime: AdminNotificationBell only (one nice label).
+      // Keep OS notification if the user granted permission.
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          const online = type === 'DRIVER_ONLINE';
+          new Notification(
+            online ? 'Έναρξη βάρδιας — PoreiaGo' : 'Τέλος βάρδιας — PoreiaGo',
+            {
+              body:
+                row.message ||
+                (online ? 'Οδηγός ξεκίνησε βάρδια' : 'Οδηγός έκλεισε βάρδια'),
+              tag: `${online ? 'driver-online' : 'driver-offline'}-${row.id}`,
+              requireInteraction: true,
+            },
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }, [limit]);
 
@@ -58,8 +90,10 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
     if (!enabled) return undefined;
     load();
 
-    const qs = `?tenant_id=${tenantId}`;
-    const url = buildWsUrl(`/ws/admin/telemetry/alerts${qs}`);
+    const url = buildWsUrl('/ws/admin/telemetry/alerts', {
+      tenant_id: tenantId,
+      token: getSaasToken() || '',
+    });
     let closed = false;
     let reconnectTimer;
 
@@ -77,8 +111,14 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
             if (data.type === 'alerts_snapshot' && Array.isArray(data.alerts)) {
               setAlerts(data.alerts.slice(0, limit));
               setLoading(false);
+            } else if (data.type === 'telemetry_alert_cleared') {
+              dropAlert(data.id);
             } else if (data.type === 'telemetry_alert') {
-              mergeAlert(data);
+              if (data.event === 'cleared' || data.cleared_at) {
+                dropAlert(data.id);
+              } else {
+                mergeAlert(data);
+              }
             }
           } catch {
             /* ignore */
@@ -105,7 +145,7 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (wsRef.current) wsRef.current.close();
     };
-  }, [enabled, tenantId, limit, load, mergeAlert]);
+  }, [enabled, tenantId, limit, load, mergeAlert, dropAlert]);
 
-  return { alerts, loading, wsConnected, refresh: load };
+  return { alerts, loading, wsConnected, refresh: load, clearAlert, dropAlert };
 }

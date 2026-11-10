@@ -23,6 +23,7 @@ export default function ScannerPanel() {
         toast.error(response.message || 'Άκυρο εισιτήριο');
       }
       await fetchDriverManifest();
+      window.dispatchEvent(new CustomEvent('driver-manifest-updated', { detail: { tripId } }));
       setTimeout(() => setScanning(true), 1800);
       return response;
     },

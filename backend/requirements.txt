@@ -20,4 +20,5 @@ python-multipart==0.0.9
 stripe==8.10.0
 prometheus-client==0.20.0
 pywebpush==1.14.0
+firebase-admin==6.5.0
 qrcode[pil]==7.4.2
