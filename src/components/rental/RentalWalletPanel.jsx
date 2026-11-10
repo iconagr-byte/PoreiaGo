@@ -8,6 +8,7 @@ import {
   cancelCustomerRentalBooking,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
+import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 import RentalWalletPass from './RentalWalletPass.jsx';
 
 const STATUS_LABEL = {
@@ -75,7 +76,10 @@ export default function RentalWalletPanel({
         return sorted[0]?.id || '';
       });
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία φόρτωσης κρατήσεων');
+      // Demo wallet session has no real JWT — empty passes, no error toast.
+      if (!isNativeRentDemo()) {
+        toast.error(err.message || 'Αποτυχία φόρτωσης κρατήσεων');
+      }
       setRows([]);
     } finally {
       setLoading(false);
