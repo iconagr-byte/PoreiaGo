@@ -1094,3 +1094,132 @@
     animation: none !important;
   }
 }
+
+/* ——— Site footer (homepage) ——— */
+.pg-home-shell {
+  overflow-x: clip;
+}
+
+.pg-site-footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #020617;
+  padding: 2.5rem 1.15rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  color: #f8fafc;
+}
+
+.pg-site-footer-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 2rem;
+}
+
+.pg-site-footer-brand {
+  min-width: 0;
+}
+
+.pg-site-footer-brand p {
+  margin: 1rem 0 0;
+  max-width: 22rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(248, 250, 252, 0.5);
+}
+
+.pg-site-footer-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.pg-site-footer-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.pg-site-footer-label {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.42);
+}
+
+.pg-site-footer-label--buses {
+  color: rgba(125, 211, 252, 0.9);
+}
+
+.pg-site-footer-label--rent {
+  color: rgba(94, 234, 212, 0.9);
+}
+
+.pg-site-footer-col a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4rem;
+  padding: 0.15rem 0;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  line-height: 1.35;
+}
+
+.pg-site-footer-col a:hover,
+.pg-site-footer-col a:focus-visible {
+  color: #fff;
+}
+
+.pg-site-footer-col a:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+  border-radius: 0.35rem;
+}
+
+.pg-site-footer-copy {
+  max-width: 72rem;
+  margin: 2rem auto 0;
+  padding-top: 0.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgba(248, 250, 252, 0.35);
+}
+
+@media (min-width: 520px) {
+  .pg-site-footer-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 1.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .pg-site-footer {
+    padding: 3rem 2rem calc(2.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pg-site-footer-inner {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.35fr);
+    align-items: start;
+    gap: 2.5rem;
+  }
+
+  .pg-site-footer-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .pg-site-footer-col a {
+    min-height: 0;
+    padding: 0.1rem 0;
+    font-size: 0.875rem;
+  }
+}
