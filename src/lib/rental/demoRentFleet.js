@@ -145,9 +145,9 @@ export function withDemoRentFleet(vehicles, opts = {}) {
   return DEMO_RENT_FLEET;
 }
 
-/** @deprecated Demo fleet ids are no longer injected. */
-export function isClientDemoFleetId() {
-  return false;
+/** True when fleet is the client-only showcase fallback (not office store). */
+export function isClientDemoFleetId(id) {
+  return /^demo-rent-(car|van)-/i.test(String(id || ''));
 }
 
 /** True when the list is (or includes) the marketing showcase fleet. */

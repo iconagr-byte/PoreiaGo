@@ -523,6 +523,33 @@ class BillingService:
                 exc_info=True,
             )
 
+
+    async def _apply_plan_module_settings(
+        self,
+        tenant: Tenant,
+        *,
+        plan: TenantPlan,
+        rent_addon: bool = False,
+    ) -> None:
+        """Keep tenants.settings_json modules/addons in sync with purchased plan."""
+        import json
+
+        bag = parse_tenant_settings(tenant.settings_json)
+        if plan == TenantPlan.RENT:
+            seeded = initial_settings_for_plan(plan, office_name=tenant.legal_name)
+            # Preserve unrelated keys (platform, branding, …) while applying rent-only seed.
+            for key, value in seeded.items():
+                if key in ("addons", "modules", "site_appearance"):
+                    if key == "site_appearance" and isinstance(bag.get("site_appearance"), dict):
+                        bag["site_appearance"] = {**bag["site_appearance"], **value}
+                    else:
+                        bag[key] = value
+                elif key not in bag:
+                    bag[key] = value
+        elif rent_addon:
+            bag = enable_rent_addon_in_settings(bag)
+        tenant.settings_json = json.dumps(bag, ensure_ascii=False)
+
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(
             select(Tenant).where(Tenant.id == tenant_id),

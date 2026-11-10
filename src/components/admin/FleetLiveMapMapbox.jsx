@@ -10,7 +10,6 @@ import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
-import FleetMapFocusVehicleMapbox from './FleetMapFocusVehicleMapbox.jsx';
 import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
 import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
@@ -44,7 +43,7 @@ function HeatmapDots({ points = [], visible = true }) {
     return (
       <Marker key={`heat-${p.lat}-${p.lng}-${i}`} longitude={p.lng} latitude={p.lat} anchor="center">
         <div
-          className="rounded-full border border-orange-400/60 bg-red-400/35"
+          className="rounded-full border border-orange-500 bg-red-500/40"
           style={{
             width: `${16 * scale}px`,
             height: `${16 * scale}px`,
@@ -56,7 +55,7 @@ function HeatmapDots({ points = [], visible = true }) {
   });
 }
 
-function BusMarker({ vehicle, selected = false, onSelectVehicle, onVehicleHistory }) {
+function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const pillLabel = formatFleetBusPillLabel(vehicle);
@@ -72,14 +71,13 @@ function BusMarker({ vehicle, selected = false, onSelectVehicle, onVehicleHistor
     onVehicleHistory?.(vehicle);
   };
   return (
-    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={selectVehicle}>
+    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
       <button
         type="button"
-        className="fleet-apple-bus-pin border-0 bg-transparent p-0"
+        className="relative cursor-pointer border-0 bg-transparent p-0"
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
-        {/* Ring-only flow box so Mapbox center anchor = GPS (labels float above). */}
         <div className="fleet-apple-bus-pin">
           {gpsSources.length ? (
             <div
@@ -138,7 +136,7 @@ function BusMarker({ vehicle, selected = false, onSelectVehicle, onVehicleHistor
           longitude={vehicle.lng}
           latitude={vehicle.lat}
           anchor="top"
-          offset={34}
+          offset={28}
           onClose={() => setOpen(false)}
           closeOnClick={false}
         >
@@ -189,16 +187,10 @@ function BusMarker({ vehicle, selected = false, onSelectVehicle, onVehicleHistor
   );
 }
 
-function MapboxAnimatedMarkers({ vehicles, selectedId = null, onSelectVehicle, onVehicleHistory }) {
+function MapboxAnimatedMarkers({ vehicles, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
   return display.map((v) => (
-    <BusMarker
-      key={v.id}
-      vehicle={v}
-      selected={selectedId === v.id}
-      onSelectVehicle={onSelectVehicle}
-      onVehicleHistory={onVehicleHistory}
-    />
+    <BusMarker key={v.id} vehicle={v} onVehicleHistory={onVehicleHistory} />
   ));
 }
 
@@ -285,10 +277,6 @@ export default function FleetLiveMapMapbox({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
-  focusVehicle = null,
-  focusNonce = 0,
-  selectedId = null,
-  onSelectVehicle,
   onVehicleHistory,
   onClearSos = null,
 }) {
@@ -326,23 +314,16 @@ export default function FleetLiveMapMapbox({
       mapStyle={MAPBOX_STYLE}
       style={{ width: '100%', height: '100%' }}
       attributionControl
-      logoPosition="bottom-right"
     >
       <NavigationControl position="bottom-right" showCompass={false} />
       <GreecePlacesMapboxLayer visible={showPlaces} />
       <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
-      <FleetMapFocusVehicleMapbox vehicle={focusVehicle} focusNonce={focusNonce} zoom={14} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
       <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <HeatmapDots points={heatmap} visible={showHeat} />
-      <MapboxAnimatedMarkers
-        vehicles={vehicles}
-        selectedId={selectedId}
-        onSelectVehicle={onSelectVehicle}
-        onVehicleHistory={onVehicleHistory}
-      />
+      <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </Map>
   );
 }

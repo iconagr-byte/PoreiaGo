@@ -13,6 +13,10 @@ import {
 } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import {
+  ACHILLIO_TRAVEL_NAME,
+  resolveOfficeSplashBrand,
+} from '../../lib/wallet/officeSplashBrand.js';
 import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
 import { WALLET_TENANT_CHANGED_EVENT } from '../../lib/wallet/walletTenantSeal.js';
 
@@ -58,11 +62,27 @@ function mergeWithCachedLogo(serverAppearance = {}) {
  * preferAdmin: use JWT/tenant appearance (BackOffice sidebar). Public host fetch can
  * miss postgres branding when the admin UI runs on the platform domain.
  */
+function isGenericOfficeLabel(value) {
+  const v = String(value || '').trim();
+  return (
+    !v ||
+    v === 'Γραφείο' ||
+    v === 'PoreiaGo' ||
+    v === 'My Wallet' ||
+    /^aerostride$/i.test(v)
+  );
+}
+
 export default function OfficeBrandMark({
   className = '',
   variant = 'light',
   asLink = true,
   fallbackLabel = 'Γραφείο',
+  /**
+   * Preferred office name from the parent (wallet already resolved branding).
+   * Wins over appearance generics so compact/native top bars always show text.
+   */
+  officeName = '',
   refreshKey = 0,
   preferAdmin = false,
   /** Sealed wallet office UUID — Capacitor Host=localhost needs this for logo. */
@@ -131,11 +151,20 @@ export default function OfficeBrandMark({
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  // Prefer a real office name from props over generic resolveOfficeBrand fallback «Γραφείο».
-  const resolvedName = brand.displayName || (brand.name !== 'Γραφείο' ? brand.name : '');
+  const splashBrand = resolveOfficeSplashBrand(appearance);
+  // Prefer parent officeName (wallet seal) → appearance → splash Achillio fallback → fallbackLabel.
+  const propOfficeName = String(officeName || '').trim();
+  const resolvedName =
+    (!isGenericOfficeLabel(propOfficeName) ? propOfficeName : '') ||
+    brand.displayName ||
+    (!isGenericOfficeLabel(brand.name) ? brand.name : '') ||
+    (!isGenericOfficeLabel(splashBrand.name) ? splashBrand.name : '');
   const label =
     resolvedName ||
-    (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
+    (!isGenericOfficeLabel(fallbackLabel) ? fallbackLabel : '') ||
+    (logoSrc && useCompact && splashBrand.name === ACHILLIO_TRAVEL_NAME
+      ? ACHILLIO_TRAVEL_NAME
+      : '') ||
     brand.name ||
     (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const resolvedHeight =
@@ -146,14 +175,10 @@ export default function OfficeBrandMark({
     resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
     { compact: useCompact },
   );
-  // Respect admin «εμφάνιση ονόματος» (default on). Compact wallet used to hide
-  // the name whenever a logo image existed — customers only saw an icon mark.
-  const nameOptOut = appearance.logo_show_name === false;
-  const showName =
-    !nameOptOut &&
-    Boolean(label) &&
-    label !== 'Γραφείο' &&
-    label !== 'PoreiaGo';
+  // Respect admin «εμφάνιση ονόματος» (default on). Native compact chrome always
+  // keeps the wordmark beside the seal — logo-only looks broken on Capacitor.
+  const nameOptOut = appearance.logo_show_name === false && !useCompact;
+  const showName = !nameOptOut && !isGenericOfficeLabel(label);
 
   const compactLogoStyle =
     useCompact && showName

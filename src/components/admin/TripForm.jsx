@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { createFleetDriver, fetchFleetDrivers } from '../../services/platformApi.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import 'leaflet/dist/leaflet.css';
@@ -14,6 +15,20 @@ import {
   MARKET_INTERNATIONAL,
   MARKET_LABELS,
 } from '../../lib/trips/tripMarket.js';
+
+const redIcon = L.divIcon({
+  className: 'custom-red-pin',
+  html: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1.5" class="w-10 h-10 drop-shadow-lg" style="margin-top:-20px; margin-left:-8px;">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+      <circle cx="12" cy="10" r="3" fill="white"></circle>
+    </svg>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 24],
+  popupAnchor: [0, -24],
+});
+L.Marker.prototype.options.icon = redIcon;
 
 const DURATION_PRESETS = ['Ημιημερήσια', 'Ημερήσια', '2 ημέρες', '3 ημέρες', 'Weekend', 'Πολυήμερη'];
 const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Early bird'];
@@ -300,6 +315,32 @@ export default function TripForm({
   const usedDriverIds = new Set(
     [formData.driverId, ...additionalFleet.map((r) => r.driverId)].filter(Boolean),
   );
+
+  const handleAddStop = () => {
+    const newId = Date.now();
+    patch({
+      stops: [
+        ...(formData.stops || []),
+        { id: newId, name: '', lat: 38.0, lng: 23.0, time: '12:00', image: null, description: '' },
+      ],
+    });
+    setActiveStopId(newId);
+  };
+
+  const handleRemoveStop = (id) => {
+    patch({ stops: formData.stops.filter((s) => s.id !== id) });
+    if (activeStopId === id) setActiveStopId(null);
+  };
+
+  const handleUpdateStop = (id, field, value) => {
+    patch({
+      stops: formData.stops.map((s) =>
+        s.id === id
+          ? { ...s, [field]: field === 'lat' || field === 'lng' ? parseFloat(value) : value }
+          : s,
+      ),
+    });
+  };
 
   const handleCoverImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -1081,7 +1122,17 @@ export default function TripForm({
       <Section
         icon="route"
         title="Διαδρομή & στάσεις"
-        hint="Αναζήτηση τόπου, συντομεύσεις πόλεων, κλικ στον χάρτη και αναδιάταξη στάσεων."
+        hint="Κάντε κλικ στον χάρτη για να ορίσετε τοποθεσία."
+        action={
+          <button
+            type="button"
+            onClick={handleAddStop}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Νέα στάση
+          </button>
+        }
       >
         <div className="grid lg:grid-cols-2 gap-5">
           <div>

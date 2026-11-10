@@ -8,7 +8,6 @@ import {
   FinalCtaSection,
   PainPointsSection,
   PricingTeaserSection,
-  RentProductSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
 import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 import { Link } from 'react-router-dom';

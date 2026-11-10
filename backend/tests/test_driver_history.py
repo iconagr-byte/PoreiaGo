@@ -171,11 +171,20 @@ class DriverLoginRecordsActivityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import api.driver_portal as portal
+        from fastapi import Request
 
         cls._orig_secret = portal._jwt_secret
         portal._jwt_secret = lambda: "dev-jwt-secret-change-in-prod-32bytes!!"
         cls.portal = portal
         cls.app = FastAPI()
+
+        @cls.app.middleware("http")
+        async def inject_office(request: Request, call_next):
+            # Simulate Host-scoped /driver on an office domain (testserver has none).
+            # DEMO home matches create_driver() default when tenant_id omitted.
+            request.state.tenant_id = "00000000-0000-0000-0000-000000000001"
+            return await call_next(request)
+
         cls.app.include_router(portal.router)
         cls.client = TestClient(cls.app)
 

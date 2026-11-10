@@ -74,9 +74,7 @@ function clearDriverGpsAutostart() {
 }
 
 export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = true } = {}) {
-  // Always start offline in UI — never inherit a stale localStorage flag from a
-  // previous visit. Resume only happens after an explicit «Έναρξη βάρδιας».
-  const [online, setOnline] = useState(false);
+  const [online, setOnline] = useState(() => isDriverShiftOnline());
   const [lastPing, setLastPing] = useState(null);
   const [gpsError, setGpsError] = useState('');
   const [manifestSummary, setManifestSummary] = useState(null);
@@ -358,38 +356,20 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     [goOffline, iosEnv.isIos, markOnline, sendPosition],
   );
 
-  // Sync UI when login/logout clears the shift flag (event from clearDriverShiftLaunchState).
-  useEffect(() => {
-    const onShiftFlag = (event) => {
-      if (event?.detail?.online) return;
-      stopRuntime();
-      setOnline(false);
-      setStarting(false);
-      setGpsError('');
-      setLastPing(null);
-    };
-    window.addEventListener('driver-shift-online', onShiftFlag);
-    return () => window.removeEventListener('driver-shift-online', onShiftFlag);
-  }, [stopRuntime]);
-
   // Keep GPS running while the driver shell is active. Tab changes must not end the shift.
   useEffect(() => {
     if (!enabled) {
       stopRuntime();
       setStarting(false);
-      setOnline(false);
       return undefined;
     }
 
     const ensureRunning = () => {
       // Resume only an already-started shift (flag set by explicit «Έναρξη βάρδιας»).
       // Never autostart from login — peekDriverGpsAutostart is always false.
-      if (!isDriverShiftOnline() && !peekDriverGpsAutostart()) {
-        if (!runningRef.current && !startingRef.current) {
-          setOnline(false);
-        }
-        return;
-      }
+      // Never resurrect GPS while Τέλος βάρδιας is in flight.
+      if (endingRef.current) return;
+      if (!isDriverShiftOnline() && !peekDriverGpsAutostart()) return;
       setOnline(true);
       if (!runningRef.current && !startingRef.current) {
         void goOnline({ resume: true });
@@ -464,14 +444,13 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     };
   }, [online, enabled]);
 
-  const toggle = useCallback(async () => {
+  const toggle = useCallback(() => {
     if (online || starting || runningRef.current || isDriverShiftOnline()) {
       void goOffline();
     } else {
       // User tap — best chance for iOS permission prompt.
       void goOnline({ resume: false });
     }
-    await goOnline({ resume: false });
   }, [online, starting, goOffline, goOnline]);
 
   return {

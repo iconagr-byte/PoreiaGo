@@ -60,7 +60,7 @@ export function HeroSection() {
               to="/grafeia"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-slate-900 rounded-full font-bold text-base hover:scale-[1.02] shadow-xl shadow-black/20 transition-transform"
             >
-              Συμβόλαια λεωφορείων
+              Δείτε τα συμβόλαια
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <a
@@ -268,22 +268,19 @@ export function PricingTeaserSection() {
 }
 
 export function RentProductSection() {
-  const [catalog, setCatalog] = useState(() => mergeRentPlanCatalog(null));
+  const [standalone, setStandalone] = useState(() => mergeRentPlanCatalog(null).standalone);
 
   useEffect(() => {
     let cancelled = false;
     fetchPublicRentPlanCatalog().then((data) => {
-      if (!cancelled) setCatalog(data);
+      if (!cancelled) setStandalone(data.standalone);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const { standalone, addon } = catalog;
-  const showStandalone = standalone.visible !== false;
-  const showAddon = addon.visible !== false;
-  if (!showStandalone && !showAddon) return null;
+  if (standalone.visible === false) return null;
 
   return (
     <section
@@ -344,95 +341,32 @@ export function RentProductSection() {
                 Άνοιγμα Rent
               </Link>
               <Link
-                to="/rent/services"
+                to="/grafeia"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
               >
-                Υπηρεσίες πελάτη
+                Συμβόλαια Rent
               </Link>
             </div>
           </div>
-        </section>
-      ) : null}
 
-      {showAddon ? (
-        <section
-          id="rent-fleet"
-          className="relative py-20 md:py-28 overflow-hidden border-b border-slate-200/80 bg-white"
-        >
-          <div
-            className="absolute inset-0 pointer-events-none opacity-70"
-            aria-hidden
-            style={{
-              backgroundImage:
-                'radial-gradient(ellipse 65% 45% at 10% 15%, rgba(13,148,136,0.08), transparent), radial-gradient(ellipse 45% 35% at 92% 85%, rgba(14,165,233,0.06), transparent)',
-            }}
-          />
-          <div className="relative max-w-6xl mx-auto px-4 md:px-8">
-            <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
-              <div>
-                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-200/80 text-xs font-bold uppercase tracking-wider text-teal-800 mb-5">
-                  <span className="material-symbols-outlined text-[16px]">directions_car</span>
-                  Στόλος για ενοικίαση · Πρόσθετο
-                </span>
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
-                  Προσθέστε στόλο ενοικίασης πάνω στο συμβόλαιο λεωφορείων
-                </h2>
-                <p className="mt-4 text-base md:text-lg text-slate-600 leading-relaxed max-w-xl">
-                  Ιδανικό για γραφεία που ήδη τρέχουν εκδρομές — κρατήσεις ενοικίασης, έλεγχος με
-                  κωδικό QR και ζωντανό εντοπισμό, χωρίς να αλλάξετε το βασικό πλάνο λεωφορείων.
-                </p>
-                <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-slate-700">
-                  {[
-                    'Όλο το module ενοικιάσεων στο υπάρχον πλάνο',
-                    'Ίδια εφαρμογή και πορτοφόλι για πελάτες',
-                    'Έκτακτη ανάγκη, οδική βοήθεια και ασφάλεια',
-                    'Κοινοποίηση διαδρομής και λίστα ελέγχου',
-                    'Στόλος, κρατήσεις και γραφείο ενοικιάσεων',
-                    'Χωρίς αλλαγή του βασικού συμβολαίου λεωφορείων',
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-teal-600 text-[18px] mt-0.5">
-                        check_circle
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-8 flex flex-wrap gap-3">
-                  <Link
-                    to="/grafeia"
-                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
-                  >
-                    Θέλω λεωφορεία και ενοικιάσεις
-                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                  </Link>
-                  <Link
-                    to="/rent/services"
-                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-slate-300 text-slate-800 font-bold hover:bg-slate-50"
-                  >
-                    Δες δημόσια σελίδα υπηρεσιών
-                  </Link>
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <article className="rounded-[24px] border border-slate-200 bg-slate-50/90 shadow-sm p-6 text-slate-900">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">
-                    {addon.badge}
-                  </p>
-                  <h3 className="mt-2 text-xl font-bold">{addon.name}</h3>
-                  <p className="mt-1 text-sm text-slate-600">{addon.tagline}</p>
-                  <p className="mt-4 text-2xl font-bold tabular-nums text-slate-900">
-                    από €{addon.monthlyEur}
-                    <span className="text-sm font-semibold text-slate-500">/μήνα</span>
-                  </p>
-                </article>
-              </div>
-            </div>
+          <div className="grid gap-4">
+            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
+                {standalone.badge}
+              </p>
+              <h3 className="mt-2 text-xl font-bold">{standalone.name}</h3>
+              <p className="mt-1 text-sm text-white/65">
+                {standalone.tagline}
+              </p>
+              <p className="mt-4 text-2xl font-bold tabular-nums">
+                από €{standalone.monthlyEur}
+                <span className="text-sm font-semibold text-white/55">/μήνα</span>
+              </p>
+            </article>
           </div>
-        </section>
-      ) : null}
-    </>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -420,18 +420,6 @@ async def _login_office_tenant(request: Request) -> str | None:
     return None
 
 
-async def _login_office_tenant(request: Request) -> str | None:
-    """Host / middleware office for this /driver login (None on bare platform host)."""
-    tid = getattr(request.state, "tenant_id", None)
-    if tid:
-        return str(tid)
-    try:
-        from api.request_tenant import public_tenant_id
-
-        return await public_tenant_id(request, allow_demo_fallback=False)
-    except Exception:
-        return None
-
 
 @router.post("/session/login", response_model=DriverSessionResponse)
 async def login_with_password(request: Request, body: DriverLoginBody):
@@ -525,6 +513,17 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         tenant_id=str(tenant_id) if tenant_id else None,
         detail=driver.license_plate or driver.vehicle_code,
     )
+    try:
+        from travel_platform.settings.driver_activity_store import record_driver_login
+
+        record_driver_login(
+            driver_id=driver.id,
+            tenant_id=tenant_id,
+            trip_id=trip_id,
+            method="password",
+        )
+    except Exception:
+        pass
     resp = _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,

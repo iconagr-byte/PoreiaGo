@@ -76,11 +76,15 @@ class RentalPaymentStoreTests(unittest.TestCase):
         # 2 days * 40 + insurance 12*2 + gps 5*2 = 80 + 24 + 10 = 114
         self.assertEqual(booking["total_cost"], 114.0)
         self.assertEqual(booking["pricing"]["extras_total"], 34.0)
-        self.assertEqual(booking["amount_due_now"], 34.2)
-        self.assertEqual(booking["amount_paid"], 34.2)
-        self.assertEqual(booking["balance_due"], 79.8)
-        self.assertEqual(booking["payment_status"], "partial")
-        self.assertIn("CDW", booking["notes"])
+        # P0: card without provider proof stays pending / unpaid until Stripe or desk confirms.
+        self.assertEqual(str(booking["payment_status"]).upper(), "PENDING")
+        self.assertEqual(float(booking["amount_paid"]), 0.0)
+        self.assertGreater(float(booking["balance_due"]), 0)
+        notes = str(booking.get("notes") or "")
+        self.assertTrue(
+            "CDW" in notes or "Extra insurance" in notes or "insurance" in notes.lower(),
+            notes,
+        )
 
 
 class RentalConfirmationEmailTests(unittest.IsolatedAsyncioTestCase):

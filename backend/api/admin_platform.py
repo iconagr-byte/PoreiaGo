@@ -360,11 +360,14 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
 
     Isolation rules:
     1. Achillio Travel Host → Achillio office only (never PoreiaGo drivers).
-    2. www.poreiago.com → canonical PoreiaGo platform drivers for DEMO /
+    2. Achillio Travel JWT → always that office's drivers (even if the admin
+       tab is open on www.poreiago.com). Remapping to the empty platform list
+       made Achilleas look «lost».
+    3. www.poreiago.com → canonical PoreiaGo platform drivers for DEMO /
        Achillio JWT / platform JWT (so Achilleas is never «missing»).
-    3. Real customer-office JWT otherwise wins — never switch via spoofable headers.
-    4. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
-    5. DEMO legacy claim permanently disabled.
+    4. Real customer-office JWT otherwise wins — never switch via spoofable headers.
+    5. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
+    6. DEMO legacy claim permanently disabled.
     """
     jwt_tid = str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
     impersonating = _request_is_impersonating(request)
@@ -375,8 +378,13 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
             return host_tid, False, False
 
-    # www.poreiago.com — always list the canonical platform drivers for Master
-    # / DEMO / Achillio sessions so Achilleas (home on PoreiaGo) is visible.
+    # Achillio Travel JWT → always that office's drivers (even on www.poreiago.com).
+    # Remapping to the empty platform list made Achilleas look «lost».
+    if jwt_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(jwt_tid):
+        include, claim = await _office_may_claim_demo_legacy(jwt_tid)
+        return jwt_tid, include, claim
+
+    # www.poreiago.com — platform drivers for DEMO / platform JWT only.
     if _request_is_platform_host(request) and not impersonating:
         from middleware.domain_tenant import _request_host
         from travel_platform.settings.office_host_guard import (
@@ -391,10 +399,8 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
             and not host_is_shared_api(host)
             and host_is_platform_marketing(host, is_platform_host=True)
         ):
-            use_platform = (
-                jwt_tid == str(DEMO_TENANT_ID)
-                or await _tenant_is_achillio_office(jwt_tid)
-                or await _tenant_is_poreiago_platform(jwt_tid)
+            use_platform = jwt_tid == str(DEMO_TENANT_ID) or await _tenant_is_poreiago_platform(
+                jwt_tid
             )
             if use_platform:
                 platform_tid = await resolve_poreiago_platform_tenant_id()

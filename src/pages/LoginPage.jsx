@@ -18,7 +18,6 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { sendWalletClaimBookingEmail } from '../lib/wallet/sendClaimBookingEmail.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { isNativeUnifiedApp } from '../lib/capacitor/nativeAppId.js';
@@ -188,30 +187,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       /* ignore */
     }
     const hadClaim = Boolean(claim);
-    const claimBookingId = highlightBooking || claim?.bookingId || claim?.reference || '';
     clearWalletClaim();
-
-    if (hadClaim && claimBookingId && !rentIntent) {
-      sendWalletClaimBookingEmail({
-        bookingId: claimBookingId,
-        reference: claim?.reference,
-        email,
-        name: profile?.name || claim?.name,
-        phone: claim?.phone,
-      })
-        .then((res) => {
-          if (res?.skipped) return;
-          if (res?.logged_only) {
-            toast.success(`Καταγράφηκε αποστολή εισιτηρίου → ${res.email}`);
-          } else if (res?.ok) {
-            toast.success(`Στάλθηκε email με την κράτηση στο ${res.email}`);
-          }
-        })
-        .catch(() => {});
-    }
-
     const homeState = walletHomeNavState({
-      highlightBooking: claimBookingId || highlightBooking,
+      highlightBooking,
       fromClaim: hadClaim,
     });
     const rentLookupState = goingRent
@@ -713,39 +691,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               </Link>
             ) : null}
           </div>
-          {!isPhone ? (
-            <aside className="wallet-auth-aside wallet-auth-aside--right" aria-label="Πώς λειτουργεί">
-              <p className="wallet-auth-aside-kicker">Πώς λειτουργεί</p>
-              <h2 className="wallet-auth-aside-title wallet-auth-aside-title--sm">
-                Από τη σύνδεση
-                <br />
-                στην επιβίβαση
-              </h2>
-              <ol className="wallet-auth-aside-steps">
-                <li>
-                  <span className="wallet-auth-aside-step">1</span>
-                  <div>
-                    <strong>Συνδεθείτε</strong>
-                    <span>Email ή Google — ασφαλή είσοδος.</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="wallet-auth-aside-step">2</span>
-                  <div>
-                    <strong>Ανοίξτε το My Wallet</strong>
-                    <span>Εισιτήριο, θέση και QR σε μία οθόνη.</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="wallet-auth-aside-step">3</span>
-                  <div>
-                    <strong>Επιβιβαστείτε με QR</strong>
-                    <span>Δείξτε το στον οδηγό — χωρίς χαρτί.</span>
-                  </div>
-                </li>
-              </ol>
-            </aside>
-          ) : null}
         </div>
       </div>
     </div>

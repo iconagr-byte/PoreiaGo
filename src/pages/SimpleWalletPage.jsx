@@ -72,6 +72,7 @@ import {
 } from '../services/officeModulesApi.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import { resolveOfficeSplashBrand } from '../lib/wallet/officeSplashBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import {
@@ -348,8 +349,7 @@ function WalletAuthenticatedApp() {
       document.removeEventListener('visibilitychange', refresh);
       window.clearInterval(poll);
     };
-    // Also refresh when opening ticket/bookings tabs so Postgres walk-ins appear.
-  }, [email, focusId, activeTab]);
+  }, [email, focusId]);
 
   useEffect(() => {
     const syncSeal = () => setSealedTenantId(getWalletTenantId() || '');
@@ -384,10 +384,13 @@ function WalletAuthenticatedApp() {
         if (cancelled) return;
         setSiteAppearance(data || DEFAULT_SITE_APPEARANCE);
         const brand = resolveOfficeBrand(data || {});
-        const name = brand.displayName || brand.name;
+        // Splash helper recovers Achillio Travel when name fields are blank.
+        const splashName = resolveOfficeSplashBrand(data || {}).name || '';
+        const name = brand.displayName || splashName || brand.name;
         // Prefer real office name — never keep generic Γραφείο / My Wallet when API sent one.
         if (name && name !== 'Γραφείο') setBrandLabel(name);
         else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
+        else if (splashName) setBrandLabel(splashName);
       })
       .catch(() => {});
     return () => {
@@ -950,6 +953,10 @@ function WalletAuthenticatedApp() {
             <OfficeBrandMark
               className="h-7 max-w-[14.5rem]"
               variant="light"
+              officeName={
+                officeBrand.displayName ||
+                (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
+              }
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
@@ -1159,7 +1166,7 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'account' && (
-          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
+          <div className="wallet-stack">
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>

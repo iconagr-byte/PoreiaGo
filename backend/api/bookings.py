@@ -25,10 +25,10 @@ redis_client = MockRedis()
 
 @router.get("/")
 async def get_bookings(
-    page: int = 1, 
-    size: int = 10, 
-    status: Optional[str] = None,
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    page: int = 1,
+    size: int = 10,
+    status: Optional[str] = None,
 ):
     """
     Fetch paginated bookings.

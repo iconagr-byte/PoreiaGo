@@ -34,7 +34,7 @@ No office picker. No “scan QR to find office” as the main path.
 
 ## Windows rebuild (preferred)
 
-Rebuild native whenever Wallet UI/nav changes land on `main`. Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.11** (`versionCode` 11).
+Rebuild native whenever Wallet UI/nav changes land on `main`. Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.15** (`versionCode` 15).
 
 **Always build from `main`.** Do not use old feature branches. `wallet-run.ps1` defaults to `-Branch main`.
 

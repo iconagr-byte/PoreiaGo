@@ -103,6 +103,7 @@ export default function WalletDesignPreview() {
             <OfficeBrandMark
               className="h-7 max-w-[14.5rem]"
               variant="light"
+              officeName={brandLabel}
               fallbackLabel={brandLabel}
               asLink={false}
               compact={Boolean(isPhone)}

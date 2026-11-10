@@ -264,35 +264,22 @@
   color: rgba(29, 29, 31, 0.68);
 }
 
-/* Bus markers — soft glass Apple pin.
-   Leaflet/Mapbox anchor the 52×52 ring center on GPS; labels float above. */
+/* Bus markers — soft glass Apple pin */
 .fleet-bus-marker-ws {
   background: transparent !important;
   border: 0 !important;
-  overflow: visible !important;
 }
 
 .fleet-apple-bus-pin {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.22));
-}
-
-.fleet-apple-bus-pin__labels {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  pointer-events: none;
-  white-space: nowrap;
+  transform: translateY(-8px);
+  filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.22));
 }
 
 .fleet-apple-bus-pill {
+  margin-top: 4px;
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -311,7 +298,9 @@
 }
 
 .fleet-apple-bus-pill--above {
-  margin: 0;
+  margin-top: 0;
+  margin-bottom: 6px;
+  order: -1;
 }
 
 /* Live speed / heading HUD bubble sitting above the pin avatar */
@@ -529,7 +518,8 @@
 }
 
 .fleet-apple-bus-excursion {
-  margin: 0;
+  order: -2;
+  margin-bottom: 4px;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -631,11 +621,20 @@
   background: #fff !important;
 }
 
-/* SVG travel pin — honor JS iconSize/iconAnchor (tip = GPS). Do not force a card box. */
 .leaflet-div-icon.teltonika-travel-pin {
   background: transparent !important;
   border: 0 !important;
+  width: 210px !important;
+  height: 86px !important;
   overflow: visible !important;
+}
+
+.leaflet-div-icon.teltonika-travel-pin img {
+  width: 64px !important;
+  height: 64px !important;
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
 }
 
 .teltonika-travel-marker {

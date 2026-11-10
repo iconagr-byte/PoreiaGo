@@ -1,6 +1,6 @@
 /**
  * Marketing copy + display specs for rent fleet cards (guest + home).
- * Matches known model names; falls back gracefully for custom vehicles.
+ * Matches known demo models; falls back gracefully for custom vehicles.
  */
 
 import { DEMO_RENT_FLEET } from './demoRentFleet.js';
@@ -214,9 +214,14 @@ export function enrichRentVehicle(vehicle) {
     known?.blurb ||
     `${category || 'Όχημα'} έτοιμο για ενοικίαση — κράτηση online σε λίγα βήματα.`;
 
+  const fallbackPhoto = DEMO_PHOTO_BY_MODEL[modelKey(v.model)] || '';
   const rawPhoto = String(v.photo_url || v.photo_urls?.[0] || '').trim();
-  const photoUrl = rawPhoto;
-  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length
+  // Prefer accurate model photo when catalog still has mismatched Unsplash stock.
+  const photoUrl =
+    fallbackPhoto && (!rawPhoto || /images\.unsplash\.com/i.test(rawPhoto))
+      ? fallbackPhoto
+      : rawPhoto || fallbackPhoto;
+  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length && !/images\.unsplash\.com/i.test(rawPhoto)
     ? v.photo_urls
     : photoUrl
       ? [photoUrl]

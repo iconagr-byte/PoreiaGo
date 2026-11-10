@@ -8,7 +8,11 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { hasPreferRentLookup, referrerLooksLikeRent } from '../lib/rental/preferRentLookup.js';
+import {
+  clearPreferRentLookup,
+  hasPreferRentLookup,
+  referrerLooksLikeRent,
+} from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchOfficeModules, shouldShowRentStorefront } from '../services/officeModulesApi.js';
 import '../styles/booking-lookup.css';
@@ -226,13 +230,6 @@ export default function BookingLookupPage() {
             Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις το εισιτήριό σου.
           </p>
 
-          <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
-            Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-            <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
-            {' · '}
-            <Link to="/rent/wallet">Rent Wallet</Link>
-          </p>
-
           <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
             <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
               <span>Email κράτησης</span>
@@ -352,7 +349,7 @@ export default function BookingLookupPage() {
 
           <div className="booking-lookup-footer-links">
             <Link to="/login" className="booking-lookup-wallet">
-              Σύνδεση στο My Wallet (λεωφορεία)
+              Σύνδεση στο My Wallet
             </Link>
             {tel ? (
               <a href={tel} className="booking-lookup-phone">

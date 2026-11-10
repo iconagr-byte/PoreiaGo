@@ -141,17 +141,6 @@ export async function sendAdminPushTest() {
   return data;
 }
 
-/** Immediate test push to this admin's registered devices. */
-export async function sendAdminPushTest() {
-  const res = await fetch(`${API_BASE}/api/admin/push/test`, {
-    method: 'POST',
-    headers: saasAuthHeaders(),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
-  return data;
-}
-
 export async function unsubscribeAdminFleetPush() {
   const email = getAdminEmail();
   const registration =

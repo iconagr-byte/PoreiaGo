@@ -3,7 +3,7 @@
  * Apple Wallet «back of pass»: details + Remove Pass.
  */
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TicketQrCode from '../TicketQrCode.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
@@ -40,7 +40,6 @@ export default function WalletTicketDetail({
   onBookingUpdated,
   onRemovePass,
 }) {
-  const navigate = useNavigate();
   const [emailSending, setEmailSending] = useState(false);
   const [removing, setRemoving] = useState(false);
 
@@ -322,10 +321,10 @@ export default function WalletTicketDetail({
         {!expired ? <WalletDeviceSave booking={booking} /> : null}
         <Link to={ticketPrintPath(booking.id, { autoPrint: true })} className="wallet-pass-cta">
           <span className="material-symbols-outlined" aria-hidden>
-            {printBusy ? 'hourglass_empty' : 'print'}
+            print
           </span>
-          {printBusy ? 'Προετοιμασία…' : 'Εκτύπωση / PDF'}
-        </button>
+          Εκτύπωση / PDF
+        </Link>
         <button
           type="button"
           className="wallet-pass-secondary wallet-ticket-email"

@@ -12,7 +12,11 @@ from travel_platform.notifications.web_push_service import (
     ensure_web_push_keys,
     push_configured,
     send_push_to_subscription,
+    web_push_configured,
 )
+
+# Re-export for tests that patch driver_push_service.web_push_configured.
+__all__ = ("send_driver_shift_invite_push", "web_push_configured", "push_configured")
 from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
 logger = logging.getLogger(__name__)

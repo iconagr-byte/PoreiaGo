@@ -51,19 +51,31 @@ class TraefikDomainsTests(unittest.TestCase):
         self.assertNotIn("sans:", yaml)
 
     def test_apex_points_to_platform(self):
+        # Pin ingress IPs so patched getaddrinfo for the domain cannot also
+        # poison platform_ingress_ips() via the www.poreiago.com CNAME lookup.
+        ingress = {"169.58.199.186", "34.141.98.145"}
         with patch(
+            "travel_platform.growth.traefik_domains.platform_ingress_ips",
+            return_value=set(ingress),
+        ), patch(
             "travel_platform.growth.traefik_domains.socket.getaddrinfo",
             return_value=[(None, None, None, None, ("169.58.199.186", 0))],
         ):
             self.assertTrue(apex_points_to_platform("achilliotravel.com"))
         with patch(
+            "travel_platform.growth.traefik_domains.platform_ingress_ips",
+            return_value=set(ingress),
+        ), patch(
             "travel_platform.growth.traefik_domains.socket.getaddrinfo",
-            return_value=[(None, None, None, None, ("34.141.98.145", 0))],
+            return_value=[(None, None, None, None, ("203.0.113.50", 0))],
         ):
             self.assertFalse(apex_points_to_platform("achilliotravel.com"))
         with patch(
+            "travel_platform.growth.traefik_domains.platform_ingress_ips",
+            return_value=set(ingress),
+        ), patch(
             "travel_platform.growth.traefik_domains.socket.getaddrinfo",
-            return_value=[(None, None, None, None, ("185.104.144.132", 0))],
+            return_value=[(None, None, None, None, ("198.51.100.10", 0))],
         ):
             self.assertFalse(apex_points_to_platform("achilliotravel.com"))
 
