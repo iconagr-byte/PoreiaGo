@@ -37,23 +37,27 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
     picture TEXT,
     auth_provider TEXT NOT NULL DEFAULT 'email',
     customer_id TEXT,
+    wallet_tenant_id TEXT,
     reset_token TEXT,
     reset_expires_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ca_reset ON customer_accounts(reset_token);
+-- idx_ca_wallet_tenant is created after ALTER (legacy DBs lack wallet_tenant_id until migrated)
 
 CREATE TABLE IF NOT EXISTS customer_bookings (
     id TEXT PRIMARY KEY,
     customer_email TEXT NOT NULL,
     customer_id TEXT,
+    tenant_id TEXT,
     payload_json TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cb_email ON customer_bookings(customer_email);
 CREATE INDEX IF NOT EXISTS idx_cb_customer ON customer_bookings(customer_id);
+-- idx_cb_email_tenant is created after ALTER (legacy DBs lack tenant_id until migrated)
 
 CREATE TABLE IF NOT EXISTS lost_items (
     id TEXT PRIMARY KEY,
@@ -70,6 +74,17 @@ CREATE TABLE IF NOT EXISTS lost_items (
 );
 CREATE INDEX IF NOT EXISTS idx_lost_email ON lost_items(customer_email);
 CREATE INDEX IF NOT EXISTS idx_lost_status ON lost_items(status);
+
+CREATE TABLE IF NOT EXISTS wallet_magic_tokens (
+    token TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    booking_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wmt_email ON wallet_magic_tokens(email);
+CREATE INDEX IF NOT EXISTS idx_wmt_booking ON wallet_magic_tokens(booking_id);
 """
 
 _db: aiosqlite.Connection | None = None
@@ -84,6 +99,46 @@ async def init_ticketing_db() -> None:
     await _db.executescript(SCHEMA)
     try:
         await _db.execute("ALTER TABLE ticket_bookings ADD COLUMN saas_booking_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute("ALTER TABLE customer_bookings ADD COLUMN tenant_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute("ALTER TABLE customer_accounts ADD COLUMN wallet_tenant_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ca_wallet_tenant ON customer_accounts(wallet_tenant_id)"
+        )
+    except Exception:
+        pass
+    try:
+        await _db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cb_email_tenant ON customer_bookings(customer_email, tenant_id)"
+        )
+    except Exception:
+        pass
+    # Backfill tenant_id from payload when missing (legacy wallet rows).
+    try:
+        cur = await _db.execute(
+            "SELECT id, payload_json FROM customer_bookings "
+            "WHERE tenant_id IS NULL OR tenant_id = ''"
+        )
+        rows = await cur.fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                continue
+            tid = str(payload.get("tenant_id") or payload.get("tenantId") or "").strip()
+            if tid:
+                await _db.execute(
+                    "UPDATE customer_bookings SET tenant_id = ? WHERE id = ?",
+                    (tid, row["id"]),
+                )
     except Exception:
         pass
     await _db.commit()

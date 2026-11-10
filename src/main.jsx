@@ -1,25 +1,67 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import './index.css';
 import App from './App.jsx';
-import { GOOGLE_CLIENT_ID } from './services/customerAuthApi.js';
+import GoogleAuthRoot from './components/GoogleAuthRoot.jsx';
+import { isNativeApp } from './lib/capacitor/isNativeApp.js';
+import {
+  getNativeAppId,
+  isNativeDriverApp,
+  isNativeUnifiedApp,
+  markNativeAppShell,
+  NATIVE_APP_DRIVER,
+  NATIVE_APP_UNIFIED,
+  NATIVE_APP_WALLET,
+} from './lib/capacitor/nativeAppId.js';
+import {
+  isUnifiedNativeAppPath,
+  resolveNativeRoleHomePath,
+} from './lib/capacitor/nativeRoleHome.js';
 
-const root = createRoot(document.getElementById('root'));
+if (typeof document !== 'undefined' && isNativeApp()) {
+  const flavor = getNativeAppId() || NATIVE_APP_UNIFIED;
+  markNativeAppShell(
+    flavor === NATIVE_APP_DRIVER ? NATIVE_APP_DRIVER : NATIVE_APP_UNIFIED,
+  );
 
-function RootApp() {
-  if (GOOGLE_CLIENT_ID) {
-    return (
-      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <App />
-      </GoogleOAuthProvider>
-    );
+  try {
+    const path = window.location.pathname || '/';
+    if (flavor === NATIVE_APP_DRIVER || isNativeDriverApp()) {
+      const driverOk =
+        path === '/driver' ||
+        path.startsWith('/driver/') ||
+        path === '/driver/auth' ||
+        path.startsWith('/driver/auth') ||
+        path.startsWith('/driver/reset-password') ||
+        path.startsWith('/driver/scan');
+      if (!driverOk) {
+        window.history.replaceState(
+          null,
+          '',
+          `/driver${window.location.search || ''}${window.location.hash || ''}`,
+        );
+      }
+    } else if (isNativeUnifiedApp() || flavor === NATIVE_APP_WALLET || flavor === NATIVE_APP_UNIFIED) {
+      if (!isUnifiedNativeAppPath(path)) {
+        const home = resolveNativeRoleHomePath();
+        window.history.replaceState(
+          null,
+          '',
+          `${home}${window.location.search || ''}${window.location.hash || ''}`,
+        );
+      }
+      // Native-only theme — website never loads this stylesheet.
+      void import('./styles/wallet-native-theme.css');
+    }
+  } catch {
+    /* ignore */
   }
-  return <App />;
 }
 
-root.render(
+createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RootApp />
+    <GoogleAuthRoot>
+      <App />
+    </GoogleAuthRoot>
   </StrictMode>,
 );

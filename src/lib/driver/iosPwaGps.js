@@ -119,7 +119,7 @@ export function resetGuidanceDismissal() {
 export function iosGeolocationOptions(isIos = detectIosDevice()) {
   return {
     enableHighAccuracy: true,
-    maximumAge: isIos ? 3000 : 2000,
+    maximumAge: isIos ? 5000 : 4000,
     timeout: isIos ? 20000 : 15000,
   };
 }
