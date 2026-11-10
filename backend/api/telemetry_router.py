@@ -37,8 +37,40 @@ router = APIRouter(tags=["telemetry"])
 ingest_router = APIRouter(prefix="/telemetry", tags=["telemetry-ingest"])
 
 
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def verify_device_key(x_device_key: str | None = Header(default=None, alias="X-Device-Key")) -> str:
-    allowed = os.getenv("TELEMETRY_DEVICE_KEYS", "dev-gps-key").split(",")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    raw = (os.getenv("TELEMETRY_DEVICE_KEYS") or "").strip()
+    if not raw:
+        if env in ("production", "prod"):
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
+        allowed = ["dev-gps-key"]
+    else:
+        allowed = [k.strip() for k in raw.split(",") if k.strip()]
+    if env in ("production", "prod") and any(
+        k.lower() in {"dev-gps-key", "change-me"} for k in allowed
+    ):
+        # Never accept known weak keys even if misconfigured in prod env.
+        allowed = [k for k in allowed if k.lower() not in {"dev-gps-key", "change-me"}]
+        if not allowed:
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
     if not x_device_key or x_device_key.strip() not in allowed:
         raise HTTPException(status_code=401, detail="Invalid device key")
     return x_device_key.strip()
@@ -90,9 +122,23 @@ async def fleet_live(
     import logging
 
     from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
+    from travel_platform.telemetry.live_fleet_trail_redis import (
+        load_trails_for_tenant,
+        trail_points_for_api,
+    )
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
     log = logging.getLogger(__name__)
-    rows: list[LiveVehicleResponse] = []
+    try:
+        # If Teltonika has a recent fix in the device store but the live fleet
+        # is empty (restart / stream lag), re-paint pins before listing.
+        from travel_platform.telemetry.teltonika.hydrate_live import (
+            hydrate_tenant_live_from_devices,
+        )
+
+        await hydrate_tenant_live_from_devices(str(tenant_id))
+    except Exception:
+        log.debug("teltonika live hydrate skipped", exc_info=True)
     try:
         live: LiveFleetService = get_live_fleet()
         vehicles = await live.list_active_for_admin_async(tenant_id)
@@ -100,44 +146,165 @@ async def fleet_live(
         log.exception("fleet_live list_active failed tenant=%s", tenant_id)
         raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
 
+    # Empty map but online IMEI in device store — force paint once (Achillio).
+    if not vehicles:
+        try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
+                hydrate_tenant_live_from_devices,
+            )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
+
+            tid = str(tenant_id)
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
+            n = await hydrate_tenant_live_from_devices(tid, force=True)
+            if n:
+                vehicles = await live.list_active_for_admin_async(tenant_id)
+                log.info(
+                    "fleet_live empty-map recovery wrote=%s tenant=%s now=%s",
+                    n,
+                    tenant_id,
+                    len(vehicles),
+                )
+        except Exception:
+            log.debug("fleet_live empty-map recovery skipped", exc_info=True)
+
+    rows = []
+    trails_by_vehicle: dict = {}
+    try:
+        vids = [str(v.vehicle_id) for v in vehicles if getattr(v, "vehicle_id", None)]
+        trails_by_vehicle = await load_trails_for_tenant(str(tenant_id), vids)
+    except Exception:
+        log.debug("fleet_live trail load skipped", exc_info=True)
+
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
     for v in vehicles:
         try:
             meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
             if not meta:
                 meta = live._vehicles.get(v.vehicle_id, {})
+            if not office_allows_live_driver(str(tenant_id), meta.get("driver_id"), meta):
+                continue
+            # Teltonika pin clears driver_id; soft-ack keeps app_driver_id for chat/photo.
+            app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
+            chat_driver_id = str(meta.get("driver_id") or app_driver_id or "").strip() or None
             media = enrich_live_vehicle_media(
-                driver_id=meta.get("driver_id"),
+                driver_id=chat_driver_id,
                 bus_plate=meta.get("bus_plate", v.vehicle_code),
                 vehicle_code=v.vehicle_code,
             )
-            updated = v.updated_at
-            if isinstance(updated, str):
-                from travel_platform.telemetry.live_fleet_redis import parse_updated_at
+            from travel_platform.telemetry.active_excursion_resolve import (
+                enrich_meta_with_active_excursion,
+            )
 
-                updated = parse_updated_at(updated) or datetime.now(timezone.utc)
+            trip_id, trip_title_hint, meta = enrich_meta_with_active_excursion(
+                str(tenant_id),
+                meta,
+                vehicle_code=v.vehicle_code,
+                trip_id=v.trip_id,
+            )
+            try:
+                live._vehicles[str(v.vehicle_id)] = {
+                    **live._vehicles.get(str(v.vehicle_id), {}),
+                    **meta,
+                }
+            except Exception:
+                pass
+            trip_title = await resolve_trip_title(trip_id, preferred=trip_title_hint or meta.get("trip_title"))
+            # Empty Redis trail → empty list. Do not fabricate a 1-point stub:
+            # the client accumulates from the live pin and a stub would replace
+            # that growing path on every poll.
+            raw_trail = trails_by_vehicle.get(str(v.vehicle_id)) or []
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            alive_sec = resolve_tracker_alive_seconds(str(tenant_id))
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=alive_sec,
+                tenant_id=str(tenant_id),
+            )
+            tracker_signal_at = str(meta.get("tracker_signal_at") or "") or None
+            hydrated_from_store = bool(meta.get("hydrated_from_store"))
+            # Online IMEI: force Teltonika onto the dual badge + clear parked hydrate
+            # (App-only pin when TCP is up but AVL is sparse / last_seen briefly stale).
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+                from travel_platform.telemetry.tracker_priority import (
+                    is_tracker_binding_alive,
+                )
+
+                device = get_enabled_device_by_vehicle_code(
+                    str(tenant_id),
+                    meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
+                )
+                # Only clear parked hydrate when the IMEI is truly live (≤ alive).
+                # Do not use a longer badge window — that faked "active" after unplug.
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                    if "teltonika" not in (gps_sources or []):
+                        gps_sources = ["teltonika", *(gps_sources or [])]
+                    tracker_signal_at = (
+                        str(device.get("last_seen_at") or "") or tracker_signal_at
+                    )
+                    hydrated_from_store = False
+                    if not meta.get("imei") and device.get("imei"):
+                        meta["imei"] = device.get("imei")
+                # Dual chip: fresh App soft-ack + live IMEI → both on the pin.
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
+            except Exception:
+                pass
             rows.append(
                 LiveVehicleResponse(
-                    vehicle_id=str(v.vehicle_id),
-                    vehicle_code=str(v.vehicle_code or ""),
-                    trip_id=int(v.trip_id) if v.trip_id is not None else None,
-                    lat=float(v.lat),
-                    lng=float(v.lng),
-                    speed_kmh=float(v.speed_kmh or 0),
-                    engine_on=bool(v.engine_on),
+                    vehicle_id=v.vehicle_id,
+                    vehicle_code=v.vehicle_code,
+                    trip_id=trip_id,
+                    lat=v.lat,
+                    lng=v.lng,
+                    speed_kmh=v.speed_kmh,
+                    engine_on=v.engine_on,
                     fuel_level_pct=v.fuel_level_pct,
-                    idle_seconds_trip=int(v.idle_seconds_trip or 0),
-                    updated_at=updated,
+                    idle_seconds_trip=v.idle_seconds_trip,
+                    updated_at=v.updated_at,
                     driver_name=meta.get("driver_name"),
                     bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
                     heading_deg=meta.get("heading_deg"),
-                    driver_id=str(meta["driver_id"]) if meta.get("driver_id") is not None else None,
+                    altitude_m=_safe_float(meta.get("altitude_m")),
+                    satellites=_safe_int(meta.get("satellites")),
+                    driver_id=chat_driver_id,
+                    app_driver_id=app_driver_id,
                     photo_url=media.get("photo_url"),
                     vehicle_image_url=media.get("vehicle_image_url"),
+                    trip_title=trip_title or None,
+                    tracking_started_at=meta.get("tracking_started_at"),
+                    trail=trail_points_for_api(raw_trail),
+                    source=str(meta.get("source") or "") or None,
+                    imei=str(meta.get("imei") or "") or None,
+                    gps_sources=gps_sources,
+                    app_seen_at=str(meta.get("app_seen_at") or "") or None,
+                    tracker_signal_at=tracker_signal_at,
+                    hydrated_from_store=hydrated_from_store,
                 ),
             )
         except Exception:
-            log.exception("fleet_live skip vehicle=%s", getattr(v, "vehicle_id", "?"))
-            continue
+            log.exception("fleet_live row enrich failed vehicle=%s", getattr(v, "vehicle_id", None))
     return rows
 
 
@@ -166,6 +333,31 @@ async def telemetry_alerts(
 ):
     rows = TelemetryAlertBus.list_recent(str(tenant_id), limit=limit)
     return [TelemetryAlertResponse(**r) for r in rows]
+
+
+@admin_router.post("/alerts/{alert_id}/clear")
+async def telemetry_clear_alert(
+    alert_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Απενεργοποίηση συναγερμού οδηγού (SOS) από το γραφείο."""
+    aid = str(alert_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="Λείπει alert_id")
+    cleared = TelemetryAlertBus.clear_alert(
+        aid,
+        tenant_id=str(tenant_id),
+        notify=True,
+        publish_redis=True,
+    )
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Ο συναγερμός δεν βρέθηκε")
+    return {
+        "ok": True,
+        "id": cleared.get("id"),
+        "cleared_at": cleared.get("cleared_at"),
+        "message": "Ο συναγερμός απενεργοποιήθηκε",
+    }
 
 
 @admin_router.get("/drivers/{driver_id}/safety", response_model=DriverSafetyResponse)
