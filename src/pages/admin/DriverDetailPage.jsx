@@ -445,6 +445,8 @@ export default function DriverDetailPage() {
           </form>
         </section>
 
+        <DriverAppQrCard driver={driver} assignedTrips={assignedTrips} />
+
         {fleetVehicle && (
           <div className="bg-primary/5 border border-primary/10 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
