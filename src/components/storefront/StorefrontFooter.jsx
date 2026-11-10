@@ -39,7 +39,7 @@ function ContactLines({ contact, tone = 'light' }) {
           <span className={`material-symbols-outlined ${iconTone}`} aria-hidden>
             mail
           </span>
-          <a href={`mailto:${contact.email}`}>{contact.email}</a>
+          <Link to="/contact">{contact.email}</Link>
         </p>
       ) : null}
       {contact.phone ? (
@@ -71,6 +71,21 @@ function ContactLines({ contact, tone = 'light' }) {
           Συμπληρώστε στοιχεία επικοινωνίας από το Design της αρχικής.
         </p>
       ) : null}
+      <p className="pt-1">
+        <Link
+          to="/contact"
+          className={
+            tone === 'dark'
+              ? 'inline-flex items-center gap-1.5 text-sm font-bold text-sky-300 hover:text-sky-200'
+              : 'inline-flex items-center gap-1.5 text-sm font-bold text-sky-700 hover:text-sky-800'
+          }
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            edit_square
+          </span>
+          Φόρμα επικοινωνίας
+        </Link>
+      </p>
     </div>
   );
 }
@@ -124,7 +139,7 @@ function ExploreLinks({ tripsEnabled, rentEnabled, showFleet, className = '' }) 
         <Link to="/wallet">My Wallet</Link>
       </li>
       <li>
-        <a href="#contact">Επικοινωνία</a>
+        <Link to="/contact">Επικοινωνία</Link>
       </li>
     </ul>
   );
@@ -207,7 +222,7 @@ export default function StorefrontFooter({
               {brand.copyright || `© ${new Date().getFullYear()} ${brand.name}`}
             </p>
             <div className="sf-footer__bottom-links">
-              <a href="#contact">Επικοινωνία</a>
+              <Link to="/contact">Φόρμα επικοινωνίας</Link>
               <FooterOfficeLogin />
             </div>
           </div>
