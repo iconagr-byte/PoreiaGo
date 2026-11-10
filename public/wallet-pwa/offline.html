@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="el">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f4c81" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>My Wallet — Offline</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --accent: #0f4c81;
+        --sand: #f4f7fb;
+        --paper: #ffffff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background:
+          radial-gradient(ellipse 80% 45% at 50% -8%, rgba(15, 76, 129, 0.12), transparent 55%),
+          linear-gradient(180deg, #e8eef5 0%, var(--sand) 42%, #eef2f6 100%);
+        color: var(--ink);
+        padding: 1rem 1rem 2rem;
+      }
+      .wrap { max-width: 22rem; margin: 0 auto; }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-bottom: 0.85rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(245, 158, 11, 0.16);
+        color: #92400e;
+        font-size: 0.75rem;
+        font-weight: 800;
+      }
+      .hero {
+        border-radius: 1.5rem 1.5rem 0 0;
+        min-height: 9.5rem;
+        background: linear-gradient(145deg, #1e3a5f 0%, #0f4c81 55%, #16324f 100%);
+        color: #fff;
+        padding: 1.25rem;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero.has-cover { background-size: cover; background-position: center; }
+      .hero-shade {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(8, 20, 35, 0.2), rgba(8, 20, 35, 0.78));
+      }
+      .hero-copy { position: relative; z-index: 1; }
+      .brand {
+        margin: 0 0 0.35rem;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+      .title {
+        margin: 0;
+        font-size: 1.55rem;
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .when { margin: 0.45rem 0 0; font-weight: 600; opacity: 0.9; }
+      .card {
+        margin-top: -0.85rem;
+        position: relative;
+        background: var(--paper);
+        border-radius: 1.35rem;
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+        padding: 1.15rem;
+      }
+      .kicker {
+        margin: 0;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .passenger {
+        margin: 0.2rem 0 0;
+        font-size: 1.05rem;
+        font-weight: 800;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin-top: 1rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid rgba(15, 23, 42, 0.06);
+      }
+      .meta strong {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.92rem;
+      }
+      .mono { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+      .qr-wrap {
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .qr-wrap img {
+        width: 168px;
+        height: 168px;
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+      }
+      .hint {
+        margin: 0;
+        text-align: center;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--muted);
+        max-width: 16rem;
+      }
+      .empty {
+        background: #fff;
+        border-radius: 1.35rem;
+        padding: 2rem 1.25rem;
+        text-align: center;
+        border: 1px solid rgba(15, 23, 42, 0.07);
+      }
+      button {
+        margin-top: 1rem;
+        width: 100%;
+        border: 0;
+        border-radius: 1rem;
+        padding: 0.95rem 1rem;
+        background: var(--ink);
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap" id="app">
+      <div class="empty">
+        <h1>Φόρτωση…</h1>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var KEY = 'wallet_last_pass_v1';
+        var app = document.getElementById('app');
+
+        function esc(s) {
+          return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        function renderEmpty(msg) {
+          app.innerHTML =
+            '<div class="empty"><h1>Χωρίς σύνδεση</h1><p class="hint" style="margin:0.75rem auto 0">' +
+            esc(msg) +
+            '</p><button type="button" onclick="location.reload()">Δοκιμή ξανά</button></div>';
+        }
+
+        try {
+          var raw = localStorage.getItem(KEY);
+          if (!raw) {
+            renderEmpty('Δεν υπάρχει αποθηκευμένο εισιτήριο σε αυτή τη συσκευή. Ανοίξτε το My Wallet online μία φορά.');
+            return;
+          }
+          var snap = JSON.parse(raw);
+          var b = snap.booking || {};
+          var when = b.date || '—';
+          if (b.time) when += ' · ' + b.time;
+          var seats = b.seat || b.seats || '—';
+          var pnr = b.pnr || b.id || '—';
+          var name = snap.passengerName || b.passengerName || b.name || '—';
+          var brand = snap.brandLabel || 'My Wallet';
+          var cover = typeof snap.coverImage === 'string' ? snap.coverImage : '';
+          var safeCover =
+            cover.indexOf('/') === 0 || cover.indexOf('https://') === 0 || cover.indexOf('http://') === 0
+              ? cover
+              : '';
+          var qrData = typeof snap.qrDataUrl === 'string' ? snap.qrDataUrl : '';
+          var safeQr = qrData.indexOf('data:image/') === 0 ? qrData : '';
+          var qrImg = safeQr
+            ? '<img alt="QR εισιτηρίου" src="' + safeQr.replace(/"/g, '') + '" />'
+            : '<p class="hint">QR μη διαθέσιμο offline — δείξτε τον κωδικό <strong class="mono">' +
+              esc(pnr) +
+              '</strong></p>';
+
+          app.innerHTML =
+            '<div class="badge">Offline · τελευταίο εισιτήριο</div>' +
+            '<div class="hero' +
+            (safeCover ? ' has-cover' : '') +
+            '"' +
+            (safeCover ? ' style="background-image:url(' + JSON.stringify(safeCover) + ')"' : '') +
+            '>' +
+            '<div class="hero-shade"></div><div class="hero-copy">' +
+            '<p class="brand">' +
+            esc(brand) +
+            '</p><h1 class="title">' +
+            esc(b.tripTitle || 'Εκδρομή') +
+            '</h1><p class="when">' +
+            esc(when) +
+            '</p></div></div>' +
+            '<div class="card"><p class="kicker">Επιβάτης</p><p class="passenger">' +
+            esc(name) +
+            '</p><div class="meta"><div><p class="kicker">Θέση</p><strong>' +
+            esc(seats) +
+            '</strong></div><div><p class="kicker">Κωδικός</p><strong class="mono">' +
+            esc(pnr) +
+            '</strong></div><div><p class="kicker">Ποσό</p><strong>€' +
+            esc(Number(b.price || 0).toFixed(2)) +
+            '</strong></div></div><div class="qr-wrap">' +
+            qrImg +
+            '<p class="hint">Χωρίς σύνδεση · χρησιμοποιήστε το τελευταίο αποθηκευμένο QR</p></div>' +
+            '<button type="button" onclick="location.reload()">Ανανέωση</button></div>';
+        } catch (e) {
+          renderEmpty('Το αποθηκευμένο εισιτήριο δεν διαβάζεται. Ανοίξτε online το My Wallet.');
+        }
+      })();
+    </script>
+  </body>
+</html>

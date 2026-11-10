@@ -35,9 +35,10 @@ def build_payment_reference(template: str, booking: dict[str, Any]) -> str:
 
 def resolve_bank_transfer_details(booking: dict[str, Any]) -> dict[str, Any]:
     """Full bank block for pending transfer emails (always uses real IBAN server-side)."""
+    from api.request_tenant import booking_tenant_id
     from travel_platform.settings.payment_settings_store import read_payment_settings
 
-    settings = read_payment_settings()
+    settings = read_payment_settings(booking_tenant_id(booking))
     accounts = [a for a in (settings.get("bank_accounts") or []) if a.get("enabled")]
     account_id = booking.get("bankAccountId") or booking.get("bank_account_id")
 
