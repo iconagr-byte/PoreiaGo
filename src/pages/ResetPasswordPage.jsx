@@ -28,7 +28,11 @@ export default function ResetPasswordPage() {
       const result = await resetCustomerPassword({ token, newPassword: password });
       loginAsCustomer(
         result.email,
-        { name: result.name, provider: result.provider || 'email' },
+        {
+          name: result.name,
+          provider: result.provider || 'email',
+          tenant_id: result.tenant_id,
+        },
         result.access_token,
       );
       toast.success('Ο κωδικός ενημερώθηκε — συνδεθήκατε αυτόματα');

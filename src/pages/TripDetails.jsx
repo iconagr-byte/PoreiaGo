@@ -1,13 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
+import { fleetCategoryLabel } from '../lib/fleet/fleetVehicleCategories.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
+import TripPhotoBento from '../components/storefront/TripPhotoBento.jsx';
+import TripItineraryNarrative from '../components/storefront/TripItineraryNarrative.jsx';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import { LEAFLET_BASEMAP } from '../lib/maps/appleMapTheme.js';
+import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+  walletBookNavState,
+  walletSelectSeatPath,
+} from '../lib/wallet/walletBookTrip.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -43,7 +56,9 @@ const liveBusIcon = L.divIcon({
 export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [trip, setTrip] = useState(null);
+  const location = useLocation();
+  const fromWallet = isWalletBookFlow(location.state);
+  const [trip, setTrip] = useState(() => officeTripFromWalletState(location.state, id));
   
   // Live Tracking State
   const [isLiveTracking, setIsLiveTracking] = useState(false);
@@ -52,12 +67,41 @@ export default function TripDetails() {
   const [progress, setProgress] = useState(0);
   const [nextStopName, setNextStopName] = useState("");
 
+  const goBack = () => {
+    if (fromWallet) navigate('/wallet');
+    else navigate('/#search-results');
+  };
+
   useEffect(() => {
-    const found = loadTrips().find(t => t.id === parseInt(id));
+    const tripId = parseInt(id, 10);
+    const seeded = officeTripFromWalletState(location.state, id);
+    if (seeded) {
+      setTrip(seeded);
+      return undefined;
+    }
+    let found = loadTrips().find((t) => Number(t.id) === tripId);
+    if (!found && isPlatformSeatBookingDemo()) {
+      found = loadPlatformDemoTrips().find((t) => Number(t.id) === tripId);
+    }
     if (found) {
       setTrip(found);
+      return undefined;
     }
-  }, [id]);
+    let cancelled = false;
+    const tenantId = getWalletTenantId() || undefined;
+    fetchPublicOfficeTrips(tenantId ? { tenantId } : undefined)
+      .then((list) => {
+        if (cancelled) return;
+        const hit = (list || []).find((t) => Number(t.id) === tripId) || null;
+        setTrip(hit);
+      })
+      .catch(() => {
+        if (!cancelled) setTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, location.state]);
 
   // Generate coordinates for polyline
   const positions = trip?.stops?.map(stop => [stop.lat, stop.lng]) || [];
@@ -112,8 +156,18 @@ export default function TripDetails() {
 
   if (!trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface gap-4 px-6">
         <p className="font-headline-md text-on-surface">Το δρομολόγιο δεν βρέθηκε.</p>
+        <button
+          type="button"
+          onClick={goBack}
+          className="inline-flex items-center gap-2 rounded-full bg-primary text-on-primary px-5 py-2.5 text-sm font-bold"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            arrow_back
+          </span>
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
+        </button>
       </div>
     );
   }
@@ -122,8 +176,13 @@ export default function TripDetails() {
     <div className="min-h-screen bg-surface flex flex-col font-sans relative">
       {/* Navbar Minimal */}
       <header className="absolute top-0 w-full z-50 px-margin-desktop py-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-on-surface-variant bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-full transition-colors font-label-md shadow-sm border border-black/[0.05]">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span> Πίσω
+        <button
+          type="button"
+          onClick={goBack}
+          className="flex items-center gap-2 text-on-surface-variant bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-full transition-colors font-label-md shadow-sm border border-black/[0.05]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>{' '}
+          {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
         </button>
       </header>
 
@@ -132,9 +191,9 @@ export default function TripDetails() {
         {/* Soft elegant gradient instead of photo */}
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-surface to-surface pointer-events-none"></div>
         
-        <div className="relative z-20 px-margin-desktop max-w-container-max mx-auto">
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative z-20 px-4 sm:px-6 md:px-margin-desktop max-w-container-max mx-auto w-full min-w-0">
+          <div className="flex flex-col gap-2 min-w-0 max-w-full">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 min-w-0">
               {isInternationalTrip(trip) ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs uppercase tracking-widest font-bold w-max">
                   <span className="material-symbols-outlined text-[14px]">public</span>
@@ -149,98 +208,181 @@ export default function TripDetails() {
               <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-xs uppercase tracking-widest font-bold w-max">
                 {trip.badge || trip.durationLabel || 'Premium Εμπειρία'}
               </span>
-              <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1 rounded-full border border-black/[0.05] shadow-sm flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px] text-primary">calendar_month</span>
-                Ετοιμαστείτε για μια αξέχαστη απόδραση στις {new Date(trip.departureTime).toLocaleDateString('el-GR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1.5 rounded-2xl border border-black/[0.05] shadow-sm flex items-start gap-2 max-w-full min-w-0 text-[13px] sm:text-sm leading-snug">
+                <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">calendar_month</span>
+                <span className="min-w-0 break-words">
+                  Ετοιμαστείτε για μια αξέχαστη απόδραση στις{' '}
+                  {new Date(trip.departureTime).toLocaleDateString('el-GR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </span>
               </span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-headline-lg font-bold text-on-surface tracking-tight">
+            <h1
+              className="text-[1.65rem] leading-tight sm:text-3xl md:text-5xl lg:text-6xl font-headline-lg font-bold text-on-surface tracking-tight max-w-full min-w-0 break-words [overflow-wrap:anywhere] hyphens-auto"
+            >
               {trip.title}
             </h1>
-            <p className="text-on-surface-variant font-body-lg max-w-3xl mt-4 leading-relaxed">
-              {trip.description}
-            </p>
+            {trip.description ? (
+              <TripItineraryNarrative description={trip.description} title={trip.title} />
+            ) : null}
+            <div className="mt-8 md:mt-10">
+              <TripPhotoBento trip={trip} />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content: Split Layout */}
-      <div className="flex-1 max-w-container-max mx-auto w-full px-margin-desktop py-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <div className="flex-1 max-w-container-max mx-auto w-full px-4 sm:px-6 md:px-margin-desktop py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 min-w-0">
         
         {/* Left Column: Details & Timeline */}
-        <div className="flex flex-col">
-          <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8">
-            <h3 className="font-headline-md text-on-surface mb-6 font-semibold">Πληροφορίες</h3>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">schedule</span>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Αναχώρηση</div>
-                  <div className="font-label-lg text-on-surface">{new Date(trip.departureTime).toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'})}</div>
-                </div>
-              </div>
+        <div className="flex flex-col min-w-0">
+          <div className="bg-surface-container-lowest rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 shadow-level-2 mb-6 sm:mb-8 overflow-hidden relative">
+            <div
+              className="pointer-events-none absolute -top-16 -right-10 h-40 w-40 rounded-full bg-[#0071e3]/[0.07]"
+              aria-hidden
+            />
+            <h3 className="relative font-headline-md text-on-surface mb-5 sm:mb-6 font-semibold tracking-tight">
+              Πληροφορίες
+            </h3>
 
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">directions_bus</span>
+            <ul className="relative flex flex-col gap-3 sm:gap-3.5" aria-label="Στοιχεία εκδρομής">
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5ac8fa] to-[#0071e3] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">schedule</span>
                 </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Οχημα</div>
-                  <div className="font-label-lg text-on-surface">{trip.vehicleType}</div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">euro</span>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Τιμή</div>
-                  <TripPriceDisplay trip={trip} showOccupancy size="sm" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">event_seat</span>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Διαθεσιμότητα</div>
-                  <div className="font-label-lg text-on-surface">{trip.availableSeats} Θέσεις</div>
-                </div>
-              </div>
-            </div>
-
-            {(trip.meetingPoint || trip.durationLabel || (Array.isArray(trip.highlights) && trip.highlights.length > 0)) && (
-              <div className="mt-8 pt-6 border-t border-black/[0.05] space-y-4">
-                {trip.durationLabel ? (
-                  <p className="text-sm text-on-surface-variant">
-                    <span className="font-bold text-on-surface">Διάρκεια:</span> {trip.durationLabel}
-                  </p>
-                ) : null}
-                {trip.meetingPoint ? (
-                  <p className="text-sm text-on-surface-variant">
-                    <span className="font-bold text-on-surface">Σημείο συνάντησης:</span> {trip.meetingPoint}
-                  </p>
-                ) : null}
-                {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {trip.highlights.map((h) => (
-                      <span
-                        key={h}
-                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
-                      >
-                        <span className="material-symbols-outlined text-[14px] text-emerald-600">check</span>
-                        {h}
-                      </span>
-                    ))}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Αναχώρηση
                   </div>
-                ) : null}
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                    {new Date(trip.departureTime).toLocaleTimeString('el-GR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              </li>
+
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#bf5af2] to-[#5856d6] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">directions_bus</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Όχημα
+                  </div>
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight break-words">
+                    {fleetCategoryLabel(trip.vehicleType)}
+                  </div>
+                </div>
+              </li>
+
+              <li className="flex items-start gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#30d158] to-[#34c759] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">euro</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Τιμή
+                  </div>
+                  <div className="mt-0.5">
+                    <TripPriceDisplay trip={trip} showOccupancy size="sm" />
+                  </div>
+                </div>
+              </li>
+
+              <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#64d2ff] to-[#32ade6] text-white shadow-sm"
+                  aria-hidden
+                >
+                  <span className="material-symbols-outlined text-[26px]">event_seat</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                    Διαθεσιμότητα
+                  </div>
+                  <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                    {trip.availableSeats} Θέσεις
+                  </div>
+                </div>
+              </li>
+
+              {trip.durationLabel ? (
+                <li className="flex items-center gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff9f0a] to-[#ff6b00] text-white shadow-sm"
+                    aria-hidden
+                  >
+                    <span className="material-symbols-outlined text-[26px]">hourglass_empty</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                      Διάρκεια
+                    </div>
+                    <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight">
+                      {trip.durationLabel}
+                    </div>
+                  </div>
+                </li>
+              ) : null}
+
+              {trip.meetingPoint ? (
+                <li className="flex items-start gap-3.5 sm:gap-4 rounded-2xl bg-[#f5f5f7] px-3.5 py-3.5 sm:px-4 sm:py-4">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff375f] to-[#ff2d55] text-white shadow-sm"
+                    aria-hidden
+                  >
+                    <span className="material-symbols-outlined text-[26px]">location_on</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold">
+                      Σημείο συνάντησης
+                    </div>
+                    <div className="mt-0.5 text-[1.05rem] font-semibold text-[#1d1d1f] tracking-tight break-words leading-snug">
+                      {trip.meetingPoint}
+                    </div>
+                  </div>
+                </li>
+              ) : null}
+            </ul>
+
+            {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
+              <div className="relative mt-5 pt-5 border-t border-black/[0.06]">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-[#86868b] font-semibold mb-2.5">
+                  Περιλαμβάνει
+                </p>
+                <div className="flex flex-col gap-2">
+                  {trip.highlights.map((h) => (
+                    <span
+                      key={h}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#f5f5f7] px-3.5 py-2.5 text-sm font-semibold text-[#1d1d1f]"
+                    >
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#30d158]/15 text-[#248a3d]"
+                        aria-hidden
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check</span>
+                      </span>
+                      <span className="min-w-0 break-words">{h}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8 flex-1">
@@ -266,17 +408,23 @@ export default function TripDetails() {
             <button 
               type="button"
               onClick={async () => {
-                const check = await checkTripAvailable(trip);
-                if (!check.available) {
-                  toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
-                  return;
+                if (!isPlatformSeatBookingDemo()) {
+                  const check = await checkTripAvailable(trip);
+                  if (!check.available) {
+                    toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
+                    return;
+                  }
+                  if (check.warning) toast(check.warning, { icon: '⚠️' });
                 }
-                if (check.warning) toast(check.warning, { icon: '⚠️' });
-                navigate(`/select-seat/${trip.id}`);
+                navigate(
+                  walletSelectSeatPath(trip.id),
+                  { state: fromWallet ? walletBookNavState(trip) : undefined },
+                );
               }}
               className="w-full py-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-[24px] font-headline-sm font-bold shadow-xl hover:scale-[1.02] hover:shadow-gray-900/30 transition-all flex items-center justify-center gap-3"
             >
-              Επιλογή Θέσης <span className="material-symbols-outlined text-2xl">arrow_forward</span>
+              {isPlatformSeatBookingDemo() ? 'Δοκιμή επιλογής θέσης' : 'Επιλογή Θέσης'}{' '}
+              <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
           </div>
         </div>
@@ -314,8 +462,10 @@ export default function TripDetails() {
             <MapContainer center={mapCenter} zoom={7} className="h-full w-full">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               {trip.stops?.map(stop => (
                 <Marker key={stop.id} position={[stop.lat, stop.lng]}>
                   <Popup>

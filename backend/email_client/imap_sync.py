@@ -14,6 +14,7 @@ from typing import Any
 
 from .constants import DEFAULT_SYNC_BATCH, FOLDER_INBOX, FOLDER_SENT, FOLDER_SPAM
 from .dynamic_mailer import settings_to_imap_config
+from .imap_utf8 import connect_imap, format_imap_connect_error
 from .store import upsert_message
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,89 @@ def _folder_names_from_cfg(cfg: dict) -> list[tuple[str, str]]:
     if spam:
         out.append((spam, FOLDER_SPAM))
     return out
+
+
+# cPanel/Dovecot often uses INBOX.Sent / INBOX.spam instead of bare "Sent"/"Spam".
+_SENT_FALLBACKS = ("INBOX.Sent", "Sent", "Sent Messages", "Sent Items")
+_SPAM_FALLBACKS = ("INBOX.spam", "INBOX.Junk", "Spam", "Junk", "Junk E-mail")
+
+
+def _parse_list_mailbox(raw: bytes | str) -> tuple[str, str]:
+    """Return (flags_upper, mailbox_name) from an IMAP LIST line."""
+    line = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    flags = ""
+    if line.startswith("("):
+        end = line.find(")")
+        if end >= 0:
+            flags = line[1:end].upper()
+            line = line[end + 1 :].strip()
+    # drop separator token ("." or "/")
+    parts = line.split(None, 1)
+    if len(parts) == 2:
+        name = parts[1].strip()
+    else:
+        name = line.strip()
+    if len(name) >= 2 and name[0] == name[-1] and name[0] in "\"'":
+        name = name[1:-1]
+    return flags, name
+
+
+def _list_mailboxes(client: imaplib.IMAP4) -> list[tuple[str, str]]:
+    try:
+        status, data = client.list()
+    except Exception as exc:
+        logger.debug("IMAP LIST failed: %s", exc)
+        return []
+    if status != "OK" or not data:
+        return []
+    out: list[tuple[str, str]] = []
+    for raw in data:
+        if raw is None:
+            continue
+        out.append(_parse_list_mailbox(raw))
+    return out
+
+
+def _pick_special_mailbox(
+    listed: list[tuple[str, str]],
+    *,
+    flag: str,
+    preferred: str,
+    fallbacks: tuple[str, ...],
+) -> str:
+    """Prefer configured name if listed, else SPECIAL-USE flag, else known fallbacks."""
+    names = {name for _, name in listed}
+    if preferred and preferred in names:
+        return preferred
+    flag_u = flag.upper()
+    for flags, name in listed:
+        if flag_u in flags.split():
+            return name
+    for cand in fallbacks:
+        if cand in names:
+            return cand
+    return preferred
+
+
+def _resolve_folder_names(client: imaplib.IMAP4, cfg: dict) -> list[tuple[str, str]]:
+    """Map local folders to selectable IMAP boxes (cPanel INBOX.* aware)."""
+    configured = _folder_names_from_cfg(cfg)
+    listed = _list_mailboxes(client)
+    if not listed:
+        return configured
+
+    resolved: list[tuple[str, str]] = []
+    for imap_box, local_folder in configured:
+        if local_folder == FOLDER_SENT:
+            imap_box = _pick_special_mailbox(
+                listed, flag="\\Sent", preferred=imap_box, fallbacks=_SENT_FALLBACKS
+            )
+        elif local_folder == FOLDER_SPAM:
+            imap_box = _pick_special_mailbox(
+                listed, flag="\\Junk", preferred=imap_box, fallbacks=_SPAM_FALLBACKS
+            )
+        resolved.append((imap_box, local_folder))
+    return resolved
 
 
 def _decode_header_value(raw: str | bytes | None) -> str:
@@ -120,12 +204,7 @@ def _message_date(msg: email.message.Message) -> str:
 
 
 def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    if cfg["use_ssl"]:
-        client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
-    else:
-        client = imaplib.IMAP4(cfg["host"], cfg["port"])
-    client.login(cfg["user"], cfg["password"])
-    return client
+    return connect_imap(cfg)
 
 
 def _fetch_all_from_imap(
@@ -144,14 +223,35 @@ def _fetch_all_from_imap(
     try:
         client = _connect_imap(cfg)
     except Exception as exc:
-        return [], [f"IMAP σύνδεση: {exc}"]
+        return [], [format_imap_connect_error(exc)]
     try:
-        for imap_box, local_folder in _folder_names_from_cfg(cfg):
+        for imap_box, local_folder in _resolve_folder_names(client, cfg):
             try:
                 status, _ = client.select(imap_box, readonly=True)
                 if status != "OK":
-                    errors.append(f"Cannot select {imap_box}")
-                    continue
+                    # Last-chance fallbacks when LIST was empty/partial.
+                    alt = None
+                    if local_folder == FOLDER_SENT:
+                        for cand in _SENT_FALLBACKS:
+                            if cand == imap_box:
+                                continue
+                            st, _ = client.select(cand, readonly=True)
+                            if st == "OK":
+                                alt = cand
+                                break
+                    elif local_folder == FOLDER_SPAM:
+                        for cand in _SPAM_FALLBACKS:
+                            if cand == imap_box:
+                                continue
+                            st, _ = client.select(cand, readonly=True)
+                            if st == "OK":
+                                alt = cand
+                                break
+                    if alt:
+                        imap_box = alt
+                    else:
+                        errors.append(f"Cannot select {imap_box}")
+                        continue
             except Exception as exc:
                 errors.append(f"{imap_box}: {exc}")
                 continue
@@ -254,9 +354,12 @@ async def sync_account_imap(
         ),
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
 
     from .settings_store import record_sync_result
 
@@ -264,9 +367,10 @@ async def sync_account_imap(
     await record_sync_result(settings_id, error=err_text)
 
     return {
-        "ok": bool(messages) or not errors,
+        # Success when IMAP fetch worked (even if every message was already cached).
+        "ok": (not errors) or bool(messages),
         "email_settings_id": settings_id,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "error": ("; ".join(errors) if errors and not messages else None),
@@ -276,18 +380,42 @@ async def sync_account_imap(
 async def sync_imap_to_database_async(
     *,
     email_settings_id: str | None = None,
+    owner_key: str | None = None,
     batch_per_folder: int = DEFAULT_SYNC_BATCH,
 ) -> dict:
-    from .settings_store import get_settings, list_all_active_settings
+    from .settings_store import get_settings, list_all_active_settings, list_settings
 
     if email_settings_id:
         account = await get_settings(email_settings_id, with_password=True)
         if not account:
-            return {"ok": False, "error": "Account not found", "synced": 0, "folders": {}, "errors": []}
+            return {
+                "ok": False,
+                "error": "Ο λογαριασμός email δεν βρέθηκε — επιλέξτε ή αποθηκεύστε ξανά από Ρυθμίσεις Email",
+                "synced": 0,
+                "folders": {},
+                "errors": [],
+            }
+        # Optional office seal when called from admin mailbox API.
+        if owner_key and str(account.get("owner_key") or "") != str(owner_key):
+            return {
+                "ok": False,
+                "error": "Ο λογαριασμός email δεν ανήκει σε αυτό το γραφείο",
+                "synced": 0,
+                "folders": {},
+                "errors": [],
+            }
         return await sync_account_imap(account, batch_per_folder=batch_per_folder)
 
-    # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
-    accounts = await list_all_active_settings()
+    # Admin UI: sync only this office. Background cron: all active accounts.
+    if owner_key:
+        accounts = await list_settings(
+            owner_key=str(owner_key),
+            active_only=True,
+            include_legacy_default=False,
+        )
+    else:
+        # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
+        accounts = await list_all_active_settings()
     if accounts:
         total = 0
         merged_errors: list[str] = []
@@ -339,12 +467,15 @@ async def sync_imap_to_database_async(
         None, lambda: _fetch_all_from_imap(cfg, batch_per_folder=batch_per_folder)
     )
     folder_counts: dict[str, int] = {}
+    new_count = 0
     for m in messages:
-        await upsert_message(m)
-        folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
+        _row, created = await upsert_message(m)
+        if created:
+            new_count += 1
+            folder_counts[m["folder"]] = folder_counts.get(m["folder"], 0) + 1
     return {
         "ok": True,
-        "synced": len(messages),
+        "synced": new_count,
         "folders": folder_counts,
         "errors": errors,
         "legacy_env": True,

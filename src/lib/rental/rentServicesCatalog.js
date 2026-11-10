@@ -1,5 +1,5 @@
 /**
- * Public marketing catalog for Rent services (guest landing + /rent/services).
+ * Public marketing bullets for Rent services (guest landing on /rent).
  * Used for advertising — not gated behind an active booking.
  */
 

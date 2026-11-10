@@ -15,15 +15,19 @@ from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 def isolated_fleet(tmp_path, monkeypatch):
     store = tmp_path / "fleet_store.json"
     monkeypatch.setattr(fleet_mod, "STORE_FILE", store)
+    # Do not migrate the package-bundled seed file into the temp store.
+    monkeypatch.setattr(fleet_mod, "_LEGACY_STORE", tmp_path / "no-legacy.json")
+    monkeypatch.setattr(fleet_mod, "UPLOAD_DIR", tmp_path / "uploads")
     svc = fleet_mod.ServiceService()
     return svc, store
 
 
-def test_seed_belongs_to_demo_tenant(isolated_fleet):
+def test_empty_store_is_tenant_isolated(isolated_fleet):
+    """New offices start with zero coaches — no demo bleed across tenants."""
     svc, _ = isolated_fleet
     demo = svc.list_vehicles(tenant_id=DEMO_TENANT_ID)
     other = svc.list_vehicles(tenant_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-    assert len(demo) >= 1
+    assert demo == []
     assert other == []
 
 
