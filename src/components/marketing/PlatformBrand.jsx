@@ -50,7 +50,7 @@ export default function PlatformBrand({ className = '', variant = 'dark', asLink
   return (
     <Link
       to="/"
-      className="pg-brand-link shrink-0 hover:opacity-90 transition-opacity"
+      className="pg-brand-link hover:opacity-90 transition-opacity"
       aria-label={`${PLATFORM_NAME} — Αρχική`}
     >
       {mark}
