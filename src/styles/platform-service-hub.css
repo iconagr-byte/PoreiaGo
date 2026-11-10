@@ -995,6 +995,109 @@
 }
 
 @media (max-width: 640px) {
+  .pg-hub {
+    overflow-x: clip;
+  }
+
+  .pg-hub-inner {
+    padding: 5.75rem 1rem 2.75rem;
+    gap: 1.75rem;
+  }
+
+  .pg-hub-copy {
+    max-width: none;
+    text-align: left;
+  }
+
+  .pg-hub-micro {
+    margin-bottom: 0.65rem;
+    font-size: 0.72rem;
+  }
+
+  .pg-hub-brand-line {
+    margin-bottom: 0.4rem;
+    font-size: clamp(2.05rem, 11vw, 2.55rem);
+    line-height: 0.98;
+  }
+
+  .pg-hub-headline {
+    margin-bottom: 0.75rem;
+    font-size: clamp(1.45rem, 6.4vw, 1.85rem);
+    line-height: 1.18;
+    letter-spacing: -0.03em;
+  }
+
+  .pg-hub-support {
+    margin-bottom: 1.25rem;
+    max-width: none;
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+
+  .pg-hub-cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+
+  .pg-hub-cta-primary,
+  .pg-hub-cta-secondary {
+    width: 100%;
+    justify-content: center;
+    min-height: 3rem;
+  }
+
+  .pg-hub-stage {
+    min-height: 0;
+    max-width: 22rem;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .pg-hub-ribbon {
+    inset: -2% -8% -18% -4%;
+    transform: rotate(-6deg) scale(1.02);
+    opacity: 0.88;
+  }
+
+  .pg-hub-stage-stack {
+    min-height: 17.5rem;
+    padding: 0.85rem 0.35rem 1.15rem;
+  }
+
+  .pg-hub-desk {
+    width: min(100%, 18.5rem);
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0.9rem;
+  }
+
+  .pg-hub-desk-body {
+    padding: 0.7rem;
+  }
+
+  .pg-hub-phone {
+    left: auto;
+    right: -0.15rem;
+    bottom: 0.35rem;
+    width: 7.35rem;
+    padding: 0.65rem 0.55rem 0.75rem;
+    border-radius: 1.1rem;
+  }
+
+  .pg-hub-phone strong {
+    font-size: 0.8rem;
+  }
+
+  .pg-hub-phone-trip,
+  .pg-hub-phone-seat {
+    font-size: 0.52rem;
+  }
+
+  .pg-hub-qr {
+    margin-bottom: 0.35rem;
+  }
+
   .pg-hub-door {
     flex: 1 1 100%;
     max-width: 100%;
@@ -1006,20 +1109,20 @@
   .pg-hub-door-arrow {
     margin-left: auto;
   }
+}
 
-  .pg-hub-cta-primary,
-  .pg-hub-cta-secondary {
-    width: 100%;
-    justify-content: center;
+@media (max-width: 400px) {
+  .pg-hub-inner {
+    padding-top: 5.35rem;
+    padding-bottom: 2.25rem;
+  }
+
+  .pg-hub-stage-stack {
+    min-height: 15.75rem;
   }
 
   .pg-hub-phone {
-    left: 2%;
-    bottom: 2%;
-    width: 8.2rem;
-  }
-
-  .pg-hub-desk {
-    margin-left: 2.5rem;
+    width: 6.6rem;
+    right: 0;
   }
 }
