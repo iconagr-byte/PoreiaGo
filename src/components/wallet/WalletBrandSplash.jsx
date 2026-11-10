@@ -4,7 +4,10 @@ import {
   WALLET_SPLASH_DURATION_MS,
   markWalletBrandSplashSeen,
 } from '../../lib/wallet/walletBrandSplash.js';
-import { resolveOfficeSplashBrand } from '../../lib/wallet/officeSplashBrand.js';
+import {
+  ACHILLIO_TRAVEL_NAME,
+  resolveOfficeSplashBrand,
+} from '../../lib/wallet/officeSplashBrand.js';
 import { getWalletTenantId } from '../../lib/wallet/walletTenantSeal.js';
 import {
   fetchSiteAppearance,
@@ -36,7 +39,13 @@ export default function WalletBrandSplash({ onDone }) {
       const brand = resolveOfficeSplashBrand(appearance || {});
       if (cancelled) return;
       if (brand.hasLogo) setOfficeLogoUrl(brand.logoUrl);
-      if (brand.name) setOfficeName(brand.name);
+      // Always pair seal + wordmark — never leave logo alone on native splash.
+      // Packaged wallet defaults to Achillio Travel host, so logo-only → wordmark.
+      if (brand.name) {
+        setOfficeName(brand.name);
+      } else if (brand.hasLogo) {
+        setOfficeName(ACHILLIO_TRAVEL_NAME);
+      }
     };
 
     // Instant paint from last sealed office cache (Capacitor Host=localhost).

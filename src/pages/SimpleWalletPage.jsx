@@ -72,6 +72,7 @@ import {
 } from '../services/officeModulesApi.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import { resolveOfficeSplashBrand } from '../lib/wallet/officeSplashBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import {
@@ -383,10 +384,13 @@ function WalletAuthenticatedApp() {
         if (cancelled) return;
         setSiteAppearance(data || DEFAULT_SITE_APPEARANCE);
         const brand = resolveOfficeBrand(data || {});
-        const name = brand.displayName || brand.name;
+        // Splash helper recovers Achillio Travel when name fields are blank.
+        const splashName = resolveOfficeSplashBrand(data || {}).name || '';
+        const name = brand.displayName || splashName || brand.name;
         // Prefer real office name — never keep generic Γραφείο / My Wallet when API sent one.
         if (name && name !== 'Γραφείο') setBrandLabel(name);
         else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
+        else if (splashName) setBrandLabel(splashName);
       })
       .catch(() => {});
     return () => {
