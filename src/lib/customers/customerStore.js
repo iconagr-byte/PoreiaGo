@@ -5,9 +5,62 @@ import {
 } from '../admin/officeTenantStore.js';
 
 const STORAGE_KEY_BASE = 'aerostride_customers_v1';
+const DELETED_KEY_BASE = 'aerostride_customers_deleted_v1';
+
+/** Bus / excursion CRM peλατολόγιο. */
+export const CUSTOMER_SERVICE_BUSES = 'buses';
+/** Rental CRM πελατολόγιο — separate from buses even for the same email. */
+export const CUSTOMER_SERVICE_RENT = 'rent';
+
+export function normalizeCustomerServiceScope(value, hints = {}) {
+  if (value === CUSTOMER_SERVICE_RENT || value === CUSTOMER_SERVICE_BUSES) return value;
+  if (hints.source === 'rental' || hints.serviceScope === CUSTOMER_SERVICE_RENT) {
+    return CUSTOMER_SERVICE_RENT;
+  }
+  return CUSTOMER_SERVICE_BUSES;
+}
 
 function storageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
+}
+
+function deletedStorageKey() {
+  return officeStorageKey(DELETED_KEY_BASE);
+}
+
+function deletedKey(email, serviceScope) {
+  const scope = normalizeCustomerServiceScope(serviceScope);
+  return `${String(email || '').trim().toLowerCase()}::${scope}`;
+}
+
+function loadDeletedEmails() {
+  try {
+    const raw = localStorage.getItem(deletedStorageKey());
+    if (!raw) return new Set();
+    const list = JSON.parse(raw);
+    return new Set(
+      (Array.isArray(list) ? list : [])
+        .map((e) => String(e || '').trim().toLowerCase())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDeletedEmails(emails) {
+  localStorage.setItem(deletedStorageKey(), JSON.stringify([...emails]));
+}
+
+function isDeletedEmail(email, serviceScope) {
+  const key = String(email || '').trim().toLowerCase();
+  if (!key) return false;
+  const deleted = loadDeletedEmails();
+  const scoped = deletedKey(key, serviceScope);
+  if (deleted.has(scoped)) return true;
+  // Legacy tombstones (pre-scope) blocked the email for every service.
+  if (deleted.has(key)) return true;
+  return false;
 }
 
 function todayIsoDate() {
@@ -25,10 +78,27 @@ function nextCustomerId(existing) {
   return `CUST-${String(max + 1).padStart(3, '0')}`;
 }
 
+function withServiceScope(customer) {
+  if (!customer) return null;
+  const serviceScope = normalizeCustomerServiceScope(customer.serviceScope, customer);
+  return { ...customer, serviceScope };
+}
+
 function loadStoredCustomers() {
   try {
     const raw = localStorage.getItem(storageKey());
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) return [];
+      let changed = false;
+      const next = list.map((c) => {
+        const scoped = withServiceScope(c);
+        if (scoped.serviceScope !== c.serviceScope) changed = true;
+        return scoped;
+      });
+      if (changed) saveStoredCustomers(next);
+      return next;
+    }
   } catch {
     /* empty */
   }
@@ -39,27 +109,67 @@ function saveStoredCustomers(list) {
   localStorage.setItem(storageKey(), JSON.stringify(list));
 }
 
-/** Authenticated office: only that tenant's stored customers (never mock seed). */
-export function loadAllCustomers() {
-  const stored = loadStoredCustomers();
-  if (isAuthenticatedOfficeSession()) {
-    return [...stored].sort((a, b) => a.name.localeCompare(b.name, 'el'));
-  }
-
-  const byEmail = new Map();
-  for (const c of mockCustomers) {
-    byEmail.set(c.email.toLowerCase(), { ...c });
-  }
-  for (const c of stored) {
-    byEmail.set(c.email.toLowerCase(), { ...byEmail.get(c.email.toLowerCase()), ...c });
-  }
-  return [...byEmail.values()].sort((a, b) => a.name.localeCompare(b.name, 'el'));
+function customerMatchesEmailScope(customer, email, serviceScope) {
+  if (!customer) return false;
+  const key = String(email || '').trim().toLowerCase();
+  if (!key) return false;
+  if (String(customer.email || '').toLowerCase() !== key) return false;
+  return normalizeCustomerServiceScope(customer.serviceScope, customer) === serviceScope;
 }
 
-export function getCustomerByEmail(email) {
+/**
+ * All customers for the office (both services). Prefer loadCustomersByService in UI.
+ */
+export function loadAllCustomers() {
+  const stored = loadStoredCustomers().filter(
+    (c) => !isDeletedEmail(c.email, normalizeCustomerServiceScope(c.serviceScope, c)),
+  );
+  if (isAuthenticatedOfficeSession()) {
+    return [...stored]
+      .map(withServiceScope)
+      .sort((a, b) => a.name.localeCompare(b.name, 'el'));
+  }
+
+  const byKey = new Map();
+  for (const c of mockCustomers) {
+    const scoped = withServiceScope({ ...c, serviceScope: CUSTOMER_SERVICE_BUSES });
+    if (isDeletedEmail(scoped.email, scoped.serviceScope)) continue;
+    byKey.set(`${scoped.email.toLowerCase()}::${scoped.serviceScope}`, scoped);
+  }
+  for (const c of stored) {
+    const scoped = withServiceScope(c);
+    if (isDeletedEmail(scoped.email, scoped.serviceScope)) continue;
+    const key = `${String(scoped.email || '').toLowerCase()}::${scoped.serviceScope}`;
+    byKey.set(key, { ...byKey.get(key), ...scoped });
+  }
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, 'el'));
+}
+
+function isDiagnosticCustomerEmail(email) {
+  const key = String(email || '')
+    .trim()
+    .toLowerCase();
+  return key.startsWith('diagnose-reg-') || key.startsWith('diagnose-');
+}
+
+/** CRM list for one service — buses and rent never mix. */
+export function loadCustomersByService(serviceScope) {
+  const scope = normalizeCustomerServiceScope(serviceScope);
+  return loadAllCustomers().filter((c) => {
+    if (normalizeCustomerServiceScope(c.serviceScope, c) !== scope) return false;
+    // Hide smoke-test diagnose accounts from office Πελάτες.
+    if (isDiagnosticCustomerEmail(c.email)) return false;
+    return true;
+  });
+}
+
+export function getCustomerByEmail(email, serviceScope = CUSTOMER_SERVICE_BUSES) {
   if (!email) return null;
+  const scope = normalizeCustomerServiceScope(serviceScope);
   const key = email.trim().toLowerCase();
-  return loadAllCustomers().find((c) => c.email.toLowerCase() === key) || null;
+  return (
+    loadAllCustomers().find((c) => customerMatchesEmailScope(c, key, scope)) || null
+  );
 }
 
 export function getCustomerById(id) {
@@ -67,20 +177,72 @@ export function getCustomerById(id) {
 }
 
 /**
- * Δημιουργία/ενημέρωση καρτέλας πελάτη (registration, checkout, login, admin).
- * @param {object} input
+ * Soft-delete from one service πελατολόγιο.
+ * Keeps a tombstone so trip/rental sync does not immediately recreate the row.
  */
-export function upsertCustomer(input) {
+export function deleteCustomer(idOrEmail, serviceScope) {
+  const needle = String(idOrEmail || '').trim();
+  if (!needle) return false;
+  const needleLower = needle.toLowerCase();
+  const all = loadAllCustomers();
+  const preferredScope = serviceScope
+    ? normalizeCustomerServiceScope(serviceScope)
+    : null;
+  const target =
+    all.find((c) => c.id === needle) ||
+    all.find((c) => {
+      if (String(c.email || '').toLowerCase() !== needleLower) return false;
+      if (!preferredScope) return true;
+      return normalizeCustomerServiceScope(c.serviceScope, c) === preferredScope;
+    });
+  if (!target) return false;
+
+  const email = String(target.email || '').trim().toLowerCase();
+  const scope = normalizeCustomerServiceScope(target.serviceScope, target);
+  const stored = loadStoredCustomers().filter((c) => c.id !== target.id);
+  saveStoredCustomers(stored);
+
+  if (email) {
+    const deleted = loadDeletedEmails();
+    deleted.add(deletedKey(email, scope));
+    saveDeletedEmails(deleted);
+  }
+  return true;
+}
+
+export function upsertCustomer(input, { revive = true } = {}) {
   const email = String(input.email || '').trim().toLowerCase();
   if (!email) return null;
 
+  const serviceScope = normalizeCustomerServiceScope(input.serviceScope, input);
+
+  const deleted = loadDeletedEmails();
+  const tombstone = deletedKey(email, serviceScope);
+  // Hydrate / booking sync must not clear tombstones or resurrect deletes.
+  if (!revive && (deleted.has(tombstone) || deleted.has(email))) {
+    return null;
+  }
+  // Manual create/edit brings the customer back for this service only.
+  if (revive) {
+    if (deleted.has(tombstone)) {
+      deleted.delete(tombstone);
+      saveDeletedEmails(deleted);
+    }
+    // Clearing a legacy unscoped tombstone so re-add works.
+    if (deleted.has(email)) {
+      deleted.delete(email);
+      saveDeletedEmails(deleted);
+    }
+  }
+
   const stored = loadStoredCustomers();
   const useMocks = !isAuthenticatedOfficeSession();
-  const mock = useMocks
-    ? mockCustomers.find((c) => c.email.toLowerCase() === email)
-    : null;
-  const idx = stored.findIndex((c) => c.email.toLowerCase() === email);
-  const existing = idx >= 0 ? stored[idx] : mock || null;
+  const mock =
+    useMocks && serviceScope === CUSTOMER_SERVICE_BUSES
+      ? mockCustomers.find((c) => c.email.toLowerCase() === email)
+      : null;
+  const idx = stored.findIndex((c) => customerMatchesEmailScope(c, email, serviceScope));
+  const existing = idx >= 0 ? stored[idx] : mock ? withServiceScope({ ...mock, serviceScope }) : null;
   const idPool = useMocks ? [...mockCustomers, ...stored] : stored;
 
   const pick = (key, fallback = '') => {
@@ -111,7 +273,8 @@ export function upsertCustomer(input) {
     city: pick('city'),
     address: pick('address'),
     notes: pick('notes'),
-    source: pick('source', 'manual'),
+    source: pick('source', serviceScope === CUSTOMER_SERVICE_RENT ? 'rental' : 'manual'),
+    serviceScope,
     marketingOptIn: Boolean(
       input.marketingOptIn !== undefined ? input.marketingOptIn : existing?.marketingOptIn,
     ),
@@ -128,54 +291,103 @@ export function upsertCustomer(input) {
   } else if (!mock) {
     stored.push(record);
   } else {
-    stored.push({ ...mock, ...record, id: mock.id });
+    stored.push({ ...mock, ...record, id: mock.id, serviceScope });
   }
 
   saveStoredCustomers(stored);
   return record;
 }
 
+/** Prefer the richer display name (wallet/Google over short booking surname). */
+export function preferDisplayName(a, b) {
+  const x = String(a || '').trim();
+  const y = String(b || '').trim();
+  if (!x) return y;
+  if (!y) return x;
+  if (x.toLowerCase() === y.toLowerCase()) return x;
+  const xt = x.split(/\s+/).filter(Boolean).length;
+  const yt = y.split(/\s+/).filter(Boolean).length;
+  if (yt > xt) return y;
+  if (xt > yt) return x;
+  if (y.includes(' ') && !x.includes(' ')) return y;
+  if (x.includes(' ') && !y.includes(' ')) return x;
+  return x;
+}
+
 export function ensureCustomerForPassenger({ name, email, phone }) {
   if (!email) return null;
-  return upsertCustomer({ name, email, phone });
+  if (isDeletedEmail(email, CUSTOMER_SERVICE_BUSES)) return null;
+  const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
+  return upsertCustomer(
+    {
+      name: preferDisplayName(existing?.name, name),
+      email,
+      phone: String(existing?.phone || '').trim() || phone || '',
+      serviceScope: CUSTOMER_SERVICE_BUSES,
+      source: existing?.source === 'wallet' || existing?.authProvider === 'google'
+        ? existing.source || 'wallet'
+        : 'booking',
+    },
+    { revive: false },
+  );
 }
 
 /** Δημιουργία/ενημέρωση φυσικού προσώπου από κράτηση ενοικίασης. */
 export function ensureCustomerForRental({ name, email, phone, id, afm } = {}) {
   if (!email) return null;
-  return upsertCustomer({
-    id,
-    name,
-    email,
-    phone,
-    afm,
-    source: 'rental',
-  });
+  if (isDeletedEmail(email, CUSTOMER_SERVICE_RENT)) return null;
+  return upsertCustomer(
+    {
+      id,
+      name,
+      email,
+      phone,
+      source: 'rental',
+      serviceScope: CUSTOMER_SERVICE_RENT,
+    },
+    { revive: false },
+  );
 }
 
 /**
- * Pull unique passengers from bookings into the office πελατολόγιο.
- * Returns how many *new* records were created.
+ * Pull unique passengers from bookings into the buses πελατολόγιο.
  */
 export function syncCustomersFromBookings(bookings = []) {
   let created = 0;
   for (const booking of bookings || []) {
     const email = String(booking.email || booking.customerEmail || '').trim();
     if (!email || !email.includes('@')) continue;
-    const existed = Boolean(getCustomerByEmail(email));
-    const row = upsertCustomer({
-      name: booking.customerName || booking.passenger_name || booking.passengerName || '',
-      email,
-      phone: booking.phone || booking.customerPhone || '',
-    });
+    if (isDeletedEmail(email, CUSTOMER_SERVICE_BUSES)) continue;
+    const existing = getCustomerByEmail(email, CUSTOMER_SERVICE_BUSES);
+    const existed = Boolean(existing);
+    const bookingName =
+      booking.customerName || booking.passenger_name || booking.passengerName || '';
+    const bookingPhone = booking.phone || booking.customerPhone || '';
+    // Never clobber wallet/Google full name with a short booking surname
+    // (e.g. «Dodopoulos» over «Axilleas Charalambidis»).
+    const keepWallet =
+      existing?.source === 'wallet' ||
+      existing?.authProvider === 'google' ||
+      String(existing?.source || '').toLowerCase() === 'google';
+    const row = upsertCustomer(
+      {
+        name: preferDisplayName(existing?.name, bookingName),
+        email,
+        phone: String(existing?.phone || '').trim() || bookingPhone || '',
+        serviceScope: CUSTOMER_SERVICE_BUSES,
+        source: keepWallet ? existing.source || 'wallet' : existing?.source || 'booking',
+        authProvider: existing?.authProvider,
+        picture: existing?.picture,
+      },
+      { revive: false },
+    );
     if (row && !existed) created += 1;
   }
   return created;
 }
 
 /**
- * Sync rental booking clients into the CRM πελατολόγιο (real people).
- * Returns { created, people } where people are CUST-* records linked to rentals.
+ * Sync rental booking clients into the rent πελατολόγιο only.
  */
 export function syncCustomersFromRentalBookings(rentalBookings = []) {
   let created = 0;
@@ -183,7 +395,8 @@ export function syncCustomersFromRentalBookings(rentalBookings = []) {
   for (const booking of rentalBookings || []) {
     const email = String(booking.client_email || booking.clientEmail || '').trim();
     if (!email || !email.includes('@')) continue;
-    const existed = Boolean(getCustomerByEmail(email));
+    if (isDeletedEmail(email, CUSTOMER_SERVICE_RENT)) continue;
+    const existed = Boolean(getCustomerByEmail(email, CUSTOMER_SERVICE_RENT));
     const row = ensureCustomerForRental({
       id: booking.client_id || booking.clientId || undefined,
       name: booking.client_name || booking.clientName || '',
@@ -229,3 +442,159 @@ export function syncCustomersFromRentalBookings(rentalBookings = []) {
   return { created, people };
 }
 
+/**
+ * Persist customer to office server (tenant JWT). Keeps localStorage as cache.
+ * @returns {Promise<object|null>}
+ */
+export async function saveCustomerToServer(input) {
+  const local = upsertCustomer(input);
+  if (!local) return null;
+  if (!isAuthenticatedOfficeSession()) return local;
+  try {
+    const {
+      createOfficeCustomer,
+      updateOfficeCustomer,
+    } = await import('../../services/officeCustomersApi.js');
+    const payload = {
+      id: local.id,
+      name: local.name,
+      email: local.email,
+      phone: local.phone,
+      company: local.company,
+      afm: local.afm,
+      city: local.city,
+      address: local.address,
+      notes: local.notes,
+      source: local.source,
+      serviceScope: local.serviceScope,
+      marketingOptIn: local.marketingOptIn,
+      tags: local.tags,
+      tier: local.tier,
+      picture: local.picture,
+      authProvider: local.authProvider,
+      joinDate: local.joinDate,
+    };
+    const isEdit = Boolean(input?.id);
+    const remote = isEdit
+      ? await updateOfficeCustomer(local.id, payload)
+      : await createOfficeCustomer(payload);
+    if (remote && remote.id) {
+      return upsertCustomer({ ...local, ...remote, id: remote.id });
+    }
+  } catch (err) {
+    console.warn('[customers] server save failed — kept local only', err);
+    throw err;
+  }
+  return local;
+}
+
+/**
+ * Soft-delete locally and on server.
+ */
+export async function deleteCustomerFromServer(idOrEmail, serviceScope) {
+  const existing =
+    getCustomerById(idOrEmail) ||
+    getCustomerByEmail(idOrEmail, serviceScope) ||
+    null;
+  const ok = deleteCustomer(idOrEmail, serviceScope);
+  if (!ok) return false;
+  if (!isAuthenticatedOfficeSession()) return true;
+  try {
+    const { deleteOfficeCustomer } = await import('../../services/officeCustomersApi.js');
+    const id = existing?.id || idOrEmail;
+    await deleteOfficeCustomer(id, serviceScope || existing?.serviceScope);
+  } catch (err) {
+    console.warn('[customers] server delete failed — local tombstone kept', err);
+  }
+  return true;
+}
+
+/**
+ * Drop local CRM rows missing from the server list and tombstone their emails
+ * so booking/wallet sync cannot resurrect deletes done on another PC.
+ */
+function pruneLocalCustomersMissingFromRemote(serviceScope, remoteRows) {
+  const scope = normalizeCustomerServiceScope(serviceScope);
+  const remoteEmails = new Set(
+    (remoteRows || [])
+      .map((r) => String(r.email || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const stored = loadStoredCustomers();
+  const deleted = loadDeletedEmails();
+  let changed = false;
+  const next = [];
+  for (const c of stored) {
+    const cScope = normalizeCustomerServiceScope(c.serviceScope, c);
+    if (cScope !== scope) {
+      next.push(c);
+      continue;
+    }
+    const email = String(c.email || '').trim().toLowerCase();
+    if (email && remoteEmails.has(email)) {
+      next.push(c);
+      continue;
+    }
+    changed = true;
+    if (email) deleted.add(deletedKey(email, scope));
+  }
+  if (changed) {
+    saveStoredCustomers(next);
+    saveDeletedEmails(deleted);
+  }
+}
+
+/**
+ * Pull CRM customers from server into localStorage (authenticated offices).
+ * Seeds server from local cache only when the office has never had CRM rows.
+ * Otherwise server (incl. soft-deletes) is source of truth across PCs.
+ */
+export async function hydrateCustomersFromServer(serviceScope) {
+  if (!isAuthenticatedOfficeSession()) {
+    return loadCustomersByService(serviceScope);
+  }
+  try {
+    const {
+      fetchOfficeCustomers,
+      replaceOfficeCustomers,
+    } = await import('../../services/officeCustomersApi.js');
+    const fetched = await fetchOfficeCustomers(serviceScope);
+    let remote = Array.isArray(fetched?.customers)
+      ? fetched.customers
+      : Array.isArray(fetched)
+        ? fetched
+        : [];
+    const hasHistory = Boolean(fetched?.hasHistory) || remote.length > 0;
+    const local = loadCustomersByService(serviceScope);
+    if (!hasHistory && remote.length === 0 && local.length > 0) {
+      // First run after deploy: push browser CRM up so nothing is lost.
+      remote = await replaceOfficeCustomers(local);
+    } else {
+      // Server wins: remove locals that were deleted on another computer.
+      pruneLocalCustomersMissingFromRemote(serviceScope, remote);
+    }
+    for (const row of remote || []) {
+      const scope = row.serviceScope || serviceScope;
+      if (isDeletedEmail(row.email, scope)) continue;
+      const existing = getCustomerByEmail(row.email, scope);
+      upsertCustomer(
+        {
+          ...row,
+          name: preferDisplayName(row.name, existing?.name),
+          phone: String(row.phone || '').trim() || existing?.phone || '',
+          serviceScope: scope,
+          source:
+            existing?.source === 'wallet' || row.source === 'wallet'
+              ? 'wallet'
+              : row.source || existing?.source,
+          authProvider: row.authProvider || existing?.authProvider,
+        },
+        { revive: false },
+      );
+    }
+    return loadCustomersByService(serviceScope);
+  } catch (err) {
+    console.warn('[customers] hydrate failed — using local cache', err);
+    return loadCustomersByService(serviceScope);
+  }
+}

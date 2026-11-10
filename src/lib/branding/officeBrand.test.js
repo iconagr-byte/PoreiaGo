@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isPlatformPlaceholderLogo,
+  officeLogoImageStyle,
   resolveOfficeBrand,
   scrubSiteAppearancePlaceholders,
 } from './officeBrand.js';
@@ -39,6 +40,38 @@ describe('resolveOfficeBrand', () => {
       logo_show_name: false,
     });
     expect(brand.showName).toBe(false);
+  });
+
+  it('applies rounded logo styles', () => {
+    const style = officeLogoImageStyle({
+      logo_height_px: 48,
+      logo_max_width_px: 120,
+      logo_radius_px: 16,
+      logo_padding_px: 4,
+      logo_bg_mode: 'white',
+      logo_shadow: true,
+    });
+    expect(style.borderRadius).toBe('16px');
+    expect(style.padding).toBe('4px');
+    expect(style.background).toBe('#ffffff');
+    expect(style.boxShadow).toContain('rgba');
+  });
+
+  it('caps height and width for compact / native top bars', () => {
+    const style = officeLogoImageStyle(
+      {
+        logo_height_px: 96,
+        logo_max_width_px: 320,
+        logo_padding_px: 12,
+        logo_shadow: true,
+      },
+      { compact: true },
+    );
+    expect(style.height).toBe('36px');
+    expect(style.maxWidth).toBe('140px');
+    expect(style.maxHeight).toBe('36px');
+    expect(style.padding).toBe('2px');
+    expect(style.boxShadow).toBeUndefined();
   });
 });
 

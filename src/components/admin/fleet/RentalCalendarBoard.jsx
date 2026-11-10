@@ -5,21 +5,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { LEAFLET_BASEMAP } from '../../../lib/maps/appleMapTheme.js';
 import {
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,
   resolvePlaceSync,
+  RENT_MAP_GREECE_CENTER,
+  RENT_MAP_GREECE_ZOOM,
 } from '../../../lib/rental/geocodePlace.js';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
 
 const STATUS_TONE = {
+  RESERVED: { chip: 'bg-indigo-100 text-indigo-800', dot: '#6366f1', label: 'Κράτηση' },
   CONFIRMED: { chip: 'bg-sky-100 text-sky-800', dot: '#0ea5e9', label: 'Επιβεβαιωμένη' },
   ACTIVE: { chip: 'bg-emerald-100 text-emerald-800', dot: '#10b981', label: 'Ενεργή' },
   COMPLETED: { chip: 'bg-slate-100 text-slate-700', dot: '#64748b', label: 'Ολοκληρωμένη' },
   CANCELLED: { chip: 'bg-rose-100 text-rose-700', dot: '#f43f5e', label: 'Ακυρωμένη' },
   MAINTENANCE: { chip: 'bg-amber-100 text-amber-800', dot: '#f59e0b', label: 'Συντήρηση' },
+  CLEANING: { chip: 'bg-cyan-100 text-cyan-800', dot: '#06b6d4', label: 'Καθαρισμός' },
   SERVICE_DUE: { chip: 'bg-orange-100 text-orange-800', dot: '#f97316', label: 'Service' },
 };
 
@@ -97,7 +102,13 @@ function pinIcon(color, selected) {
 function FitPins({ pins, focusId }) {
   const map = useMap();
   useEffect(() => {
-    if (!pins.length) return;
+    // Leaflet often boots at world zoom when the container sizes late — always
+    // re-assert Greece when there are no pins yet.
+    map.invalidateSize();
+    if (!pins.length) {
+      map.setView(RENT_MAP_GREECE_CENTER, RENT_MAP_GREECE_ZOOM, { animate: false });
+      return;
+    }
     const focus = focusId ? pins.find((p) => p.id === focusId) : null;
     if (focus) {
       map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 12), { duration: 0.55 });
@@ -172,7 +183,9 @@ export default function RentalCalendarBoard({
       }));
 
     const maintenance = (blocks || [])
-      .filter((b) => b.kind === 'maintenance' || b.kind === 'service_due')
+      .filter((b) =>
+        ['maintenance', 'service_due', 'kteo', 'insurance'].includes(b.kind),
+      )
       .map((b) => ({
         id: b.id,
         kind: b.kind,
@@ -226,6 +239,14 @@ export default function RentalCalendarBoard({
       return start <= monthEnd && end >= monthStart;
     });
   }, [cursor, rentalBlocks]);
+
+  const complianceAlerts = useMemo(
+    () =>
+      (rentalBlocks || []).filter((b) =>
+        ['kteo', 'insurance', 'service_due', 'maintenance'].includes(b.kind),
+      ),
+    [rentalBlocks],
+  );
 
   const dayRentals = useMemo(
     () => monthRentals.filter((b) => sameDayRange(b.start_time, b.end_time, selectedDay)),
@@ -367,6 +388,31 @@ export default function RentalCalendarBoard({
             </button>
           </div>
         </div>
+
+        {complianceAlerts.length > 0 ? (
+          <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-800/80">
+              Ops · ΚΤΕΟ / ασφάλεια / συντήρηση
+            </p>
+            <ul className="mt-1.5 flex flex-wrap gap-2">
+              {complianceAlerts.slice(0, 8).map((a) => (
+                <li
+                  key={a.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-950"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-amber-700">
+                    {a.kind === 'kteo'
+                      ? 'fact_check'
+                      : a.kind === 'insurance'
+                        ? 'verified_user'
+                        : 'build'}
+                  </span>
+                  {a.plate_number} · {a.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)] gap-4">
           {/* Month grid */}
@@ -592,14 +638,18 @@ export default function RentalCalendarBoard({
             </div>
           ) : null}
           <MapContainer
-            center={[38.5, 23.5]}
-            zoom={6}
+            center={RENT_MAP_GREECE_CENTER}
+            zoom={RENT_MAP_GREECE_ZOOM}
+            minZoom={5}
+            maxZoom={18}
             className="h-full w-full"
             scrollWheelZoom
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap &copy; CARTO"
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution={LEAFLET_BASEMAP.attribution}
+              url={LEAFLET_BASEMAP.url}
+            subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
             />
             <FitPins pins={mapPins} focusId={selectedBookingId ? `${selectedBookingId}-pickup` : null} />
             {routeLines.map((line) => (

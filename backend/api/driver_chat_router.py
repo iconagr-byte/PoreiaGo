@@ -12,7 +12,7 @@ from travel_platform.driver.chat_store import (
     mark_thread_read,
     unread_counts,
 )
-from travel_platform.settings.drivers_store import get_driver
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID, get_driver
 
 router = APIRouter(prefix="/api/driver/chat", tags=["driver-chat"])
 
@@ -22,16 +22,38 @@ class ChatSendBody(BaseModel):
 
 
 def _driver_context(session: dict) -> tuple[str, str, int | None, str | None]:
-    tenant_id = str(session.get("tenant_id") or "")
-    driver_id = str(session.get("sub") or session.get("driver_id") or "")
-    if not tenant_id or not driver_id or driver_id == "master-qr-driver":
+    """
+    Chat is stored under the driver's home office tenant.
+
+    Session tenant must match that home (or DEMO legacy during claim) so a
+    driver cannot read/write another γραφείο's thread.
+    """
+    session_tid = str(session.get("tenant_id") or "").strip()
+    driver_id = str(session.get("sub") or session.get("driver_id") or "").strip()
+    if not driver_id or driver_id == "master-qr-driver":
+        raise HTTPException(status_code=403, detail="Απαιτείται συνεδρία οδηγού")
+    driver = get_driver(driver_id)
+    if not driver:
+        raise HTTPException(status_code=403, detail="Ο οδηγός δεν βρέθηκε")
+    home = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID).strip()
+    if session_tid and home and session_tid != home:
+        # Allow only DEMO↔office handoff while Achillio claims legacy rows.
+        if not (
+            session_tid == str(DEMO_TENANT_ID)
+            or home == str(DEMO_TENANT_ID)
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Το chat ανήκει σε άλλο γραφείο",
+            )
+    tenant_id = home or session_tid
+    if not tenant_id:
         raise HTTPException(status_code=403, detail="Απαιτείται συνεδρία οδηγού")
     trip_id = session.get("trip_id")
     try:
         trip = int(trip_id) if trip_id is not None else None
     except (TypeError, ValueError):
         trip = None
-    driver = get_driver(driver_id)
     name = driver.name if driver else None
     return tenant_id, driver_id, trip, name
 
