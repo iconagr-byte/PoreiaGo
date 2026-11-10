@@ -2361,8 +2361,9 @@ def cancel_booking_for_customer(
     booking_id: str,
     *,
     email: str,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Customer self-cancel — only CONFIRMED bookings owned by this email."""
+    """Customer self-cancel — CONFIRMED only, free within FREE_CANCEL_HOURS before pickup."""
     tid = _normalize_tenant(tenant_id)
     needle = str(email or "").strip().lower()
     bid = str(booking_id or "").strip()

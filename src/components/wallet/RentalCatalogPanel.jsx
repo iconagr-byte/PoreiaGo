@@ -488,11 +488,23 @@ export default function RentalCatalogPanel({
   const dueNow = amountDueAtCheckout(selectedTotal, paymentPlan, depositPercent);
   const isDepositPlan = depositEnabled && paymentPlan === PAYMENT_PLAN_DEPOSIT;
 
-  const cancelBooking = async (bookingId) => {
-    if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
+  const cancelBooking = async (booking) => {
+    const row = typeof booking === 'string' ? mine.find((b) => b.id === booking) : booking;
+    const id = row?.id || booking;
+    if (!row || !isFreeCancelEligible(row)) {
+      toast.error(cancelBlockedMessage(row || {}));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      await cancelCustomerRentalBooking(bookingId);
+      await cancelCustomerRentalBooking(id);
       toast.success('Η κράτηση ακυρώθηκε');
       await loadMine();
     } catch (err) {
@@ -784,7 +796,8 @@ export default function RentalCatalogPanel({
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
           <p className="rent-cancel-policy">
-            Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
+            Δωρεάν ακύρωση έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή — εφαρμόζεται αυτόματα στην
+            εφαρμογή. Μετά επικοινωνήστε με το γραφείο.
           </p>
         </form>
       </section>
@@ -1096,10 +1109,12 @@ export default function RentalCatalogPanel({
                         type="button"
                         className="wallet-btn wallet-btn-danger"
                         disabled={busy}
-                        onClick={() => cancelBooking(b.id)}
+                        onClick={() => cancelBooking(b)}
                       >
                         Ακύρωση
                       </button>
+                    ) : b.rental_status === 'CONFIRMED' ? (
+                      <span className="wallet-chip wallet-chip-muted">Ακύρωση μόνο μέσω γραφείου</span>
                     ) : null}
                   </div>
                 </div>

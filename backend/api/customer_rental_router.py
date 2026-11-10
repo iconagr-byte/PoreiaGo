@@ -132,6 +132,12 @@ class GuestRentalLookupBody(BaseModel):
 
 
 def _public_booking(row: dict) -> dict:
+    eligible = store.free_cancel_eligible(row)
+    hours = None
+    try:
+        hours = round(store.hours_until_start(row.get("start_time") or ""), 1)
+    except Exception:
+        hours = None
     return {
         "id": row["id"],
         "reference_code": store._booking_reference_code(row),
@@ -445,7 +451,6 @@ async def book_rental(
 
         await notify_rental_booking_to_office(row)
     except Exception:
-        # Booking must succeed even if office push fails.
         pass
 
     try:
