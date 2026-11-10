@@ -220,6 +220,14 @@ async def login(request: Request, body: LoginRequest):
                 mfa_code=body.mfa_code,
                 mirror_missing_user=mirror_missing_user,
             )
+            if reject_achillio_on_platform:
+                from app.services.tenant_modules import is_achillio_travel_office
+
+                if is_achillio_travel_office(tenant):
+                    raise ValueError(
+                        "Αυτός ο λογαριασμός ανήκει στο Achillio Travel — "
+                        "συνδεθείτε από https://www.achilliotravel.com/admin/login"
+                    )
             await db.commit()
         except ValueError as exc:
             await db.rollback()
