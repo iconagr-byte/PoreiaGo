@@ -1,56 +1,252 @@
 import { Link } from 'react-router-dom';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import { resolveFooterContact } from '../../lib/storefront/footerContact.js';
+import OfficeLoginLink from './OfficeLoginLink.jsx';
+import '../../styles/storefront-footer.css';
+import '../../styles/storefront-sections.css';
 
-export default function StorefrontFooter({ siteAppearance, templateId = 'classic_columns' }) {
-  const brand = siteAppearance.footer_brand_name || 'PoreiaGo';
-  const contact = (
-    <>
-      {siteAppearance.footer_contact_email && (
-        <p>
-          <a href={`mailto:${siteAppearance.footer_contact_email}`} className="hover:underline">
-            {siteAppearance.footer_contact_email}
-          </a>
-        </p>
-      )}
-      {siteAppearance.footer_contact_phone && (
-        <p>
-          <a href={`tel:${siteAppearance.footer_contact_phone.replace(/\s/g, '')}`} className="hover:underline">
-            {siteAppearance.footer_contact_phone}
-          </a>
-        </p>
-      )}
-      {siteAppearance.footer_address && <p>{siteAppearance.footer_address}</p>}
-    </>
-  );
+function FooterBrandBlock({ siteAppearance, tone = 'light', tagline = '' }) {
+  const brand = resolveOfficeBrand(siteAppearance);
+  const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
+  const nameClass = tone === 'dark' ? 'text-white' : 'sf-footer__brand-name';
+  const logoStyle = {
+    ...officeLogoImageStyle(siteAppearance),
+    height: `${Math.max(Math.min(brand.heightPx, 56), 36)}px`,
+    maxWidth: `${Math.min(brand.maxWidthPx, 160)}px`,
+  };
 
-  const links = (
-    <>
-      {siteAppearance.footer_privacy_label && (
-        <a href={siteAppearance.footer_privacy_url || '#'} className="hover:underline">
-          {siteAppearance.footer_privacy_label}
-        </a>
+  return (
+    <div>
+      {logoSrc ? (
+        <img src={logoSrc} alt={brand.name} style={logoStyle} className="mb-3 object-contain" />
+      ) : (
+        <p className={nameClass}>{brand.name}</p>
       )}
-      {siteAppearance.footer_terms_label && (
-        <a href={siteAppearance.footer_terms_url || '#'} className="hover:underline">
-          {siteAppearance.footer_terms_label}
-        </a>
-      )}
-      <Link
-        to="/admin/login"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all"
-      >
-        <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
-        Admin Login
-      </Link>
-    </>
+      {brand.displayName && logoSrc ? <p className={nameClass}>{brand.displayName}</p> : null}
+      {tagline ? <p className="sf-footer__tagline">{tagline}</p> : null}
+    </div>
   );
+}
+
+function ContactLines({ contact, tone = 'light' }) {
+  const muted = tone === 'dark' ? 'text-white/70' : '';
+  const iconTone = tone === 'dark' ? 'text-sky-300' : '';
+  return (
+    <div className="space-y-3">
+      {contact.email ? (
+        <p className={`sf-footer__contact-line ${muted}`}>
+          <span className={`material-symbols-outlined ${iconTone}`} aria-hidden>
+            mail
+          </span>
+          <Link to="/contact">{contact.email}</Link>
+        </p>
+      ) : null}
+      {contact.phone ? (
+        <p className={`sf-footer__contact-line ${muted}`}>
+          <span className={`material-symbols-outlined ${iconTone}`} aria-hidden>
+            call
+          </span>
+          <a href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`}>{contact.phone}</a>
+        </p>
+      ) : null}
+      {contact.address ? (
+        <p className={`sf-footer__contact-line ${muted}`}>
+          <span className={`material-symbols-outlined ${iconTone}`} aria-hidden>
+            location_on
+          </span>
+          <span>{contact.address}</span>
+        </p>
+      ) : null}
+      {contact.hours ? (
+        <p className={`sf-footer__contact-line ${muted}`}>
+          <span className={`material-symbols-outlined ${iconTone}`} aria-hidden>
+            schedule
+          </span>
+          <span>{contact.hours}</span>
+        </p>
+      ) : null}
+      {!contact.email && !contact.phone && !contact.address && !contact.hours ? (
+        <p className={`text-sm ${tone === 'dark' ? 'text-white/55' : 'text-slate-500'}`}>
+          Συμπληρώστε στοιχεία επικοινωνίας από το Design της αρχικής.
+        </p>
+      ) : null}
+      <p className="pt-1">
+        <Link
+          to="/contact"
+          className={
+            tone === 'dark'
+              ? 'inline-flex items-center gap-1.5 text-sm font-bold text-sky-300 hover:text-sky-200'
+              : 'inline-flex items-center gap-1.5 text-sm font-bold text-sky-700 hover:text-sky-800'
+          }
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            edit_square
+          </span>
+          Φόρμα επικοινωνίας
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+function SocialRow({ contact }) {
+  if (!contact.facebook && !contact.instagram) return null;
+  return (
+    <div className="sf-footer__social" aria-label="Κοινωνικά δίκτυα">
+      {contact.facebook ? (
+        <a href={contact.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            public
+          </span>
+        </a>
+      ) : null}
+      {contact.instagram ? (
+        <a href={contact.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            photo_camera
+          </span>
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function ExploreLinks({ tripsEnabled, rentEnabled, showFleet, className = '' }) {
+  return (
+    <ul className={`sf-footer__list ${className}`.trim()}>
+      {tripsEnabled ? (
+        <li>
+          <a href="#search-results">Εκδρομές</a>
+        </li>
+      ) : null}
+      {rentEnabled ? (
+        <li>
+          <Link to="/rent">Ενοικίαση</Link>
+        </li>
+      ) : null}
+      {showFleet ? (
+        <li>
+          <a href="#our-fleet">Στόλος</a>
+        </li>
+      ) : null}
+      {tripsEnabled ? (
+        <li>
+          <Link to="/my-booking">Η κράτησή μου</Link>
+        </li>
+      ) : null}
+      <li>
+        <Link to="/wallet">My Wallet</Link>
+      </li>
+      <li>
+        <Link to="/contact">Επικοινωνία</Link>
+      </li>
+    </ul>
+  );
+}
+
+function LegalLinks({ siteAppearance, className = '' }) {
+  return (
+    <ul className={`sf-footer__list ${className}`.trim()}>
+      {siteAppearance.footer_privacy_label ? (
+        <li>
+          <a href={siteAppearance.footer_privacy_url || '#'}>{siteAppearance.footer_privacy_label}</a>
+        </li>
+      ) : null}
+      {siteAppearance.footer_terms_label ? (
+        <li>
+          <a href={siteAppearance.footer_terms_url || '#'}>{siteAppearance.footer_terms_label}</a>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
+function FooterOfficeLogin({ tone = 'light' }) {
+  if (typeof window !== 'undefined' && !isTenantStorefrontHost()) {
+    return null;
+  }
+  return <OfficeLoginLink variant={tone === 'dark' ? 'dark' : 'light'} density="footer" />;
+}
+
+export default function StorefrontFooter({
+  siteAppearance,
+  templateId = 'classic_columns',
+  tripsEnabled = true,
+  rentEnabled = false,
+}) {
+  const brand = resolveOfficeBrand(siteAppearance);
+  const contact = resolveFooterContact(siteAppearance);
+  const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
+  const tagline =
+    String(siteAppearance.footer_tagline || '').trim() ||
+    'Κράτηση θέσης, εισιτήρια και υποστήριξη γραφείου — σε μία σύγχρονη εμπειρία.';
+
+  // Prefer the modern multi-column layout for classic + contact-forward templates.
+  if (
+    templateId === 'classic_columns' ||
+    templateId === 'split_contact' ||
+    !templateId
+  ) {
+    return (
+      <footer id="contact" className="sf-footer">
+        <div className="sf-footer__inner">
+          <div className="sf-footer__grid">
+            <div>
+              <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
+              <SocialRow contact={contact} />
+            </div>
+
+            <div>
+              <p className="sf-footer__heading">Πλοήγηση</p>
+              <ExploreLinks
+                tripsEnabled={tripsEnabled}
+                rentEnabled={rentEnabled}
+                showFleet={showFleet}
+              />
+            </div>
+
+            <div>
+              <p className="sf-footer__heading">Επικοινωνία</p>
+              <ContactLines contact={contact} />
+            </div>
+
+            <div>
+              <p className="sf-footer__heading">Νομικά</p>
+              <LegalLinks siteAppearance={siteAppearance} />
+            </div>
+          </div>
+
+          <div className="sf-footer__bottom">
+            <p className="sf-footer__copy">
+              {brand.copyright || `© ${new Date().getFullYear()} ${brand.name}`}
+            </p>
+            <div className="sf-footer__bottom-links">
+              <Link to="/contact">Φόρμα επικοινωνίας</Link>
+              <FooterOfficeLogin />
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
 
   if (templateId === 'minimal_center') {
     return (
-      <footer className="bg-surface-container-lowest py-16 border-t border-surface-container text-center">
-        <div className="max-w-container-max mx-auto px-margin-desktop">
-          <p className="font-headline-md font-bold text-on-surface mb-2">{brand}</p>
-          <p className="text-secondary text-sm mb-8">{siteAppearance.footer_copyright}</p>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-secondary">{links}</div>
+      <footer id="contact" className="scroll-mt-24 bg-surface-container-lowest py-16 border-t border-surface-container text-center">
+        <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop flex flex-col items-center">
+          <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
+          <div className="mt-8 max-w-md w-full text-left sm:text-center">
+            <p className="sf-footer__heading sm:!text-center">Επικοινωνία</p>
+            <ContactLines contact={contact} />
+          </div>
+          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-secondary">
+            <LegalLinks siteAppearance={siteAppearance} className="!flex-row !gap-6" />
+          </div>
+          <div className="mt-8">
+            <FooterOfficeLogin />
+          </div>
         </div>
       </footer>
     );
@@ -58,35 +254,45 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'dark_band') {
     return (
-      <footer className="bg-slate-950 text-white py-16">
-        <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-2 gap-10">
-          <div>
-            <p className="text-2xl font-bold mb-3">{brand}</p>
-            <p className="text-white/60 text-sm">{siteAppearance.footer_copyright}</p>
-            <div className="mt-6 space-y-1 text-sm text-white/70">{contact}</div>
+      <footer id="contact" className="scroll-mt-24 bg-slate-950 text-white py-16">
+        <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
+          <div className="grid md:grid-cols-3 gap-10">
+            <div>
+              <FooterBrandBlock siteAppearance={siteAppearance} tone="dark" tagline={tagline} />
+              <SocialRow contact={contact} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45 mb-3">
+                Επικοινωνία
+              </p>
+              <ContactLines contact={contact} tone="dark" />
+            </div>
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45 mb-3">
+                  Πλοήγηση
+                </p>
+                <ExploreLinks
+                  tripsEnabled={tripsEnabled}
+                  rentEnabled={rentEnabled}
+                  showFleet={showFleet}
+                  className="[&_a]:text-white/80"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45 mb-3">
+                  Νομικά
+                </p>
+                <LegalLinks siteAppearance={siteAppearance} className="[&_a]:text-white/80" />
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-6 items-start md:justify-end text-sm text-white/80">{links}</div>
-        </div>
-      </footer>
-    );
-  }
-
-  if (templateId === 'split_contact') {
-    return (
-      <footer className="bg-white border-t border-black/[0.06] py-14">
-        <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-3 gap-10">
-          <div>
-            <p className="font-bold text-xl text-on-surface mb-2">{brand}</p>
-            <p className="text-sm text-secondary">{siteAppearance.footer_copyright}</p>
-          </div>
-          <div className="space-y-3 text-sm text-on-surface-variant">
-            <p className="font-bold text-on-surface flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[20px]">contact_mail</span>
-              Επικοινωνία
+          <div className="mt-10 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-white/55">
+              {brand.copyright || `© ${new Date().getFullYear()} ${brand.name}`}
             </p>
-            {contact}
+            <FooterOfficeLogin tone="dark" />
           </div>
-          <div className="flex flex-wrap gap-4 items-start text-sm text-secondary">{links}</div>
         </div>
       </footer>
     );
@@ -94,8 +300,8 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'newsletter_cta') {
     return (
-      <footer className="bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
-        <div className="max-w-container-max mx-auto px-margin-desktop">
+      <footer id="contact" className="scroll-mt-24 bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
+        <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
           <div className="rounded-3xl bg-slate-900 text-white p-8 md:p-10 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <p className="text-xl font-bold mb-1">Μείνετε ενημερωμένοι</p>
@@ -114,12 +320,19 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
               </button>
             </div>
           </div>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
+            <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
             <div>
-              <p className="font-bold text-on-surface">{brand}</p>
-              <p className="text-sm text-secondary mt-2">{siteAppearance.footer_copyright}</p>
+              <p className="sf-footer__heading">Επικοινωνία</p>
+              <ContactLines contact={contact} />
             </div>
-            <div className="flex flex-wrap gap-6 justify-start md:justify-end text-sm text-secondary">{links}</div>
+            <div>
+              <p className="sf-footer__heading">Νομικά</p>
+              <LegalLinks siteAppearance={siteAppearance} />
+            </div>
+          </div>
+          <div className="mt-8 flex justify-end">
+            <FooterOfficeLogin />
           </div>
         </div>
       </footer>
@@ -127,33 +340,58 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
   }
 
   if (templateId === 'compact_inline') {
+    const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
+    const logoStyle = officeLogoImageStyle(siteAppearance);
     return (
-      <footer className="bg-surface-container-low py-6 border-t">
-        <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-secondary">
-          <p>
-            <span className="font-bold text-on-surface">{brand}</span> · {siteAppearance.footer_copyright}
-          </p>
-          <div className="flex flex-wrap gap-4">{links}</div>
+      <footer id="contact" className="scroll-mt-24 bg-surface-container-low py-8 border-t">
+        <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-secondary">
+            <div className="flex items-center gap-3 min-w-0">
+              {logoSrc ? (
+                <img src={logoSrc} alt={brand.name} style={logoStyle} className="object-contain" />
+              ) : (
+                <span className="font-bold text-on-surface">{brand.name}</span>
+              )}
+              {brand.copyright ? <span className="truncate">· {brand.copyright}</span> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <LegalLinks siteAppearance={siteAppearance} className="!flex-row !gap-4" />
+              <FooterOfficeLogin />
+            </div>
+          </div>
+          <div className="pt-2 border-t border-black/[0.05]">
+            <p className="sf-footer__heading">Επικοινωνία</p>
+            <ContactLines contact={contact} />
+          </div>
         </div>
       </footer>
     );
   }
 
-  // classic_columns
+  // Fallback → same modern classic
   return (
-    <footer className="bg-surface-container-lowest py-stack-lg border-t border-surface-container">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-container-max mx-auto">
-        <div className="col-span-1">
-          <div className="font-headline-md text-headline-md font-bold text-on-surface mb-4">{brand}</div>
-          <p className="font-label-md text-label-md text-secondary mb-3">{siteAppearance.footer_copyright}</p>
-          {(siteAppearance.footer_contact_email ||
-            siteAppearance.footer_contact_phone ||
-            siteAppearance.footer_address) && (
-            <div className="space-y-1 text-sm text-secondary">{contact}</div>
-          )}
+    <footer id="contact" className="sf-footer">
+      <div className="sf-footer__inner">
+        <div className="sf-footer__grid">
+          <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
+          <div>
+            <p className="sf-footer__heading">Πλοήγηση</p>
+            <ExploreLinks tripsEnabled={tripsEnabled} rentEnabled={rentEnabled} showFleet={showFleet} />
+          </div>
+          <div>
+            <p className="sf-footer__heading">Επικοινωνία</p>
+            <ContactLines contact={contact} />
+          </div>
+          <div>
+            <p className="sf-footer__heading">Νομικά</p>
+            <LegalLinks siteAppearance={siteAppearance} />
+          </div>
         </div>
-        <div className="col-span-1 md:col-span-3 flex flex-wrap justify-end items-center gap-x-8 gap-y-3 text-sm text-secondary">
-          {links}
+        <div className="sf-footer__bottom">
+          <p className="sf-footer__copy">
+            {brand.copyright || `© ${new Date().getFullYear()} ${brand.name}`}
+          </p>
+          <FooterOfficeLogin />
         </div>
       </div>
     </footer>
