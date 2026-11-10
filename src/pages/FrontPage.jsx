@@ -1,88 +1,72 @@
-import { Link } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import PlatformBusesSession from '../components/marketing/PlatformBusesSession.jsx';
+import PlatformWalletSession from '../components/marketing/PlatformWalletSession.jsx';
+import PlatformMarketingHeader from '../components/marketing/PlatformMarketingHeader.jsx';
+import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
   FeaturesSection,
   FinalCtaSection,
-  HeroSection,
-  HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
-  RentProductSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
-import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
+import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
+import { Link } from 'react-router-dom';
+import '../styles/platform-landing-rest.css';
 
 export default function FrontPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 h-[72px] flex items-center justify-between gap-4">
-          <PlatformBrand variant="dark" />
-
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-white/75">
-            <a href="#features" className="hover:text-white transition-colors">
-              Λειτουργίες
-            </a>
-            <a href="#rent" className="hover:text-white transition-colors">
-              Ενοικιάσεις
-            </a>
-            <a href="#pricing" className="hover:text-white transition-colors">
-              Τιμές
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              to="/admin/login"
-              className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-white/80 hover:text-white"
-            >
-              Σύνδεση
-            </Link>
-            <Link
-              to="/grafeia"
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-full shadow-lg shadow-sky-500/25 transition-colors"
-            >
-              Συμβόλαια
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div
+      className="pg-home-shell min-h-screen bg-slate-950 text-white"
+      style={{
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
+    >
+      <PlatformMarketingHeader />
 
       <main>
-        <HeroSection />
+        <PlatformServiceHub />
+        <PlatformBusesSession />
+        <PlatformWalletSession />
         <PainPointsSection />
         <FeaturesSection />
-        <RentProductSection />
-        <HowItWorksSection />
         <PricingTeaserSection />
         <FinalCtaSection />
       </main>
 
-      <footer className="border-t border-white/10 bg-slate-950 py-12">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between gap-8">
-          <div>
+      <footer className="pg-site-footer">
+        <div className="pg-site-footer-inner">
+          <div className="pg-site-footer-brand">
             <PlatformBrand variant="dark" asLink={false} />
-            <p className="text-sm text-white/45 mt-4 max-w-xs">
-              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, billing.
+            <p>
+              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, χρεώσεις.
             </p>
           </div>
-          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
-            <Link to="/rent/services" className="hover:text-white">
-              Υπηρεσία Rent
-            </Link>
-            <Link to="/grafeia" className="hover:text-white">
-              Συμβόλαια
-            </Link>
-            <Link to="/my-booking" className="hover:text-white">
-              Ανάκτηση κράτησης
-            </Link>
-            <Link to="/admin/login" className="hover:text-white">
-              Σύνδεση γραφείου
-            </Link>
+
+          <div className="pg-site-footer-cols">
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label pg-site-footer-label--buses">Λεωφορεία</span>
+              <a href="#session-buses">Εκδρομές & λεωφορεία</a>
+              <a href="#platform-trips">Εκδρομές</a>
+              <a href="#our-fleet">Στόλος</a>
+              <a href="#session-wallet">My Wallet</a>
+              <a href="#features">Λειτουργίες</a>
+            </div>
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label pg-site-footer-label--rent">Ενοικιάσεις</span>
+              <Link to="/rent">Ενοικιάσεις οχημάτων</Link>
+              <Link to="/rent">Σελίδα Rent</Link>
+              <Link to="/grafeia">Συμβόλαια Rent</Link>
+            </div>
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label">Πλατφόρμα</span>
+              <a href="#pricing">Τιμές</a>
+              <Link to="/my-booking">Ανάκτηση κράτησης</Link>
+            </div>
           </div>
         </div>
-        <p className="text-center text-xs text-white/30 mt-10">
-          © {new Date().getFullYear()} {PLATFORM_NAME} — Travel Agency SaaS
+        <p className="pg-site-footer-copy">
+          © {new Date().getFullYear()} {PLATFORM_NAME} — {PLATFORM_BRAND_LINE}
         </p>
       </footer>
     </div>

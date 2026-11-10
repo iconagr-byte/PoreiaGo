@@ -1,13 +1,24 @@
 /**
- * Derive rental booking paperwork status from inspections (pickup/return signatures).
+ * Derive rental booking paperwork status from inspections + legal doc pack signatures.
  */
+import { legalPackProgress } from './rentalLegalDocs.js';
 
 export function inspectionsForBooking(inspections, bookingId) {
   return (inspections || []).filter((i) => i.rental_booking_id === bookingId);
 }
 
 export function latestInspectionOfType(inspections, bookingId, type) {
-  return inspectionsForBooking(inspections, bookingId).find((i) => i.inspection_type === type) || null;
+  const matches = inspectionsForBooking(inspections, bookingId).filter(
+    (i) => i.inspection_type === type,
+  );
+  if (!matches.length) return null;
+  // Prefer a signed inspection; among equals, take the most recently updated/created.
+  const rank = (i) => {
+    const signed = i?.signature_url ? 1_000_000_000_000 : 0;
+    const t = Date.parse(i?.updated_at || i?.created_at || '') || 0;
+    return signed + t;
+  };
+  return matches.reduce((best, cur) => (rank(cur) >= rank(best) ? cur : best));
 }
 
 /**
@@ -17,11 +28,13 @@ export function latestInspectionOfType(inspections, bookingId, type) {
  *   pickupSigned: boolean,
  *   returnSigned: boolean,
  *   agreementReady: boolean,
+ *   legal: ReturnType<typeof legalPackProgress>,
  *   statusKey: 'missing'|'pickup_only'|'complete'|'cancelled',
  *   statusLabel: string,
  * }}
  */
 export function paperworkStatusForBooking(booking, inspections) {
+  const legal = legalPackProgress(booking, inspections);
   if (!booking) {
     return {
       pickup: null,
@@ -29,6 +42,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       pickupSigned: false,
       returnSigned: false,
       agreementReady: false,
+      legal,
       statusKey: 'missing',
       statusLabel: 'Χωρίς δεδομένα',
     };
@@ -40,6 +54,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       pickupSigned: false,
       returnSigned: false,
       agreementReady: false,
+      legal,
       statusKey: 'cancelled',
       statusLabel: 'Ακυρωμένη',
     };
@@ -48,6 +63,20 @@ export function paperworkStatusForBooking(booking, inspections) {
   const returnCheck = latestInspectionOfType(inspections, booking.id, 'RETURN_CHECK');
   const pickupSigned = Boolean(pickup?.signature_url);
   const returnSigned = Boolean(returnCheck?.signature_url);
+  const legalHint = `Νομικά ${legal.signedCount}/${legal.total}`;
+
+  if (pickupSigned && returnSigned && legal.packComplete) {
+    return {
+      pickup,
+      returnCheck,
+      pickupSigned,
+      returnSigned,
+      agreementReady: true,
+      legal,
+      statusKey: 'complete',
+      statusLabel: 'Πλήρης χαρτούρα',
+    };
+  }
   if (pickupSigned && returnSigned) {
     return {
       pickup,
@@ -55,8 +84,9 @@ export function paperworkStatusForBooking(booking, inspections) {
       pickupSigned,
       returnSigned,
       agreementReady: true,
+      legal,
       statusKey: 'complete',
-      statusLabel: 'Πλήρης χαρτούρα',
+      statusLabel: `Check-in/out OK · ${legalHint}`,
     };
   }
   if (pickupSigned) {
@@ -66,18 +96,27 @@ export function paperworkStatusForBooking(booking, inspections) {
       pickupSigned,
       returnSigned,
       agreementReady: true,
+      legal,
       statusKey: 'pickup_only',
-      statusLabel: 'Υπογραφή παραλαβής',
+      statusLabel: legal.pickupReady
+        ? 'Υπογραφή παραλαβής · νομικά OK'
+        : `Υπογραφή παραλαβής · ${legalHint}`,
     };
   }
+  const pendingLegal = legal.pickupSignedCount < legal.pickupTotal;
   return {
     pickup,
     returnCheck,
     pickupSigned,
     returnSigned,
     agreementReady: Boolean(booking.id),
+    legal,
     statusKey: 'missing',
-    statusLabel: pickup ? 'Check-in χωρίς υπογραφή' : 'Εκκρεμεί υπογραφή',
+    statusLabel: pickup
+      ? 'Check-in χωρίς υπογραφή'
+      : pendingLegal
+        ? `Εκκρεμεί υπογραφή · ${legalHint}`
+        : 'Εκκρεμεί υπογραφή παραλαβής',
   };
 }
 
@@ -94,6 +133,7 @@ export function paperworkStatusChipClass(statusKey) {
   }
 }
 
+/** @deprecated Prefer RENTAL_LEGAL_DOCS agreement clauses — kept for older imports. */
 export const RENTAL_AGREEMENT_TERMS = [
   'Ο πελάτης δηλώνει ότι παρέλαβε το όχημα στην κατάσταση που περιγράφεται στον έλεγχο παραλαβής και ότι διαθέτει ισχύουσα άδεια οδήγησης.',
   'Το όχημα χρησιμοποιείται μόνο από τον δηλωμένο οδηγό (ή οδηγούς που εγκρίνει το γραφείο) και σύμφωνα με την ισχύουσα νομοθεσία.',

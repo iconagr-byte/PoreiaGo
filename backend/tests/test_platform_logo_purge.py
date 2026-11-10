@@ -19,7 +19,12 @@ class PlatformLogoPurgeTests(unittest.TestCase):
             logo_path.write_bytes(b"fake-achillion-logo")
             appearance_file = data_dir / "site_appearance.json"
             appearance_file.write_text(
-                json.dumps({"logo_url": "/api/site/assets/logo?v=1", "hero_image_url": "/images/hero-bus-achillio.png"}),
+                json.dumps(
+                    {
+                        "logo_url": "/api/site/assets/logo?v=1",
+                        "hero_image_url": "/images/hero-bus-achillio.png",
+                    }
+                ),
                 encoding="utf-8",
             )
             marker = data_dir / ".purged_achillion_platform_logo_v1"
@@ -27,10 +32,10 @@ class PlatformLogoPurgeTests(unittest.TestCase):
             import api.site_appearance_router as mod
 
             with (
-                mock.patch.object(mod, "_DATA", data_dir),
-                mock.patch.object(mod, "_APPEARANCE_FILE", appearance_file),
-                mock.patch.object(mod, "_UPLOAD_DIR", upload_dir),
-                mock.patch.object(mod, "_PURGE_ACHILLION_PLATFORM_LOGO_MARKER", marker),
+                mock.patch.object(mod, "_data_root", return_value=data_dir),
+                mock.patch.object(mod, "_appearance_file", return_value=appearance_file),
+                mock.patch.object(mod, "_upload_dir", return_value=upload_dir),
+                mock.patch.object(mod, "_purge_achillion_marker", return_value=marker),
             ):
                 self.assertTrue(mod.purge_mistaken_platform_logo())
                 self.assertFalse(logo_path.exists())
@@ -54,16 +59,32 @@ class PlatformLogoPurgeTests(unittest.TestCase):
             import api.site_appearance_router as mod
 
             with (
-                mock.patch.object(mod, "_DATA", data_dir),
-                mock.patch.object(mod, "_APPEARANCE_FILE", appearance_file),
-                mock.patch.object(mod, "_UPLOAD_DIR", upload_dir),
-                mock.patch.object(mod, "_PURGE_ACHILLION_PLATFORM_LOGO_MARKER", marker),
+                mock.patch.object(mod, "_data_root", return_value=data_dir),
+                mock.patch.object(mod, "_appearance_file", return_value=appearance_file),
+                mock.patch.object(mod, "_upload_dir", return_value=upload_dir),
+                mock.patch.object(mod, "_purge_achillion_marker", return_value=marker),
             ):
                 data = mod._read_appearance()
                 self.assertEqual(data.get("logo_url"), "")
                 self.assertTrue(mod._is_platform_host("www.poreiago.com"))
                 self.assertTrue(mod._is_platform_host(None))
                 self.assertFalse(mod._is_platform_host("www.achilliontravel.gr"))
+
+    def test_scrub_achillio_from_platform_appearance(self):
+        import api.site_appearance_router as mod
+
+        cleaned = mod._scrub_achillio_from_platform_appearance(
+            {
+                "footer_brand_name": "Achillio Travel",
+                "logo_url": "/images/achillio-logo.png",
+                "hero_image_url": "/images/hero-bus-achillio.png",
+                "hero_title": "Keep me",
+            }
+        )
+        self.assertEqual(cleaned["footer_brand_name"], "PoreiaGo")
+        self.assertEqual(cleaned["logo_url"], "")
+        self.assertEqual(cleaned["hero_image_url"], "")
+        self.assertEqual(cleaned["hero_title"], "Keep me")
 
 
 if __name__ == "__main__":

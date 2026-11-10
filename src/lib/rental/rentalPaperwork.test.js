@@ -16,6 +16,10 @@ console.assert(
   paperworkStatusForBooking(booking, []).statusKey === 'missing',
   'no inspections → missing',
 );
+console.assert(
+  paperworkStatusForBooking(booking, []).legal?.total >= 8,
+  'legal pack attached',
+);
 
 const pickupOnly = paperworkStatusForBooking(booking, [
   {

@@ -1,11 +1,21 @@
 /**
- * Printable rental agreement / paperwork sheet for a booking.
+ * Printable rental agreement / paperwork sheet for a booking — includes legal doc pack.
  */
+import { useEffect, useRef, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
 import {
-  RENTAL_AGREEMENT_TERMS,
-  paperworkStatusForBooking,
-} from '../../../lib/rental/rentalPaperwork.js';
+  fetchRentalCheckoutStatus,
+  fetchRentalInspections,
+  openRentalContractFile,
+  resetRentalSignature,
+} from '../../../services/fleetRentalApi.js';
+import {
+  legalDocById,
+  legalPackProgress,
+} from '../../../lib/rental/rentalLegalDocs.js';
+import { paperworkStatusForBooking } from '../../../lib/rental/rentalPaperwork.js';
+import { LIVE_REFRESH_MS } from '../../../lib/liveRefresh.js';
+import RentalLegalDocPack from './RentalLegalDocPack.jsx';
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -37,32 +47,203 @@ function statusEl(status) {
 }
 
 export default function RentalBookingAgreement({
-  booking,
+  booking: bookingProp,
   vehicle,
   inspections = [],
   officeName = 'Γραφείο ενοικιάσεων',
   onClose,
   onOpenCheckIn,
+  onOpenCheckout,
+  onBookingUpdated,
+  onInspectionsUpdated,
+  onToast,
 }) {
+  const [booking, setBooking] = useState(bookingProp);
+  const [liveInspections, setLiveInspections] = useState(inspections);
+  const [openingContract, setOpeningContract] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [liveHint, setLiveHint] = useState('');
+  const seenPickup = useRef(false);
+  const seenReturn = useRef(false);
+  const primed = useRef(false);
+  const bookingRef = useRef(bookingProp);
+
+  const handleUpdated = (updated) => {
+    if (updated?.id) {
+      setBooking(updated);
+      bookingRef.current = updated;
+    }
+    onBookingUpdated?.(updated);
+  };
+
+  useEffect(() => {
+    setBooking(bookingProp);
+    bookingRef.current = bookingProp;
+  }, [bookingProp]);
+
+  useEffect(() => {
+    setLiveInspections(inspections);
+  }, [inspections]);
+
+  // Poll this booking's inspections/signature until both check-in & check-out are signed.
+  useEffect(() => {
+    if (!bookingProp?.id) return undefined;
+    const bookingId = bookingProp.id;
+    let cancelled = false;
+    primed.current = false;
+
+    const tick = async () => {
+      try {
+        const [fresh, status] = await Promise.all([
+          fetchRentalInspections(bookingId),
+          fetchRentalCheckoutStatus(bookingId).catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        setLiveInspections((prev) => {
+          const others = (prev || []).filter((i) => i.rental_booking_id !== bookingId);
+          return [...fresh, ...others];
+        });
+        onInspectionsUpdated?.(fresh, bookingId);
+
+        const current = bookingRef.current || bookingProp;
+        if (status?.signed || status?.contract_pdf_url) {
+          const next = {
+            ...current,
+            rental_status: status.rental_status || current.rental_status,
+            contract_status: status.contract_status || current.contract_status,
+            contract_pdf_url: status.contract_pdf_url || current.contract_pdf_url,
+            signature_pending: Boolean(status.signature_pending),
+            contract_issued_at:
+              status.signed && !current.contract_issued_at
+                ? current.contract_issued_at || new Date().toISOString()
+                : current.contract_issued_at,
+          };
+          const changed =
+            next.contract_pdf_url !== current.contract_pdf_url ||
+            next.rental_status !== current.rental_status ||
+            next.contract_status !== current.contract_status ||
+            Boolean(next.signature_pending) !== Boolean(current.signature_pending) ||
+            next.contract_issued_at !== current.contract_issued_at;
+          if (changed) handleUpdated(next);
+        }
+
+        const paper = paperworkStatusForBooking(current, fresh);
+        if (!primed.current) {
+          seenPickup.current = paper.pickupSigned;
+          seenReturn.current = paper.returnSigned;
+          primed.current = true;
+          setLiveHint(
+            paper.pickupSigned && paper.returnSigned
+              ? ''
+              : 'Ζωντανή ενημέρωση υπογραφών…',
+          );
+          return;
+        }
+        if (paper.pickupSigned && !seenPickup.current) {
+          seenPickup.current = true;
+          onToast?.('success', 'Η υπογραφή παραλαβής έφτασε στο γραφείο');
+        }
+        if (paper.returnSigned && !seenReturn.current) {
+          seenReturn.current = true;
+          onToast?.('success', 'Η υπογραφή επιστροφής έφτασε στο γραφείο');
+        }
+        setLiveHint(
+          paper.pickupSigned && paper.returnSigned
+            ? ''
+            : 'Ζωντανή ενημέρωση υπογραφών…',
+        );
+      } catch {
+        /* keep polling */
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, LIVE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll keyed to booking id
+  }, [bookingProp?.id]);
+
   if (!booking) return null;
 
-  const paper = paperworkStatusForBooking(booking, inspections);
+  const paper = paperworkStatusForBooking(booking, liveInspections);
+  const legal = legalPackProgress(booking, liveInspections);
   const plate = booking.vehicle_plate || vehicle?.plate_number || '—';
   const model = booking.vehicle_model || vehicle?.model || '—';
   const category = booking.vehicle_category || vehicle?.category || '—';
+  const agreementDoc = legalDocById('agreement');
 
   const print = () => {
     window.print();
+  };
+
+  const openIssuedContract = async () => {
+    if (!booking.contract_pdf_url || openingContract) return;
+    setOpeningContract(true);
+    try {
+      await openRentalContractFile(booking.contract_pdf_url);
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία ανοίγματος σύμβασης');
+    } finally {
+      setOpeningContract(false);
+    }
+  };
+
+  const canResetSignature =
+    Boolean(booking.contract_issued_at) ||
+    Boolean(booking.contract_pdf_url) ||
+    (legal.signedCount || 0) > 0 ||
+    Boolean(booking.signature_pending);
+
+  const clearAndResendLink = async () => {
+    if (!booking?.id || resetBusy) return;
+    const ok = window.confirm(
+      'Καθαρισμός υπογραφής / σύμβασης και αποστολή νέου link στον πελάτη;',
+    );
+    if (!ok) return;
+    setResetBusy(true);
+    try {
+      const result = await resetRentalSignature(booking.id, {
+        sendLink: true,
+        publicBaseUrl: window.location.origin,
+      });
+      const updated = result.booking || result;
+      handleUpdated(updated);
+      onToast?.(
+        'success',
+        result.sign_url
+          ? 'Καθαρίστηκε — στάλθηκε νέο link υπογραφής'
+          : 'Καθαρίστηκε η υπογραφή',
+      );
+      if (onOpenCheckout) onOpenCheckout();
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία καθαρισμού');
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   return (
     <div className="rental-agreement-sheet space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <h3 className="font-bold text-gray-900 text-lg">Σύμβαση ενοικίασης</h3>
+          <h3 className="font-bold text-gray-900 text-lg">Φάκελος χαρτούρας</h3>
           <p className="text-sm text-gray-500 mt-0.5">
-            Χαρτούρα κράτησης · εκτύπωση ή αποθήκευση ως PDF από τον εκτυπωτή του προγράμματος περιήγησης
+            Νομικό πακέτο έτοιμο για υπογραφή · εκτύπωση ή PDF από τον εκτυπωτή του προγράμματος
+            περιήγησης
           </p>
+          <p className="text-xs text-teal-800 font-semibold mt-1">
+            Νομικά {legal.signedCount}/{legal.total} · {paper.statusLabel}
+          </p>
+          {liveHint ? (
+            <p className="text-xs text-teal-600 mt-1 flex items-center gap-1 print:hidden">
+              <span className="material-symbols-outlined text-[14px] animate-pulse">sync</span>
+              {liveHint}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -71,8 +252,53 @@ export default function RentalBookingAgreement({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
           >
             <span className="material-symbols-outlined text-[18px]">print</span>
-            Εκτύπωση / PDF
+            Εκτύπωση πακέτου / PDF
           </button>
+          {onOpenCheckout && (legal.signedCount < 6 || !paper.pickupSigned) ? (
+            <button
+              type="button"
+              onClick={onOpenCheckout}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-sm font-bold"
+              title="Sign-on-Glass ή σύνδεσμος στο κινητό πελάτη"
+            >
+              <span className="material-symbols-outlined text-[18px]">draw</span>
+              Ψηφιακή υπογραφή
+            </button>
+          ) : null}
+          {canResetSignature ? (
+            <button
+              type="button"
+              disabled={resetBusy}
+              onClick={clearAndResendLink}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-sm font-bold disabled:opacity-50"
+              title="Σβήνει την υπογραφή/σύμβαση και στέλνει νέο link 24ωρών"
+            >
+              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+              {resetBusy ? 'Αποστολή…' : 'Καθαρισμός & νέο link'}
+            </button>
+          ) : null}
+          {booking.contract_pdf_url ? (
+            <button
+              type="button"
+              disabled={openingContract}
+              onClick={openIssuedContract}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              title="Άνοιγμα εκδομένης σύμβασης"
+            >
+              <span className="material-symbols-outlined text-[18px]">description</span>
+              {openingContract ? 'Άνοιγμα…' : 'Σύμβαση'}
+            </button>
+          ) : onOpenCheckout ? (
+            <button
+              type="button"
+              onClick={onOpenCheckout}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700 hover:bg-slate-50"
+              title="Έκδοση σύμβασης με dual-mode υπογραφή"
+            >
+              <span className="material-symbols-outlined text-[18px]">description</span>
+              Σύμβαση
+            </button>
+          ) : null}
           {!paper.pickupSigned && onOpenCheckIn ? (
             <button
               type="button"
@@ -151,14 +377,18 @@ export default function RentalBookingAgreement({
           </div>
         </section>
 
-        <section>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">Όροι</p>
-          <ol className="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
-            {RENTAL_AGREEMENT_TERMS.map((term) => (
-              <li key={term}>{term}</li>
-            ))}
-          </ol>
-        </section>
+        {agreementDoc ? (
+          <section>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+              Βασικοί όροι σύμβασης
+            </p>
+            <ol className="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+              {agreementDoc.clauses.map((term) => (
+                <li key={term.slice(0, 40)}>{term}</li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
 
         <section className="grid sm:grid-cols-2 gap-4">
           <SignatureBlock
@@ -178,12 +408,29 @@ export default function RentalBookingAgreement({
           <span>{officeName}</span>
         </footer>
       </article>
+
+      <RentalLegalDocPack
+        booking={booking}
+        inspections={liveInspections}
+        officeName={officeName}
+        onBookingUpdated={handleUpdated}
+        onOpenCheckIn={onOpenCheckIn}
+        onToast={onToast}
+      />
     </div>
   );
 }
 
+function signatureSrc(inspection) {
+  const raw = resolveSiteAssetUrl(inspection?.signature_url || '');
+  if (!raw || raw.startsWith('data:')) return raw;
+  const bust = inspection?.updated_at || inspection?.created_at || inspection?.id || '';
+  if (!bust) return raw;
+  return `${raw}${raw.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(bust))}`;
+}
+
 function SignatureBlock({ title, inspection, emptyHint }) {
-  const url = resolveSiteAssetUrl(inspection?.signature_url || '');
+  const url = signatureSrc(inspection);
   return (
     <div className="rounded-xl border border-black/[0.08] p-4 min-h-[10rem]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{title}</p>
