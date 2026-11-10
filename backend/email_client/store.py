@@ -157,11 +157,15 @@ async def sync_subscribers_from_accounts() -> None:
     await db.commit()
 
 
-async def upsert_message(data: dict) -> dict | None:
-    """Εισαγωγή ή ενημέρωση αν υπάρχει το ίδιο message_id (+ λογαριασμός)."""
+async def upsert_message(data: dict) -> tuple[dict | None, bool]:
+    """Εισαγωγή ή ενημέρωση αν υπάρχει το ίδιο message_id (+ λογαριασμός).
+
+    Returns ``(message, created)`` — ``created`` is True only on first insert
+    so IMAP sync can report truly new mail instead of re-counted upserts.
+    """
     mid = (data.get("message_id") or "").strip()
     if not mid:
-        return None
+        return None, False
     sid = data.get("email_settings_id")
     db = get_db()
     existing = None
@@ -198,7 +202,7 @@ async def upsert_message(data: dict) -> dict | None:
         # Durable trash: IMAP sync of INBOX/Sent/Spam must not resurrect
         # messages the user already moved to Κάδος (local or IMAP).
         cur = await db.execute(
-            "SELECT folder FROM email_messages WHERE id = ?",
+            "SELECT folder, is_read FROM email_messages WHERE id = ?",
             (eid,),
         )
         prev = await cur.fetchone()
@@ -207,6 +211,12 @@ async def upsert_message(data: dict) -> dict | None:
             folder = FOLDER_TRASH
         else:
             folder = incoming_folder
+        # Durable read: opening mail in PoreiaGo sets is_read locally. IMAP poll
+        # every few seconds must not clobber that with a still-unread \\Seen flag
+        # (blue unread dots kept coming back on every sync).
+        incoming_read = bool(data.get("is_read"))
+        prev_read = bool(prev["is_read"]) if prev is not None else False
+        is_read = 1 if (prev_read or incoming_read) else 0
         await db.execute(
             """
             UPDATE email_messages
@@ -222,7 +232,7 @@ async def upsert_message(data: dict) -> dict | None:
                 data.get("body_html", ""),
                 data.get("body_text"),
                 folder,
-                1 if data.get("is_read") else 0,
+                is_read,
                 data.get("date") or now,
                 data.get("imap_uid"),
                 sid,
@@ -231,7 +241,7 @@ async def upsert_message(data: dict) -> dict | None:
             ),
         )
         await db.commit()
-        return await get_message(eid)
+        return await get_message(eid), False
 
     eid = _new_id("EM")
     await db.execute(
@@ -260,7 +270,7 @@ async def upsert_message(data: dict) -> dict | None:
         ),
     )
     await db.commit()
-    return await get_message(eid)
+    return await get_message(eid), True
 
 
 async def get_message(message_pk: str) -> dict | None:
@@ -270,20 +280,46 @@ async def get_message(message_pk: str) -> dict | None:
     return _row_message(row) if row else None
 
 
+def _account_scope_clause(
+    *,
+    email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
+) -> tuple[str, list]:
+    """SQL fragment + params for tenant/account scope.
+
+    ``email_settings_ids=[]`` (empty list) seals to nothing — never unscoped.
+    ``None`` keeps legacy unscoped reads for internal/background callers only.
+    """
+    if email_settings_ids is not None:
+        ids = [str(i).strip() for i in email_settings_ids if str(i).strip()]
+        if not ids:
+            return " AND 1=0", []
+        placeholders = ",".join("?" * len(ids))
+        return f" AND email_settings_id IN ({placeholders})", ids
+    if email_settings_id:
+        return " AND email_settings_id = ?", [str(email_settings_id)]
+    return "", []
+
+
 async def list_messages(
     *,
     folder: str,
     email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
     limit: int = 50,
     offset: int = 0,
     search: str | None = None,
 ) -> list[dict]:
     db = get_db()
-    q = "SELECT * FROM email_messages WHERE folder = ?"
-    params: list = [folder]
-    if email_settings_id:
-        q += " AND email_settings_id = ?"
-        params.append(email_settings_id)
+    scope_sql, scope_params = _account_scope_clause(
+        email_settings_id=email_settings_id,
+        email_settings_ids=email_settings_ids,
+    )
+    # Empty explicit scope → no cross-tenant leak.
+    if email_settings_ids is not None and not scope_params and scope_sql == " AND 1=0":
+        return []
+    q = f"SELECT * FROM email_messages WHERE folder = ?{scope_sql}"
+    params: list = [folder, *scope_params]
     if search:
         q += " AND (subject LIKE ? OR sender LIKE ? OR recipient LIKE ?)"
         like = f"%{search}%"
@@ -294,17 +330,24 @@ async def list_messages(
     return [_row_message(r) for r in await cur.fetchall()]
 
 
-async def folder_unread_counts(*, email_settings_id: str | None = None) -> dict[str, int]:
+async def folder_unread_counts(
+    *,
+    email_settings_id: str | None = None,
+    email_settings_ids: list[str] | None = None,
+) -> dict[str, int]:
+    scope_sql, scope_params = _account_scope_clause(
+        email_settings_id=email_settings_id,
+        email_settings_ids=email_settings_ids,
+    )
+    if email_settings_ids is not None and not scope_params and scope_sql == " AND 1=0":
+        return {}
     db = get_db()
-    q = """
+    q = f"""
         SELECT folder, COUNT(*) AS cnt
         FROM email_messages
-        WHERE is_read = 0 AND folder != ?
+        WHERE is_read = 0 AND folder != ?{scope_sql}
     """
-    params: list = [FOLDER_TRASH]
-    if email_settings_id:
-        q += " AND email_settings_id = ?"
-        params.append(email_settings_id)
+    params: list = [FOLDER_TRASH, *scope_params]
     q += " GROUP BY folder"
     cur = await db.execute(q, params)
     rows = await cur.fetchall()
@@ -382,7 +425,7 @@ async def record_sent_local(
     message_id: str | None = None,
     email_settings_id: str | None = None,
 ) -> dict:
-    return await upsert_message(
+    msg, _created = await upsert_message(
         {
             "message_id": message_id or f"sent-{_new_id('m')}@local",
             "email_settings_id": email_settings_id,
@@ -394,7 +437,8 @@ async def record_sent_local(
             "is_read": True,
             "date": _now(),
         }
-    )  # type: ignore[return-value]
+    )
+    return msg  # type: ignore[return-value]
 
 
 # --- Subscribers ---

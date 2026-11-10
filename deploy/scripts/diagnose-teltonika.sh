@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Diagnose Teltonika Codec 8 TCP ingest + Achillio Travel device bindings.
 # Safe to run via Actions from /tmp — pass REPO_ROOT=/opt/poreiago.
+# Bump: 2026-11-01 21:21 EET check IMEI 861076085468260 live pin.
 set -euo pipefail
 
 ROOT="${REPO_ROOT:-}"
@@ -89,30 +90,63 @@ for r in rows:
 PY
 
 echo
-echo "=== TCP IMEI probe (localhost :${PORT}) ==="
+echo "=== TCP health probe (bogus IMEI — does NOT refresh real last_seen) ==="
 "${COMPOSE[@]}" exec -T api-blue python - <<'PY'
-import json, socket, struct
+import socket, struct
+from datetime import datetime, timezone
 from travel_platform.telemetry.teltonika import list_devices
+from travel_platform.telemetry.teltonika.tcp_server import get_teltonika_status
 
-rows = list_devices()
-imei = None
-for r in rows:
-    if r.get("enabled") and r.get("imei"):
-        imei = str(r["imei"])
-        break
-if not imei:
-    print("PROBE_SKIP no enabled IMEI")
-else:
-    payload = struct.pack(">H", len(imei)) + imei.encode("ascii")
-    try:
-        s = socket.create_connection(("127.0.0.1", 5027), timeout=5)
-        s.sendall(payload)
-        resp = s.recv(1)
-        s.close()
-        code = resp.hex() if resp else "empty"
-        print("PROBE_IMEI", imei, "reply=0x" + code, "OK" if resp == b"\x01" else "REJECT")
-    except Exception as exc:
-        print("PROBE_FAIL", type(exc).__name__, str(exc)[:200])
+# Server listening + reject path only (never login a bound IMEI — that faked online).
+try:
+    s = socket.create_connection(("127.0.0.1", 5027), timeout=5)
+    imei = "000000000000001"
+    s.sendall(struct.pack(">H", len(imei)) + imei.encode("ascii"))
+    resp = s.recv(1)
+    s.close()
+    print(
+        "PROBE_BOGUS reply=0x" + (resp.hex() if resp else "empty"),
+        "REJECT_OK" if resp == b"\x00" else "UNEXPECTED",
+    )
+except Exception as exc:
+    print("PROBE_FAIL", type(exc).__name__, str(exc)[:200])
+
+st = get_teltonika_status()
+print(
+    "SERVER_STATUS",
+    "listening=", st.get("listening"),
+    "enabled=", st.get("enabled"),
+    "active_connections=", st.get("active_connections"),
+    "open_imeis=", st.get("open_imeis"),
+    "accepted=", st.get("accepted_imeis"),
+    "packets_ok=", st.get("packets_ok"),
+)
+
+now = datetime.now(timezone.utc)
+print("DEVICE_ONLINE_WINDOW_SEC=90")
+for r in list_devices():
+    if not r.get("enabled"):
+        continue
+    seen = r.get("last_seen_at")
+    age = None
+    if seen:
+        try:
+            dt = datetime.fromisoformat(str(seen).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            age = max(0.0, (now - dt).total_seconds())
+        except Exception:
+            age = None
+    live = age is not None and age <= 90
+    print(
+        "DEVICE_LIVE_CHECK",
+        "plate=", r.get("vehicle_code"),
+        "imei=", r.get("imei"),
+        "last_seen=", seen,
+        "age_sec=", None if age is None else round(age, 1),
+        "badge=", "ONLINE" if live else "OFFLINE",
+        "speed=", r.get("last_speed_kmh"),
+    )
 PY
 
 echo
@@ -191,12 +225,24 @@ async def main():
     print("memory_vehicle_count=", len(vehicles))
     for tid in ach_ids:
         try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+            from travel_platform.telemetry.teltonika import hydrate_live as hl
+
+            hl._last_hydrate_at.clear()
+            n = await hydrate_tenant_live_from_devices(tid)
+            print("achillio_hydrate_wrote=", n, "tenant=", tid)
+        except Exception as exc:
+            print("achillio_hydrate_error", tid, exc)
+        try:
             rows = await live.list_active_for_admin_async(UUID(tid))
         except Exception as exc:
             print("achillio_live_list_error", tid, exc)
             continue
         print("achillio_live_active=", len(rows), "tenant=", tid)
         for r in rows[:20]:
+            meta = live._vehicles.get(str(getattr(r, "vehicle_id", "")), {}) or {}
             print(
                 "ACHILLIO_LIVE",
                 getattr(r, "vehicle_id", None),
@@ -204,7 +250,30 @@ async def main():
                 getattr(r, "lat", None),
                 getattr(r, "lng", None),
                 getattr(r, "updated_at", None),
+                "source=", meta.get("source"),
+                "imei=", meta.get("imei"),
+                "tracker_signal_at=", meta.get("tracker_signal_at"),
+                "hydrated=", meta.get("hydrated_from_store"),
             )
+        try:
+            from travel_platform.telemetry.live_fleet_redis import load_live_vehicles
+            from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
+            remote = await load_live_vehicles(tid)
+            print("achillio_redis_live=", len(remote or []), "tenant=", tid)
+            for meta in (remote or [])[:20]:
+                allowed = office_allows_live_driver(tid, meta.get("driver_id"), meta)
+                print(
+                    "ACHILLIO_REDIS",
+                    meta.get("vehicle_code"),
+                    meta.get("source"),
+                    meta.get("lat"),
+                    meta.get("lng"),
+                    "allowed=", allowed,
+                    "updated_at=", meta.get("updated_at"),
+                )
+        except Exception as exc:
+            print("achillio_redis_error", tid, exc)
 
 asyncio.run(main())
 PY
@@ -217,3 +286,5 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 
 echo
 echo "=== done ==="
+
+# diagnose bump 20261007T105817Z — end-shift clear pin

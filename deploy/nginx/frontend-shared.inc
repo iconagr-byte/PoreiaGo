@@ -110,6 +110,15 @@ location = /sw.js {
 location = /driver-sw.js {
     try_files $uri =404;
     add_header Cache-Control "no-cache";
+    add_header Service-Worker-Allowed "/driver/";
+    add_header Content-Type "application/javascript; charset=utf-8";
+}
+
+location = /driver-telemetry-manifest.webmanifest {
+    try_files $uri =404;
+    add_header Cache-Control "no-cache";
+    default_type application/manifest+json;
+    add_header Content-Type "application/manifest+json; charset=utf-8";
 }
 
 location = /index.html {

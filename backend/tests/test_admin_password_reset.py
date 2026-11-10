@@ -173,6 +173,9 @@ class AdminPasswordResetPublicPathTests(unittest.TestCase):
         self.assertTrue(
             _admin_public_post("/api/admin/platform/password-reset/confirm", "POST")
         )
+        self.assertTrue(
+            _admin_public_post("/api/admin/platform/password-reset/request", "POST")
+        )
         self.assertFalse(
             _admin_public_post("/api/admin/platform/password-reset/send", "POST")
         )
