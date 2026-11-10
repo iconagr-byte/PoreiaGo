@@ -3,7 +3,7 @@ import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { loadTrips, getTripById } from '../../lib/trips/tripStore.js';
 import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers, notifyDriverShiftPush } from '../../services/platformApi.js';
-import { syncTripsToPostgres } from '../../services/tripsSyncApi.js';
+import { syncTripsToPostgres, hydrateTripsFromServer } from '../../services/tripsSyncApi.js';
 import BusPwaInstallGuide from './BusPwaInstallGuide.jsx';
 
 const fieldClass =
@@ -20,13 +20,27 @@ export default function MasterQrPanel({ compact = false }) {
   const [driversLoading, setDriversLoading] = useState(true);
 
   useEffect(() => {
-    const all = loadTrips();
-    setTrips(all);
-    if (all.length && !tripId) {
-      setTripId(String(all[0].id));
-    }
-    syncTripsToPostgres(all).catch(() => {});
-  }, [tripId]);
+    let cancelled = false;
+    const apply = (all) => {
+      if (cancelled) return;
+      setTrips(all);
+      const initialId = all.length ? String(all[0].id) : '';
+      if (initialId) setTripId((prev) => prev || initialId);
+      // Background only — never block driver list / QR issue on full trip sync.
+      if (all.length) {
+        syncTripsToPostgres(all).catch(() => {});
+      }
+    };
+    apply(loadTrips());
+    hydrateTripsFromServer()
+      .then((result) => {
+        if (result?.trips?.length) apply(result.trips);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +48,9 @@ export default function MasterQrPanel({ compact = false }) {
     fetchFleetDrivers('active')
       .then((rows) => {
         if (!cancelled) setDrivers(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDrivers([]);
       })
       .finally(() => {
         if (!cancelled) setDriversLoading(false);
@@ -54,15 +71,14 @@ export default function MasterQrPanel({ compact = false }) {
       setLoading(true);
       try {
         const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
+        // Fire-and-forget sync of the selected trip; QR mint must not wait.
         if (trip) {
-          const sync = await syncTripsToPostgres([trip]);
-          if (!sync.postgres_available) {
-            toast('Postgres offline — τοπικό QR', { icon: 'ℹ️' });
-          }
+          syncTripsToPostgres([trip]).catch(() => {});
         }
         const result = await issueMasterQr({
           tripId: id,
           driverId: driverId.trim() || undefined,
+          preferAdmin: true,
         });
         setIssued(result);
         toast.success('Το Master QR εκδόθηκε');

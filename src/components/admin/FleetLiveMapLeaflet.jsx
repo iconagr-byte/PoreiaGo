@@ -1,20 +1,39 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../../styles/fleet-live-map.css';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
+import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import {
+  fleetPinTelemetryHudHtml,
   formatBoardingLabel,
+  formatHeadingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatSpeedKmh,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import {
+  formatFleetBusPillLabel,
+  formatFleetExcursionBadge,
+} from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  fleetGpsSourceBadgeHtml,
+  formatFleetGpsSourceBadge,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
+import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
+import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
+import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 
 function escapeAttr(value) {
   return String(value || '')
@@ -24,23 +43,52 @@ function escapeAttr(value) {
     .replace(/>/g, '&gt;');
 }
 
+/** Avoid recreating L.divIcon every animation frame (reloads the photo). */
+const BUS_ICON_CACHE = new Map();
+const BUS_ICON_CACHE_MAX = 80;
+
 const busIcon = (vehicle) => {
-  const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
-  const img = escapeAttr(resolveFleetMarkerImage(vehicle));
-  return L.divIcon({
+  const headingRaw = Number.isFinite(Number(vehicle?.heading)) ? Number(vehicle.heading) : 0;
+  const heading = Math.round(headingRaw / 15) * 15;
+  const speed = formatSpeedKmh(vehicle);
+  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
+  const label = formatFleetBusPillLabel(vehicle);
+  const excursion = formatFleetExcursionBadge(vehicle);
+  const gpsBadge = fleetGpsSourceBadgeHtml(vehicle, { escapeAttr });
+  const gpsKey = resolveFleetGpsSources(vehicle).join('+');
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${speed}|${label}|${excursion}|${gpsKey}`;
+  const cached = BUS_ICON_CACHE.get(key);
+  if (cached) return cached;
+
+  const excursionHtml = excursion
+    ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
+    : '';
+  const hudHtml = fleetPinTelemetryHudHtml(vehicle, { escapeAttr });
+  const tall = Boolean(excursion || gpsBadge.heightBoost);
+  // HUD (~34px) sits between plate pill and avatar — bump Leaflet hit box.
+  const iconH = tall ? (gpsBadge.dual ? 156 : 148) : 110;
+  const anchorY = tall ? (gpsBadge.dual ? 120 : 112) : 74;
+  const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-10px);filter:drop-shadow(0 8px 18px rgba(15,23,42,.28))">
-      <div style="position:relative;width:52px;height:52px">
-        <div style="width:52px;height:52px;border-radius:50%;overflow:hidden;border:3px solid #f8fafc;background:#0f172a;box-shadow:0 0 0 2px #0f172a">
-          <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" />
-        </div>
-        <div style="position:absolute;inset:-4px;border-radius:50%;border:2px solid #facc15;pointer-events:none"></div>
-        <div style="position:absolute;left:50%;top:-2px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #facc15;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 30px"></div>
+    html: `<div class="fleet-apple-bus-pin">
+      ${gpsBadge.html}
+      ${excursionHtml}
+      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
+      ${hudHtml}
+      <div class="fleet-apple-bus-pin__ring">
+        <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
+        <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
-    iconSize: [52, 64],
-    iconAnchor: [26, 26],
+    iconSize: [52, iconH],
+    iconAnchor: [26, anchorY],
   });
+  BUS_ICON_CACHE.set(key, icon);
+  if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
+    const first = BUS_ICON_CACHE.keys().next().value;
+    BUS_ICON_CACHE.delete(first);
+  }
+  return icon;
 };
 
 function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
@@ -59,25 +107,29 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
         },
       }}
     >
-      <Tooltip direction="top" offset={[0, -28]} opacity={0.96} permanent>
-        <strong>{v.driver_name}</strong>
-        <br />
-        {v.bus_plate} · {Math.round(v.speed)} km/h
-      </Tooltip>
       <Popup>
-        <div style={{ minWidth: 180 }}>
+        <div className="fleet-apple-popup">
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
             <img
-              src={resolveFleetMarkerImage(v)}
+              src={resolveSiteAssetUrl(resolveFleetMarkerImage(v))}
               alt=""
-              style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }}
+              decoding="async"
+              style={{ width: 48, height: 48, borderRadius: 14, objectFit: 'cover' }}
             />
             <div>
-              <strong>{v.driver_name}</strong>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{v.bus_plate}</div>
+              <div className="fleet-apple-popup__title">{v.driver_name}</div>
+              <div className="fleet-apple-popup__meta">
+                {v.bus_plate}
+                {v.trip_title || v.trip_id ? ` · ${v.trip_title || `Εκδρομή #${v.trip_id}`}` : ''}
+              </div>
             </div>
           </div>
-          Ταχύτητα: {Math.round(v.speed)} km/h
+          Ταχύτητα: {formatSpeedKmh(v)} km/h
+          <br />
+          Κατεύθυνση: {formatHeadingLabel(v) || '—'}
+          <br />
+          Πηγή GPS: {formatFleetGpsSourceBadge(v) || '—'}
+          {resolveFleetGpsSources(v).length > 1 ? ' (και τα δύο ενεργά)' : ''}
           <br />
           Δρομολόγιο #{v.trip_id ?? '—'}
           <br />
@@ -117,15 +169,20 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
   ));
 }
 
-/** Fit only when the vehicle *set* changes or when parent requests recenter — never on GPS ticks. */
+/** Fit when the active pin *set* changes (or recenter) — zoom by pin count, never on GPS ticks. */
 function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
   const userMovedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
 
   useEffect(() => {
     const markMoved = () => {
+      if (programmaticRef.current) {
+        programmaticRef.current = false;
+        return;
+      }
       userMovedRef.current = true;
     };
     map.on('dragstart', markMoved);
@@ -138,7 +195,11 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
 
   useEffect(() => {
     if (!vehicles?.length) return;
-    const ids = vehicles
+    const pts = vehicles.filter(
+      (v) => Number.isFinite(Number(v.lat)) && Number.isFinite(Number(v.lng)),
+    );
+    if (!pts.length) return;
+    const ids = pts
       .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
       .sort()
       .join('|');
@@ -152,16 +213,25 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       return;
     }
     fittedIdsRef.current = ids;
-    const bounds = L.latLngBounds(vehicles.map((v) => [v.lat, v.lng]));
-    map.fitBounds(bounds, { padding: [56, 56], maxZoom: 14 });
+    const count = pts.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    programmaticRef.current = true;
+    if (count === 1) {
+      map.setView([pts[0].lat, pts[0].lng], maxZoom, { animate: true });
+      return;
+    }
+    const bounds = L.latLngBounds(pts.map((v) => [v.lat, v.lng]));
+    map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
   }, [vehicles, map, fitNonce]);
 
   return null;
 }
 
-/** Leaflet fallback — χωρίς Mapbox token. */
+/** Leaflet fallback — Apple-like soft basemap + ελληνικές ετικέτες. */
 export default function FleetLiveMapLeaflet({
   vehicles,
+  trailVehicles,
   center,
   heatmap = [],
   showHeat = false,
@@ -170,9 +240,12 @@ export default function FleetLiveMapLeaflet({
   sosAlerts = [],
   showGeofence = false,
   showSosPins = true,
+  showPlaces = true,
+  showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
+  onClearSos = null,
 }) {
   const fitPoints = useMemo(() => {
     const pts = vehicles.map((v) => ({ ...v, id: v.id || v.vehicle_id }));
@@ -180,16 +253,35 @@ export default function FleetLiveMapLeaflet({
     return pts;
   }, [vehicles, sosAlerts]);
 
+  // Blue trail only for vehicles with an active excursion (parent may pass a subset).
+  const trailSource = trailVehicles ?? vehicles;
+  const trails = useFleetVehicleTrails(trailSource, {
+    enabled: showTrails,
+    maxPoints: 3000,
+    minMoveM: 3,
+  });
+
   return (
-    <MapContainer center={center} zoom={7} className="h-full w-full" scrollWheelZoom>
+    <MapContainer
+      center={center}
+      zoom={6.4}
+      className="h-full w-full"
+      scrollWheelZoom
+      zoomControl={false}
+    >
       <TileLayer
-        attribution="© OpenStreetMap · © CARTO"
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        attribution={APPLE_LEAFLET_TILES.attribution}
+        url={APPLE_LEAFLET_TILES.url}
+        subdomains={APPLE_LEAFLET_TILES.subdomains}
+        maxZoom={APPLE_LEAFLET_TILES.maxZoom}
       />
+      <ZoomControl position="bottomright" />
+      <GreecePlacesLeafletLayer visible={showPlaces} />
       <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
-      <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
+      <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
+      <FleetSosPins alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
       <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </MapContainer>
