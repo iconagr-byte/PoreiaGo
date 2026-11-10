@@ -420,6 +420,19 @@ async def _login_office_tenant(request: Request) -> str | None:
     return None
 
 
+async def _login_office_tenant(request: Request) -> str | None:
+    """Host / middleware office for this /driver login (None on bare platform host)."""
+    tid = getattr(request.state, "tenant_id", None)
+    if tid:
+        return str(tid)
+    try:
+        from api.request_tenant import public_tenant_id
+
+        return await public_tenant_id(request, allow_demo_fallback=False)
+    except Exception:
+        return None
+
+
 @router.post("/session/login", response_model=DriverSessionResponse)
 async def login_with_password(request: Request, body: DriverLoginBody):
     """
