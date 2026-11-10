@@ -369,6 +369,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         block: 'start',
       });
     });
+    setTestResult(null);
+    setPasswordVisible(false);
   };
 
   const runTest = async () => {
