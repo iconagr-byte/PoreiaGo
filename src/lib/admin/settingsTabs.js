@@ -34,7 +34,14 @@ export const PLATFORM_OPERATOR_TABS = [
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
-  { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
+  {
+    id: 'growth',
+    label: 'Growth',
+    icon: 'hub',
+    section: 'platform',
+    accent: 'rose',
+    description: 'Partner webhooks και εργαλεία ανάπτυξης',
+  },
 ];
 
 /** Όλες οι καρτέλες ρυθμίσεων για super admin στο Back Office. */
