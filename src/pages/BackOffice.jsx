@@ -35,6 +35,7 @@ import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
 import SettingsHub from '../components/admin/SettingsHub.jsx';
 import AddCustomerModal from '../components/admin/AddCustomerModal.jsx';
 import CustomersCrmPanel from '../components/admin/CustomersCrmPanel.jsx';
+import CustomerRegistrationsPanel from '../components/admin/CustomerRegistrationsPanel.jsx';
 import AdminMobileNavDrawer from '../components/admin/AdminMobileNavDrawer.jsx';
 import { canRecordCashPayment } from '../lib/bookingDisplay.js';
 import { recordCashPayment } from '../lib/ticketing/bookingStore.js';
@@ -3048,6 +3049,11 @@ export default function BackOffice() {
                     setActiveTab('customers');
                   }}
                 />
+              </AdminMenuFade>
+            )}
+            {activeTab === 'wallet_registrations' && (
+              <AdminMenuFade panelKey="wallet-registrations">
+                <CustomerRegistrationsPanel />
               </AdminMenuFade>
             )}
             {activeTab === 'email' && (
