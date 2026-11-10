@@ -2,7 +2,9 @@ import { API_BASE } from '../config/api.js';
 import { adminAuthHeaders } from './adminApi.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
-const DEVICE_KEY = import.meta.env.VITE_TELEMETRY_DEVICE_KEY || 'dev-gps-key';
+const DEVICE_KEY =
+  import.meta.env.VITE_TELEMETRY_DEVICE_KEY ||
+  (import.meta.env.PROD ? '' : 'dev-gps-key');
 
 export async function postTelemetryUpdate(payload) {
   const res = await fetch(`${API_BASE}/telemetry/update`, {
@@ -30,8 +32,11 @@ export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
   }
   // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
   if (authHeaders?.Authorization) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail || `Αποτυχία live στόλου (${res.status})`;
+    const err = new Error(typeof detail === 'string' ? detail : `Αποτυχία live στόλου (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   return getMockFleet();
 }
@@ -178,10 +183,13 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   fuel_price_eur_per_liter: 1.85,
   gforce_spike_threshold_g: 0.45,
   prefer_tracker_events: true,
-  eta_refresh_seconds: 300,
-  eta_ws_push_seconds: 30,
+  eta_refresh_seconds: 1,
+  eta_ws_push_seconds: 1,
   driver_stale_seconds: 90,
   google_maps_configured: false,
+  fleet_digest_enabled: true,
+  fleet_digest_email_enabled: true,
+  fleet_digest_sms_enabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'aerostride_telemetry_settings';
@@ -228,16 +236,48 @@ export async function updateTelemetrySettings(patch, authHeaders = adminAuthHead
   }
 }
 
+export async function sendFleetDigest({ days = 1 } = {}, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/fleet-digest/send?days=${encodeURIComponent(days)}`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία αποστολής digest');
+  }
+  return data;
+}
+
 export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = adminAuthHeaders()) {
   try {
     const res = await fetch(`${API_BASE}/api/admin/telemetry/alerts?limit=${limit}`, {
       headers: authHeaders,
     });
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
   } catch {
-    /* offline */
+    /* ignore — fall through */
   }
-  return getMockAlerts();
+  // Never inject demo ROUTE_DEVIATION («120m εκτός διαδρόμου») into real offices.
+  // That mock leaked into every γραφείο via a shared session inbox.
+  return [];
+}
+
+/** Office dismisses driver SOS — pin leaves the live map. */
+export async function clearTelemetryAlert(alertId, authHeaders = adminAuthHeaders()) {
+  const id = String(alertId || '').trim();
+  if (!id) throw new Error('Λείπει alert id');
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/alerts/${encodeURIComponent(id)}/clear`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία απενεργοποίησης συναγερμού');
+  }
+  return data;
 }
 
 export async function compareTripRoutes(tripA, tripB, { limit = 5000 } = {}, authHeaders = adminAuthHeaders()) {
@@ -274,6 +314,29 @@ export async function fetchTripRoute(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.detail || 'Αποτυχία φόρτωσης διαδρομής');
+  }
+  return data;
+}
+
+/** Full vehicle GPS history (Teltonika / driver) — works without trip_id. */
+export async function fetchVehicleRoute(
+  vehicleId,
+  { from, to, vehicleCode, limit = 5000 } = {},
+  authHeaders = adminAuthHeaders(),
+) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (vehicleCode) params.set('vehicle_code', String(vehicleCode));
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/vehicles/${encodeURIComponent(vehicleId)}/route${qs ? `?${qs}` : ''}`,
+    { headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία φόρτωσης ιστορικού οχήματος');
   }
   return data;
 }
@@ -345,22 +408,6 @@ export async function downloadTripRouteExport(
   URL.revokeObjectURL(url);
 }
 
-function getMockAlerts() {
-  const now = new Date().toISOString();
-  return [
-    {
-      id: 'mock-1',
-      alert_type: 'ROUTE_DEVIATION',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      vehicle_id: 'demo-vehicle-1',
-      trip_id: 1,
-      message: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
-      metadata: { distance_outside_m: 120, buffer_m: 75 },
-      created_at: now,
-    },
-  ];
-}
-
 function getMockFleet() {
   return [
     {
@@ -386,4 +433,63 @@ function getMockFleet() {
       idle_seconds_trip: 420,
     },
   ];
+}
+
+async function parseAdminError(res) {
+  const err = await res.json().catch(() => ({}));
+  const detail = err.detail;
+  if (typeof detail === 'string') throw new Error(detail);
+  throw new Error(err.message || `HTTP ${res.status}`);
+}
+
+export async function fetchTeltonikaStatus(authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/status`, {
+    headers: authHeaders,
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function fetchTeltonikaDevices(authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/devices`, {
+    headers: authHeaders,
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function createTeltonikaDevice(body, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/devices`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function deleteTeltonikaDevice(deviceId, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/teltonika/devices/${encodeURIComponent(deviceId)}`,
+    { method: 'DELETE', headers: authHeaders },
+  );
+  if (!res.ok && res.status !== 204) await parseAdminError(res);
+}
+
+/** Admin test: place a GPS pin for a bound Teltonika IMEI on the live fleet map. */
+export async function testPingTeltonikaDevice(
+  deviceId,
+  body = {},
+  authHeaders = adminAuthHeaders(),
+) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/teltonika/devices/${encodeURIComponent(deviceId)}/test-ping`,
+    {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    },
+  );
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
 }
