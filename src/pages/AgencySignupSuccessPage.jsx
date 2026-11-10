@@ -34,17 +34,18 @@ export default function AgencySignupSuccessPage() {
             </p>
             <ol className="list-decimal list-inside space-y-1">
               <li>Περιμένετε 10–30 δευτ. για provisioning (webhook Stripe)</li>
-              <li>Συνδεθείτε με το admin email της εγγραφής</li>
-              <li>Χρησιμοποιήστε τον subdomain ως κωδικό γραφείου αν ζητηθεί</li>
+              <li>Συνδεθείτε στο /admin/login με το admin email της εγγραφής</li>
+              <li>Ξεκινήστε στο PoreiaGo · το δικό σας domain το βάζετε μετά από τον οδηγό</li>
             </ol>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               to="/admin/login"
+              state={{ officeSetup: true, activeTab: 'dashboard' }}
               className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-primary text-white font-bold text-sm hover:opacity-90"
             >
-              Σύνδεση Control Panel
+              Σύνδεση & ρύθμιση γραφείου
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </Link>
             <Link

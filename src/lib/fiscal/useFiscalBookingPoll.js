@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { fetchAdminBooking } from '../../services/adminBookingsApi.js';
 import { bookingFiscalReceipts, bookingFiscalStatus } from './fiscalDisplay.js';
 
-const POLL_MS = 4000;
+const POLL_MS = 5000;
 const MAX_POLLS = 30;
 
 function hasPendingFiscal(booking) {
