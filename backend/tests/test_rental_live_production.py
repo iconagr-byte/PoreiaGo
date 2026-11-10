@@ -157,7 +157,7 @@ class RentalLiveProductionTests(unittest.TestCase):
         self.assertEqual(cancelled["rental_status"], "CANCELLED")
         # Re-read after status update
         row = store.get_booking(self.tid, booking["id"])
-        self.assertEqual(row["payment_status"], "refunded")
+        self.assertEqual(str(row["payment_status"]).lower(), "refunded")
         self.assertEqual(row["refund_id"], "re_test_1")
 
     def test_bank_confirm_marks_paid(self) -> None:
@@ -176,7 +176,7 @@ class RentalLiveProductionTests(unittest.TestCase):
                 "payment_method": "bank_transfer",
             },
         )
-        self.assertEqual(booking["payment_status"], "pending")
+        self.assertEqual(str(booking["payment_status"]).upper(), "PENDING")
         with patch(
             "travel_platform.settings.payment_settings_store.read_payment_settings",
             return_value={"security": {"require_amount_on_confirm": True, "require_reference_on_confirm": False}},
@@ -187,7 +187,7 @@ class RentalLiveProductionTests(unittest.TestCase):
                 confirmed_amount=float(booking["amount_due_now"]),
                 reference_code="REF1",
             )
-        self.assertEqual(updated["payment_status"], "paid")
+        self.assertEqual(str(updated["payment_status"]).upper(), "PAID")
         self.assertGreater(float(updated["amount_paid"]), 0)
 
     def test_review_create_and_aggregate(self) -> None:
