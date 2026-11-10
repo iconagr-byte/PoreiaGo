@@ -1,3 +1,5 @@
+import { galleryForDemoTrip } from './demoTripGalleries.js';
+
 export const mockTrips = [
   {
     id: 1,
@@ -13,6 +15,7 @@ export const mockTrips = [
     vehiclePlate: 'XAH-4021',
     vehicleCode: 'XAH-4021',
     image: '/images/meteora.png',
+    images: galleryForDemoTrip('meteora'),
     hook: 'Ανακαλύψτε τη μαγεία των βράχων',
     description: 'Μια μαγευτική διαδρομή από την πρωτεύουσα προς τα επιβλητικά Μετέωρα. Απολαύστε το ταξίδι σας με την άνεση του Luxury Coach μας, με δωρεάν Wi-Fi και αναπαυτικά καθίσματα.',
     stops: [
@@ -34,6 +37,7 @@ export const mockTrips = [
     vehiclePlate: 'YZA-9901',
     vehicleCode: 'YZA-9901',
     image: '/images/athens.png',
+    images: galleryForDemoTrip('athens'),
     hook: 'Ταξίδι Express στην πρωτεύουσα',
     description: 'Express δρομολόγιο που συνδέει τη Θεσσαλονίκη με την Αθήνα. Γρήγορο, ασφαλές και ξεκούραστο ταξίδι με το Premium Express στόλο μας.',
     stops: [
@@ -55,6 +59,7 @@ export const mockTrips = [
     vehiclePlate: 'XAH-4022',
     vehicleCode: 'XAH-4022',
     image: '/images/ioannina.png',
+    images: galleryForDemoTrip('ioannina'),
     hook: 'Απόδραση στη μαγευτική λίμνη',
     description: 'Ταξιδέψτε από τη δυτική πύλη της Ελλάδας, την Πάτρα, προς την Ήπειρο. Απολαύστε τη διαδρομή μέσω της Ιόνιας Οδού.',
     stops: [
@@ -76,7 +81,8 @@ export const mockTrips = [
     availableSeats: 18,
     driverName: 'Γιώργος Γεωργίου',
     vehiclePlate: 'YZA-9901',
-    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1200&q=80',
+    image: '/images/demo/paris-1.jpg',
+    images: galleryForDemoTrip('paris'),
     hook: 'Άφιξη στην πιο γοητευτική πρωτεύουσα της Ευρώπης',
     description:
       'Διεθνές δρομολόγιο από την Ελλάδα προς το Παρίσι. Άνεση Premium Express, στάσεις ανάπαυσης και άφιξη κέντρου.',
@@ -100,7 +106,8 @@ export const mockTrips = [
     availableSeats: 24,
     driverName: 'Νίκος Παπαδόπουλος',
     vehiclePlate: 'XAH-4021',
-    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1200&q=80',
+    image: '/images/demo/rome-1.jpg',
+    images: galleryForDemoTrip('rome'),
     hook: 'Ιστορία, κουζίνα & άνεση σε ένα ταξίδι',
     description:
       'Ταξίδι προς την Αιώνια Πόλη με Luxury Coach. Διαδρομή μέσω Αδριατικής με ελεγχόμενες στάσεις και VIP θέσεις.',
@@ -123,7 +130,9 @@ export const mockTrips = [
     availableSeats: 20,
     driverName: 'Ανδρέας Ανδρέου',
     vehiclePlate: 'XAH-4022',
-    image: 'https://images.unsplash.com/photo-1541849543477-7ddc1d1e8f4e?w=1200&q=80',
+    // Charles Bridge / Prague old town
+    image: '/images/demo/prague-1.jpg',
+    images: galleryForDemoTrip('prague_vienna'),
     hook: 'Δύο κορυφαίες ευρωπαϊκές πρωτεύουσες, ένα ταξίδι',
     description:
       'Οργανωμένη εκδρομή προς Κεντρική Ευρώπη. Πράγα και Βιέννη με ίδιο άνετο coach και επιλογή θέσης.',

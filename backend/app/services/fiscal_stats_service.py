@@ -7,11 +7,18 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import apply_tenant_rls
 from app.models.fiscal_invoice import FiscalInvoice, FiscalInvoiceStatus
+
+
+def _not_abandoned():
+    return or_(
+        FiscalInvoice.metadata_json.is_(None),
+        ~FiscalInvoice.metadata_json.contains({"abandoned": True}),
+    )
 
 
 def _pct(numerator: int, denominator: int) -> float | None:
@@ -98,6 +105,7 @@ class FiscalStatsService:
             ).where(
                 FiscalInvoice.tenant_id == tenant_id,
                 FiscalInvoice.created_at >= window_start,
+                _not_abandoned(),
             ),
         )
         row = result.one()
@@ -145,6 +153,7 @@ class FiscalStatsService:
                     (FiscalInvoiceStatus.PENDING, FiscalInvoiceStatus.QUEUED),
                 ),
                 FiscalInvoice.updated_at <= cutoff,
+                _not_abandoned(),
             ),
         )
         stuck_candidates = int(stuck_result.scalar() or 0)
@@ -159,6 +168,7 @@ class FiscalStatsService:
                         FiscalInvoiceStatus.FAILED,
                     ),
                 ),
+                _not_abandoned(),
             ),
         )
         oldest_open = oldest_result.scalar()

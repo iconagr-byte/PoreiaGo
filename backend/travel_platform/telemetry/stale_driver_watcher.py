@@ -12,6 +12,8 @@ SWEEP_INTERVAL_SEC = 15
 
 
 async def _handle_stale_session(session: dict) -> None:
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+    from travel_platform.telemetry.driver_gps_heartbeat import clear_driver_gps
     from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
     from travel_platform.telemetry.fleet_metrics import record_stale_offline
     from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
@@ -21,12 +23,28 @@ async def _handle_stale_session(session: dict) -> None:
     record_stale_offline(tenant_id)
     driver_id = str(session.get("sub") or session.get("driver_id") or "driver")
     trip_id = session.get("trip_id")
+
     removed: list[str] = []
-    if driver_id:
+    if tenant_id and driver_id:
         try:
-            removed = await get_live_fleet().remove_driver_vehicles(tenant_id, driver_id)
+            removed = await get_live_fleet().remove_driver_vehicles(
+                tenant_id,
+                driver_id,
+                extra_tenant_ids=[DEFAULT_TENANT],
+            )
         except Exception:
+            logger.exception(
+                "stale remove_driver_vehicles failed tenant=%s driver=%s",
+                tenant_id,
+                driver_id,
+            )
             removed = []
+
+    try:
+        clear_driver_gps(session)
+    except Exception:
+        pass
+
     payload = {
         "type": "fleet_driver_offline",
         "tenant_id": tenant_id,
