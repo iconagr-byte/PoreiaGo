@@ -104,6 +104,7 @@ export default function SOSButton() {
       requestDriverGpsKeepalive();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αναφοράς');
+      requestDriverGpsKeepalive();
     }
   };
 
