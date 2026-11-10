@@ -139,10 +139,8 @@ export default function DriversManagementPanel() {
             Λογαριασμοί οδηγών
           </h3>
           <p className="mt-1 text-[14px] text-zinc-500 tracking-tight max-w-lg">
-            Email και κωδικός για είσοδο στο /driver. Ο Αχιλλέας (
-            <span className="font-medium text-zinc-700">axilleas0@yahoo.gr</span>) ανήκει στο{' '}
-            <span className="font-medium text-zinc-700">Achillio Travel</span> — όχι στο γραφείο
-            PoreiaGo platform.
+            Email και κωδικός για είσοδο στο /driver. Ο Αχιλλέας ανήκει στο PoreiaGo —
+            αν η λίστα είναι άδεια, κάντε ανανέωση μετά το deploy.
           </p>
         </div>
         <button

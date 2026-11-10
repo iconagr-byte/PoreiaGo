@@ -7,6 +7,7 @@ import {
   loadCachedBranding,
   platformDocumentTitle,
   purgeLegacyBrandingCache,
+  syncDocumentMetaTitle,
   tenantDocumentTitle,
 } from '../lib/branding/applyBranding.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
@@ -21,12 +22,22 @@ export default function BrandingBoot() {
     const cached = loadCachedBranding();
 
     if (onTenant) {
-      document.title = tenantDocumentTitle(cached?.display_name, host);
+      // Never leave PoreiaGo in the tab/SERP on Achillio (or any office domain).
+      syncDocumentMetaTitle(tenantDocumentTitle(cached?.display_name, host));
       if (cached) applyBrandingToDocument(cached);
     } else {
-      document.title = platformDocumentTitle();
+      syncDocumentMetaTitle(platformDocumentTitle());
       if (cached && !isPlatformMarketingHost(host)) applyBrandingToDocument(cached);
     }
+
+    // Prefer server SEO payload (same source Googlebot sees via seo-shell).
+    fetch(`/api/site/seo?host=${encodeURIComponent(host)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((seo) => {
+        if (!seo?.title) return;
+        syncDocumentMetaTitle(seo.title, seo.description || '');
+      })
+      .catch(() => {});
 
     fetchBranding(host)
       .then((branding) => {
@@ -53,15 +64,15 @@ export default function BrandingBoot() {
       })
       .catch(async () => {
         if (!onTenant) {
-          document.title = platformDocumentTitle();
+          syncDocumentMetaTitle(platformDocumentTitle());
           return;
         }
         try {
           const appearance = await fetchSiteAppearance(host);
           const name = appearance?.footer_brand_name || appearance?.display_name || '';
-          document.title = tenantDocumentTitle(name, host);
+          syncDocumentMetaTitle(tenantDocumentTitle(name, host));
         } catch {
-          document.title = tenantDocumentTitle(cached?.display_name, host);
+          syncDocumentMetaTitle(tenantDocumentTitle(cached?.display_name, host));
         }
       });
   }, []);

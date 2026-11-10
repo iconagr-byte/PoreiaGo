@@ -6,7 +6,7 @@ import {
   paymentStyle,
 } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
-import StaticTicketQr from '../StaticTicketQr.jsx';
+import PersonalTicketPassList from '../booking/PersonalTicketPass.jsx';
 
 export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicket }) {
   const pay = parsePaymentMethod(booking);
@@ -117,13 +117,12 @@ export default function CustomerBookingCard({ booking, onOpenDetail, onViewTicke
           </div>
 
           {booking.boardingPassIssued && (
-            <div className="lg:col-span-2 flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-sky-50">
-              <StaticTicketQr booking={booking} size={120} />
-              <div className="text-center sm:text-left">
-                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Εισιτήριο</p>
-                <p className="font-mono font-bold text-lg tracking-widest text-slate-900">{pnr}</p>
-                <p className="text-xs text-slate-500 mt-1">Σκανάρετε κατά την επιβίβαση</p>
-              </div>
+            <div className="lg:col-span-2 rounded-[22px] border border-black/[0.05] bg-[#f5f5f7] p-4 sm:p-5">
+              <PersonalTicketPassList
+                booking={booking}
+                compact
+                brandLabel="Boarding pass"
+              />
             </div>
           )}
 
