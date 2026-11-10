@@ -21,12 +21,14 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 from travel_platform.settings.backup_service import (
-    BACKUP_DIR,
-    create_backup,
+    create_database_backup,
+    create_office_backup,
+    create_office_database_backup,
+    create_platform_backup,
     delete_backup,
     list_backups,
-    read_backup,
-    restore_backup,
+    resolve_backup_path,
+    restore_backup_async,
 )
 from travel_platform.settings.platform_store import get_platform_config, update_platform_config
 from travel_platform.settings.drivers_store import (
@@ -47,6 +49,7 @@ from travel_platform.settings.users_store import (
 )
 from travel_platform.fleet.service_service import UPLOAD_DIR, service_service
 from schemas.platform_admin import (
+    BackupCreateRequest,
     BackupCreateResponse,
     BackupInfoResponse,
     BackupRestoreResponse,
@@ -74,6 +77,7 @@ from schemas.platform_admin import (
     TripSyncItem,
     TripsSyncRequest,
     TripsSyncResponse,
+    TripsListResponse,
     FleetCostReportResponse,
     FleetDepreciationResponse,
     MaintenanceEventCreate,
@@ -83,6 +87,11 @@ from schemas.platform_admin import (
     PlatformUserCreate,
     PlatformUserResponse,
     PlatformUserUpdate,
+    AdminPasswordResetSendByUser,
+    AdminPasswordResetSendByEmail,
+    AdminPasswordResetRequestPublic,
+    AdminPasswordResetConfirm,
+    AdminPasswordResetSendResponse,
     VehicleCreate,
     VehicleProfileResponse,
     VehicleUpdate,
@@ -137,6 +146,7 @@ def _request_tenant_id(request: Request) -> str:
     Prefer request.state.tenant_id (set by DomainTenant + JWT middleware).
     Fall back to Bearer JWT tenant_id so creates never silently land in the
     demo office when Host is the platform domain.
+    Production fail-closes instead of returning DEMO_TENANT_ID.
     """
     tid = getattr(request.state, "tenant_id", None)
     if tid:
@@ -157,30 +167,72 @@ def _request_tenant_id(request: Request) -> str:
                         return str(raw)
             except Exception:
                 pass
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if env in ("production", "prod"):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="tenant context required")
     return DEMO_TENANT_ID
 
 
-def _driver_for_tenant(driver_id: str, tenant_id: str):
-    """Resolve driver for office — includes non-seed DEMO legacy rows."""
+def _driver_for_tenant(
+    driver_id: str,
+    tenant_id: str,
+    *,
+    allow_demo_legacy: bool = False,
+):
+    """Resolve driver for office — DEMO orphans only when claim is allowed."""
     d = get_driver(driver_id)
-    if not driver_visible_to_office(d, tenant_id):
+    if not driver_visible_to_office(d, tenant_id, allow_demo_legacy=allow_demo_legacy):
         return None
     return d
 
 
-def _host_looks_like_achillio(request: Request | None) -> bool:
-    """True when the admin Host is Achillio Travel (custom domain / subdomain)."""
+def _normalize_request_host(value: str | None) -> str:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return ""
+    if "://" in raw:
+        try:
+            from urllib.parse import urlparse
+
+            raw = urlparse(raw).hostname or ""
+        except Exception:
+            raw = raw.split("/")[0]
+    raw = raw.split(",")[0].strip()
+    raw = raw.split(":")[0].strip().removeprefix("www.")
+    return raw
+
+
+def _trusted_proxy_hosts(request: Request | None) -> list[str]:
+    """
+    Hostnames from the reverse proxy only — never client-spoofable
+    X-Poreiago-Office-Host / Origin / Referer.
+    """
     if request is None:
-        return False
-    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
-    host = host.removeprefix("www.")
-    if not host:
-        return False
-    if "achilliotravel" in host or host.endswith(".achillio.gr") or host == "achillio.gr":
-        return True
-    # Local / preview hosts used for the Achillio office.
-    if host.startswith("admin-achillio"):
-        return True
+        return []
+    headers = request.headers
+    candidates = [
+        headers.get("x-forwarded-host"),
+        headers.get("host"),
+    ]
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        host = _normalize_request_host(raw)
+        if host and host not in seen:
+            seen.add(host)
+            out.append(host)
+    return out
+
+
+def _host_looks_like_achillio(request: Request | None) -> bool:
+    """True when the proxied Host is Achillio Travel (custom domain / subdomain)."""
+    for host in _trusted_proxy_hosts(request):
+        if "achilliotravel" in host or host.endswith(".achillio.gr") or host == "achillio.gr":
+            return True
+        if host.startswith("admin-achillio"):
+            return True
     return False
 
 
@@ -207,48 +259,187 @@ async def _tenant_is_achillio_office(tenant_id: str) -> bool:
         return False
 
 
+async def _tenant_is_poreiago_platform(tenant_id: str) -> bool:
+    """DB lookup — PoreiaGo platform / Master office (slug achillio seed, etc.)."""
+    tid = str(tenant_id or "").strip()
+    if not tid or tid == str(DEMO_TENANT_ID):
+        return False
+    try:
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_poreiago_platform_office
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+            tenant = result.scalar_one_or_none()
+            return bool(tenant and is_poreiago_platform_office(tenant))
+    except Exception:
+        logger.debug("PoreiaGo platform lookup failed for %s", tid, exc_info=True)
+        return False
+
+
+async def _resolve_achillio_tenant_id_from_request(request: Request | None) -> str | None:
+    """Map Achillio custom-domain Host → office tenant UUID (proxy Host only)."""
+    if request is None or not _host_looks_like_achillio(request):
+        return None
+    try:
+        from middleware.domain_tenant import _resolve_host_cached
+
+        for host in _trusted_proxy_hosts(request):
+            if not host or host.startswith("api."):
+                continue
+            resolved = await _resolve_host_cached(host)
+            if resolved and getattr(resolved, "tenant_id", None):
+                return str(resolved.tenant_id)
+            if not host.startswith("www."):
+                resolved = await _resolve_host_cached(f"www.{host}")
+                if resolved and getattr(resolved, "tenant_id", None):
+                    return str(resolved.tenant_id)
+    except Exception:
+        logger.debug("Achillio host→tenant resolve failed", exc_info=True)
+    return None
+
+
+async def _office_may_claim_demo_legacy(tenant_id: str) -> tuple[bool, bool]:
+    """
+    SEAL: DEMO include/claim is permanently disabled.
+
+    Cross-office driver theft via DEMO claim must never happen again.
+    ``tenant_id`` kept for call-site compatibility.
+    """
+    del tenant_id
+    return False, False
+
+
 async def _demo_legacy_flags(
     tenant_id: str,
     request: Request | None = None,
 ) -> tuple[bool, bool]:
-    """
-    (include, claim) for DEMO-tenant drivers that are not seed demos.
+    """Backward-compatible wrapper — Host headers must not grant claim alone."""
+    del request  # never authorize from client-controlled Host/Origin
+    return await _office_may_claim_demo_legacy(tenant_id)
 
-    Achillio Travel (custom domain Host / platform tenant / Achillio office JWT)
-    may see + permanently claim them. Other SaaS offices stay strictly scoped.
+
+def _request_is_platform_host(request: Request | None) -> bool:
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+
+        return bool(_is_platform_host(_request_host(request)))
+    except Exception:
+        return False
+
+
+def _request_is_impersonating(request: Request | None) -> bool:
+    if request is None:
+        return False
+    if bool(getattr(request.state, "impersonating", False)):
+        return True
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return False
+    try:
+        import jwt
+        from middleware.tenant import _jwt_settings
+
+        secret, algorithm, _ = _jwt_settings()
+        if not secret:
+            return False
+        payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+        return bool(payload.get("impersonating"))
+    except Exception:
+        return False
+
+
+async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
     """
-    tid = str(tenant_id or "").strip()
-    if not tid or tid == str(DEMO_TENANT_ID):
-        return False, False
+    Tenant + legacy flags for driver CRUD / list.
+
+    Isolation rules:
+    1. Achillio Travel Host → Achillio office only (never PoreiaGo drivers).
+    2. www.poreiago.com → canonical PoreiaGo platform drivers for DEMO /
+       Achillio JWT / platform JWT (so Achilleas is never «missing»).
+    3. Real customer-office JWT otherwise wins — never switch via spoofable headers.
+    4. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
+    5. DEMO legacy claim permanently disabled.
+    """
+    jwt_tid = str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
+    impersonating = _request_is_impersonating(request)
+
+    # Achillio Travel URL — drivers for that office only.
+    if _host_looks_like_achillio(request):
+        host_tid = await _resolve_achillio_tenant_id_from_request(request)
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
+            return host_tid, False, False
+
+    # www.poreiago.com — always list the canonical platform drivers for Master
+    # / DEMO / Achillio sessions so Achilleas (home on PoreiaGo) is visible.
+    if _request_is_platform_host(request) and not impersonating:
+        from middleware.domain_tenant import _request_host
+        from travel_platform.settings.office_host_guard import (
+            host_is_platform_marketing,
+            host_is_shared_api,
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        host = _request_host(request)
+        if (
+            host
+            and not host_is_shared_api(host)
+            and host_is_platform_marketing(host, is_platform_host=True)
+        ):
+            use_platform = (
+                jwt_tid == str(DEMO_TENANT_ID)
+                or await _tenant_is_achillio_office(jwt_tid)
+                or await _tenant_is_poreiago_platform(jwt_tid)
+            )
+            if use_platform:
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    if platform_tid != jwt_tid:
+                        logger.info(
+                            "Drivers list on PoreiaGo host: JWT %s → platform %s",
+                            jwt_tid,
+                            platform_tid,
+                        )
+                    return str(platform_tid), False, False
+
+    if jwt_tid != str(DEMO_TENANT_ID):
+        include, claim = await _office_may_claim_demo_legacy(jwt_tid)
+        return jwt_tid, include, claim
 
     if _host_looks_like_achillio(request):
-        return True, True
+        host_tid = await _resolve_achillio_tenant_id_from_request(request)
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
+            return host_tid, False, False
 
-    platform_tid = ""
-    try:
-        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+    return jwt_tid, False, False
 
-        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
-    except Exception:
-        logger.debug("resolve_platform_tenant_id failed for drivers list", exc_info=True)
 
-    if platform_tid and tid == platform_tid:
-        return True, True
+async def _fleet_tenant_id(request: Request) -> str:
+    """
+    Office scope for fleet CRUD / list (Διαχείριση Στόλου).
 
-    if await _tenant_is_achillio_office(tid):
-        return True, True
-
-    if platform_tid:
-        # Known multi-office deploy — do not leak Achilleas to PoreiaGo/etc.
-        return False, False
-
-    # DB unavailable / single-office deploy — recover Achilleas-style orphans.
-    return True, True
+    Achillio Travel Host → Achillio office UUID so DEMO / stale JWT recovery
+    matches the public ``/api/site/fleet?host=www.achilliotravel.com`` showcase
+    the office already published. Otherwise JWT / DomainTenant.
+    """
+    if _host_looks_like_achillio(request):
+        host_tid = await _resolve_achillio_tenant_id_from_request(request)
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
+            return str(host_tid)
+    return str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
 
 
 def _user_response(u) -> PlatformUserResponse:
+    # In-memory PlatformUser or dict from Postgres adapter
+    if isinstance(u, dict):
+        return PlatformUserResponse(**u)
     return PlatformUserResponse(
-        id=u.id,
+        id=u.id if isinstance(u.id, str) else str(u.id),
         email=u.email,
         name=u.name,
         role=u.role,
@@ -258,30 +449,66 @@ def _user_response(u) -> PlatformUserResponse:
     )
 
 
-@router.get("/settings", response_model=PlatformSettingsResponse)
-async def get_settings():
-    s = get_platform_config()
-    return PlatformSettingsResponse(**s.__dict__)
+def _parse_tenant_uuid(request: Request):
+    from uuid import UUID
 
-
-@router.patch("/settings", response_model=PlatformSettingsResponse)
-async def patch_settings(body: PlatformSettingsUpdate):
-    patch = body.model_dump(exclude_unset=True)
-    s = update_platform_config(patch)
-    if patch.get("checkout_base_url"):
-        from travel_platform.growth.branding_store import update_branding
-
-        update_branding("default", {"checkout_base_url": patch["checkout_base_url"]})
-    return PlatformSettingsResponse(**s.__dict__)
+    raw = str(_request_tenant_id(request) or "").strip()
+    if not raw:
+        return None
+    try:
+        return UUID(raw)
+    except ValueError:
+        return None
 
 
 @router.get("/users", response_model=list[PlatformUserResponse])
-async def get_users():
+async def get_users(request: Request, all_offices: bool = False):
+    """List backoffice users for the JWT tenant.
+
+    Superadmin may pass ``all_offices=1`` to get every office's staff,
+    each row labeled with ``tenant_id`` / ``tenant_name`` / ``tenant_slug``.
+    """
+    if all_offices:
+        _require_superadmin(request)
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import list_all_staff_users_with_tenants
+
+        async with AsyncSessionLocal() as db:
+            rows = await list_all_staff_users_with_tenants(db)
+            return [_user_response(r) for r in rows]
+
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import list_tenant_users, user_to_platform_dict
+
+        async with AsyncSessionLocal() as db:
+            users = await list_tenant_users(db, tid)
+            return [_user_response(user_to_platform_dict(u)) for u in users]
     return [_user_response(u) for u in list_users()]
 
 
 @router.post("/users", response_model=PlatformUserResponse, status_code=201)
-async def post_user(body: PlatformUserCreate):
+async def post_user(request: Request, body: PlatformUserCreate):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import create_tenant_user, user_to_platform_dict
+
+        try:
+            async with AsyncSessionLocal() as db:
+                u = await create_tenant_user(
+                    db,
+                    tenant_id=tid,
+                    email=body.email,
+                    name=body.name,
+                    role=body.role,
+                    password=body.password,
+                )
+                await db.commit()
+                return _user_response(user_to_platform_dict(u))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
     try:
         u = create_user(
             email=body.email,
@@ -295,7 +522,32 @@ async def post_user(body: PlatformUserCreate):
 
 
 @router.patch("/users/{user_id}", response_model=PlatformUserResponse)
-async def patch_user(user_id: str, body: PlatformUserUpdate):
+async def patch_user(request: Request, user_id: str, body: PlatformUserUpdate):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import update_tenant_user, user_to_platform_dict
+
+        try:
+            uid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        try:
+            async with AsyncSessionLocal() as db:
+                u = await update_tenant_user(
+                    db,
+                    tenant_id=tid,
+                    user_id=uid,
+                    patch=body.model_dump(exclude_unset=True),
+                )
+                await db.commit()
+                return _user_response(user_to_platform_dict(u))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
     try:
         u = update_user(user_id, body.model_dump(exclude_unset=True))
     except KeyError:
@@ -306,7 +558,27 @@ async def patch_user(user_id: str, body: PlatformUserUpdate):
 
 
 @router.delete("/users/{user_id}", status_code=204)
-async def remove_user(user_id: str):
+async def remove_user(request: Request, user_id: str):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import delete_tenant_user
+
+        try:
+            uid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        try:
+            async with AsyncSessionLocal() as db:
+                await delete_tenant_user(db, tenant_id=tid, user_id=uid)
+                await db.commit()
+            return Response(status_code=204)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
     try:
         delete_user(user_id)
     except KeyError:
@@ -315,17 +587,680 @@ async def remove_user(user_id: str):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+async def _send_reset_for_db_user(
+    user,
+    *,
+    include_reset_url: bool = False,
+    public_base: str | None = None,
+) -> AdminPasswordResetSendResponse:
+    from travel_platform.settings.admin_password_reset import (
+        build_reset_url,
+        create_reset_token,
+        send_admin_reset_email,
+    )
+
+    token = create_reset_token(
+        user_id=str(user.id),
+        tenant_id=str(user.tenant_id),
+        password_hash=user.password_hash,
+    )
+    reset_url = build_reset_url(token, public_base=public_base)
+    try:
+        await send_admin_reset_email(
+            to_email=user.email,
+            full_name=user.full_name or user.email,
+            reset_url=reset_url,
+        )
+        return AdminPasswordResetSendResponse(
+            ok=True,
+            message=f"Στάλθηκε σύνδεσμος επαναφοράς στο {user.email}",
+            email=user.email,
+            user_id=str(user.id),
+            tenant_id=str(user.tenant_id),
+        )
+    except Exception as exc:
+        logger.warning("admin password reset email failed for %s: %s", user.email, exc)
+        return AdminPasswordResetSendResponse(
+            ok=True,
+            message=(
+                "Το email απέτυχε. "
+                + (
+                    "Αντιγράψτε τον σύνδεσμο και στείλτε τον χειροκίνητα."
+                    if include_reset_url
+                    else "Ελέγξτε SMTP ή δοκιμάστε ξανά."
+                )
+            ),
+            email=user.email,
+            user_id=str(user.id),
+            tenant_id=str(user.tenant_id),
+            reset_url=reset_url if include_reset_url else None,
+        )
+
+
+def _require_password_reset_sender(request: Request) -> bool:
+    """tenant_admin or superadmin may send reset links. Returns is_superadmin."""
+    roles = {str(r).lower() for r in (getattr(request.state, "roles", None) or [])}
+    if "superadmin" in roles:
+        return True
+    if "tenant_admin" in roles:
+        return False
+    # Dev synthetic context without roles: treat as non-superadmin admin.
+    if os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes"):
+        env = (os.getenv("ENVIRONMENT") or "development").lower()
+        if env in ("development", "dev", "local", "test"):
+            return False
+    raise HTTPException(
+        status_code=403,
+        detail="Μόνο διαχειριστής γραφείου ή superadmin μπορεί να στείλει reset link",
+    )
+
+
+@router.post(
+    "/users/{user_id}/send-password-reset",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def send_user_password_reset(
+    request: Request,
+    user_id: str,
+    body: AdminPasswordResetSendByUser | None = None,
+):
+    """Office admin / superadmin: email a one-hour reset link for a backoffice user."""
+    _ = body  # reserved
+    is_sa = _require_password_reset_sender(request)
+    tid = _parse_tenant_uuid(request)
+    from uuid import UUID
+
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import get_user_any_tenant
+    from travel_platform.settings.users_db import get_tenant_user
+
+    try:
+        uid = UUID(user_id)
+    except ValueError:
+        uid = None
+    if uid is not None:
+        try:
+            async with AsyncSessionLocal() as db:
+                user = None
+                if tid is not None:
+                    user = await get_tenant_user(db, tid, uid)
+                # Superadmin list spans all offices — allow lookup by id alone.
+                if user is None and is_sa:
+                    user = await get_user_any_tenant(db, uid)
+                if user and user.is_active:
+                    result = await _send_reset_for_db_user(
+                        user, include_reset_url=is_sa
+                    )
+                    try:
+                        from travel_platform.settings.login_audit_store import (
+                            record_login_from_request,
+                        )
+
+                        record_login_from_request(
+                            request,
+                            actor_type="admin",
+                            identity=str(
+                                getattr(request.state, "email", None)
+                                or getattr(request.state, "sub", None)
+                                or "admin"
+                            ),
+                            success=True,
+                            method="password_reset_send",
+                            detail=f"reset_link_sent:{user.email}",
+                            tenant_id=str(user.tenant_id or tid or ""),
+                        )
+                    except Exception:
+                        pass
+                    return result
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("send-password-reset DB lookup failed: %s", exc)
+
+    from travel_platform.settings.admin_password_reset import memory_fallback_allowed
+
+    if not memory_fallback_allowed():
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # In-memory demo users (local/dev/test only)
+    from travel_platform.settings.admin_password_reset import (
+        build_reset_url,
+        create_reset_token,
+        send_admin_reset_email,
+    )
+    from travel_platform.settings.users_store import get_user
+
+    user = get_user(user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=404, detail="User not found")
+    token = create_reset_token(
+        user_id=user.id,
+        tenant_id="",
+        password_hash=user.password_hash,
+    )
+    reset_url = build_reset_url(token)
+    try:
+        await send_admin_reset_email(
+            to_email=user.email,
+            full_name=user.name,
+            reset_url=reset_url,
+        )
+        msg = f"Στάλθηκε σύνδεσμος επαναφοράς στο {user.email}"
+        url_out = None
+    except Exception as exc:
+        logger.warning("admin password reset email failed: %s", exc)
+        msg = "Το email απέτυχε — αντιγράψτε τον σύνδεσμο." if is_sa else "Το email απέτυχε."
+        url_out = reset_url if is_sa else None
+    return AdminPasswordResetSendResponse(
+        ok=True,
+        message=msg,
+        email=user.email,
+        user_id=user.id,
+        reset_url=url_out,
+    )
+
+
+@router.post(
+    "/password-reset/send",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def send_password_reset_by_email(
+    request: Request,
+    body: AdminPasswordResetSendByEmail,
+):
+    """Platform superadmin: send reset link by email (optionally scoped to a tenant)."""
+    _require_superadmin(request)
+    from uuid import UUID
+
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import find_users_by_email
+
+    email = str(body.email).strip().lower()
+    async with AsyncSessionLocal() as db:
+        users = await find_users_by_email(db, email)
+        if body.tenant_id:
+            try:
+                want = UUID(str(body.tenant_id).strip())
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Μη έγκυρο tenant_id") from None
+            users = [u for u in users if u.tenant_id == want]
+        active = [u for u in users if u.is_active]
+        if not active:
+            raise HTTPException(
+                status_code=404,
+                detail="Δεν βρέθηκε ενεργός λογαριασμός με αυτό το email",
+            )
+        if len(active) > 1:
+            from sqlalchemy import select
+
+            from app.models.tenant import Tenant
+
+            tenant_ids = {u.tenant_id for u in active if u.tenant_id}
+            labels: dict = {}
+            if tenant_ids:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[t.id] = {
+                        "tenant_name": t.legal_name,
+                        "tenant_slug": t.slug,
+                    }
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Το email υπάρχει σε περισσότερα γραφεία — επιλέξτε tenant_id",
+                    "matches": [
+                        {
+                            "user_id": str(u.id),
+                            "tenant_id": str(u.tenant_id),
+                            "tenant_name": (labels.get(u.tenant_id) or {}).get("tenant_name"),
+                            "tenant_slug": (labels.get(u.tenant_id) or {}).get("tenant_slug"),
+                            "name": u.full_name,
+                            "email": u.email,
+                        }
+                        for u in active
+                    ],
+                },
+            )
+        result = await _send_reset_for_db_user(active[0], include_reset_url=True)
+        try:
+            from travel_platform.settings.login_audit_store import record_login_from_request
+
+            record_login_from_request(
+                request,
+                actor_type="admin",
+                identity=str(
+                    getattr(request.state, "email", None)
+                    or getattr(request.state, "sub", None)
+                    or "superadmin"
+                ),
+                success=True,
+                method="password_reset_send",
+                detail=f"reset_link_sent:{active[0].email}",
+                tenant_id=str(active[0].tenant_id),
+            )
+        except Exception:
+            pass
+        return result
+
+
+@router.post(
+    "/password-reset/request",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def request_admin_password_reset_public(
+    request: Request,
+    body: AdminPasswordResetRequestPublic,
+):
+    """
+    Public forgot-password from office /admin/login.
+
+    Always returns a generic success message (no email enumeration).
+    Scopes to the tenant resolved from Host when on an office subdomain.
+    """
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import (
+        allow_request_attempt,
+        find_users_by_email,
+    )
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_request_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
+    generic = AdminPasswordResetSendResponse(
+        ok=True,
+        message="Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε οδηγίες επαναφοράς (έλεγχος και spam).",
+        email=None,
+        user_id=None,
+        tenant_id=None,
+    )
+
+    email = str(body.email).strip().lower()
+    if not email:
+        return generic
+
+    # Prefer explicit office host from the SPA (API Host is often api.*).
+    host = (
+        str(body.host or "").split(":")[0].strip().lower()
+        or (request.headers.get("origin") or "").replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].strip().lower()
+        or (request.headers.get("host") or "").split(":")[0].strip().lower()
+    )
+    public_base = None
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[
+        0
+    ].strip()
+    if host and host not in ("api.poreiago.com", "localhost", "127.0.0.1"):
+        public_base = f"{proto}://{host}"
+
+    tenant_id = None
+    try:
+        from olympus.tenant.domain_resolver import DomainResolver
+
+        async with AsyncSessionLocal() as db:
+            resolved = await DomainResolver(db).resolve(host)
+            if resolved and resolved.tenant_id:
+                tenant_id = resolved.tenant_id
+    except Exception as exc:
+        logger.warning("password-reset/request host resolve failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            users = await find_users_by_email(db, email)
+            active = [u for u in users if u.is_active]
+            if tenant_id is not None:
+                active = [u for u in active if u.tenant_id == tenant_id]
+            if len(active) != 1:
+                return generic
+            await _send_reset_for_db_user(
+                active[0],
+                include_reset_url=False,
+                public_base=public_base,
+            )
+    except Exception as exc:
+        logger.warning("password-reset/request failed for %s: %s", email, exc)
+    return generic
+
+
+@router.post("/password-reset/confirm")
+async def confirm_admin_password_reset(request: Request, body: AdminPasswordResetConfirm):
+    """Public: set a new backoffice password with a signed reset token."""
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import (
+        allow_confirm_attempt,
+        apply_password_reset,
+        fingerprints_match,
+        memory_fallback_allowed,
+        parse_reset_token,
+        password_fingerprint,
+        validate_new_admin_password,
+    )
+    from travel_platform.settings.users_store import get_user, update_user
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_confirm_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
+    try:
+        validate_new_admin_password(body.new_password)
+        parsed = parse_reset_token(body.token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Memory demo users (no tenant_id in token) — non-production only
+    if not parsed.get("tenant_id"):
+        if not memory_fallback_allowed():
+            raise HTTPException(status_code=400, detail="Μη έγκυρος σύνδεσμος επαναφοράς")
+        mem = get_user(parsed["user_id"])
+        if not mem or not mem.is_active:
+            raise HTTPException(status_code=400, detail="Μη έγκυρος σύνδεσμος επαναφοράς")
+        if not fingerprints_match(password_fingerprint(mem.password_hash), parsed["fingerprint"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί ή ο κωδικός άλλαξε",
+            )
+        try:
+            update_user(mem.id, {"password": body.new_password})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "email": mem.email, "message": "Ο κωδικός ενημερώθηκε"}
+
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await apply_password_reset(
+                db, token=body.token, new_password=body.new_password
+            )
+            await db.commit()
+            try:
+                from travel_platform.settings.login_audit_store import (
+                    record_login_from_request,
+                )
+
+                record_login_from_request(
+                    request,
+                    actor_type="admin",
+                    identity=user.email,
+                    success=True,
+                    method="password_reset_confirm",
+                    detail="password_changed_via_reset_link",
+                    tenant_id=str(user.tenant_id),
+                    actor_id=str(user.id),
+                    actor_name=user.full_name,
+                )
+            except Exception:
+                pass
+            return {
+                "ok": True,
+                "email": user.email,
+                "message": "Ο κωδικός ενημερώθηκε",
+            }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _settings_response_from_dict(data: dict) -> PlatformSettingsResponse:
+    fields = getattr(PlatformSettingsResponse, "model_fields", None) or getattr(
+        PlatformSettingsResponse, "__fields__", {}
+    )
+    return PlatformSettingsResponse(**{k: v for k, v in data.items() if k in fields})
+
+
+async def _office_uses_tenant_platform_settings(request: Request):
+    """
+    True for Achillio Travel + customer offices (Postgres only).
+
+    False for PoreiaGo platform — shared platform_settings.json is OK there.
+    """
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import (
+        is_achillio_travel_office,
+        is_poreiago_platform_office,
+    )
+
+    raw = str(_request_tenant_id(request) or "").strip()
+    if not raw:
+        return None
+    try:
+        tid = UUID(raw)
+    except ValueError:
+        return None
+    try:
+        async with AsyncSessionLocal() as db:
+            row = await db.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                return None
+            if is_achillio_travel_office(tenant):
+                return tid
+            if is_poreiago_platform_office(tenant):
+                return None
+            return tid
+    except Exception:
+        logger.debug("tenant platform settings resolve failed", exc_info=True)
+        return None
+
+
+@router.get("/settings", response_model=PlatformSettingsResponse)
+async def get_settings(request: Request):
+    from app.core.database import AsyncSessionLocal
+    from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
+
+    tid = await _office_uses_tenant_platform_settings(request)
+    if tid is not None:
+        try:
+            async with AsyncSessionLocal() as db:
+                data = await TenantPlatformSettingsService(db).get_settings(tid)
+                await db.commit()
+                return _settings_response_from_dict(data)
+        except Exception:
+            logger.debug("tenant platform settings get failed", exc_info=True)
+            from fastapi import HTTPException
+
+            raise HTTPException(
+                status_code=503,
+                detail="Αδυναμία φόρτωσης ρυθμίσεων γραφείου",
+            ) from None
+    s = get_platform_config()
+    return _settings_response_from_dict(s.__dict__)
+
+
+@router.patch("/settings", response_model=PlatformSettingsResponse)
+async def patch_settings(request: Request, body: PlatformSettingsUpdate):
+    from app.core.database import AsyncSessionLocal
+    from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
+
+    patch = body.model_dump(exclude_unset=True)
+    tid = await _office_uses_tenant_platform_settings(request)
+    if tid is not None:
+        async with AsyncSessionLocal() as db:
+            data = await TenantPlatformSettingsService(db).update_settings(tid, patch)
+            await db.commit()
+            return _settings_response_from_dict(data)
+
+    # Shared file store — PoreiaGo platform only. Never write Achillio checkout
+    # into branding key "default".
+    checkout = str(patch.get("checkout_base_url") or "").strip().lower()
+    if "achilliotravel.com" in checkout:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Το checkout URL του Achillio Travel δεν αποθηκεύεται στις "
+                "κοινές ρυθμίσεις PoreiaGo"
+            ),
+        )
+    s = update_platform_config(patch)
+    if patch.get("checkout_base_url"):
+        from travel_platform.growth.branding_store import update_branding
+
+        update_branding("default", {"checkout_base_url": patch["checkout_base_url"]})
+    return _settings_response_from_dict(s.__dict__)
+
+
+@router.get("/trip-reminder")
+async def get_trip_reminder_settings(request: Request):
+    """Office settings for automatic pre-departure reminder emails."""
+    from travel_platform.settings.trip_reminder_store import read_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    return read_trip_reminder_settings(tid)
+
+
+@router.put("/trip-reminder")
+async def put_trip_reminder_settings(request: Request):
+    """Save days-before / hour / copy for trip reminder emails."""
+    from travel_platform.settings.trip_reminder_store import write_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    return write_trip_reminder_settings(body, tid)
+
+
+@router.get("/login-audits")
+async def get_login_audits(
+    limit: int = Query(100, ge=1, le=500),
+    actor_type: str | None = Query(default=None, pattern="^(admin|customer|driver)$"),
+    success: bool | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
+):
+    """Login history: χρόνος, IP, συσκευή, γραφείο — admin / customer / driver."""
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from travel_platform.settings.login_audit_store import actor_type_label, list_login_events
+
+    # Fetch without q first so we can match office labels after DB enrich.
+    fetch_cap = 500 if (q and str(q).strip()) else limit
+    rows = list_login_events(
+        limit=fetch_cap,
+        actor_type=actor_type,
+        success=success,
+        q=None,
+    )
+
+    tenant_ids: set[UUID] = set()
+    for row in rows:
+        raw = str(row.get("tenant_id") or "").strip()
+        if not raw:
+            continue
+        try:
+            tenant_ids.add(UUID(raw))
+        except ValueError:
+            continue
+
+    labels: dict[str, dict[str, str | None]] = {}
+    if tenant_ids:
+        try:
+            async with AsyncSessionLocal() as db:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[str(t.id)] = {
+                        "tenant_name": getattr(t, "legal_name", None),
+                        "tenant_slug": getattr(t, "slug", None),
+                    }
+        except Exception:
+            logger.debug("login-audits tenant label enrich failed", exc_info=True)
+
+    needle = " ".join(str(q or "").lower().split()).strip()
+    out: list[dict] = []
+    for row in rows:
+        tid = str(row.get("tenant_id") or "").strip() or None
+        meta = labels.get(tid or "") if tid else None
+        name = (meta or {}).get("tenant_name") if meta else None
+        slug = (meta or {}).get("tenant_slug") if meta else None
+        if name and slug and str(slug) not in str(name):
+            office_label = f"{name} · {slug}"
+        else:
+            office_label = name or slug or (f"Γραφείο {tid[:8]}…" if tid else "Χωρίς γραφείο")
+        row["actor_type_label"] = actor_type_label(row.get("actor_type"))
+        row["tenant_name"] = name
+        row["tenant_slug"] = slug
+        row["office_label"] = office_label
+        if needle:
+            blob = " ".join(
+                str(x or "")
+                for x in (
+                    office_label,
+                    name,
+                    slug,
+                    tid,
+                    row.get("identity"),
+                    row.get("actor_name"),
+                    row.get("ip"),
+                    row.get("device"),
+                    row.get("detail"),
+                    row.get("actor_id"),
+                )
+            ).lower()
+            if needle not in blob:
+                continue
+        out.append(row)
+        if len(out) >= limit:
+            break
+    return {"items": out, "total": len(out)}
+
+
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
-    tenant_id = _request_tenant_id(request)
-    include_legacy, claim_legacy = await _demo_legacy_flags(tenant_id, request)
+    tenant_id, include_legacy, claim_legacy = await _drivers_list_tenant_id(request)
+    # Soft ensure on every list for the PoreiaGo platform office — Achilleas
+    # must not look «lost» after a rehome / empty JWT mismatch.
+    try:
+        from travel_platform.settings.drivers_store import (
+            _POREIAGO_HOME_EMAILS,
+            ensure_home_driver_on_tenant,
+        )
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        platform_tid = await resolve_poreiago_platform_tenant_id()
+        if platform_tid and str(tenant_id) == str(platform_tid):
+            for email in _POREIAGO_HOME_EMAILS:
+                ensure_home_driver_on_tenant(email, str(platform_tid))
+    except Exception:
+        logger.debug("PoreiaGo home-driver soft ensure skipped", exc_info=True)
+
     rows = list_drivers_for_office(
         tenant_id,
         status,
         include_demo_legacy=include_legacy,
         claim_demo_legacy=claim_legacy,
     )
-    return [_driver_response(d, enrich_safety=False) for d in rows]
+    out: list[FleetDriverResponse] = []
+    for d in rows:
+        try:
+            out.append(_driver_response(d, enrich_safety=False))
+        except Exception:
+            logger.exception("Skipping corrupt driver row %s", getattr(d, "id", "?"))
+    return out
 
 
 _DRIVER_PHOTO_DIR = Path(
@@ -370,7 +1305,8 @@ async def upload_driver_photo(file: UploadFile = File(...)):
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)
 async def post_driver(request: Request, body: FleetDriverCreate):
     data = body.model_dump()
-    data["tenant_id"] = _request_tenant_id(request)
+    tenant_id, _include, _claim = await _drivers_list_tenant_id(request)
+    data["tenant_id"] = tenant_id
     try:
         d = create_driver(data)
     except ValueError as e:
@@ -382,7 +1318,8 @@ async def post_driver(request: Request, body: FleetDriverCreate):
 
 @router.get("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def get_driver_api(request: Request, driver_id: str):
-    d = _driver_for_tenant(driver_id, _request_tenant_id(request))
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    d = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy)
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
     return _driver_response(d, enrich_safety=True)
@@ -390,7 +1327,8 @@ async def get_driver_api(request: Request, driver_id: str):
 
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate):
-    if not _driver_for_tenant(driver_id, _request_tenant_id(request)):
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
         d = update_driver(driver_id, body.model_dump(exclude_unset=True))
@@ -405,12 +1343,132 @@ async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate
 
 @router.delete("/drivers/{driver_id}", status_code=204)
 async def remove_driver(request: Request, driver_id: str):
-    if not _driver_for_tenant(driver_id, _request_tenant_id(request)):
+    """Delete only within the active office — never across PoreiaGo ↔ Achillio."""
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
-        delete_driver(driver_id)
+        delete_driver(driver_id, tenant_id=tenant_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
+
+
+# --- Office CRM customers (durable, tenant-scoped) ---------------------------------
+
+
+class OfficeCustomerIn(BaseModel):
+    id: str | None = None
+    name: str = ""
+    email: str
+    phone: str = ""
+    company: str = ""
+    afm: str = ""
+    city: str = ""
+    address: str = ""
+    notes: str = ""
+    source: str = "manual"
+    serviceScope: str = "buses"
+    marketingOptIn: bool = True
+    tags: list[str] = Field(default_factory=list)
+    tier: str = "Silver"
+    picture: str = ""
+    authProvider: str = "email"
+    points: int | None = None
+    joinDate: str | None = None
+
+
+class OfficeCustomersReplaceIn(BaseModel):
+    customers: list[OfficeCustomerIn] = Field(default_factory=list)
+
+
+@router.get("/customers")
+async def list_office_customers(
+    request: Request,
+    service_scope: str | None = Query(default=None, alias="serviceScope"),
+):
+    from travel_platform.settings.office_customers_store import (
+        has_customer_history,
+        list_customers,
+    )
+    from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
+
+    tid = _request_tenant_id(request)
+    # Buses CRM: pull My Wallet accounts sealed to this office so Google /
+    # register profiles appear with their wallet name (not only booking surnames).
+    scope = (service_scope or "").strip().lower()
+    if not scope or scope in ("buses", "bus", "excursions"):
+        try:
+            await sync_wallet_accounts_into_crm(tid)
+        except Exception:
+            pass
+    return {
+        "customers": list_customers(tid, service_scope=service_scope),
+        # True even when the live list is empty after soft-deletes — stops
+        # another PC from re-seeding deleted names from localStorage.
+        "hasHistory": has_customer_history(tid, service_scope=service_scope),
+    }
+
+
+@router.post("/customers", status_code=201)
+async def create_office_customer(request: Request, body: OfficeCustomerIn):
+    from travel_platform.settings.office_customers_store import upsert_customer
+
+    tid = _request_tenant_id(request)
+    payload = body.model_dump()
+    # Explicit admin create may revive a previously soft-deleted email.
+    payload["revive"] = True
+    try:
+        row = upsert_customer(tid, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=400, detail="Αποτυχία αποθήκευσης πελάτη")
+    return row
+
+
+@router.put("/customers/{customer_id}")
+async def update_office_customer(request: Request, customer_id: str, body: OfficeCustomerIn):
+    from travel_platform.settings.office_customers_store import upsert_customer
+
+    tid = _request_tenant_id(request)
+    payload = body.model_dump()
+    payload["id"] = customer_id
+    payload["revive"] = True
+    try:
+        row = upsert_customer(tid, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return row
+
+
+@router.delete("/customers/{customer_id}", status_code=204)
+async def delete_office_customer(
+    request: Request,
+    customer_id: str,
+    service_scope: str | None = Query(default=None, alias="serviceScope"),
+):
+    from travel_platform.settings.office_customers_store import delete_customer
+
+    tid = _request_tenant_id(request)
+    ok = delete_customer(tid, customer_id, service_scope=service_scope)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return Response(status_code=204)
+
+
+@router.post("/customers/replace")
+async def replace_office_customers(request: Request, body: OfficeCustomersReplaceIn):
+    """Replace tenant CRM snapshot (used when migrating localStorage → server)."""
+    from travel_platform.settings.office_customers_store import replace_customers_for_tenant
+
+    tid = _request_tenant_id(request)
+    rows = replace_customers_for_tenant(
+        tid,
+        [c.model_dump() for c in body.customers],
+    )
+    return {"customers": rows, "count": len(rows)}
 
 
 @router.get("/fleet/availability")
@@ -431,22 +1489,60 @@ async def post_fleet_dispatch_blocked(body: DispatchBlockedRequest):
 
 @router.get("/fleet/vehicles", response_model=list[VehicleProfileResponse])
 async def get_fleet_vehicles(request: Request):
-    return service_service.list_vehicles(tenant_id=_request_tenant_id(request))
+    return service_service.list_vehicles(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.post("/fleet/vehicles", response_model=VehicleProfileResponse, status_code=201)
 async def post_fleet_vehicle(request: Request, body: VehicleCreate):
     data = body.model_dump(exclude_unset=True)
-    data["tenant_id"] = _request_tenant_id(request)
+    data["tenant_id"] = await _fleet_tenant_id(request)
     try:
         return service_service.create_vehicle(data)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+_FLEET_PHOTO_DIR = Path(
+    os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data"
+) / "uploads" / "fleet_photos"
+_MAX_FLEET_PHOTO_BYTES = 8 * 1024 * 1024
+
+
+@router.post("/fleet/vehicles/photo-upload")
+async def upload_fleet_vehicle_photo(file: UploadFile = File(...)):
+    """Admin upload — returns a public URL for vehicle public_image_url / gallery."""
+    from travel_platform.media.image_optimize import optimize_driver_photo
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_FLEET_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 8 MB)")
+
+    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "bus").stem)[:40] or "bus"
+    filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
+
+    _FLEET_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _FLEET_PHOTO_DIR / filename
+    out_path.write_bytes(optimized.content)
+    url = f"/api/site/fleet-photos/{filename}"
+    return {
+        "ok": True,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }
+
+
 @router.get("/fleet/vehicles/{vehicle_id}", response_model=VehicleProfileResponse)
 async def get_fleet_vehicle(request: Request, vehicle_id: str):
-    row = service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request))
+    row = service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request))
     if not row:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return row
@@ -458,7 +1554,7 @@ async def patch_fleet_vehicle(request: Request, vehicle_id: str, body: VehicleUp
         return service_service.update_vehicle(
             vehicle_id,
             body.model_dump(exclude_unset=True),
-            tenant_id=_request_tenant_id(request),
+            tenant_id=await _fleet_tenant_id(request),
         )
     except KeyError:
         raise HTTPException(status_code=404, detail="Vehicle not found") from None
@@ -468,14 +1564,14 @@ async def patch_fleet_vehicle(request: Request, vehicle_id: str, body: VehicleUp
 
 @router.delete("/fleet/vehicles/{vehicle_id}")
 async def delete_fleet_vehicle(request: Request, vehicle_id: str):
-    if not service_service.delete_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.delete_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"ok": True, "id": vehicle_id}
 
 
 @router.post("/fleet/vehicles/{vehicle_id}/odometer", response_model=VehicleProfileResponse)
 async def sync_vehicle_odometer(request: Request, vehicle_id: str, odometer_km: float):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.sync_odometer_from_telemetry(vehicle_id, odometer_km)
@@ -485,7 +1581,7 @@ async def sync_vehicle_odometer(request: Request, vehicle_id: str, odometer_km: 
 
 @router.get("/fleet/maintenance-events", response_model=list[MaintenanceEventResponse])
 async def get_maintenance_events(request: Request, vehicle_id: str | None = None):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     if vehicle_id and not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     events = service_service.list_maintenance_events(vehicle_id=vehicle_id)
@@ -500,7 +1596,7 @@ async def post_maintenance_event(request: Request, body: MaintenanceEventCreate)
     data = body.model_dump(exclude_unset=True)
     vehicle_id = data.get("vehicle_id")
     if not vehicle_id or not service_service.get_vehicle(
-        vehicle_id, tenant_id=_request_tenant_id(request)
+        vehicle_id, tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
@@ -518,7 +1614,7 @@ async def post_maintenance_attachment(request: Request, event_id: str, file: Upl
     event_rows = service_service.list_maintenance_events()
     event = next((e for e in event_rows if e.get("id") == event_id), None)
     if not event or not service_service.get_vehicle(
-        event.get("vehicle_id"), tenant_id=_request_tenant_id(request)
+        event.get("vehicle_id"), tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Maintenance event not found")
     safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
@@ -542,7 +1638,7 @@ async def post_maintenance_attachment(request: Request, event_id: str, file: Upl
 
 @router.post("/fleet/alerts/scan", response_model=list[FleetAlertResponse])
 async def post_fleet_alert_scan(request: Request):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     alerts = service_service.scan_predictive_alerts()
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     return [a for a in alerts if a.get("vehicle_id") in owned]
@@ -550,7 +1646,7 @@ async def post_fleet_alert_scan(request: Request):
 
 @router.get("/fleet/alerts", response_model=list[FleetAlertResponse])
 async def get_fleet_alerts(request: Request, unresolved_only: bool = True):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     alerts = service_service.list_alerts(unresolved_only=unresolved_only)
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     return [a for a in alerts if a.get("vehicle_id") in owned]
@@ -558,7 +1654,7 @@ async def get_fleet_alerts(request: Request, unresolved_only: bool = True):
 
 @router.post("/fleet/alerts/{alert_id}/resolve", response_model=FleetAlertResponse)
 async def post_fleet_alert_resolve(request: Request, alert_id: str):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     try:
         alert = service_service.resolve_alert(alert_id)
@@ -573,7 +1669,7 @@ async def post_fleet_alert_resolve(request: Request, alert_id: str):
 async def get_fleet_cost_report(
     request: Request, vehicle_id: str, date_from: date, date_to: date
 ):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.get_vehicle_cost_report(vehicle_id, date_from, date_to)
@@ -585,7 +1681,7 @@ async def get_fleet_cost_report(
 async def get_fleet_depreciation(
     request: Request, vehicle_id: str, as_of: date | None = None
 ):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.estimate_book_value(vehicle_id, as_of=as_of)
@@ -595,18 +1691,18 @@ async def get_fleet_depreciation(
 
 @router.get("/fleet/dashboard")
 async def get_fleet_dashboard_cards(request: Request):
-    return service_service.dashboard_cards(tenant_id=_request_tenant_id(request))
+    return service_service.dashboard_cards(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.get("/fleet/availability-board")
 async def get_fleet_availability_board(request: Request):
-    return service_service.list_availability(tenant_id=_request_tenant_id(request))
+    return service_service.list_availability(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.get("/fleet/calendar")
 async def get_fleet_calendar(request: Request, within_days: int = Query(120, ge=7, le=365)):
     return service_service.list_calendar(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         within_days=within_days,
     )
 
@@ -614,7 +1710,7 @@ async def get_fleet_calendar(request: Request, within_days: int = Query(120, ge=
 @router.get("/fleet/documents")
 async def get_fleet_documents(request: Request, vehicle_id: str | None = None):
     return service_service.list_documents(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         vehicle_id=vehicle_id,
     )
 
@@ -627,7 +1723,7 @@ async def post_fleet_vehicle_document(
     kind: str = Query("registration"),
     expires_at: date | None = None,
 ):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     if not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     if not file.filename:
@@ -663,7 +1759,7 @@ async def post_fleet_vehicle_document(
 @router.delete("/fleet/vehicles/{vehicle_id}/documents/{document_id}")
 async def delete_fleet_vehicle_document(request: Request, vehicle_id: str, document_id: str):
     if not service_service.delete_vehicle_document(
-        vehicle_id, document_id, tenant_id=_request_tenant_id(request)
+        vehicle_id, document_id, tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}
@@ -681,7 +1777,7 @@ async def get_fleet_document_file(filename: str):
 @router.get("/fleet/expenses", response_model=list[FleetExpenseResponse])
 async def get_fleet_expenses(request: Request, vehicle_id: str | None = None):
     return service_service.list_expenses(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         vehicle_id=vehicle_id,
     )
 
@@ -689,7 +1785,7 @@ async def get_fleet_expenses(request: Request, vehicle_id: str | None = None):
 @router.post("/fleet/expenses", response_model=FleetExpenseResponse, status_code=201)
 async def post_fleet_expense(request: Request, body: FleetExpenseCreate):
     data = body.model_dump(exclude_unset=True)
-    data["tenant_id"] = _request_tenant_id(request)
+    data["tenant_id"] = await _fleet_tenant_id(request)
     try:
         return service_service.create_expense(data)
     except KeyError:
@@ -700,59 +1796,103 @@ async def post_fleet_expense(request: Request, body: FleetExpenseCreate):
 
 @router.delete("/fleet/expenses/{expense_id}")
 async def delete_fleet_expense(request: Request, expense_id: str):
-    if not service_service.delete_expense(expense_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.delete_expense(expense_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Expense not found")
     return {"ok": True}
 
 
-@router.get("/backups", response_model=list[BackupInfoResponse])
-async def get_backups():
-    return [
-        BackupInfoResponse(
-            id=b["id"],
-            filename=b["filename"],
-            size_bytes=b["size_bytes"],
-            created_at=datetime.fromisoformat(b["created_at"].replace("Z", "+00:00")),
-            includes=b["includes"],
+def _require_superadmin(request: Request) -> None:
+    """Full-store backups include every office's drivers — superadmin only."""
+    roles = set(getattr(request.state, "roles", None) or [])
+    if "superadmin" not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Μόνο superadmin — τα backup περιέχουν οδηγούς όλων των γραφείων",
         )
-        for b in list_backups()
-    ]
 
 
-@router.post("/backups", response_model=BackupCreateResponse)
-async def post_backup():
-    b = create_backup()
-    return BackupCreateResponse(
-        backup=BackupInfoResponse(
-            id=b["id"],
-            filename=b["filename"],
-            size_bytes=b["size_bytes"],
-            created_at=datetime.fromisoformat(b["created_at"].replace("Z", "+00:00")),
-            includes=b["includes"],
-        ),
-        message="Το backup δημιουργήθηκε επιτυχώς",
+def _backup_info_response(b: dict) -> BackupInfoResponse:
+    return BackupInfoResponse(
+        id=b["id"],
+        filename=b["filename"],
+        size_bytes=b["size_bytes"],
+        created_at=datetime.fromisoformat(str(b["created_at"]).replace("Z", "+00:00")),
+        includes=list(b.get("includes") or []),
+        scope=str(b.get("scope") or "platform"),
+        tenant_id=b.get("tenant_id"),
+        tenant_label=b.get("tenant_label"),
+        kind=str(b.get("kind") or "json"),
+        restorable=bool(b.get("restorable", b.get("scope") != "database")),
+        db_mode=b.get("db_mode"),
     )
 
 
-@router.post("/backups/{backup_id}/restore", response_model=BackupRestoreResponse)
-async def post_restore(backup_id: str):
+@router.get("/backups", response_model=list[BackupInfoResponse])
+async def get_backups(request: Request):
+    _require_superadmin(request)
+    return [_backup_info_response(b) for b in list_backups()]
+
+
+@router.post("/backups", response_model=BackupCreateResponse)
+async def post_backup(request: Request, body: BackupCreateRequest | None = None):
+    _require_superadmin(request)
+    payload = body or BackupCreateRequest()
+    scope = payload.scope or "platform"
     try:
-        result = restore_backup(backup_id)
+        if scope == "office":
+            if not payload.tenant_id:
+                raise HTTPException(status_code=400, detail="Επίλεξε γραφείο για office backup")
+            b = await create_office_backup(
+                payload.tenant_id,
+                client_extras=payload.client_extras,
+            )
+            msg = f"Backup γραφείου «{b.get('tenant_label') or payload.tenant_id}» έτοιμο"
+        elif scope == "database":
+            if payload.tenant_id:
+                b = await create_office_database_backup(payload.tenant_id)
+                msg = f"Database dump γραφείου «{b.get('tenant_label') or payload.tenant_id}» έτοιμο"
+            else:
+                b = await create_database_backup()
+                msg = "Πλήρες database dump έτοιμο (λήψη μόνο — όχι restore από UI)"
+        else:
+            b = create_platform_backup()
+            msg = "Backup πλατφόρμας έτοιμο"
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Αποτυχία backup: {exc}") from exc
+
+    return BackupCreateResponse(backup=_backup_info_response(b), message=msg)
+
+
+@router.post("/backups/{backup_id}/restore", response_model=BackupRestoreResponse)
+async def post_restore(request: Request, backup_id: str):
+    _require_superadmin(request)
+    try:
+        result = await restore_backup_async(backup_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Backup not found") from None
-    return BackupRestoreResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return BackupRestoreResponse(**{k: v for k, v in result.items() if k in BackupRestoreResponse.model_fields})
 
 
 @router.get("/backups/{backup_id}/download")
-async def download_backup(backup_id: str):
-    path = BACKUP_DIR / f"{backup_id}.json"
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup not found")
-    return FileResponse(path, filename=path.name, media_type="application/json")
+async def download_backup(request: Request, backup_id: str):
+    _require_superadmin(request)
+    try:
+        path = resolve_backup_path(backup_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Backup not found") from None
+    media = "application/gzip" if path.name.endswith(".gz") else "application/json"
+    return FileResponse(path, filename=path.name, media_type=media)
 
 
 @router.delete("/backups/{backup_id}", status_code=204)
-async def remove_backup(backup_id: str):
+async def remove_backup(request: Request, backup_id: str):
+    _require_superadmin(request)
     try:
         delete_backup(backup_id)
     except FileNotFoundError:
@@ -787,9 +1927,13 @@ async def issue_master_qr(body: MasterQrIssueRequest, request: Request):
         resolve_platform_tenant_id,
     )
 
-    tenant_id = _request_tenant_id(request)
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if tenant_id == DEMO_TENANT_ID:
         tenant_id = await resolve_platform_tenant_id()
+    if body.driver_id and not _driver_for_tenant(
+        body.driver_id, str(tenant_id), allow_demo_legacy=include_legacy
+    ):
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν ανήκει σε αυτό το γραφείο")
     result = await issue_master_qr_hybrid(
         body.trip_id,
         driver_id=body.driver_id,
@@ -818,9 +1962,13 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
     )
     from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
-    tenant_id = _request_tenant_id(request)
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if tenant_id == DEMO_TENANT_ID:
         tenant_id = await resolve_platform_tenant_id()
+    if body.driver_id and not _driver_for_tenant(
+        body.driver_id, str(tenant_id), allow_demo_legacy=include_legacy
+    ):
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν ανήκει σε αυτό το γραφείο")
     result = await issue_master_qr_hybrid(
         body.trip_id,
         driver_id=body.driver_id,
@@ -829,8 +1977,21 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
     _spawn_passenger_sync(body.trip_id, str(result.get("tenant_id") or tenant_id))
     auth_url = result.get("auth_url") or result.get("qr_content")
     qr_token = result.get("qr_token")
+    # Achillio drivers live on achilliotravel.com — never rewrite their magic link to poreiago.
+    driver_base = driver_app_public_base()
+    brand_label = "PoreiaGo"
+    try:
+        if await _tenant_is_achillio_office(str(result.get("tenant_id") or tenant_id)) or _host_looks_like_achillio(
+            request
+        ):
+            driver_base = "https://www.achilliotravel.com"
+            brand_label = "Achillio Travel"
+    except Exception:
+        if _host_looks_like_achillio(request):
+            driver_base = "https://www.achilliotravel.com"
+            brand_label = "Achillio Travel"
     if qr_token:
-        auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())
+        auth_url = build_driver_auth_url(qr_token, base_url=driver_base)
 
     push_result = await send_driver_shift_invite_push(
         tenant_id=str(result["tenant_id"]),
@@ -840,6 +2001,7 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
         trip_title=body.trip_title,
         auth_url=auth_url,
         qr_token=qr_token,
+        brand_label=brand_label,
     )
 
     return DriverShiftPushResponse(
@@ -891,6 +2053,16 @@ async def master_qr_png(
     )
 
 
+
+@router.get("/trips", response_model=TripsListResponse)
+async def list_trips_admin(request: Request):
+    from travel_platform.operations.trips_sync import list_office_trips
+
+    tenant_id = _request_tenant_id(request)
+    rows = await list_office_trips(tenant_id)
+    return TripsListResponse(trips=rows, tenant_id=tenant_id)
+
+
 @router.post("/trips/sync", response_model=TripsSyncResponse)
 async def sync_trips_admin(request: Request, body: TripsSyncRequest):
     from travel_platform.operations.trips_sync import sync_trips_to_postgres
@@ -910,23 +2082,69 @@ async def sync_trips_admin(request: Request, body: TripsSyncRequest):
         payload,
         tenant_id=tenant_id,
         replace_catalog=bool(getattr(body, "replace_catalog", False)),
+        prune_missing=bool(getattr(body, "prune_missing", False)),
     )
     return TripsSyncResponse(**result)
 
 
 @router.get("/branding", response_model=BrandingAdminResponse)
-async def get_admin_branding():
+async def get_admin_branding(request: Request):
     from travel_platform.growth.branding_store import get_branding
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import is_poreiago_platform_office
 
-    return BrandingAdminResponse(**get_branding().to_dict())
+    tid = _request_tenant_id(request)
+    key = "default"
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if tenant and not is_poreiago_platform_office(tenant):
+                key = str(tenant.slug or tenant.subdomain or tid)
+    except Exception:
+        key = "default"
+    return BrandingAdminResponse(**get_branding(key).to_dict())
 
 
 @router.put("/branding", response_model=BrandingAdminResponse)
-async def put_admin_branding(body: BrandingAdminUpdate):
+async def put_admin_branding(request: Request, body: BrandingAdminUpdate):
+    from fastapi import HTTPException
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import (
+        is_achillio_travel_office,
+        is_poreiago_platform_office,
+    )
     from travel_platform.growth.branding_store import update_branding
 
     patch = body.model_dump(exclude_unset=True)
-    return BrandingAdminResponse(**update_branding("default", patch).to_dict())
+    tid = _request_tenant_id(request)
+    key = None
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                raise HTTPException(status_code=403, detail="Άγνωστο γραφείο — branding απορρίφθηκε")
+            if is_poreiago_platform_office(tenant) and not is_achillio_travel_office(tenant):
+                key = "default"
+            else:
+                # Achillio Travel / customer offices — never write shared "default".
+                key = str(tenant.slug or tenant.subdomain or tid)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Αδυναμία επίλυσης γραφείου για branding",
+        ) from None
+    if not key:
+        raise HTTPException(status_code=403, detail="Άγνωστο γραφείο — branding απορρίφθηκε")
+    return BrandingAdminResponse(**update_branding(key, patch).to_dict())
 
 
 @router.get("/partners/webhooks", response_model=list[PartnerWebhookResponse])
@@ -1005,19 +2223,53 @@ async def get_public_pricing_quote(
 
 
 @router.get("/abandoned/carts", response_model=list[AbandonedCartResponse])
-async def list_abandoned_carts(include_completed: bool = False):
+async def list_abandoned_carts(request: Request, include_completed: bool = False):
     from travel_platform.revenue.abandoned_carts import list_carts
 
-    return [AbandonedCartResponse(**c.to_dict()) for c in list_carts(include_completed=include_completed)]
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    return [
+        AbandonedCartResponse(**c.to_dict())
+        for c in list_carts(include_completed=include_completed, tenant_id=tid)
+    ]
 
 
 @router.post("/abandoned/scan", response_model=AbandonedScanResponse)
 async def scan_abandoned_carts(body: AbandonedScanRequest, request: Request):
     from travel_platform.revenue.abandoned_carts import scan_and_send_recovery
 
+    tid = str(_request_tenant_id(request) or "").strip() or None
     origin = request.headers.get("origin") or request.headers.get("referer", "")
-    base = body.base_url or (origin.rstrip("/") if origin else "http://localhost:5173")
-    stats = await scan_and_send_recovery(base_url=base, pending_minutes=body.pending_minutes)
+    base = body.base_url or (origin.rstrip("/") if origin else "https://www.poreiago.com")
+    # Never let Achillio Travel domain leak into PoreiaGo recovery scans.
+    if tid and "achilliotravel.com" in str(base).lower():
+        if not await _tenant_is_achillio_office(tid):
+            base = "https://www.poreiago.com"
+    label = "PoreiaGo"
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_achillio_travel_office
+
+        if tid:
+            from uuid import UUID
+
+            async with AsyncSessionLocal() as db:
+                row = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+                tenant = row.scalar_one_or_none()
+                if tenant:
+                    label = str(tenant.legal_name or tenant.slug or "PoreiaGo")
+                    if is_achillio_travel_office(tenant) and not body.base_url:
+                        base = "https://www.achilliotravel.com"
+    except Exception:
+        pass
+    stats = await scan_and_send_recovery(
+        base_url=base,
+        pending_minutes=body.pending_minutes,
+        tenant_id=tid,
+        company_label=label,
+    )
     return AbandonedScanResponse(**stats)
 
 
@@ -1030,12 +2282,38 @@ class DriverChatSendBody(BaseModel):
     sender_name: str | None = None
 
 
-async def _chat_tenant_id(request: Request) -> str:
-    """Office scope for driver chat — JWT / request tenant, never global platform id."""
-    tid = _request_tenant_id(request)
-    if tid:
-        return str(tid)
-    raise HTTPException(status_code=401, detail="Tenant required")
+async def _chat_office_scope(request: Request) -> tuple[str, bool]:
+    """
+    Same office resolution as Οδηγοί — JWT tenant (+ Achillio DEMO claim).
+
+    Returns (tenant_id, allow_demo_legacy).
+    """
+    tenant_id, include_legacy, claim_legacy = await _drivers_list_tenant_id(request)
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Tenant required")
+    return str(tenant_id), bool(include_legacy or claim_legacy)
+
+
+def _office_chat_driver_ids(tenant_id: str, *, allow_demo_legacy: bool) -> set[str]:
+    from travel_platform.settings.drivers_store import office_driver_id_set
+
+    return office_driver_id_set(tenant_id, include_demo_legacy=allow_demo_legacy)
+
+
+def _sync_chat_after_driver_claim(tenant_id: str, allowed: set[str]) -> None:
+    """Pull DEMO-tagged history for this office's drivers onto the office tenant."""
+    if not allowed or str(tenant_id) == str(DEMO_TENANT_ID):
+        return
+    try:
+        from travel_platform.driver.chat_store import reassign_messages_tenant
+
+        reassign_messages_tenant(
+            driver_ids=allowed,
+            to_tenant=tenant_id,
+            from_tenant=str(DEMO_TENANT_ID),
+        )
+    except Exception:
+        logger.debug("chat DEMO→office reassign failed for %s", tenant_id, exc_info=True)
 
 
 @router.get("/driver-chat/threads")
@@ -1045,10 +2323,25 @@ async def admin_chat_threads(
 ):
     from travel_platform.driver.chat_store import list_threads
 
-    tenant_id = await _chat_tenant_id(request)
-    threads = list_threads(tenant_id=tenant_id, limit=limit)
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    # Ensure DEMO drivers are claimed onto this office first (Achillio only).
+    if allow_legacy:
+        list_drivers_for_office(
+            tenant_id,
+            include_demo_legacy=True,
+            claim_demo_legacy=True,
+        )
+    allowed = _office_chat_driver_ids(tenant_id, allow_demo_legacy=allow_legacy)
+    _sync_chat_after_driver_claim(tenant_id, allowed)
+    threads = list_threads(
+        tenant_id=tenant_id,
+        limit=limit,
+        allowed_driver_ids=allowed,
+    )
     for t in threads:
-        d = _driver_for_tenant(t.get("driver_id"), tenant_id)
+        d = _driver_for_tenant(
+            t.get("driver_id"), tenant_id, allow_demo_legacy=allow_legacy
+        )
         t["driver_name"] = d.name if d else None
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
     return {"tenant_id": tenant_id, "threads": threads}
@@ -1056,11 +2349,22 @@ async def admin_chat_threads(
 
 @router.get("/driver-chat/unread")
 async def admin_chat_unread(request: Request):
-    from travel_platform.driver.chat_store import unread_counts
+    from travel_platform.driver.chat_store import list_threads
 
-    tenant_id = await _chat_tenant_id(request)
-    counts = unread_counts(tenant_id=tenant_id)
-    return {"tenant_id": tenant_id, "unread": counts.get("office", 0)}
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if allow_legacy:
+        list_drivers_for_office(
+            tenant_id,
+            include_demo_legacy=True,
+            claim_demo_legacy=True,
+        )
+    allowed = _office_chat_driver_ids(tenant_id, allow_demo_legacy=allow_legacy)
+    _sync_chat_after_driver_claim(tenant_id, allowed)
+    # Count only this office's drivers — never sum another γραφείο's unread.
+    office = 0
+    for t in list_threads(tenant_id=tenant_id, allowed_driver_ids=allowed):
+        office += int(t.get("unread_office") or 0)
+    return {"tenant_id": tenant_id, "unread": office}
 
 
 @router.get("/driver-chat/{driver_id}/messages")
@@ -1072,9 +2376,10 @@ async def admin_chat_messages(
 ):
     from travel_platform.driver.chat_store import list_messages, unread_counts
 
-    tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
+    _sync_chat_after_driver_claim(tenant_id, {str(driver_id)})
     messages = list_messages(
         tenant_id=tenant_id,
         driver_id=driver_id,
@@ -1094,8 +2399,8 @@ async def admin_chat_messages(
 async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Request):
     from travel_platform.driver.chat_store import append_message
 
-    tenant_id = await _chat_tenant_id(request)
-    driver = _driver_for_tenant(driver_id, tenant_id)
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    driver = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
@@ -1131,8 +2436,9 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Req
 async def admin_chat_read(driver_id: str, request: Request):
     from travel_platform.driver.chat_store import mark_thread_read
 
-    tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
+    _sync_chat_after_driver_claim(tenant_id, {str(driver_id)})
     changed = mark_thread_read(tenant_id=tenant_id, driver_id=driver_id, reader="office")
     return {"ok": True, "marked": changed, "driver_id": driver_id}

@@ -2,7 +2,9 @@
  * Rent desk «Χαρτούρα» — booking contracts, signatures, printable agreements.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { createRentalDemoSignSample } from '../../../services/fleetRentalApi.js';
 import RentalBookingAgreement from './RentalBookingAgreement.jsx';
+import RentalCheckout from './RentalCheckout.jsx';
 import {
   paperworkStatusChipClass,
   paperworkStatusForBooking,
@@ -34,13 +36,34 @@ export default function RentalPaperworkDesk({
   officeName,
   initialBookingId = null,
   onOpenCheckIn,
+  onOpenWizard,
   onConsumedFocus,
   onBookingUpdated,
+  onInspectionsUpdated,
   onToast,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('ALL');
   const [selectedId, setSelectedId] = useState(initialBookingId || null);
+  const [checkoutId, setCheckoutId] = useState(null);
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  const openDemoSign = async () => {
+    if (demoBusy) return;
+    setDemoBusy(true);
+    try {
+      const booking = await createRentalDemoSignSample();
+      if (!booking?.id) throw new Error('Δεν δημιουργήθηκε δοκιμαστική κράτηση');
+      onBookingUpdated?.(booking);
+      setSelectedId(null);
+      setCheckoutId(booking.id);
+      onToast?.('success', 'Άνοιξε dual-mode υπογραφή');
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία δοκιμαστικής υπογραφής');
+    } finally {
+      setDemoBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!initialBookingId) return undefined;
@@ -86,6 +109,32 @@ export default function RentalPaperworkDesk({
   }, [bookings, vehicles, inspections, query, filter]);
 
   const selected = rows.find((r) => r.booking.id === selectedId) || null;
+  const checkoutRow =
+    rows.find((r) => r.booking.id === checkoutId) ||
+    (bookings || [])
+      .map((b) => ({
+        booking: b,
+        vehicle: (vehicles || []).find((v) => v.id === b.vehicle_id) || null,
+      }))
+      .find((r) => r.booking.id === checkoutId) ||
+    null;
+
+  if (checkoutRow) {
+    return (
+      <RentalCheckout
+        booking={checkoutRow.booking}
+        vehicle={checkoutRow.vehicle}
+        officeName={officeName}
+        onCancel={() => setCheckoutId(null)}
+        onComplete={(updated) => {
+          onBookingUpdated?.(updated);
+          setCheckoutId(null);
+          if (updated?.id) setSelectedId(updated.id);
+        }}
+        onToast={onToast}
+      />
+    );
+  }
 
   if (selected) {
     return (
@@ -96,7 +145,12 @@ export default function RentalPaperworkDesk({
         officeName={officeName}
         onClose={() => setSelectedId(null)}
         onOpenCheckIn={onOpenCheckIn}
+        onOpenCheckout={() => {
+          setCheckoutId(selected.booking.id);
+          setSelectedId(null);
+        }}
         onBookingUpdated={onBookingUpdated}
+        onInspectionsUpdated={onInspectionsUpdated}
         onToast={onToast}
       />
     );
@@ -115,12 +169,24 @@ export default function RentalPaperworkDesk({
         <div>
           <h3 className="font-bold text-gray-900">Χαρτούρα κρατήσεων</h3>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
-            Νομικό πακέτο (σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, όροι) + πρωτόκολλα
-            παραλαβής/επιστροφής — έτοιμα για υπογραφή και εκτύπωση.
+            Νομικό πακέτο + πρωτόκολλα παραλαβής/επιστροφής. Dual-mode υπογραφή: στο tablet
+            του γραφείου (Sign-on-Glass) ή ασφαλές σύνδεσμος 24ωρών στο κινητό του πελάτη
+            (SMS/email) — 5 υποχρεωτικοί όροι.
           </p>
           <p className="text-xs text-gray-400 mt-2">
             Εκκρεμούν υπογραφές: {pendingCount} · Πλήρεις φάκελοι: {completeCount}
           </p>
+          <button
+            type="button"
+            disabled={demoBusy}
+            onClick={openDemoSign}
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {demoBusy ? 'progress_activity' : 'draw'}
+            </span>
+            {demoBusy ? 'Άνοιγμα…' : 'Δοκιμή ψηφιακής υπογραφής'}
+          </button>
         </div>
         <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
           Αναζήτηση
@@ -160,18 +226,62 @@ export default function RentalPaperworkDesk({
         {loading ? (
           <p className="p-6 text-sm text-gray-500">Φόρτωση…</p>
         ) : rows.length === 0 ? (
-          <div className="p-6 space-y-1">
-            <p className="text-sm font-bold text-gray-800">Δεν υπάρχουν φάκελοι σε αυτό το φίλτρο</p>
-            <p className="text-sm text-gray-500">
-              Οι κρατήσεις εμφανίζονται εδώ αυτόματα. Ανοίξτε τον φάκελο για να υπογράψει ο πελάτης
-              όλα τα νομικά έντυπα· το Check-in / out καλύπτει τα πρωτόκολλα παραλαβής/επιστροφής.
+          <div className="p-6 space-y-3">
+            <p className="text-sm font-bold text-gray-800">
+              {(bookings || []).length === 0
+                ? 'Δεν υπάρχουν ακόμα κρατήσεις'
+                : 'Δεν υπάρχουν φάκελοι σε αυτό το φίλτρο'}
             </p>
+            <p className="text-sm text-gray-500 max-w-lg">
+              {(bookings || []).length === 0 ? (
+                <>
+                  Πάτα <span className="font-bold text-teal-800">Δοκιμή ψηφιακής υπογραφής</span>{' '}
+                  πάνω ή εδώ — ανοίγει αμέσως η επιλογή Sign-on-Glass / αποστολή link.
+                </>
+              ) : (
+                <>
+                  Δοκίμασε το φίλτρο «Όλες». Άνοιξε φάκελο ή πάτα «Ψηφιακή υπογραφή» για dual-mode
+                  checkout.
+                </>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                disabled={demoBusy}
+                onClick={openDemoSign}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">draw</span>
+                {demoBusy ? 'Άνοιγμα…' : 'Δοκιμή ψηφιακής υπογραφής'}
+              </button>
+              {(bookings || []).length === 0 && onOpenWizard ? (
+                <button
+                  type="button"
+                  onClick={onOpenWizard}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  Νέα κράτηση γραφείου
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : (
           rows.map(({ booking: b, paper }) => (
             <article
               key={b.id}
-              className="px-4 py-3 flex flex-wrap items-start justify-between gap-3"
+              role="button"
+              tabIndex={0}
+              title="Διπλό κλικ για άνοιγμα φακέλου"
+              onDoubleClick={() => setSelectedId(b.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedId(b.id);
+                }
+              }}
+              className="px-4 py-3 flex flex-wrap items-start justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
             >
               <div className="min-w-0 space-y-1">
                 <p className="font-bold text-sm text-gray-900">
@@ -214,6 +324,17 @@ export default function RentalPaperworkDesk({
                 >
                   Άνοιγμα φακέλου
                 </button>
+                {!paper.pickupSigned || (paper.legal?.signedCount ?? 0) < 6 ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-xs font-bold inline-flex items-center gap-1"
+                    onClick={() => setCheckoutId(b.id)}
+                    title="Sign-on-Glass ή σύνδεσμος στο κινητό πελάτη"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">draw</span>
+                    Ψηφιακή υπογραφή
+                  </button>
+                ) : null}
                 {!paper.pickupSigned && onOpenCheckIn ? (
                   <button
                     type="button"

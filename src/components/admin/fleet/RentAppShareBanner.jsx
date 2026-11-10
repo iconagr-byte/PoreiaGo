@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { fetchTenantBrandingSettings } from '../../../services/growthApi.js';
-import { getOfficeRentWalletUrl } from '../../../lib/platform/officePublicUrl.js';
+import {
+  getOfficeRentWalletUrl,
+  getOfficeShareDisplayName,
+} from '../../../lib/platform/officePublicUrl.js';
 
 export default function RentAppShareBanner() {
   const [rentUrl, setRentUrl] = useState('');
@@ -15,18 +18,21 @@ export default function RentAppShareBanner() {
 
   useEffect(() => {
     let cancelled = false;
-    // 1) Resolve current office (JWT tenant branding), 2) then emit Rent Wallet link + QR.
+    // 1) Resolve current office (JWT tenant branding), 2) then emit My Wallet rentals link + QR.
+    // Session seal: on PoreiaGo admin host never emit Achillio Travel domain.
+    const contextHost =
+      typeof window !== 'undefined' ? window.location.hostname : '';
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
         const office = branding || {};
-        setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
-        setRentUrl(getOfficeRentWalletUrl(office));
+        setOfficeName(getOfficeShareDisplayName(office));
+        setRentUrl(getOfficeRentWalletUrl(office, { contextHost }));
       })
       .catch(() => {
         if (cancelled) return;
         setOfficeName('Γραφείο');
-        setRentUrl(getOfficeRentWalletUrl({}));
+        setRentUrl(getOfficeRentWalletUrl({}, { contextHost }));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -96,18 +102,18 @@ export default function RentAppShareBanner() {
           </div>
           <div className="min-w-0">
             <p className="font-bold tracking-tight">
-              Rent Wallet · /rent/wallet
+              My Wallet · /wallet?tab=rentals
               {officeName ? (
                 <span className="ml-1.5 font-semibold text-[#6e6e73]">· {officeName}</span>
               ) : null}
             </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
-              Πράσινο My Wallet ενοικίασης — χωριστά από το μπλε /wallet λεωφορείων. Σκανάρετε για
+              My Wallet με καρτέλα Ενοικιάσεις — ίδιο πορτοφόλι με τα εισιτήρια. Σκανάρετε για
               σύνδεση, κρατήσεις και εγκατάσταση.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">
-                Σύνδεσμος Rent Wallet
+                Σύνδεσμος My Wallet
               </p>
               <code className="text-[11px] break-all text-[#1d1d1f] leading-snug">
                 {loading ? 'Φόρτωση γραφείου…' : rentUrl || '—'}
@@ -115,12 +121,12 @@ export default function RentAppShareBanner() {
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <a
-                href={rentUrl || '/rent/wallet'}
+                href={rentUrl || '/wallet?tab=rentals'}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#0b3d4a] text-white text-xs font-bold shadow-md shadow-teal-900/20"
               >
-                Άνοιγμα /rent/wallet
+                Άνοιγμα My Wallet
                 <span className="material-symbols-outlined text-[16px]">open_in_new</span>
               </a>
               <button

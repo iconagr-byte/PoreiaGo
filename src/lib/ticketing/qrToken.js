@@ -26,16 +26,19 @@ export function buildCanonicalMessage(payload) {
 export async function issueSignedQrToken(booking, opts = {}) {
   const ttlHours = opts.ttlHours ?? 72;
   const departure = booking.date ? new Date(`${booking.date}T23:59:59`) : new Date();
-  const exp = Math.floor(
-    (departure.getTime() + ttlHours * 60 * 60 * 1000) / 1000,
-  );
+  const exp = Math.floor((departure.getTime() + ttlHours * 60 * 60 * 1000) / 1000);
+
+  const seat =
+    opts.seat != null
+      ? String(opts.seat).trim()
+      : String(booking.seat || booking.seats?.[0] || '').trim();
 
   /** @type {TicketPayload} */
   const payload = {
     v: TICKET_VERSION,
     bid: booking.id,
     tripId: booking.tripId ?? 0,
-    seat: booking.seat || (booking.seats?.[0] ?? ''),
+    seat,
     exp,
     nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
   };

@@ -29,6 +29,7 @@ def _token(tenant_id: str) -> str:
             "sub": "admin-user",
             "tenant_id": tenant_id,
             "roles": ["tenant_admin"],
+            "exp": int(time.time()) + 3600,
         },
         JWT_SECRET,
         algorithm="HS256",
@@ -87,10 +88,17 @@ class DriverCreateJwtTenantTests(unittest.TestCase):
             "FLEET_DRIVERS_STORE": str(self.store_path),
             "AUTH_JWT_SECRET": JWT_SECRET,
             "ADMIN_AUTH_DISABLED": "0",
+            "ENVIRONMENT": "test",
         }
         self._patches = [patch.dict("os.environ", self.env, clear=False)]
         for p in self._patches:
             p.start()
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
         store.STORE_PATH = self.store_path
         store._DATA_DIR = Path(self._tmpdir.name)
         self.store_path.write_text('{"drivers": []}', encoding="utf-8")
@@ -107,6 +115,12 @@ class DriverCreateJwtTenantTests(unittest.TestCase):
         store.reset_drivers_cache()
         for p in self._patches:
             p.stop()
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
         self._tmpdir.cleanup()
 
     def _create_body(self, stamp: str) -> dict:

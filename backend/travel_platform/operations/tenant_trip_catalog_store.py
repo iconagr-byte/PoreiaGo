@@ -47,6 +47,40 @@ def _path_for(tenant_id: str) -> Path | None:
     return _catalog_dir() / f"{key}.json"
 
 
+def _normalize_images(raw: dict[str, Any]) -> list[str]:
+    for key in ("images", "gallery", "gallery_urls"):
+        val = raw.get(key)
+        if isinstance(val, list):
+            return [str(u).strip() for u in val if str(u or "").strip()]
+    return []
+
+
+def _normalize_additional_fleet(raw: dict[str, Any]) -> list[dict[str, str]]:
+    extra = raw.get("additionalFleet") or raw.get("additional_fleet") or []
+    if not isinstance(extra, list):
+        return []
+    out: list[dict[str, str]] = []
+    for row in extra:
+        if not isinstance(row, dict):
+            continue
+        out.append(
+            {
+                "driverId": str(row.get("driverId") or row.get("driver_id") or "").strip(),
+                "driverName": str(row.get("driverName") or row.get("driver_name") or "").strip(),
+                "vehicleType": str(row.get("vehicleType") or row.get("vehicle_type") or "").strip(),
+                "vehiclePlate": str(
+                    row.get("vehiclePlate") or row.get("vehicle_plate") or ""
+                )
+                .strip()
+                .upper(),
+                "vehicleCode": str(row.get("vehicleCode") or row.get("vehicle_code") or "")
+                .strip()
+                .upper(),
+            }
+        )
+    return out
+
+
 def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
@@ -95,6 +129,7 @@ def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
         ),
         "description": str(raw.get("description") or "").strip(),
         "image": str(raw.get("image") or raw.get("image_url") or "").strip(),
+        "images": _normalize_images(raw),
         "hook": str(raw.get("hook") or "").strip(),
         "durationLabel": str(raw.get("durationLabel") or raw.get("duration_label") or "").strip(),
         "badge": str(raw.get("badge") or "").strip(),
@@ -106,6 +141,23 @@ def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
         "market": str(raw.get("market") or "").strip() or None,
         "vehicleType": str(raw.get("vehicleType") or raw.get("vehicle_type") or "").strip(),
         "currency": str(raw.get("currency") or "EUR").strip() or "EUR",
+        # Fleet assignment — used by live map to label active excursions on GPS pins.
+        "driverId": str(raw.get("driverId") or raw.get("driver_id") or "").strip(),
+        "driverName": str(raw.get("driverName") or raw.get("driver_name") or "").strip(),
+        "vehiclePlate": str(
+            raw.get("vehiclePlate") or raw.get("vehicle_plate") or raw.get("bus_plate") or ""
+        )
+        .strip()
+        .upper(),
+        "vehicleCode": str(raw.get("vehicleCode") or raw.get("vehicle_code") or "").strip().upper(),
+        "additionalFleet": _normalize_additional_fleet(raw),
+        # Office starter catalog (e.g. Achillio seeded from PoreiaGo demo cards).
+        "officeSeed": bool(
+            raw.get("officeSeed")
+            or raw.get("office_seed")
+            or str(raw.get("catalogSource") or "").strip() == "office_seed"
+        ),
+        "catalogSource": str(raw.get("catalogSource") or raw.get("catalog_source") or "").strip(),
     }
 
 

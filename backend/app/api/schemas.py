@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -13,6 +13,12 @@ class LoginRequest(BaseModel):
     tenant_id: UUID | None = None
     tenant_slug: str | None = Field(default=None, max_length=64, description="Optional agency code e.g. achillio")
     mfa_code: str | None = None
+
+
+class GoogleAdminLoginRequest(BaseModel):
+    id_token: str = Field(min_length=10)
+    tenant_id: UUID | None = None
+    tenant_slug: str | None = Field(default=None, max_length=64)
 
 
 class TokenResponse(BaseModel):
@@ -38,7 +44,7 @@ class MfaVerifyRequest(BaseModel):
 
 
 class BookingCreate(BaseModel):
-    trip_id: UUID | None = None
+    trip_id: int | None = None
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None
@@ -57,22 +63,49 @@ class GuestBookingLookup(BaseModel):
 
 
 class GuestBookingCreate(BaseModel):
-    """B2C checkout — no JWT; tenant_id scopes the organization."""
+    """B2C / office checkout — no JWT; tenant_id scopes the organization.
 
-    tenant_id: UUID
+    ``tenant_id`` is optional when the request Host resolves to an office
+    (Achillio custom domain / Capacitor → www.achilliotravel.com).
+    """
+
+    tenant_id: UUID | None = None
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None
-    amount_eur: Decimal = Field(gt=0)
+    # 0 allowed for pay-on-bus holds when total_eur > 0 (office walk-in).
+    amount_eur: Decimal = Field(ge=0)
     external_trip_id: int | None = None
     trip_title: str | None = None
     payment_method: str | None = None
     phone: str | None = None
     seats: list[str] | None = None
+    # Optional party members: [{seat, name, role}] — one entry per seat.
+    passengers: list[dict] | None = None
     payment_plan: str | None = None
     total_eur: Decimal | None = None
     balance_due: Decimal | None = None
     deposit_percent: int | None = Field(None, ge=5, le=90)
+    source: str | None = None
+    agent_name: str | None = None
+    departure_at: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_amounts(self):
+        total = self.total_eur if self.total_eur is not None else self.amount_eur
+        if total is None or total <= 0:
+            raise ValueError("Το σύνολο κράτησης πρέπει να είναι μεγαλύτερο από 0.")
+        if self.amount_eur > total:
+            raise ValueError("Το ποσό πληρωμής δεν μπορεί να υπερβαίνει το σύνολο.")
+        return self
+
+
+class OccupiedSeatsResponse(BaseModel):
+    """Public B2C — seat codes only (no passenger PII)."""
+
+    external_trip_id: int
+    seats: list[str] = Field(default_factory=list)
+    count: int = 0
 
 
 class BookingResponse(BaseModel):
@@ -90,6 +123,12 @@ class BookingResponse(BaseModel):
     metadata_json: dict | None = None
 
     model_config = {"from_attributes": True}
+
+
+class GuestBookingResponse(BookingResponse):
+    """Guest B2C create — optional one-shot token to open My Wallet without a password."""
+
+    wallet_activate_token: str | None = None
 
 
 class FiscalInvoiceResponse(BaseModel):
@@ -279,6 +318,8 @@ class PlatformTenantCreateRequest(BaseModel):
     legal_name: str = Field(min_length=2, max_length=255)
     subdomain: str = Field(min_length=2, max_length=64)
     plan: str = "starter"
+    # buses = trips only · rent = rent-only plan · both = bus plan + rent add-on
+    service_mode: str = "buses"
     vat_number: str | None = None
     admin_email: EmailStr
     admin_password: str = Field(min_length=8, max_length=128)
@@ -299,6 +340,9 @@ class PlatformTenantUpdateRequest(BaseModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     admin_notes: str | None = None
+    # SuperAdmin: set / reset the office admin login password (min 8).
+    admin_password: str | None = Field(default=None, min_length=8, max_length=128)
+    admin_email: EmailStr | None = None
 
 
 class PlatformOverviewResponse(BaseModel):
@@ -366,9 +410,24 @@ class TenantDnsInstructionsResponse(BaseModel):
     cname_host: str
     cname_target: str
     alternate_www_host: str | None = None
+    apex_host: str | None = None
+    apex_a_record: str | None = None
     subdomain_cname_host: str | None = None
     subdomain_cname_target: str | None = None
     notes: list[str] = Field(default_factory=list)
+
+
+class TenantDomainDnsCheckResponse(BaseModel):
+    domain: str = ""
+    www_ok: bool = False
+    apex_ok: bool = False
+    ready_for_tls: bool = False
+    ingress_cname: str = "www.poreiago.com"
+    ingress_ip: str = "169.58.199.186"
+    message: str = ""
+    www: dict[str, object] | None = None
+    apex: dict[str, object] | None = None
+    edge: dict[str, object] | None = None
 
 
 class TenantBrandingSettingsResponse(BaseModel):
@@ -399,12 +458,20 @@ class TenantBrandingSettingsUpdate(BaseModel):
 class TenantSiteAppearanceResponse(BaseModel):
     storage_source: str = "postgres"
     tenant_slug: str | None = None
+    display_name: str = ""
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
+    logo_radius_px: int = 0
+    logo_padding_px: int = 0
+    logo_bg_mode: str = "none"
+    logo_shadow: bool = False
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
+    hero_overlay_opacity: int = 100
+    hero_image_fit: str = "cover"
+    hero_height_vh: int = 88
     hero_badge: str = ""
     hero_title: str = ""
     hero_title_accent: str = ""
@@ -416,11 +483,26 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_hero_title: str = ""
     rent_hero_copy: str = ""
     rent_guest_hero_title: str = ""
+    rent_guest_hero_title_accent: str = ""
     rent_guest_hero_copy: str = ""
+    rent_guest_hero_benefits: list[str] = []
+    rent_search_show_dropoff_toggle: bool = True
+    rent_search_show_promo: bool = True
+    rent_search_submit_label: str = "Αναζήτηση"
     rent_cta_label: str = ""
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
     rent_upsell_coverage_id: str = ""
+    rent_notify_email_enabled: bool = True
+    rent_notify_sms_enabled: bool = True
+    rent_notify_email_label: str = ""
+    rent_notify_sms_label: str = ""
+    rent_notify_email_default: bool = False
+    rent_notify_sms_default: bool = False
+    rent_notify_sms_template_confirmed: str = ""
+    rent_notify_sms_template_status: str = ""
+    rent_notify_email_subject: str = ""
+    rent_notify_email_body: str = ""
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -433,17 +515,61 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_slider_slides: list[dict] = []
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
+    secondary_color: str = "#1e3a5f"
+    surface_color: str = "#f8fafc"
     show_fleet_section: bool = True
     show_why_us_section: bool = True
+    header_template: str = "glass_dark"
+    hero_template: str = "fullscreen_overlay"
+    trips_layout_template: str = "grid_three"
+    trip_card_template: str = "premium"
+    footer_template: str = "classic_columns"
+    rent_fleet_layout_template: str = "rent_grid_three"
+    rent_fleet_card_template: str = "rent_premium"
+    rent_theme_id: str = "aegean_coast"
+    rent_hero_style: str = "coastal"
+    rent_hero_layout: str = "strip"
+    rent_hero_image_url: str = "/images/rent-hero-coastal-v2.jpg"
+    rent_header_style: str = "glass"
+    rent_accent_color: str = "#0a7a6c"
+    rent_secondary_color: str = "#0b3d4a"
+    rent_surface_color: str = "#f0fdfa"
+    intl_trips_layout_template: str = "editorial_stack"
+    intl_trip_card_template: str = "abroad_horizontal"
+    trips_section_eyebrow: str = "Ανακαλύψτε"
+    trips_section_title: str = "Εκδρομές στην Ελλάδα"
+    trips_section_subtitle: str = (
+        "Ημερήσιες και πολυήμερες διαδρομές με premium στόλο — κράτηση θέσης online."
+    )
+    intl_section_eyebrow: str = "Διεθνή δρομολόγια"
+    intl_section_title: str = "Ταξίδια προς το Εξωτερικό"
+    intl_section_subtitle: str = (
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
+    )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = []
+    wallet_home_news: list[dict] = []
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
 
 
 class TenantSiteAppearanceUpdate(BaseModel):
     logo_url: str | None = None
     logo_height_px: int | None = Field(default=None, ge=20, le=96)
     logo_max_width_px: int | None = Field(default=None, ge=60, le=400)
+    logo_radius_px: int | None = Field(default=None, ge=0, le=48)
+    logo_padding_px: int | None = Field(default=None, ge=0, le=24)
+    logo_bg_mode: str | None = None
+    logo_shadow: bool | None = None
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
+    hero_overlay_opacity: int | None = None
+    hero_image_fit: str | None = None
+    hero_height_vh: int | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None
@@ -455,11 +581,26 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
+    rent_guest_hero_title_accent: str | None = None
     rent_guest_hero_copy: str | None = None
+    rent_guest_hero_benefits: list[str] | None = None
+    rent_search_show_dropoff_toggle: bool | None = None
+    rent_search_show_promo: bool | None = None
+    rent_search_submit_label: str | None = None
     rent_cta_label: str | None = None
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
     rent_upsell_coverage_id: str | None = None
+    rent_notify_email_enabled: bool | None = None
+    rent_notify_sms_enabled: bool | None = None
+    rent_notify_email_label: str | None = None
+    rent_notify_sms_label: str | None = None
+    rent_notify_email_default: bool | None = None
+    rent_notify_sms_default: bool | None = None
+    rent_notify_sms_template_confirmed: str | None = None
+    rent_notify_sms_template_status: str | None = None
+    rent_notify_email_subject: str | None = None
+    rent_notify_email_body: str | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = Field(default=None, ge=3, le=20)
@@ -472,8 +613,41 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_slider_slides: list[dict] | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
+    secondary_color: str | None = None
+    surface_color: str | None = None
     show_fleet_section: bool | None = None
     show_why_us_section: bool | None = None
+    header_template: str | None = None
+    hero_template: str | None = None
+    trips_layout_template: str | None = None
+    trip_card_template: str | None = None
+    footer_template: str | None = None
+    rent_fleet_layout_template: str | None = None
+    rent_fleet_card_template: str | None = None
+    rent_theme_id: str | None = None
+    rent_hero_style: str | None = None
+    rent_hero_layout: str | None = None
+    rent_hero_image_url: str | None = None
+    rent_header_style: str | None = None
+    rent_accent_color: str | None = None
+    rent_secondary_color: str | None = None
+    rent_surface_color: str | None = None
+    intl_trips_layout_template: str | None = None
+    intl_trip_card_template: str | None = None
+    trips_section_eyebrow: str | None = None
+    trips_section_title: str | None = None
+    trips_section_subtitle: str | None = None
+    intl_section_eyebrow: str | None = None
+    intl_section_title: str | None = None
+    intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 class TenantPlatformSettingsResponse(BaseModel):
@@ -494,7 +668,7 @@ class TenantPlatformSettingsResponse(BaseModel):
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
     checkout_bank_transfer_enabled: bool = True

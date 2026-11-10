@@ -97,11 +97,11 @@ export default function RentPickupLocationsEditor() {
           <div>
             <h3 className="font-bold text-gray-900">Σημεία παραλαβής</h3>
             <p className="text-sm text-gray-500 mt-1 max-w-xl">
-              Ό,τι προσθέσεις εδώ εμφανίζεται στο μενού «Σημείο έναρξης ενοικίασης» της σελίδας{' '}
+              Εμφανίζονται στο <strong className="font-semibold text-gray-700">hero</strong> της{' '}
               <a href="/rent" target="_blank" rel="noreferrer" className="text-teal-700 font-semibold">
                 /rent
-              </a>
-              .
+              </a>{' '}
+              και στο μενού «Σημείο έναρξης ενοικίασης» της φόρμας αναζήτησης.
             </p>
           </div>
           <button

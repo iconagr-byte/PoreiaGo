@@ -48,7 +48,12 @@ export default function GdprCompliancePanel() {
       setLogs(data.items || []);
       setTotal(data.total ?? 0);
     } catch (e) {
-      toast.error(e.message || 'Αποτυχία audit log');
+      const msg = String(e?.message || '');
+      toast.error(
+        !msg || msg === 'Internal Server Error'
+          ? 'Αποτυχία φόρτωσης Audit Trail (σφάλμα βάσης). Ανανεώστε σε λίγο.'
+          : msg,
+      );
       setLogs([]);
     } finally {
       setLoading(false);
