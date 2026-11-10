@@ -1,20 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Map, { Marker, Popup, useMap } from 'react-map-gl/mapbox';
+import Map, { Marker, Popup, NavigationControl, useMap } from 'react-map-gl/mapbox';
 import { LngLatBounds } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '../../styles/fleet-live-map.css';
 import { MAPBOX_STYLE, MAPBOX_TOKEN } from '../../lib/maps/mapboxConfig.js';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
+import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
+import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
+import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
   formatBoardingLabel,
+  formatHeadingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatSpeedKmh,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
+  resolveVehicleHeadingDeg,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import {
+  formatFleetBusPillLabel,
+  formatFleetExcursionBadge,
+  resolveVehicleTripTitle,
+} from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetGpsSourceBadge,
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -38,7 +57,14 @@ function HeatmapDots({ points = [], visible = true }) {
 
 function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
-  const img = resolveFleetMarkerImage(vehicle);
+  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
+  const pillLabel = formatFleetBusPillLabel(vehicle);
+  const tripTitle = resolveVehicleTripTitle(vehicle);
+  const excursion = formatFleetExcursionBadge(vehicle);
+  const gpsSources = resolveFleetGpsSources(vehicle);
+  const speed = formatSpeedKmh(vehicle);
+  const headingLabel = formatHeadingLabel(vehicle);
+  const headingDeg = resolveVehicleHeadingDeg(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -52,26 +78,56 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
-        <div className="relative h-[52px] w-[52px] drop-shadow-[0_8px_18px_rgba(15,23,42,0.28)]">
-          <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-slate-50 bg-slate-900 ring-2 ring-slate-900">
-            <img src={img} alt="" className="h-full w-full object-cover" />
+        <div className="fleet-apple-bus-pin">
+          {gpsSources.length ? (
+            <div
+              className={`fleet-apple-bus-gps-sources${gpsSources.length > 1 ? ' is-dual' : ''}`}
+            >
+              {gpsSources.map((kind) => (
+                <span
+                  key={kind}
+                  className={`fleet-apple-bus-gps-source fleet-apple-bus-gps-source--${kind}`}
+                >
+                  {formatFleetGpsSourceChipLabel(kind)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
+          <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
+            {pillLabel}
           </div>
-          <div className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-amber-300" />
           <div
-            className="pointer-events-none absolute left-1/2 top-[-2px] h-0 w-0 -translate-x-1/2 border-x-[5px] border-b-[8px] border-x-transparent border-b-amber-300"
-            style={{
-              transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
-              transformOrigin: '50% 30px',
-            }}
-          />
-        </div>
-        <div
-          className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-xl bg-white px-2.5 py-1.5 text-left shadow-lg border border-black/[0.06]"
-          onDoubleClick={openHistory}
-        >
-          <div className="text-[11px] font-bold text-slate-900 leading-tight">{vehicle.driver_name}</div>
-          <div className="text-[10px] text-slate-500">
-            {vehicle.bus_plate} · {Math.round(vehicle.speed || 0)} km/h
+            className="fleet-apple-bus-hud"
+            role="status"
+            aria-label={`Ταχύτητα ${speed} χιλιόμετρα ανά ώρα${headingLabel ? `, κατεύθυνση ${headingLabel}` : ''}`}
+          >
+            <span className="fleet-apple-bus-hud__speed">
+              <strong>{speed}</strong>
+              <small>km/h</small>
+            </span>
+            <span className="fleet-apple-bus-hud__sep" aria-hidden="true" />
+            <span className={`fleet-apple-bus-hud__heading${headingLabel ? '' : ' is-empty'}`}>
+              {headingDeg != null ? (
+                <span
+                  className="fleet-apple-bus-hud__arrow"
+                  style={{ transform: `rotate(${Math.round(headingDeg)}deg)` }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {headingLabel || '—'}
+            </span>
+          </div>
+          <div className="fleet-apple-bus-pin__ring">
+            <div className="fleet-apple-bus-pin__avatar">
+              <img src={img} alt="" decoding="async" width={40} height={40} />
+            </div>
+            <div
+              className="fleet-apple-bus-pin__heading"
+              style={{
+                transform: `translateX(-50%) rotate(${headingDeg ?? 0}deg)`,
+              }}
+            />
           </div>
         </div>
       </button>
@@ -84,15 +140,28 @@ function BusMarker({ vehicle, onVehicleHistory }) {
           onClose={() => setOpen(false)}
           closeOnClick={false}
         >
-          <div className="min-w-[180px] text-sm">
+          <div className="fleet-apple-popup text-sm">
             <div className="mb-2 flex items-center gap-2.5">
-              <img src={img} alt="" className="h-12 w-12 rounded-xl object-cover" />
+              <img
+                src={img}
+                alt=""
+                decoding="async"
+                className="h-12 w-12 rounded-[14px] object-cover bg-slate-100"
+              />
               <div>
-                <div className="font-bold">{vehicle.driver_name}</div>
-                <div className="text-xs text-slate-500">{vehicle.bus_plate}</div>
+                <div className="fleet-apple-popup__title">{vehicle.driver_name}</div>
+                <div className="fleet-apple-popup__meta">
+                  {vehicle.bus_plate}
+                  {tripTitle ? ` · ${tripTitle}` : ''}
+                </div>
               </div>
             </div>
-            <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
+            <div>Ταχύτητα: {speed} km/h</div>
+            <div>Κατεύθυνση: {headingLabel || '—'}</div>
+            <div>
+              Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}
+              {gpsSources.length > 1 ? ' (και τα δύο ενεργά)' : ''}
+            </div>
             <div>Δρομολόγιο #{vehicle.trip_id ?? '—'}</div>
             <div>Ενημέρωση: {formatUpdatedAgo(vehicle.timestamp) || '—'}</div>
             {formatBoardingLabel(vehicle) ? <div>Επιβιβασμένοι: {formatBoardingLabel(vehicle)}</div> : null}
@@ -104,7 +173,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
               <FleetDriverPlaybackButton vehicle={vehicle} />
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
+                className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
                 onClick={openHistory}
               >
                 Ιστορικό
@@ -129,12 +198,17 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
   const userMovedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
 
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance?.on) return undefined;
     const markMoved = () => {
+      if (programmaticRef.current) {
+        programmaticRef.current = false;
+        return;
+      }
       userMovedRef.current = true;
     };
     mapInstance.on('dragstart', markMoved);
@@ -148,7 +222,11 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance || !vehicles?.length) return;
-    const ids = vehicles
+    const pts = vehicles.filter(
+      (v) => Number.isFinite(Number(v.lng)) && Number.isFinite(Number(v.lat)),
+    );
+    if (!pts.length) return;
+    const ids = pts
       .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
       .sort()
       .join('|');
@@ -162,22 +240,32 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       return;
     }
     fittedIdsRef.current = ids;
+    const count = pts.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    const duration = force ? 700 : 500;
+    programmaticRef.current = true;
+    if (count === 1) {
+      mapInstance.flyTo({
+        center: [pts[0].lng, pts[0].lat],
+        zoom: maxZoom,
+        duration,
+      });
+      return;
+    }
     const bounds = new LngLatBounds();
-    vehicles.forEach((v) => {
-      if (Number.isFinite(v.lng) && Number.isFinite(v.lat)) {
-        bounds.extend([v.lng, v.lat]);
-      }
-    });
+    pts.forEach((v) => bounds.extend([v.lng, v.lat]));
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: force ? 600 : 0 });
+    mapInstance.fitBounds(bounds, { padding: pad, maxZoom, duration });
   }, [vehicles, map, fitNonce]);
 
   return null;
 }
 
-/** Mapbox GL — react-map-gl με ομαλή κίνηση δεικτών. */
+/** Mapbox GL — Apple light style + ελληνικές ετικέτες. */
 export default function FleetLiveMapMapbox({
   vehicles,
+  trailVehicles,
   heatmap = [],
   showHeat = false,
   geofenceLayers = null,
@@ -185,24 +273,39 @@ export default function FleetLiveMapMapbox({
   sosAlerts = [],
   showGeofence = false,
   showSosPins = true,
+  showPlaces = true,
+  showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
+  onClearSos = null,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
-      return { longitude: vehicles[0].lng, latitude: vehicles[0].lat, zoom: 10 };
+      return {
+        longitude: vehicles[0].lng,
+        latitude: vehicles[0].lat,
+        zoom: resolveFleetFitMaxZoom(vehicles.length),
+      };
     }
     if (sosAlerts.length) {
-      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 12 };
+      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 14 };
     }
-    return { longitude: 23.0, latitude: 38.5, zoom: 7 };
+    return { longitude: 23.0, latitude: 38.5, zoom: 6.4 };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial only
 
   const fitVehicles = useMemo(() => {
     const extra = sosAlerts.map((a, i) => ({ id: `sos-${a.id || i}`, lat: a.lat, lng: a.lng }));
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
+
+  // Blue trail only for vehicles with an active excursion (parent may pass a subset).
+  const trailSource = trailVehicles ?? vehicles;
+  const trails = useFleetVehicleTrails(trailSource, {
+    enabled: showTrails,
+    maxPoints: 3000,
+    minMoveM: 3,
+  });
 
   return (
     <Map
@@ -212,10 +315,13 @@ export default function FleetLiveMapMapbox({
       style={{ width: '100%', height: '100%' }}
       attributionControl
     >
+      <NavigationControl position="bottom-right" showCompass={false} />
+      <GreecePlacesMapboxLayer visible={showPlaces} />
       <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
-      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
+      <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
+      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <HeatmapDots points={heatmap} visible={showHeat} />
       <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </Map>

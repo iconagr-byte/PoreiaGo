@@ -120,11 +120,11 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
         <div>
           <h3 className="font-bold flex items-center gap-1">
             <span className="material-symbols-outlined text-[18px] text-primary">schedule</span>
-            Live ETA
+            Ζωντανό ETA
           </h3>
           <p className="text-[10px] text-gray-500">
-            refresh {LIVE_REFRESH_SEC}s
-            {data?.google_maps_configured ? ' · Google Traffic' : ' · mock ETA'}
+            ανανέωση {LIVE_REFRESH_SEC}δ
+            {data?.google_maps_configured ? ' · Google Traffic' : ' · εκτίμηση'}
           </p>
         </div>
         {loading ? <span className="text-[10px] text-gray-400">…</span> : null}

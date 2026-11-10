@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -15,10 +17,27 @@ from travel_platform.settings.drivers_store import DEMO_TENANT_ID, list_drivers
 ServiceStatus = Literal["OK", "Warning", "Urgent"]
 AlertSeverity = Literal["warning", "urgent"]
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "fleet_store.json"
-NOTIFICATION_LOG = DATA_DIR / "fleet_notifications.log"
-UPLOAD_DIR = DATA_DIR / "uploads"
+# Prefer persistent volume in production (docker mount /app/data).
+_PKG_DIR = Path(__file__).resolve().parent
+_DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or (_PKG_DIR.parents[1] / "data"))
+_LEGACY_STORE = _PKG_DIR / "fleet_store.json"
+STORE_FILE = Path(os.getenv("FLEET_VEHICLES_STORE") or (_DATA_DIR / "fleet_store.json"))
+NOTIFICATION_LOG = _DATA_DIR / "fleet_notifications.log"
+UPLOAD_DIR = _DATA_DIR / "fleet_uploads"
+# Keep package-relative alias for older imports/tests that patch DATA_DIR.
+DATA_DIR = _DATA_DIR
+
+
+def _ensure_store_path() -> None:
+    """Migrate legacy package-local store onto the durable data volume once."""
+    STORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    if STORE_FILE.exists() or not _LEGACY_STORE.is_file():
+        return
+    try:
+        shutil.copy2(_LEGACY_STORE, STORE_FILE)
+    except OSError:
+        pass
 
 DEFAULT_AMENITIES: dict[str, list[str]] = {
     "Luxury Coach": [
@@ -71,6 +90,34 @@ def _default_seats(category: str) -> int:
     return DEFAULT_SEATS.get(category, 49)
 
 
+# Stable English category ids → Greek labels (matches src/lib/fleet/fleetVehicleCategories.js).
+_CATEGORY_LABEL_EL: dict[str, str] = {
+    "Luxury Coach": "Πολυτελές λεωφορείο",
+    "Premium Express": "Εξπρές πολυτελείας",
+    "Standard": "Κλασικό λεωφορείο",
+    "Van": "Μικρό λεωφορείο / van",
+}
+
+
+def _category_label_el(category: str | None) -> str:
+    raw = str(category or "").strip()
+    if not raw:
+        return "—"
+    if raw in _CATEGORY_LABEL_EL:
+        return _CATEGORY_LABEL_EL[raw]
+    # Soft match for legacy / free-text values.
+    lower = raw.lower()
+    if "van" in lower or "minibus" in lower:
+        return _CATEGORY_LABEL_EL["Van"]
+    if "express" in lower or "premium" in lower:
+        return _CATEGORY_LABEL_EL["Premium Express"]
+    if "luxury" in lower or "coach" in lower:
+        return _CATEGORY_LABEL_EL["Luxury Coach"]
+    if "standard" in lower or "classic" in lower:
+        return _CATEGORY_LABEL_EL["Standard"]
+    return raw
+
+
 @dataclass
 class Vehicle:
     id: str
@@ -94,6 +141,7 @@ class Vehicle:
     seat_count: int = 49
     amenities: list[str] = field(default_factory=list)
     public_image_url: str = ""
+    gallery_urls: list[str] = field(default_factory=list)
     public_summary: str = ""
     show_on_website: bool = True
     tenant_id: str = DEMO_TENANT_ID
@@ -178,6 +226,7 @@ class ServiceService:
         self._events: dict[str, MaintenanceEvent] = {}
         self._alerts: dict[str, FleetAlert] = {}
         self._expenses: dict[str, FleetExpense] = {}
+        self._store_mtime: float | None = None
         self._load()
 
     def _seed(self) -> None:
@@ -221,9 +270,39 @@ class ServiceService:
                 tenant_id=DEMO_TENANT_ID,
             )
 
+    def _clear_memory(self) -> None:
+        self._vehicles.clear()
+        self._events.clear()
+        self._alerts.clear()
+        self._expenses.clear()
+
+    def _disk_mtime(self) -> float | None:
+        try:
+            if STORE_FILE.exists():
+                return STORE_FILE.stat().st_mtime
+        except OSError:
+            return None
+        return None
+
+    def _ensure_fresh(self) -> None:
+        """
+        Reload when another worker / process wrote a newer fleet_store.json.
+
+        Public site builds a fresh ServiceService per request (always disk-fresh).
+        Admin uses the module singleton — without this, Contabo multi-worker
+        shows 0 vehicles in «Διαχείριση Στόλου» while /api/site/fleet is full.
+        """
+        disk_mtime = self._disk_mtime()
+        if disk_mtime is None:
+            return
+        if self._store_mtime is not None and disk_mtime > self._store_mtime:
+            self._load()
+
     def _load(self) -> None:
+        _ensure_store_path()
+        self._clear_memory()
         if not STORE_FILE.exists():
-            self._seed()
+            # Start empty — never inject demo coaches for new offices.
             self._persist()
             return
         raw = json.loads(STORE_FILE.read_text(encoding="utf-8"))
@@ -250,6 +329,11 @@ class ServiceService:
                 seat_count=int(r.get("seat_count") or _default_seats(str(r.get("category") or "Standard"))),
                 amenities=list(r.get("amenities") or _default_amenities(str(r.get("category") or "Standard"))),
                 public_image_url=str(r.get("public_image_url") or ""),
+                gallery_urls=[
+                    str(u).strip()
+                    for u in (r.get("gallery_urls") or [])
+                    if str(u).strip()
+                ],
                 public_summary=str(r.get("public_summary") or ""),
                 show_on_website=bool(r.get("show_on_website", True)),
                 # Legacy rows without tenant_id belong to the demo office only.
@@ -301,15 +385,26 @@ class ServiceService:
                 note=str(r.get("note") or ""),
                 created_at=_parse_datetime(r.get("created_at")),
             )
+        try:
+            self._store_mtime = STORE_FILE.stat().st_mtime
+        except OSError:
+            self._store_mtime = None
 
     def _persist(self) -> None:
+        _ensure_store_path()
         payload = {
             "vehicles": [_iso(asdict(v)) for v in self._vehicles.values()],
             "events": [_iso(asdict(e)) for e in self._events.values()],
             "alerts": [_iso(asdict(a)) for a in self._alerts.values()],
             "expenses": [_iso(asdict(e)) for e in self._expenses.values()],
         }
-        STORE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp = STORE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(STORE_FILE)
+        try:
+            self._store_mtime = STORE_FILE.stat().st_mtime
+        except OSError:
+            self._store_mtime = None
 
     def _service_threshold(self, v: Vehicle) -> float:
         return float(v.next_service_threshold or (v.last_service_mileage + v.service_interval_km))
@@ -342,12 +437,14 @@ class ServiceService:
         return _normalize_tenant_id(getattr(v, "tenant_id", None))
 
     def _vehicles_for_tenant(self, tenant_id: str | None) -> list[Vehicle]:
+        self._ensure_fresh()
         if tenant_id is None:
             return list(self._vehicles.values())
         tid = _normalize_tenant_id(tenant_id)
         return [v for v in self._vehicles.values() if self._vehicle_tenant_id(v) == tid]
 
     def get_vehicle_for_tenant(self, vehicle_id: str, tenant_id: str) -> Vehicle | None:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
             return None
@@ -377,11 +474,12 @@ class ServiceService:
                     "make": v.make,
                     "model": v.model,
                     "category": v.category,
+                    "category_label": _category_label_el(v.category),
                     "year": v.year,
                     "seat_count": v.seat_count,
                     "amenities": amenities,
                     "summary": v.public_summary
-                    or f"{v.category} · {v.seat_count} θέσεις · Euro VI",
+                    or f"{_category_label_el(v.category)} · {v.seat_count} θέσεις · Euro VI",
                     "image_url": v.public_image_url or "/images/hero-bus-achillio.png",
                     "status_label": status_label,
                 }
@@ -389,6 +487,7 @@ class ServiceService:
         return sorted(rows, key=lambda x: x["name"])
 
     def get_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
             return None
@@ -397,6 +496,8 @@ class ServiceService:
         return self._vehicle_response(v)
 
     def create_vehicle(self, payload: dict[str, Any]) -> dict[str, Any]:
+        # Reload first so persist does not clobber peer-worker writes.
+        self._ensure_fresh()
         vid = payload.get("id") or f"FL-{str(uuid4())[:8].upper()}"
         category = str(payload.get("category") or "Standard")
         v = Vehicle(
@@ -421,11 +522,20 @@ class ServiceService:
             seat_count=int(payload.get("seat_count") or _default_seats(category)),
             amenities=list(payload.get("amenities") or _default_amenities(category)),
             public_image_url=str(payload.get("public_image_url") or ""),
+            gallery_urls=[
+                str(u).strip()
+                for u in (payload.get("gallery_urls") or [])
+                if str(u).strip()
+            ],
             public_summary=str(payload.get("public_summary") or ""),
             show_on_website=bool(payload.get("show_on_website", True)),
             tenant_id=_normalize_tenant_id(payload.get("tenant_id")),
             documents=list(payload.get("documents") or []),
         )
+        if v.public_image_url and v.public_image_url not in v.gallery_urls:
+            v.gallery_urls = [v.public_image_url, *v.gallery_urls]
+        elif not v.public_image_url and v.gallery_urls:
+            v.public_image_url = v.gallery_urls[0]
         self._vehicles[v.id] = v
         self._persist()
         return self._vehicle_response(v)
@@ -436,6 +546,7 @@ class ServiceService:
         patch: dict[str, Any],
         tenant_id: str | None = None,
     ) -> dict[str, Any]:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
             raise KeyError("Vehicle not found")
@@ -452,10 +563,17 @@ class ServiceService:
                 setattr(v, key, int(value))
             elif key == "amenities" and isinstance(value, list):
                 setattr(v, key, [str(a).strip() for a in value if str(a).strip()])
+            elif key == "gallery_urls" and isinstance(value, list):
+                urls = [str(u).strip() for u in value if str(u).strip()]
+                setattr(v, key, urls)
+                if urls and not (patch.get("public_image_url") or v.public_image_url):
+                    v.public_image_url = urls[0]
             elif key == "show_on_website":
                 setattr(v, key, bool(value))
             elif key in {"category", "public_image_url", "public_summary"}:
                 setattr(v, key, str(value).strip())
+                if key == "public_image_url" and value and str(value).strip() not in (v.gallery_urls or []):
+                    v.gallery_urls = [str(value).strip(), *(v.gallery_urls or [])]
             elif key in {"current_odometer", "last_service_mileage", "next_service_threshold", "purchase_price", "fuel_cost_total", "insurance_cost_total"}:
                 setattr(v, key, float(value))
             elif hasattr(v, key):
@@ -465,6 +583,7 @@ class ServiceService:
         return self._vehicle_response(v)
 
     def delete_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> bool:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
             return False
@@ -480,6 +599,7 @@ class ServiceService:
         return self.update_vehicle(vehicle_id, {"current_odometer": odometer_km})
 
     def list_maintenance_events(self, vehicle_id: str | None = None) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         events = list(self._events.values())
         if vehicle_id:
             events = [e for e in events if e.vehicle_id == vehicle_id]
@@ -487,6 +607,7 @@ class ServiceService:
         return [_iso(asdict(e)) for e in events]
 
     def create_maintenance_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._ensure_fresh()
         if payload["vehicle_id"] not in self._vehicles:
             raise KeyError("Vehicle not found")
         e = MaintenanceEvent(
@@ -519,6 +640,7 @@ class ServiceService:
         return _iso(asdict(e))
 
     def attach_to_event(self, event_id: str, file_name: str, mime_type: str, size_bytes: int, storage_path: str) -> dict[str, Any]:
+        self._ensure_fresh()
         event = self._events.get(event_id)
         if not event:
             raise KeyError("Maintenance event not found")
@@ -535,6 +657,7 @@ class ServiceService:
         return row
 
     def scan_predictive_alerts(self) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         now = date.today()
         existing = {
             (a.vehicle_id, a.kind): a
@@ -608,6 +731,7 @@ class ServiceService:
         )
 
     def list_alerts(self, unresolved_only: bool = True) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         alerts = list(self._alerts.values())
         if unresolved_only:
             alerts = [a for a in alerts if not a.resolved]
@@ -615,6 +739,7 @@ class ServiceService:
         return [_iso(asdict(a)) for a in alerts]
 
     def resolve_alert(self, alert_id: str) -> dict[str, Any]:
+        self._ensure_fresh()
         alert = self._alerts.get(alert_id)
         if not alert:
             raise KeyError("Alert not found")
@@ -630,6 +755,7 @@ class ServiceService:
         trip_title: str | None = None,
     ) -> dict[str, Any]:
         """Log blocked booking attempt; notify fleet manager (email log file)."""
+        self._ensure_fresh()
         plate = (plate_number or "").strip().upper().replace(" ", "")
         vehicle_id = "unknown"
         for v in self._vehicles.values():
@@ -988,6 +1114,7 @@ class ServiceService:
         tenant_id: str | None = None,
         vehicle_id: str | None = None,
     ) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         items = list(self._expenses.values())
         if tenant_id is not None:
             tid = _normalize_tenant_id(tenant_id)
@@ -1030,6 +1157,7 @@ class ServiceService:
         return _iso(asdict(e))
 
     def delete_expense(self, expense_id: str, tenant_id: str | None = None) -> bool:
+        self._ensure_fresh()
         e = self._expenses.get(expense_id)
         if not e:
             return False

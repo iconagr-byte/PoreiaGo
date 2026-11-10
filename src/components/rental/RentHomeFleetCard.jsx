@@ -1,0 +1,152 @@
+import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
+
+/**
+ * Vehicle pick card — Apple Store product style, photo-first, clear price + CTA.
+ * Double-click / photo tap opens vehicle detail sheet.
+ */
+export default function RentHomeFleetCard({
+  vehicle,
+  favorite = false,
+  onToggleFavorite,
+  onSelect,
+  onOpenDetails,
+  ctaLabel = 'Επιλογή',
+  templateId = 'rent_premium',
+  featured = false,
+}) {
+  const v = enrichRentVehicle(vehicle);
+  const cover = v.photo_urls?.[0] || v.photo_url || '';
+  const groupLine = [v.group_code, v.size_label].filter(Boolean).join(' · ');
+  const rate =
+    v.daily_rate_eur != null && v.daily_rate_eur !== ''
+      ? Number(v.daily_rate_eur)
+      : null;
+
+  const seatsLabel =
+    Number(v.seating_capacity) > 0
+      ? `${v.seating_capacity}`
+      : String(v.seats_label || '').replace(/[^\d]/g, '') || '—';
+  const bagsLabel =
+    Number(v.luggage_bags) > 0
+      ? `${v.luggage_bags}`
+      : String(v.luggage_label || '').replace(/^x/i, '') || '—';
+  const fuelLabel = String(v.fuel || v.fuel_type || '').trim() || 'A/C';
+  const gearLabel = String(v.transmission || '').trim() || 'Με ταχύτητες';
+
+  const specs = [
+    { icon: 'person', label: seatsLabel, title: 'Επιβάτες' },
+    { icon: 'luggage', label: bagsLabel, title: 'Αποσκευές' },
+    { icon: 'local_gas_station', label: fuelLabel, title: 'Καύσιμο' },
+    { icon: 'settings', label: gearLabel, title: 'Κιβώτιο' },
+  ];
+
+  const openDetails = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    onOpenDetails?.(vehicle);
+  };
+
+  const cardMod = String(templateId || 'rent_premium').replace(/^rent_/, '');
+  const cardClass = [
+    'rent-pick',
+    `rent-pick--${cardMod}`,
+    featured ? 'rent-pick--featured' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <article
+      className={cardClass}
+      onDoubleClick={openDetails}
+      title="Διπλό κλικ για περισσότερες φωτογραφίες & στοιχεία μίσθωσης"
+    >
+      <button
+        type="button"
+        className="rent-pick-media"
+        onClick={openDetails}
+        aria-label={`Λεπτομέρειες ${v.model || 'οχήματος'}`}
+      >
+        {cover ? (
+          <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" />
+        ) : (
+          <span className="material-symbols-outlined rent-pick-media-fallback">directions_car</span>
+        )}
+        {groupLine ? <span className="rent-pick-badge">{groupLine}</span> : null}
+        <span className="rent-pick-media-hint">
+          <span className="material-symbols-outlined" aria-hidden>
+            photo_library
+          </span>
+          Φωτογραφίες
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={`rent-pick-fav${favorite ? ' is-on' : ''}`}
+        aria-label={favorite ? 'Αφαίρεση από αγαπημένα' : 'Προσθήκη στα αγαπημένα'}
+        aria-pressed={favorite}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleFavorite?.();
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden>
+          {favorite ? 'favorite' : 'favorite_border'}
+        </span>
+      </button>
+
+      <div className="rent-pick-body">
+        <header className="rent-pick-top">
+          <h3 className="rent-pick-title">
+            <span>{v.model || 'Όχημα'}</span>
+            {v.similar_label ? <em>{v.similar_label}</em> : null}
+          </h3>
+        </header>
+
+        <ul className="rent-pick-specs" aria-label="Χαρακτηριστικά">
+          {specs.map((s) => (
+            <li key={s.icon} title={s.title}>
+              <span className="material-symbols-outlined" aria-hidden>
+                {s.icon}
+              </span>
+              <span>{s.label}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="rent-pick-foot">
+          <div className="rent-pick-price-block">
+            {rate != null && Number.isFinite(rate) ? (
+              <>
+                <span className="rent-pick-price-kicker">από</span>
+                <p className="rent-pick-price">
+                  <span className="rent-pick-price-amount">€{rate.toFixed(0)}</span>
+                  <span className="rent-pick-price-unit">/ημέρα</span>
+                </p>
+              </>
+            ) : v.price_label ? (
+              <p className="rent-pick-price rent-pick-price--plain">{v.price_label}</p>
+            ) : (
+              <p className="rent-pick-price-kicker">Τιμή κατόπιν επιλογής</p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="rent-pick-cta"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect?.();
+            }}
+          >
+            {ctaLabel}
+            <span className="material-symbols-outlined" aria-hidden>
+              arrow_forward
+            </span>
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}

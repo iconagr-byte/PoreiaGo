@@ -13,7 +13,12 @@ def current_step(ts: float | None = None) -> int:
     return int(t) // settings.qr_window_seconds
 
 
-def issue_rotating_jwt(ticket_ref: str, trip_id: int) -> dict[str, Any]:
+def issue_rotating_jwt(
+    ticket_ref: str,
+    trip_id: int,
+    *,
+    seat: str | None = None,
+) -> dict[str, Any]:
     step = current_step()
     window_end = (step + 1) * settings.qr_window_seconds
     payload = {
@@ -24,12 +29,16 @@ def issue_rotating_jwt(ticket_ref: str, trip_id: int) -> dict[str, Any]:
         "exp": window_end + 5,
         "iat": int(time.time()),
     }
+    seat_code = str(seat or "").strip()
+    if seat_code:
+        payload["seat"] = seat_code
     token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return {
         "token": token,
         "expires_in": max(1, window_end - int(time.time())),
         "step": step,
         "window_seconds": settings.qr_window_seconds,
+        "seat": seat_code or None,
     }
 
 

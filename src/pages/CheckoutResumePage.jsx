@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import AchillioLogo from '../components/AchillioLogo.jsx';
+import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchResumeCart } from '../services/abandonedApi.js';
 import { savePendingCheckout } from '../lib/ticketing/pendingCheckout.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
@@ -53,7 +53,7 @@ export default function CheckoutResumePage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4">
-      <AchillioLogo className="h-10 mb-8" />
+      <OfficeBrandMark className="h-10 mb-8" variant="light" />
       {loading && (
         <p className="text-on-surface-variant flex items-center gap-2">
           <span className="material-symbols-outlined animate-spin">progress_activity</span>
