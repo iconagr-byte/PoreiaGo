@@ -3,6 +3,7 @@
  */
 import { issueSignedQrToken } from './qrToken.js';
 import { isBookingPaid } from './bookingStore.js';
+import { formatMoney } from '../currency/multiCurrency.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -16,10 +17,11 @@ function qrImageUrl(data, size = 200) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&margin=8`;
 }
 
-/** Same-tab print page (no popup). */
-export function ticketPrintPath(bookingId) {
+/** Same-tab print page (no popup). Pass `{ autoPrint: true }` to open print dialog. */
+export function ticketPrintPath(bookingId, { autoPrint = false } = {}) {
   const id = bookingId || 'demo';
-  return `/ticket/print/${encodeURIComponent(id)}`;
+  const base = `/ticket/print/${encodeURIComponent(id)}`;
+  return autoPrint ? `${base}?print=1` : base;
 }
 
 /**
@@ -58,7 +60,8 @@ export async function openTicketPrintWindow(booking, trip, opts = {}) {
       })
     : '—';
   const timeStr = booking.time || '—';
-  const price = booking.price != null ? `€${Number(booking.price).toFixed(2)}` : '—';
+  const price =
+    booking.price != null ? formatMoney(booking.price, booking.currency || 'EUR') : '—';
   const invoice = booking.invoiceNumber || '—';
   const qrSrc = qrImageUrl(qrToken, 220);
 

@@ -1,0 +1,140 @@
+"""Demo rental fleet seed (3 cars + 3 vans)."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import mock
+
+from travel_platform.rental import rental_store as store
+
+
+def test_ensure_demo_rental_fleet_seeds_six_vehicles():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+            added = store.ensure_demo_rental_fleet(tid)
+            assert added == 6
+            rows = store.list_vehicles(tid)
+            cats = [v["category"] for v in rows]
+            assert cats.count("MINI") == 1
+            assert cats.count("COMPACT") == 2
+            assert cats.count("VAN") == 2
+            assert cats.count("MINIBUS") == 1
+            assert all(v.get("photo_url") for v in rows)
+            # Idempotent
+            assert store.ensure_demo_rental_fleet(tid) == 0
+            assert len(store.list_vehicles(tid)) == 6
+
+
+def test_public_catalog_auto_seeds_demo():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "11111111-2222-3333-4444-555555555555"
+            catalog = store.public_catalog(tid)
+            assert len(catalog) == 6
+            assert {v["category"] for v in catalog} == {"MINI", "COMPACT", "VAN", "MINIBUS"}
+            models = {v["model"] for v in catalog}
+            assert "Toyota Aygo X" in models
+            assert "Peugeot 208" in models
+            assert "Renault Clio" in models
+            assert "VW Multivan" in models
+            assert "Ford Transit Custom" in models
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            assert len(raw["vehicles"]) == 6
+
+
+def test_public_catalog_no_seed_in_production():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            tid = "11111111-2222-3333-4444-555555555555"
+            assert store.public_catalog(tid) == []
+
+
+def test_ensure_demo_sample_booking_for_empty_demo_office():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "aaaaaaaa-bbbb-cccc-dddd-ffffffffffff"
+            assert store.ensure_demo_rental_fleet(tid) == 6
+            first = store.ensure_demo_rental_sample_booking(tid)
+            assert first is not None
+            assert first["rental_status"] == "CONFIRMED"
+            assert first["client_name"] == "Δοκιμαστικός Πελάτης"
+            assert store.ensure_demo_rental_sample_booking(tid) is None
+            assert len(store.list_bookings(tid)) == 1
+
+
+def test_sample_booking_seeds_when_demo_fleet_already_present_in_prod():
+    """Prod may keep demo vehicles; still seed one paperwork booking if empty."""
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
+            store.ensure_demo_rental_fleet(tid)
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            booking = store.ensure_demo_rental_sample_booking(tid)
+            assert booking is not None
+            assert len(store.list_bookings(tid)) == 1
+
+
+def test_create_demo_sign_sample_works_with_empty_prod_office():
+    """One-click path must work even when demo fleet auto-seed is off."""
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            tid = "cccccccc-dddd-eeee-ffff-111111111111"
+            assert store.list_vehicles(tid) == []
+            booking = store.create_demo_sign_sample(tid)
+            assert booking["rental_status"] == "CONFIRMED"
+            assert booking["client_name"] == "Δοκιμαστικός Πελάτης"
+            assert len(store.list_vehicles(tid)) >= 1
+            again = store.create_demo_sign_sample(tid)
+            assert again["id"] == booking["id"]

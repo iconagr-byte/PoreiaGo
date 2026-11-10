@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Save, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '../../../styles/emailCompose.css';
@@ -54,8 +55,9 @@ export default function EmailComposeModal({
         body_html: form.body_html,
         preheader: form.preheader,
         includeSignature: form.includeSignature,
+        fromEmail,
       }),
-    [form.body_html, form.preheader, form.includeSignature],
+    [form.body_html, form.preheader, form.includeSignature, fromEmail],
   );
 
   const insertSnippet = (html) => {
@@ -134,7 +136,7 @@ export default function EmailComposeModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="emc-overlay" role="dialog" aria-modal="true" aria-labelledby="emc-title">
       <div className="emc-shell">
         <header className="emc-header">
@@ -242,7 +244,7 @@ export default function EmailComposeModal({
                 checked={form.includeSignature}
                 onChange={(e) => patch('includeSignature', e.target.checked)}
               />
-              Υπογραφή PoreiaGo
+              Υπογραφή email
             </label>
 
             <p className="emc-section-title mt-3">Γρήγορες εισαγωγές</p>
@@ -276,6 +278,7 @@ export default function EmailComposeModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

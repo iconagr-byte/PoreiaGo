@@ -1,5 +1,6 @@
 import TripCard from './TripCard.jsx';
 import { tripsGridClass, tripCardWrapperClass } from '../../lib/homepage/homepageTemplates.js';
+import { PreviewBuilderControl } from './preview/PreviewDesignMode.jsx';
 
 export default function TripsSection({
   id,
@@ -11,42 +12,84 @@ export default function TripsSection({
   siteAppearance,
   pricingSettings,
   hidden = false,
+  sectionClassName = '',
+  /** Tighter padding — for strips inserted between hero blocks (e.g. abroad before fleet). */
+  compact = false,
 }) {
   if (hidden) return null;
 
   const layoutId = siteAppearance.trips_layout_template || 'grid_three';
   const cardId = siteAppearance.trip_card_template || 'premium';
-  const gridClass = tripsGridClass(layoutId);
-  const wrapClass = tripCardWrapperClass(layoutId);
+  const tripCount = trips.length;
+  const solo = tripCount === 1;
+  const dense = compact || solo;
+  const gridClass = tripsGridClass(layoutId, tripCount, cardId);
+  const abroadStrip = cardId === 'abroad_horizontal';
+  const sectionKey = id || 'trips';
 
   return (
-    <section id={id} className="py-24 px-margin-desktop max-w-container-max mx-auto bg-surface">
-      <div className="text-center mb-16">
+    <section
+      id={id}
+      className={`sf-trips-section ${dense ? 'py-10 md:py-12' : 'py-16 md:py-24'} px-4 sm:px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
+    >
+      <div className={`text-center ${dense ? (abroadStrip ? 'mb-8' : 'mb-6') : 'mb-16'}`}>
         {eyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
             {eyebrow}
           </span>
         )}
-        <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight">
-          {title}
-        </h2>
+        {/* One Builder for the whole card template (Καρτέλες) — not per trip card. */}
+        <div className="sf-preview-trips-section-head">
+          <h2
+            className={`font-bold text-on-surface tracking-tight ${
+              abroadStrip
+                ? 'text-3xl md:text-4xl'
+                : dense
+                  ? 'text-2xl md:text-3xl'
+                  : 'font-headline-lg text-4xl md:text-5xl'
+            }`}
+          >
+            {title}
+          </h2>
+          <PreviewBuilderControl
+            sectionId="trips"
+            label="Καρτέλες"
+            variant="inline"
+            instanceId={`trips-title-${sectionKey}`}
+            className="sf-preview-trips-section-head__builder"
+          />
+        </div>
         {subtitle && (
-          <p className="text-on-surface-variant font-body-md mt-3 max-w-xl mx-auto">{subtitle}</p>
+          <p
+            className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
+              abroadStrip
+                ? 'max-w-2xl text-base sm:text-lg'
+                : dense
+                  ? 'max-w-md text-sm sm:text-base'
+                  : 'max-w-xl'
+            }`}
+          >
+            {subtitle}
+          </p>
         )}
       </div>
 
       {trips.length === 0 ? (
         <p className="text-center text-on-surface-variant py-12 font-body-md">{emptyMessage}</p>
       ) : (
-        <div className={gridClass}>
+        <div className={`sf-trips-grid ${gridClass}`}>
           {trips.map((trip, index) => (
-            <div key={trip.id} className={wrapClass}>
+            <div
+              key={String(trip.id ?? index)}
+              className={`sf-trips-card-wrap ${tripCardWrapperClass(layoutId, tripCount, index, cardId)}`}
+            >
               <TripCard
                 trip={trip}
                 pricingSettings={pricingSettings}
                 templateId={cardId}
                 layoutId={layoutId}
                 index={index}
+                solo={solo}
               />
             </div>
           ))}

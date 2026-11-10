@@ -96,9 +96,8 @@ python -m unittest tests.test_fleet_telemetry_ws -v
 
 | Στοιχείο | Αρχείο |
 |----------|--------|
-| Sidebar | **Λειτουργίες Στόλου** → Ζωντανός Χάρτης, Ενεργοί Οδηγοί (`sidebarNav.js`) |
+| Sidebar | **Λειτουργίες Στόλου** → Ζωντανός Χάρτης (`sidebarNav.js`) |
 | Ζωντανός χάρτης (WS + glide) | `FleetLiveMapWebSocket.jsx` → `FleetLiveMapMapbox.jsx` ή `FleetLiveMapLeaflet.jsx` |
-| Λίστα ενεργών οδηγών | `src/components/admin/ActiveDriversList.jsx` |
 | WS context (ένα socket ανά session) | `src/context/FleetTelemetryContext.jsx` |
 
 Το **tenant_id** για το egress WebSocket επιλύεται αυτόματα από:
@@ -106,7 +105,7 @@ python -m unittest tests.test_fleet_telemetry_ws -v
 2. `localStorage` (`saas_tenant_id`)
 3. Fallback demo: `VITE_DEMO_TENANT_ID`
 
-Ο χάρτης χρησιμοποιεί **Mapbox GL** (`react-map-gl`) όταν οριστεί `VITE_MAPBOX_TOKEN`· αλλιώς **Leaflet / CARTO** (χωρίς token).
+Ο χάρτης χρησιμοποιεί **Mapbox GL** (`react-map-gl`) όταν οριστεί `VITE_MAPBOX_TOKEN`· αλλιώς **Leaflet / OpenStreetMap** (χωρίς token).
 
 **Mapbox env** (προαιρετικό):
 

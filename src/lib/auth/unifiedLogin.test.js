@@ -1,0 +1,182 @@
+/**
+ * @vitest-environment node
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const store = new Map();
+
+function installStorage() {
+  const api = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => {
+      store.set(String(k), String(v));
+    },
+    removeItem: (k) => {
+      store.delete(k);
+    },
+    clear: () => store.clear(),
+  };
+  vi.stubGlobal('localStorage', api);
+  vi.stubGlobal('sessionStorage', {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+  });
+}
+
+vi.mock('../../services/customerAuthApi.js', () => ({
+  loginCustomer: vi.fn(),
+}));
+
+vi.mock('../../services/driverPortalApi.js', () => ({
+  loginDriver: vi.fn(),
+}));
+
+vi.mock('../../services/customerBookingsApi.js', () => ({
+  fetchMyBookingsFromServer: vi.fn(async () => []),
+}));
+
+vi.mock('../../services/customerRentalApi.js', () => ({
+  fetchMyRentalBookings: vi.fn(async () => []),
+}));
+
+vi.mock('../rental/preferRentLookup.js', () => ({
+  hasPreferRentLookup: vi.fn(() => false),
+}));
+
+import { loginCustomer } from '../../services/customerAuthApi.js';
+import { loginDriver } from '../../services/driverPortalApi.js';
+import { fetchMyBookingsFromServer } from '../../services/customerBookingsApi.js';
+import { fetchMyRentalBookings } from '../../services/customerRentalApi.js';
+import { hasPreferRentLookup } from '../rental/preferRentLookup.js';
+import {
+  attemptUnifiedLogin,
+  isNetworkAuthError,
+  resolveCustomerSurface,
+} from './unifiedLogin.js';
+import { rememberNativeRoleHome, clearNativeRoleHome } from '../capacitor/nativeRoleHome.js';
+
+describe('unifiedLogin', () => {
+  beforeEach(() => {
+    store.clear();
+    installStorage();
+    clearNativeRoleHome();
+    loginCustomer.mockReset();
+    loginDriver.mockReset();
+    fetchMyBookingsFromServer.mockReset();
+    fetchMyRentalBookings.mockReset();
+    hasPreferRentLookup.mockReturnValue(false);
+    fetchMyBookingsFromServer.mockResolvedValue([]);
+    fetchMyRentalBookings.mockResolvedValue([]);
+  });
+
+  it('detects network auth errors', () => {
+    expect(isNetworkAuthError(new Error('Failed to fetch'))).toBe(true);
+    expect(isNetworkAuthError(new Error('Λάθος email ή κωδικός'))).toBe(false);
+  });
+
+  it('opens My Wallet for customers by default', async () => {
+    loginCustomer.mockResolvedValue({
+      email: 'a@b.com',
+      access_token: 'tok',
+    });
+    loginDriver.mockRejectedValue(new Error('Λάθος όνομα χρήστη ή κωδικός'));
+    const out = await attemptUnifiedLogin('a@b.com', 'secret');
+    expect(out.kind).toBe('customer');
+    expect(out.path).toBe('/wallet');
+  });
+
+  it('opens driver when only driver credentials match', async () => {
+    loginCustomer.mockRejectedValue(new Error('Λάθος email ή κωδικός'));
+    loginDriver.mockResolvedValue({ accessToken: 'drv' });
+    const out = await attemptUnifiedLogin('driver@office.com', 'pw');
+    expect(out.kind).toBe('driver');
+    expect(out.path).toBe('/driver');
+  });
+
+  it('prefers driver when both succeed and last role was driver', async () => {
+    rememberNativeRoleHome('driver');
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('driver');
+  });
+
+  it('prefers driver when both succeed without role memory (native ops default)', async () => {
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('driver');
+  });
+
+  it('prefers customer when both succeed and last role was wallet', async () => {
+    rememberNativeRoleHome('wallet');
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('customer');
+  });
+
+  it('prefers customer when both succeed and last role was rent', async () => {
+    rememberNativeRoleHome('rent');
+    loginCustomer.mockResolvedValue({ email: 'both@x.com', access_token: 'c' });
+    loginDriver.mockResolvedValue({ accessToken: 'd' });
+    const out = await attemptUnifiedLogin('both@x.com', 'pw');
+    expect(out.kind).toBe('customer');
+  });
+
+  it('surfaces office-scoped driver error over generic customer error', async () => {
+    loginCustomer.mockRejectedValue(new Error('Λάθος email ή κωδικός'));
+    loginDriver.mockRejectedValue(
+      new Error('Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο'),
+    );
+    await expect(attemptUnifiedLogin('a@b.com', 'pw')).rejects.toThrow(/άλλο γραφείο/);
+  });
+
+  it('does not swallow network failure from customer', async () => {
+    loginCustomer.mockRejectedValue(new Error('Δεν υπάρχει σύνδεση με τον server'));
+    loginDriver.mockRejectedValue(new Error('Λάθος'));
+    await expect(attemptUnifiedLogin('a@b.com', 'pw')).rejects.toThrow(/σύνδεση/);
+  });
+
+  it('routes rent-only customers to unified My Wallet rentals tab', async () => {
+    fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
+    fetchMyBookingsFromServer.mockResolvedValue([]);
+    const surface = await resolveCustomerSurface();
+    expect(surface.path).toBe('/wallet?tab=rentals');
+  });
+
+  it('routes dual-product customers to bus My Wallet', async () => {
+    fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
+    fetchMyBookingsFromServer.mockResolvedValue([{ id: 'bus-1' }]);
+    rememberNativeRoleHome('rent');
+    const surface = await resolveCustomerSurface();
+    expect(surface.path).toBe('/wallet');
+  });
+
+  it('bus bookings beat remembered rent role', async () => {
+    rememberNativeRoleHome('rent');
+    fetchMyBookingsFromServer.mockResolvedValue([{ id: 'bus-1' }]);
+    fetchMyRentalBookings.mockResolvedValue([]);
+    const surface = await resolveCustomerSurface();
+    expect(surface.path).toBe('/wallet');
+  });
+
+  it('honors rememberNativeRoleHome for rent when bookings are empty', async () => {
+    rememberNativeRoleHome('rent');
+    const surface = await resolveCustomerSurface();
+    expect(surface.role).toBe('rent');
+  });
+
+  it('preferWallet hint beats rent-only probe', async () => {
+    fetchMyRentalBookings.mockResolvedValue([{ id: 1 }]);
+    const surface = await resolveCustomerSurface({ preferWallet: true });
+    expect(surface.path).toBe('/wallet');
+  });
+
+  it('preferRent hint opens unified My Wallet rentals tab', async () => {
+    const surface = await resolveCustomerSurface({ preferRent: true });
+    expect(surface.path).toBe('/wallet?tab=rentals');
+  });
+});
