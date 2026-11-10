@@ -1,0 +1,9 @@
+# AUTO-GENERATED — apex → www redirect for tenant custom domains
+# Regenerated when Domain settings are saved / API boots / deploy sync.
+# Do not edit by hand.
+
+map "$host|$http_x_forwarded_host" $apex_to_www {
+    default "";
+    ~*^achilliotravel\.com\| www.achilliotravel.com;
+    ~*\|achilliotravel\.com(?::[0-9]+)?(?:,|$) www.achilliotravel.com;
+}

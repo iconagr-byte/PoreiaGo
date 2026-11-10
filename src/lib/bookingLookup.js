@@ -107,8 +107,13 @@ export function openBookingInWallet(booking, email) {
 
   const claim = saveWalletClaim({
     email: cleanEmail,
-    name: booking?.passengerName || booking?.name || '',
-    phone: booking?.phone || '',
+    name:
+      booking?.customerName ||
+      booking?.passengerName ||
+      booking?.passenger_name ||
+      booking?.name ||
+      '',
+    phone: booking?.phone || booking?.customerPhone || '',
     bookingId: booking?.id,
     reference: booking?.pnr || booking?.id,
     source: 'lookup',

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -14,17 +15,28 @@ from app.api.schemas import (
     BillingCheckoutRequest,
     BillingCheckoutResponse,
     BillingConfigResponse,
+    BillingEnableRentAddonResponse,
     BillingPortalResponse,
     BillingSignupCheckoutRequest,
     BillingSubscriptionResponse,
     BillingTrialRequest,
     BillingUsageReportResponse,
+    OfficeModulesResponse,
 )
 from app.core.auth_deps import get_current_tenant_id, get_tenant_db, require_roles
 from app.core.database import AsyncSessionLocal
 from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
 from app.services.billing_service import BillingService, stripe_readiness
+from app.services.tenant_modules import (
+    apply_known_office_rent_policy,
+    enable_rent_addon_in_settings,
+    initial_settings_for_plan,
+    is_achillio_travel_office,
+    is_poreiago_platform_office,
+    modules_for_tenant,
+    parse_tenant_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,18 +65,110 @@ async def get_subscription(
 ):
     tenant = await _load_tenant(db, tenant_id)
     billing = BillingService(db)
-    sub = await billing.get_or_create_subscription(tenant)
+    try:
+        sub = await billing.get_or_create_subscription(tenant)
+    except Exception:
+        # Last resort: heal schema (subscriptions.plan) then retry once.
+        logger.exception("billing subscription load failed tenant=%s — healing", tenant_id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        from app.services.tenant_modules import _heal_subscription_plan_column
+
+        await _heal_subscription_plan_column(db)
+        try:
+            sub = await billing.get_or_create_subscription(tenant)
+        except Exception as exc:
+            logger.exception("billing subscription still failing after heal")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία φόρτωσης συνδρομής — δοκιμάστε Ανανέωση ή επικοινωνήστε με υποστήριξη.",
+            ) from exc
+    plan = getattr(sub.plan, "value", None) or str(sub.plan or tenant.plan.value)
+    status_val = getattr(sub.status, "value", None) or str(sub.status or "trialing")
     return BillingSubscriptionResponse(
         tenant_id=tenant.id,
-        plan=sub.plan.value,
-        status=sub.status.value,
+        plan=plan,
+        status=status_val,
         is_active=tenant.is_active,
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=sub.stripe_subscription_id,
         current_period_end=sub.current_period_end,
         trial_ends_at=sub.trial_ends_at,
-        cancel_at_period_end=sub.cancel_at_period_end,
-        base_amount_cents=sub.base_amount_cents,
+        cancel_at_period_end=bool(sub.cancel_at_period_end),
+        base_amount_cents=int(sub.base_amount_cents or 0),
+    )
+
+
+@router.get("/modules", response_model=OfficeModulesResponse)
+async def get_office_modules(
+    db: Annotated[AsyncSession, Depends(get_tenant_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+):
+    """Authenticated office product modules — drives Back Office nav for Rent-only."""
+    tenant = await _load_tenant(db, tenant_id)
+    # Keep PoreiaGo platform Rent-on (and Achillio Rent-off) even if settings drifted.
+    try:
+        updated = apply_known_office_rent_policy(tenant)
+        if updated is not None:
+            tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+            await db.commit()
+            await db.refresh(tenant)
+    except Exception:
+        logger.debug("apply_known_office_rent_policy skipped on /modules", exc_info=True)
+
+    mods = modules_for_tenant(tenant)
+    if is_achillio_travel_office(tenant):
+        kind = "achillio_travel"
+    elif is_poreiago_platform_office(tenant):
+        kind = "poreiago_platform"
+        # Response must advertise Rent for the Super Admin sidebar.
+        mods = {**mods, "rent_enabled": True, "trips_enabled": True}
+        if mods.get("mode") == "trips_only":
+            mods["mode"] = "both"
+    else:
+        kind = "customer"
+    return OfficeModulesResponse(
+        **mods,
+        tenant_slug=tenant.slug,
+        office_kind=kind,
+    )
+
+def _dump_settings(settings: dict[str, Any]) -> str:
+    return json.dumps(settings, ensure_ascii=False)
+
+
+@router.post("/enable-rent-addon", response_model=BillingEnableRentAddonResponse)
+async def enable_rent_addon(
+    db: Annotated[AsyncSession, Depends(get_tenant_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+):
+    """Enable Rent module as add-on on the current bus office plan (keeps trips)."""
+    tenant = await _load_tenant(db, tenant_id)
+    if tenant.plan == TenantPlan.RENT:
+        mods = modules_for_tenant(tenant)
+        return BillingEnableRentAddonResponse(
+            **mods,
+            message="Το γραφείο είναι ήδη σε αυτόνομο Rent συμβόλαιο",
+        )
+
+    current = parse_tenant_settings(tenant.settings_json)
+    updated = enable_rent_addon_in_settings(current)
+    # Seed rent appearance defaults if missing.
+    if not isinstance(updated.get("site_appearance"), dict):
+        seeded = initial_settings_for_plan(TenantPlan.RENT, office_name=tenant.legal_name)
+        appearance = seeded.get("site_appearance")
+        if isinstance(appearance, dict):
+            updated["site_appearance"] = appearance
+    tenant.settings_json = _dump_settings(updated)
+    await db.commit()
+    await db.refresh(tenant)
+    mods = modules_for_tenant(tenant)
+    return BillingEnableRentAddonResponse(
+        **mods,
+        message="Το Rent add-on ενεργοποιήθηκε — εμφανίζεται το μενού Ενοικιάσεις",
     )
 
 
@@ -107,6 +211,15 @@ async def start_trial(
             plan=plan,
             billing_interval=body.billing_interval,
         )
+        if plan == TenantPlan.RENT:
+            current = parse_tenant_settings(tenant.settings_json)
+            seeded = initial_settings_for_plan(TenantPlan.RENT, office_name=tenant.legal_name)
+            merged = {**current, **seeded}
+            # Keep existing site_appearance keys; fill gaps from rent seed.
+            cur_app = current.get("site_appearance") if isinstance(current.get("site_appearance"), dict) else {}
+            seed_app = seeded.get("site_appearance") if isinstance(seeded.get("site_appearance"), dict) else {}
+            merged["site_appearance"] = {**seed_app, **cur_app}
+            tenant.settings_json = _dump_settings(merged)
         await db.commit()
     except ValueError as exc:
         await db.rollback()
@@ -135,6 +248,14 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
 
     readiness = stripe_readiness()
     use_demo = bool(readiness.get("demo_mode"))
+    if not use_demo and not readiness.get("checkout_ready"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Οι online πληρωμές ρυθμίζονται ακόμα (λείπει Stripe). "
+                "Επικοινωνήστε με την υποστήριξη PoreiaGo για ενεργοποίηση συμβολαίου."
+            ),
+        )
 
     async with AsyncSessionLocal() as db:
         try:
