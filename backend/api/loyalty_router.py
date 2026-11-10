@@ -26,8 +26,12 @@ _ADMIN_ROLES = {"tenant_admin", "dispatcher", "superadmin"}
 
 
 def _require_admin(payload: dict) -> None:
-    role = str(payload.get("role") or "").lower()
-    if role not in _ADMIN_ROLES:
+    # JWT uses roles: list[str] (see create_access_token) — not singular "role".
+    roles = {str(r).lower() for r in (payload.get("roles") or [])}
+    singular = str(payload.get("role") or "").lower()
+    if singular:
+        roles.add(singular)
+    if not roles & _ADMIN_ROLES:
         raise HTTPException(status_code=403, detail="Απαιτείται ρόλος διαχειριστή")
 
 

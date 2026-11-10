@@ -101,3 +101,125 @@ export function writeRentBookingPrefs(patch = {}) {
   }
   return next;
 }
+
+/** Session flag: land on search dates with a friendly prompt. */
+export const RENT_NEED_DATES_KEY = 'rent_need_dates_v1';
+
+/** Window event so an already-mounted search bar can show the dates prompt. */
+export const RENT_NEED_DATES_EVENT = 'rent-need-dates';
+
+export const RENT_NEED_DATES_DEFAULT_MESSAGE =
+  'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.';
+
+/** @param {ReturnType<typeof readRentBookingPrefs>} [prefs] */
+export function rentTripSearchReady(prefs = readRentBookingPrefs()) {
+  const p = prefs && typeof prefs === 'object' ? prefs : {};
+  return Boolean(
+    String(p.start_time || '').trim() &&
+      String(p.end_time || '').trim() &&
+      String(p.pickup_location || '').trim(),
+  );
+}
+
+/** @param {string} [message] */
+export function markNeedRentDates(message = RENT_NEED_DATES_DEFAULT_MESSAGE) {
+  try {
+    sessionStorage.setItem(
+      RENT_NEED_DATES_KEY,
+      JSON.stringify({
+        message: String(message || RENT_NEED_DATES_DEFAULT_MESSAGE).trim(),
+        at: Date.now(),
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/** @returns {{ message: string, at?: number } | null} */
+export function consumeNeedRentDates() {
+  try {
+    const raw = sessionStorage.getItem(RENT_NEED_DATES_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(RENT_NEED_DATES_KEY);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      message: String(parsed.message || RENT_NEED_DATES_DEFAULT_MESSAGE).trim(),
+      at: Number(parsed.at) || Date.now(),
+    };
+  } catch {
+    try {
+      sessionStorage.removeItem(RENT_NEED_DATES_KEY);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+}
+
+/**
+ * Focus the pickup date field + scroll search into view (safe no-op if missing).
+ */
+export function focusRentPickupDateField() {
+  if (typeof document === 'undefined') return;
+  const run = () => {
+    document.getElementById('rent-guest-search')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    const input = document.getElementById('rent-pickup-date');
+    if (!input) return;
+    try {
+      input.focus?.({ preventScroll: true });
+      input.showPicker?.();
+    } catch {
+      try {
+        input.focus?.();
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(run, 60);
+    });
+  } else {
+    run();
+  }
+}
+
+/**
+ * Redirect to guest search focused on pickup date.
+ * Works even when the user is already on `/rent` (dispatches a window event).
+ * @param {(to: string, opts?: object) => void} navigate
+ * @param {{ message?: string, replace?: boolean }} [opts]
+ */
+export function navigateToRentDateSearch(navigate, opts = {}) {
+  const message = opts.message || RENT_NEED_DATES_DEFAULT_MESSAGE;
+  markNeedRentDates(message);
+
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(
+        new CustomEvent(RENT_NEED_DATES_EVENT, {
+          detail: { message },
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Unique query so React Router updates even when already on /rent.
+  const to = `/rent?need_dates=1&t=${Date.now()}#rent-pickup-date`;
+  if (typeof navigate !== 'function') {
+    if (typeof window !== 'undefined') {
+      window.location.assign(to);
+    }
+    return;
+  }
+  navigate(to, { replace: Boolean(opts.replace) });
+  focusRentPickupDateField();
+}

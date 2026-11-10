@@ -99,13 +99,14 @@ export const STITCH_RENT_TEMPLATES = [
 <li>Έχετε έτοιμο το QR της κράτησης</li>
 <li>Χρειάζεστε παράταση; Επικοινωνήστε μαζί μας</li>
 </ul>`),
-      cta('Άνοιξε Rent Wallet', 'https://www.poreiago.com/rent/wallet'),
+      cta('Άνοιξε My Wallet', 'https://www.poreiago.com/wallet?tab=rentals'),
     ],
   },
   {
     id: 'rent-loyalty-offer',
     category: 'rent',
     requiresModule: 'rent',
+    hidden: true,
     name: 'Επαναλαμβανόμενοι πελάτες',
     subtitle: 'Έκπτωση για την επόμενη κράτηση /rent',
     thumb: THUMB.promo,

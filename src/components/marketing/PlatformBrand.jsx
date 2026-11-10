@@ -1,43 +1,59 @@
 import { Link } from 'react-router-dom';
-import { PLATFORM_NAME } from '../../lib/marketing/platformCopy.js';
+import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../../lib/marketing/platformCopy.js';
 
-/** Neutral platform wordmark — not a single travel agency. */
+/**
+ * PoreiaGo platform wordmark — wave mark + Poreia/Go split.
+ * Sized as a header brand signal (not a tiny nav icon).
+ */
 export default function PlatformBrand({ className = '', variant = 'dark', asLink = true }) {
   const isDark = variant === 'dark';
-  const inner = (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <span
-        className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm shadow-lg ${
-          isDark
-            ? 'bg-gradient-to-br from-sky-400 to-indigo-600 text-white'
-            : 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white'
-        }`}
+  const mark = (
+    <span className={`pg-brand ${isDark ? 'pg-brand--dark' : 'pg-brand--light'} ${className}`.trim()}>
+      <svg
+        className="pg-brand-mark"
+        viewBox="0 0 48 48"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden
       >
-        T
-      </span>
-      <span className="flex flex-col leading-none">
-        <span
-          className={`font-bold text-lg tracking-tight ${
-            isDark ? 'text-white' : 'text-slate-900'
-          }`}
-        >
-          {PLATFORM_NAME}
+        <path
+          d="M14 38c0-10 4.5-18 10-26"
+          stroke="currentColor"
+          strokeWidth="5.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M24 40c0-11 4.8-20 11-28"
+          stroke="currentColor"
+          strokeWidth="5.5"
+          strokeLinecap="round"
+          opacity="0.85"
+        />
+        <path
+          d="M34 42c0-12 4.2-21 9-28"
+          stroke="currentColor"
+          strokeWidth="5.5"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+      </svg>
+      <span className="pg-brand-copy">
+        <span className="pg-brand-name">
+          Poreia<span className="pg-brand-go">Go</span>
         </span>
-        <span
-          className={`text-[10px] font-semibold uppercase tracking-[0.14em] mt-0.5 ${
-            isDark ? 'text-white/50' : 'text-slate-500'
-          }`}
-        >
-          SaaS για ταξιδιωτικά γραφεία
-        </span>
+        <span className="pg-brand-line">{PLATFORM_BRAND_LINE}</span>
       </span>
     </span>
   );
 
-  if (!asLink) return inner;
+  if (!asLink) return mark;
   return (
-    <Link to="/" className="shrink-0 hover:opacity-90 transition-opacity" aria-label={`${PLATFORM_NAME} — Αρχική`}>
-      {inner}
+    <Link
+      to="/"
+      className="pg-brand-link hover:opacity-90 transition-opacity"
+      aria-label={`${PLATFORM_NAME} — Αρχική`}
+    >
+      {mark}
     </Link>
   );
 }
