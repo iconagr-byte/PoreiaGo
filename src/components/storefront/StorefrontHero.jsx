@@ -240,9 +240,10 @@ export default function StorefrontHero({
   }
 
   // fullscreen_overlay (default)
+  // overflow-x only — overflow-y:hidden clipped hero title/search on short phones.
   return (
     <section
-      className="sf-hero-fullscreen relative w-full flex items-center justify-center px-4 sm:px-margin-desktop overflow-hidden"
+      className="sf-hero-fullscreen relative w-full flex items-center justify-center px-4 sm:px-margin-desktop overflow-x-clip"
       style={{ minHeight }}
     >
       <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />

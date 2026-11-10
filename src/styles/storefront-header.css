@@ -66,13 +66,16 @@
 
   .sf-header-inner #pdw-brand > span:not([aria-hidden]),
   .sf-header-inner #pdw-brand .sf-brand-name {
-    display: block !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.92rem !important;
+    text-overflow: unset;
+    white-space: normal;
+    font-size: 0.88rem !important;
     line-height: 1.15 !important;
     letter-spacing: -0.02em;
   }

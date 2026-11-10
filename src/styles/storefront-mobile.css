@@ -1,41 +1,78 @@
-/* Office storefront — phone-first trip visibility + touch UX (Achillio & all desks) */
+/* Office storefront — phone-first; no clipped text/graphics (Achillio & all desks) */
 
 .sf-hero-fullscreen {
   box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
-  /* Keep hero shorter so «Εκδρομές» enter the second screen faster */
+  /* Page shell — kill horizontal bleed that clips edges */
+  .storefront-themed {
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+
+  .storefront-themed main,
+  .storefront-themed section {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /*
+   * Hero: never clip title / search / CTAs.
+   * Short min-height + overflow:hidden was cutting Greek copy mid-panel.
+   */
   .sf-hero-fullscreen {
-    min-height: min(58vh, 520px) !important;
+    min-height: 0 !important;
+    height: auto !important;
+    align-items: flex-start !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
     padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
   }
 
   .sf-hero-fullscreen .sf-hero-copy {
-    padding-top: 4.75rem;
-    padding-bottom: 1.25rem;
+    padding-top: 5rem;
+    padding-bottom: 1.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .sf-hero-fullscreen .sf-hero-copy > div {
+    max-width: 100% !important;
+    min-width: 0;
   }
 
   .sf-hero-fullscreen h1 {
-    font-size: clamp(1.35rem, 5.6vw, 1.7rem) !important;
-    line-height: 1.25 !important;
-    margin-bottom: 0.75rem !important;
+    font-size: clamp(1.28rem, 5.4vw, 1.65rem) !important;
+    line-height: 1.28 !important;
+    margin-bottom: 0.7rem !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
   }
 
   .sf-hero-fullscreen .sf-hero-copy > div > p,
-  .sf-hero-fullscreen .sf-hero-copy p.text-base {
-    font-size: 0.92rem !important;
+  .sf-hero-fullscreen .sf-hero-copy p.text-base,
+  .sf-hero-fullscreen .sf-hero-copy p {
+    font-size: 0.9rem !important;
     line-height: 1.45 !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.9rem !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
-  /* Search panel — stack for thumbs, larger taps */
+  /* Search panel — full width, no side clip */
   .sf-hero-search {
     margin-top: 0.35rem !important;
-    padding: 0.9rem !important;
-    border-radius: 1.25rem !important;
+    padding: 0.85rem !important;
+    border-radius: 1.2rem !important;
     max-width: 100% !important;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
   }
 
   .sf-hero-search .sf-hero-search__chips {
@@ -45,8 +82,9 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    margin: 0 -0.15rem;
-    padding: 0.1rem 0.15rem 0.25rem;
+    margin: 0;
+    padding: 0.1rem 0 0.25rem;
+    max-width: 100%;
   }
 
   .sf-hero-search .sf-hero-search__chips::-webkit-scrollbar {
@@ -65,11 +103,19 @@
     display: none !important;
   }
 
+  .sf-hero-search label {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .sf-hero-search select,
   .sf-hero-search input {
     min-height: 3rem;
+    max-width: 100%;
+    width: 100%;
     font-size: 16px !important; /* avoid iOS zoom */
     border-radius: 1rem !important;
+    box-sizing: border-box;
   }
 
   .sf-hero-search .sf-hero-search__actions {
@@ -82,17 +128,19 @@
 
   .sf-hero-search .sf-hero-search__actions > * {
     width: 100% !important;
+    max-width: 100% !important;
     justify-content: center !important;
     min-height: 3rem;
     box-sizing: border-box;
   }
 
+  /* Trips */
   .sf-trips-section {
     scroll-margin-top: 5rem;
     padding-top: 2.25rem !important;
     padding-bottom: 2.25rem !important;
-    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
@@ -108,21 +156,60 @@
   .sf-trips-section .sf-trips-card-wrap {
     min-width: 0;
     width: 100%;
+    max-width: 100%;
   }
 
   .sf-trips-section h2 {
-    font-size: clamp(1.35rem, 5.8vw, 1.75rem) !important;
-    line-height: 1.2;
+    font-size: clamp(1.3rem, 5.6vw, 1.7rem) !important;
+    line-height: 1.25 !important;
+    overflow-wrap: anywhere;
+    padding-inline: 0.15rem;
   }
 
-  /* Premium trip cards — denser, thumb-friendly book CTA */
+  .sf-trips-section p {
+    overflow-wrap: anywhere;
+  }
+
+  /* Trip cards — stop single-line ellipsis cutting titles/hooks */
   .sf-trips-section article {
     border-radius: 1.35rem !important;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .sf-trips-section article > div.p-8,
   .sf-trips-section article .p-8 {
-    padding: 1.1rem !important;
+    padding: 1.05rem !important;
+  }
+
+  .sf-trips-section article h3,
+  .sf-trips-section article .truncate {
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: unset !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .sf-trips-section article .absolute.z-20 p,
+  .sf-trips-section article .absolute.z-20 h3 {
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden !important;
+    white-space: normal !important;
+    max-width: 100%;
+  }
+
+  .sf-trips-section article img {
+    object-fit: cover;
+    object-position: center;
+    max-width: 100%;
   }
 
   .sf-trips-section article button {
@@ -134,14 +221,48 @@
     font-size: 0.92rem;
   }
 
-  /* Why-us — less scroll tax */
+  /* Fleet showcase — same edge padding as trips */
+  #our-fleet {
+    padding-top: 2.5rem !important;
+    padding-bottom: 2.5rem !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: clip;
+  }
+
+  #our-fleet h2 {
+    font-size: clamp(1.3rem, 5.6vw, 1.7rem) !important;
+    line-height: 1.25 !important;
+    overflow-wrap: anywhere;
+  }
+
+  #our-fleet article {
+    max-width: 100%;
+  }
+
+  #our-fleet article h3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  /* Why-us */
   .sf-why-us {
-    padding-top: 2.75rem !important;
-    padding-bottom: 2.75rem !important;
+    padding-top: 2.5rem !important;
+    padding-bottom: 2.5rem !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    overflow-x: clip;
   }
 
   .sf-why-us .mb-16 {
-    margin-bottom: 1.5rem !important;
+    margin-bottom: 1.35rem !important;
   }
 
   .sf-why-us .gap-8 {
@@ -149,8 +270,14 @@
   }
 
   .sf-why-us .sf-why-us-card {
-    padding: 1.15rem 1rem !important;
-    border-radius: 1.25rem !important;
+    padding: 1.1rem 0.95rem !important;
+    border-radius: 1.2rem !important;
+    max-width: 100%;
+  }
+
+  .sf-why-us .sf-why-us-card h3,
+  .sf-why-us .sf-why-us-card p {
+    overflow-wrap: anywhere;
   }
 
   .sf-why-us .sf-why-us-card .w-16 {
@@ -163,21 +290,46 @@
     font-size: 26px !important;
   }
 
-  /* Mobile menu — larger tap rows */
+  /* Header brand — wrap instead of hard ellipsis mid-name */
+  .sf-header-inner #pdw-brand {
+    max-width: calc(100% - 6.75rem);
+  }
+
+  .sf-header-inner #pdw-brand .sf-brand-name {
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: unset !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 0.84rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .sf-header-inner #pdw-brand img {
+    max-width: min(88px, 26vw) !important;
+  }
+
+  /* Mobile menu — larger tap rows, no side clip */
   .sf-header-mobile-nav a,
   .sf-header-mobile-nav button {
     min-height: 3rem;
     font-size: 0.95rem !important;
+    overflow-wrap: anywhere;
   }
 
   .sf-header-mobile-nav {
     padding-top: 0.65rem !important;
     padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
     gap: 0.2rem !important;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 }
 
 #search-results,
-#international-trips {
+#international-trips,
+#our-fleet {
   scroll-margin-top: 5rem;
 }
