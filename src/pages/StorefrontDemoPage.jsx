@@ -43,6 +43,7 @@ import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
+import StorefrontMobileDock from '../components/storefront/StorefrontMobileDock.jsx';
 import StorefrontRentSection from '../components/storefront/StorefrontRentSection.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
 import {
@@ -246,7 +247,7 @@ export default function StorefrontDemoPage() {
   const searchForm = (
     <form
       onSubmit={handleSearch}
-      className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
+      className="sf-hero-search mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
     >
       <div className="sf-preview-trip-program-head">
         <p className="text-xs font-bold uppercase tracking-wider text-white/70 min-w-0">
@@ -260,7 +261,7 @@ export default function StorefrontDemoPage() {
           instanceId="trips-header"
         />
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="sf-hero-search__chips flex flex-wrap gap-2">
         {[
           { id: MARKET_FILTER_ALL, label: 'Όλες' },
           { id: MARKET_FILTER_DOMESTIC, label: 'Ελλάδα' },
@@ -282,7 +283,7 @@ export default function StorefrontDemoPage() {
       </div>
 
       {pickerTrips.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="sf-hero-search__trip-picks flex flex-wrap gap-2">
           {pickerTrips.slice(0, 4).map((trip) => {
             const active = String(searchFilters.tripId) === String(trip.id);
             return (
@@ -358,7 +359,7 @@ export default function StorefrontDemoPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 pt-1">
+      <div className="sf-hero-search__actions flex flex-wrap gap-3 pt-1">
         <button
           type="submit"
           className="bg-primary text-white px-8 py-3.5 rounded-full font-label-md font-bold hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
@@ -567,6 +568,14 @@ export default function StorefrontDemoPage() {
           rentEnabled={rentEnabled}
         />
       </PreviewEditableSection>
+
+      {!previewOn ? (
+        <StorefrontMobileDock
+          tripsEnabled={tripsEnabled}
+          rentEnabled={rentEnabled}
+          phone={siteAppearance.footer_contact_phone}
+        />
+      ) : null}
 
       {previewOn ? (
         <div className="sf-preview-dock" aria-label="Studio — γρήγορες ενότητες">
