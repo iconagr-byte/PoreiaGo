@@ -51,6 +51,7 @@ import {
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
 import '../styles/storefront-mobile.css';
+import '../styles/storefront-sections.css';
 
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
@@ -485,8 +486,8 @@ export default function StorefrontDemoPage() {
         />
 
         {siteAppearance.show_why_us_section !== false && (
-        <section className="py-24 bg-surface-bright border-y border-black/[0.05]">
-          <div className="max-w-container-max mx-auto px-margin-desktop">
+        <section className="sf-why-us py-24 border-y border-sky-200/60">
+          <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
             <div className="text-center max-w-2xl mx-auto mb-16">
               {/* One Builder for the whole why-us card template — not per card. */}
               <div className="sf-preview-trips-section-head mb-6">
@@ -540,7 +541,7 @@ export default function StorefrontDemoPage() {
               ].map((card) => (
                 <div
                   key={card.id}
-                  className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
+                  className="sf-why-us-card p-8 rounded-3xl flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
                 >
                   <div
                     className={`w-16 h-16 rounded-full ${card.iconWrap} flex items-center justify-center mb-6`}

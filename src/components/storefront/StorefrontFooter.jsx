@@ -5,6 +5,7 @@ import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { resolveFooterContact } from '../../lib/storefront/footerContact.js';
 import OfficeLoginLink from './OfficeLoginLink.jsx';
 import '../../styles/storefront-footer.css';
+import '../../styles/storefront-sections.css';
 
 function FooterBrandBlock({ siteAppearance, tone = 'light', tagline = '' }) {
   const brand = resolveOfficeBrand(siteAppearance);
