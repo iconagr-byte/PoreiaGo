@@ -1,0 +1,257 @@
+"""Heal bookings (+ fiscal_invoices) schema drift when Contabo DBs lag Alembic.
+
+Production often has a `bookings` table from an older bootstrap while ORM/migrations
+expect columns from 001/002/007/015 (notably `customer_user_id`, payment fields).
+Alembic upgrade can fail earlier (e.g. DuplicateColumn on tenants), so cash capture
+then dies with UndefinedColumnError.
+
+Safe to call on every API boot — uses IF NOT EXISTS / idempotent DDL.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
+
+# One statement per execute — asyncpg rejects multi-command prepared statements.
+_HEAL_STATEMENTS: tuple[str, ...] = (
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS customer_user_id UUID",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS passenger_vat_id VARCHAR(32)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS fiscal_mark VARCHAR(64)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS total_price NUMERIC(12, 2)",
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(12, 2) NOT NULL DEFAULT 0"
+    ),
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS payment_status VARCHAR(16) NOT NULL DEFAULT 'pending'"
+    ),
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS seat_label VARCHAR(128)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id BIGINT",
+    # Contabo legacy: trip_id was uuid or int4. Office Date.now() trip ids
+    # (e.g. 1792475148749) overflow INTEGER → guest checkout 500. Prefer BIGINT.
+    """
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'trip_id'
+          AND udt_name = 'uuid'
+      ) THEN
+        ALTER TABLE bookings
+          ALTER COLUMN trip_id TYPE BIGINT
+          USING NULL;
+      ELSIF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'trip_id'
+          AND udt_name = 'int4'
+      ) THEN
+        ALTER TABLE bookings
+          ALTER COLUMN trip_id TYPE BIGINT
+          USING trip_id::bigint;
+      END IF;
+    END $$
+    """,
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS reference_code VARCHAR(64)",
+    # Contabo refs from UUID keys can exceed VARCHAR(32) (BK- + 36-char UUID).
+    """
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'reference_code'
+      ) THEN
+        ALTER TABLE bookings ALTER COLUMN reference_code TYPE VARCHAR(64);
+      END IF;
+    END $$
+    """,
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'pending'",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS passenger_name VARCHAR(255)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS passenger_email VARCHAR(320)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS amount_eur NUMERIC(12, 2)",
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'EUR'"
+    ),
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS metadata_json JSONB",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS notes TEXT",
+    # TimestampMixin — Contabo bootstrap tables often only have created_at.
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+    ),
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+    ),
+    """
+    UPDATE bookings
+    SET updated_at = COALESCE(updated_at, created_at, now())
+    WHERE updated_at IS NULL
+    """,
+    """
+    UPDATE bookings
+    SET total_price = COALESCE(total_price, amount_eur, amount_paid, 0)
+    WHERE total_price IS NULL
+    """,
+    """
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'seat_label'
+      ) THEN
+        ALTER TABLE bookings ALTER COLUMN seat_label TYPE VARCHAR(128);
+      END IF;
+    END $$
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_bookings_payment_status ON bookings (payment_status)",
+    # Contabo legacy bookings tables often have extra NOT NULL columns the ORM
+    # never sets (e.g. name/code/customer_name). INSERT then fails and cash
+    # capture wrongly reports "booking not found". Soften those constraints.
+    """
+    DO $$
+    DECLARE
+      r RECORD;
+      keep TEXT[] := ARRAY[
+        'id', 'tenant_id', 'reference_code', 'status', 'payment_status',
+        'passenger_name', 'total_price', 'amount_paid', 'amount_eur',
+        'currency', 'created_at', 'updated_at'
+      ];
+    BEGIN
+      FOR r IN
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND is_nullable = 'NO'
+          AND column_default IS NULL
+          AND NOT (column_name = ANY (keep))
+      LOOP
+        EXECUTE format(
+          'ALTER TABLE bookings ALTER COLUMN %I DROP NOT NULL',
+          r.column_name
+        );
+      END LOOP;
+    END $$
+    """,
+    """
+    UPDATE bookings
+    SET amount_eur = COALESCE(amount_eur, total_price, amount_paid, 0)
+    WHERE amount_eur IS NULL
+    """,
+    """
+    UPDATE bookings
+    SET passenger_name = COALESCE(NULLIF(passenger_name, ''), 'Επιβάτης')
+    WHERE passenger_name IS NULL OR passenger_name = ''
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS fiscal_invoices (
+        id UUID PRIMARY KEY,
+        tenant_id UUID NOT NULL,
+        booking_id UUID NOT NULL,
+        aade_submission_id UUID,
+        invoice_kind VARCHAR(32) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        amount NUMERIC(12, 2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+        stripe_payment_intent_id VARCHAR(128),
+        idempotency_key VARCHAR(128) NOT NULL,
+        aade_mark VARCHAR(64),
+        error_message TEXT,
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_fiscal_invoices_idempotency "
+        "ON fiscal_invoices (idempotency_key)"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_fiscal_invoices_tenant_id ON fiscal_invoices (tenant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_fiscal_invoices_booking_id ON fiscal_invoices (booking_id)",
+    "CREATE INDEX IF NOT EXISTS ix_fiscal_invoices_status ON fiscal_invoices (status)",
+)
+
+_healed = False
+
+
+def reset_bookings_schema_heal_flag() -> None:
+    """Test helper — allow ensure to run again in-process."""
+    global _healed
+    _healed = False
+
+
+async def ensure_bookings_schema(session: AsyncSession, *, force: bool = False) -> bool:
+    """Add missing bookings columns / fiscal_invoices. Returns True on success."""
+    global _healed
+    if _healed and not force:
+        return True
+    try:
+        for stmt in _HEAL_STATEMENTS:
+            await session.execute(text(stmt))
+        await session.commit()
+        _healed = True
+        logger.info(
+            "Bookings schema healed "
+            "(customer_user_id / payment / updated_at / fiscal_invoices)"
+        )
+        return True
+    except Exception as exc:
+        await session.rollback()
+        logger.warning("Bookings schema ensure failed: %s", exc)
+        return False
+
+
+def is_bookings_schema_drift_error(exc: BaseException) -> bool:
+    """True when Postgres/SQLAlchemy reports missing/mismatched bookings columns."""
+    msg = f"{exc.__class__.__name__}: {exc}".lower()
+    if "undefinedcolumn" in msg or "does not exist" in msg:
+        if "bookings." in msg or "column bookings" in msg or "customer_user_id" in msg:
+            return True
+        if "payment_status" in msg or "amount_paid" in msg or "total_price" in msg:
+            return True
+        if "updated_at" in msg or "created_at" in msg:
+            return True
+    # Contabo: trip_id integer vs ORM uuid (or the reverse after partial migrates).
+    if "datatypemismatch" in msg or "datatype mismatch" in msg:
+        if "trip_id" in msg and "bookings" in msg:
+            return True
+        if "trip_id" in msg and ("uuid" in msg or "integer" in msg):
+            return True
+    # Date.now() office trip ids overflow int4 until heal widens to BIGINT.
+    if "out of int32 range" in msg or "int32 range" in msg:
+        return True
+    return False
+
+
+async def ensure_bookings_schema_best_effort(session: Any | None = None) -> bool:
+    """Open a session if needed and heal. Never raises."""
+    if session is not None:
+        try:
+            return await ensure_bookings_schema(session, force=True)
+        except Exception:
+            logger.exception("Bookings schema heal via provided session failed")
+            return False
+    try:
+        from app.core.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            return await ensure_bookings_schema(db, force=True)
+    except Exception:
+        logger.exception("Bookings schema heal bootstrap failed")
+        return False

@@ -42,6 +42,16 @@ export async function cancelAdminBooking(bookingId) {
   return res.json();
 }
 
+/** Permanently delete a booking (Postgres + ticket cache). */
+export async function deleteAdminBooking(bookingId) {
+  const res = await adminFetch(
+    `/api/admin/platform/bookings/${encodeURIComponent(bookingId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function retryFiscalInvoice(invoiceId) {
   const res = await adminFetch(
     `/api/admin/platform/fiscal-invoices/${encodeURIComponent(invoiceId)}/retry`,

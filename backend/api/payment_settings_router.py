@@ -178,6 +178,31 @@ class RecordCashPaymentBody(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=128)
 
 
+def _cash_booking_lookup_keys(
+    booking_key: str,
+    booking: dict[str, Any],
+    body: RecordCashPaymentBody,
+) -> list[str]:
+    """URL id, form PNR, and cache aliases — office bookings often differ across these."""
+    keys: list[str] = []
+    for raw in (
+        booking_key,
+        body.reference_code,
+        booking.get("pnr"),
+        booking.get("reference_code"),
+        booking.get("referenceCode"),
+        booking.get("ticketRef"),
+        booking.get("ticket_ref"),
+        booking.get("id"),
+    ):
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text and text not in keys:
+            keys.append(text)
+    return keys
+
+
 class PaymentAuditEntry(BaseModel):
     id: str
     at: str
@@ -225,11 +250,15 @@ async def _persist_confirmed_booking(
 
     merged = {**booking, **patch}
     email = merged.get("email") or "unknown@local.invalid"
-    saved = await upsert_booking(
-        merged,
-        customer_email=email,
-        tenant_id=str(await _tenant_id_for_admin_request(request)),
-    )
+    try:
+        saved = await upsert_booking(
+            merged,
+            customer_email=email,
+            tenant_id=str(await _tenant_id_for_admin_request(request)),
+        )
+    except Exception:
+        # Cache upsert must not fail a successful Postgres cash capture.
+        saved = merged
 
     try:
         from api.admin_booking_mapper import apply_patch_to_booking, booking_to_admin_dict
@@ -406,7 +435,11 @@ async def confirm_bank_deposit(
     )
 
     try:
-        await send_payment_confirmation_notifications(saved, event=EVENT_BANK_CONFIRMED)
+        await send_payment_confirmation_notifications(
+            saved,
+            event=EVENT_BANK_CONFIRMED,
+            require_office=True,
+        )
     except Exception:
         pass
 
@@ -457,10 +490,109 @@ async def record_cash_payment_admin(
     pg_snapshot: dict[str, Any] = {}
 
     async with AsyncSessionLocal() as db:
-        await apply_tenant_rls(db, tenant_id)
-        pg_booking = await _find_booking(db, tenant_id, booking_key)
+        try:
+            from app.services.ensure_bookings_schema import ensure_bookings_schema
+
+            # Heal Contabo drift before SELECT (missing customer_user_id etc.).
+            await ensure_bookings_schema(db)
+            await apply_tenant_rls(db, tenant_id)
+            pg_booking = None
+            for lookup_key in _cash_booking_lookup_keys(booking_key, booking, body):
+                pg_booking = await _find_booking(db, tenant_id, lookup_key)
+                if pg_booking:
+                    break
+        except HTTPException:
+            raise
+        except Exception as exc:
+            await db.rollback()
+            import logging
+            logging.getLogger(__name__).exception(
+                "Cash payment DB prelude failed booking_key=%s", booking_key
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}: {exc}",
+            ) from exc
         if not pg_booking:
-            raise HTTPException(status_code=404, detail="Booking not found in Postgres")
+            # Office / walk-in bookings may exist only in the ticket cache.
+            # Upsert into Postgres so cash capture + fiscal receipt can proceed.
+            from api.admin_booking_mapper import ensure_booking_from_admin_dict
+            import logging
+
+            from sqlalchemy.exc import IntegrityError
+
+            log = logging.getLogger(__name__)
+            try:
+                pg_booking = ensure_booking_from_admin_dict(tenant_id, booking)
+                db.add(pg_booking)
+                await db.flush()
+                log.info(
+                    "Upserted cache booking into Postgres for cash capture key=%s ref=%s",
+                    booking_key,
+                    pg_booking.reference_code,
+                )
+            except IntegrityError as exc:
+                # Race / already inserted under PNR — reload instead of fake 404.
+                await db.rollback()
+                await apply_tenant_rls(db, tenant_id)
+                for lookup_key in _cash_booking_lookup_keys(booking_key, booking, body):
+                    pg_booking = await _find_booking(db, tenant_id, lookup_key)
+                    if pg_booking:
+                        break
+                if not pg_booking:
+                    log.exception(
+                        "Cash upsert IntegrityError and reload miss key=%s", booking_key
+                    )
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Η κράτηση υπάρχει ήδη στη βάση αλλά δεν εντοπίστηκε με αυτό το "
+                            f"PNR/id. Δοκίμασε ξανά με PNR {body.reference_code or booking.get('pnr') or booking_key}."
+                        ),
+                    ) from exc
+            except Exception as exc:
+                from app.services.ensure_bookings_schema import (
+                    ensure_bookings_schema,
+                    is_bookings_schema_drift_error,
+                )
+
+                if is_bookings_schema_drift_error(exc):
+                    await db.rollback()
+                    await ensure_bookings_schema(db, force=True)
+                    await apply_tenant_rls(db, tenant_id)
+                    try:
+                        pg_booking = ensure_booking_from_admin_dict(tenant_id, booking)
+                        db.add(pg_booking)
+                        await db.flush()
+                        log.info(
+                            "Retried cash upsert after bookings schema heal key=%s",
+                            booking_key,
+                        )
+                    except Exception as retry_exc:
+                        await db.rollback()
+                        log.exception(
+                            "Cash upsert retry after heal failed booking_key=%s",
+                            booking_key,
+                        )
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
+                                f"καταχώρηση μετρητών: {retry_exc.__class__.__name__}: {retry_exc}"
+                            ),
+                        ) from retry_exc
+                else:
+                    await db.rollback()
+                    log.exception(
+                        "Cash upsert from cache failed booking_key=%s", booking_key
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
+                            f"καταχώρηση μετρητών: {exc.__class__.__name__}: {exc}"
+                        ),
+                    ) from exc
 
         try:
             result = await BookingPaymentService(db).record_cash_payment(
@@ -473,6 +605,12 @@ async def record_cash_payment_admin(
                 note=body.note,
                 receipt_number=body.receipt_number,
             )
+            if result.status not in ("captured", "duplicate"):
+                await db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Η καταχώρηση μετρητών δεν ολοκληρώθηκε ({result.status})",
+                )
             await db.commit()
             await db.refresh(pg_booking)
             result_status = result.status
@@ -495,37 +633,69 @@ async def record_cash_payment_admin(
                 "total_price": float(pg_booking.total_price),
                 "admin": booking_to_admin_dict(pg_booking, fiscal_invoices=fiscal_invoices),
             }
+        except HTTPException:
+            raise
         except Exception as exc:
             await db.rollback()
-            raise HTTPException(status_code=500, detail="Cash payment failed") from exc
+            import logging
 
+            logging.getLogger(__name__).exception(
+                "Cash payment failed booking_key=%s", booking_key
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}: {exc}",
+            ) from exc
+
+    # Side-effects after a successful capture must never turn into HTTP 500 —
+    # the money is already recorded in Postgres.
     if fiscal_invoice_id and result_status == "captured":
-        dispatch_fiscal_receipt(str(fiscal_invoice_id))
+        try:
+            dispatch_fiscal_receipt(str(fiscal_invoice_id))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Fiscal dispatch failed after cash capture booking_key=%s", booking_key
+            )
 
     balance = round(max(pg_snapshot["total_price"] - pg_snapshot["amount_paid"], 0.0), 2)
-    patch = build_cash_payment_patch(
-        pg_snapshot["admin"],
-        channel=channel,
-        amount_paid_now=float(body.amount),
-        new_amount_paid=pg_snapshot["amount_paid"],
-        new_balance=balance,
-        note=body.note,
-        receipt_number=body.receipt_number,
-    )
-    saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch, request)
-
-    record_cash_audit(
-        booking_id=str(pg_snapshot["id"]),
-        amount_eur=float(body.amount),
-        channel=channel,
-        actor_id=str(actor_id) if actor_id else None,
-        reference=body.reference_code,
-        detail=body.note,
-        receipt_number=body.receipt_number,
-    )
+    try:
+        patch = build_cash_payment_patch(
+            pg_snapshot["admin"],
+            channel=channel,
+            amount_paid_now=float(body.amount),
+            new_amount_paid=pg_snapshot["amount_paid"],
+            new_balance=balance,
+            note=body.note,
+            receipt_number=body.receipt_number,
+        )
+        saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch, request)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Post-cash persist failed booking_key=%s", booking_key
+        )
+        saved = {**pg_snapshot["admin"], "amountPaid": pg_snapshot["amount_paid"], "balanceDue": balance}
 
     try:
-        await send_payment_confirmation_notifications(saved, event=EVENT_CASH_PAYMENT)
+        record_cash_audit(
+            booking_id=str(pg_snapshot["id"]),
+            amount_eur=float(body.amount),
+            channel=channel,
+            actor_id=str(actor_id) if actor_id else None,
+            reference=body.reference_code,
+            detail=body.note,
+            receipt_number=body.receipt_number,
+        )
+    except Exception:
+        pass
+
+    try:
+        await send_payment_confirmation_notifications(
+            saved,
+            event=EVENT_CASH_PAYMENT,
+            require_office=True,
+        )
     except Exception:
         pass
 

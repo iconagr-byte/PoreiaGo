@@ -185,7 +185,7 @@ function RentVisual() {
         </svg>
       </div>
       <div className="absolute bottom-3 right-4 rounded-full bg-white text-[11px] font-semibold text-slate-700 px-3 py-1 shadow-sm border border-black/[0.06]">
-        SOS · 24/7
+        Οδική βοήθεια 24/7
       </div>
     </SceneShell>
   );
