@@ -14,6 +14,7 @@ import {
   reportPlatformUsageAll,
   suspendPlatformTenant,
   updatePlatformTenant,
+  checkPlatformDomainDns,
   validatePlatformDomain,
 } from '../../services/platformSaasApi.js';
 import { getSaasToken, startImpersonationSession } from '../../services/saasApi.js';
@@ -688,14 +689,25 @@ export default function SuperAdminPanel() {
     setCheckingDomain(true);
     setDomainCheck(null);
     try {
-      // Registry check (TLS allowlist). Domain must be saved first to pass.
-      const result = await validatePlatformDomain(domain);
+      // Registry + live DNS (Achillio-style CNAME/A) for any office.
+      let result;
+      try {
+        result = await checkPlatformDomainDns(domain);
+      } catch {
+        result = await validatePlatformDomain(domain);
+      }
+      const wwwOk = Boolean(result?.www_ok);
+      const apexOk = Boolean(result?.apex_ok);
+      const allowed = Boolean(result?.allowed);
+      const ready = Boolean(result?.ready_for_tls);
       setDomainCheck({
-        ok: Boolean(result?.allowed),
+        ok: allowed && ready,
         domain,
-        message: result?.allowed
-          ? 'Το domain είναι καταχωρημένο στο registry — έτοιμο για TLS'
-          : 'Δεν είναι ακόμα στο registry. Αποθήκευσε το domain και ξαναέλεγξε.',
+        message:
+          result?.message ||
+          (allowed
+            ? `Registry OK · www ${wwwOk ? '✓' : '✗'} · apex ${apexOk ? '✓' : '✗'}`
+            : 'Δεν είναι ακόμα στο registry. Αποθήκευσε το domain και ξαναέλεγξε.'),
       });
     } catch (err) {
       setDomainCheck({ ok: false, domain, message: err.message || 'Αποτυχία ελέγχου' });

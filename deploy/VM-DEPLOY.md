@@ -46,8 +46,28 @@
    | `*.poreiago.com` (all offices) | `127.0.0.1:8003` |
    | `www.achilliotravel.com`, `achilliotravel.com` | `127.0.0.1:8003` |
 
-4. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
-   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει, ανανεώνει το `dist/`
+### Custom domain για οποιοδήποτε γραφείο (όπως Achillio)
+
+Στο **Domain & εμφάνιση** του γραφείου:
+
+1. Βάλε το apex (π.χ. `myagency.gr`) και **Αποθήκευση**
+2. Στον DNS πάροχο: `www` **CNAME** → `www.poreiago.com` · προαιρετικά `@` **A** → `169.58.199.186`
+3. Πάτα **Έλεγχος DNS** (live CNAME/A) και **Edge sync**
+
+Το API μετά την αποθήκευση: ενημερώνει Traefik YAML (αν υπάρχει), ξαναγράφει το nginx
+`apex-www-redirect.map` (apex→www για κάθε office), και αν στο `.env.prod` έχεις:
+
+```
+EDGE_PROXY=npm
+NPM_API_URL=http://127.0.0.1:81
+NPM_EMAIL=admin@example.com
+NPM_PASSWORD=…
+```
+
+κάνει upsert Proxy Host `www.{domain}` + Redirection Host apex→www (ίδιο pattern με Achillio).
+Χωρίς NPM credentials, το DNS check + nginx map δουλεύουν· το Proxy Host ανοίγεται μία φορά στο NPM UI.
+
+4. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει, ανανεώνει το `dist/`
    **και** εγκαθιστά το `deploy/nginx/frontend.conf` ώστε το `/api` να πηγαίνει στο api-blue
    (χωρίς αυτό το Contabo έδινε 405 στο login).
 

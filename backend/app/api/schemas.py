@@ -410,9 +410,24 @@ class TenantDnsInstructionsResponse(BaseModel):
     cname_host: str
     cname_target: str
     alternate_www_host: str | None = None
+    apex_host: str | None = None
+    apex_a_record: str | None = None
     subdomain_cname_host: str | None = None
     subdomain_cname_target: str | None = None
     notes: list[str] = Field(default_factory=list)
+
+
+class TenantDomainDnsCheckResponse(BaseModel):
+    domain: str = ""
+    www_ok: bool = False
+    apex_ok: bool = False
+    ready_for_tls: bool = False
+    ingress_cname: str = "www.poreiago.com"
+    ingress_ip: str = "169.58.199.186"
+    message: str = ""
+    www: dict[str, object] | None = None
+    apex: dict[str, object] | None = None
+    edge: dict[str, object] | None = None
 
 
 class TenantBrandingSettingsResponse(BaseModel):

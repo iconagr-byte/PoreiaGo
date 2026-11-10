@@ -271,9 +271,9 @@ async def update_tenant(
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     try:
-        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+        from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 
-        await sync_traefik_custom_domains_from_db(db)
+        await sync_edge_custom_domains_from_db(db)
     except Exception:
         pass
     data = await PlatformAdminService(db).get_tenant(tenant_id)

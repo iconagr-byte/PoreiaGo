@@ -326,13 +326,18 @@ async def lifespan(app: FastAPI):
         )
     try:
         from app.core.database import AsyncSessionLocal
-        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+        from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 
         async with AsyncSessionLocal() as session:
-            synced = await sync_traefik_custom_domains_from_db(session)
-            if synced:
+            synced = await sync_edge_custom_domains_from_db(session)
+            domains = synced.get("domains") or []
+            if domains:
                 __import__("logging").getLogger("poreiago.startup").info(
-                    "Traefik custom domains synced: %s", ", ".join(synced)
+                    "Edge custom domains synced: %s (traefik=%s nginx_map=%s npm=%s)",
+                    ", ".join(domains),
+                    synced.get("traefik"),
+                    synced.get("nginx_map"),
+                    len(synced.get("npm") or []),
                 )
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
