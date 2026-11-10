@@ -128,7 +128,7 @@ def _driver_response(d, *, enrich_safety: bool = False) -> FleetDriverResponse:
         salary_per_km=d.salary_per_km,
         salary_per_trip=d.salary_per_trip,
         current_balance=d.current_balance,
-        safety_score=safety,
+        safety_score=d.safety_score,
         trips_completed=d.trips_completed,
         total_km=d.total_km,
         license_expires_at=d.license_expires_at,
@@ -1325,13 +1325,51 @@ async def get_driver_api(request: Request, driver_id: str):
     return _driver_response(d, enrich_safety=True)
 
 
+@router.get("/drivers/{driver_id}/history")
+async def get_driver_history_api(driver_id: str, limit: int = Query(100, ge=1, le=500)):
+    """Πλήρες ιστορικό οδηγού: logins, βάρδιες, χιλιόμετρα (GPS + καταγραφές)."""
+    from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+    from travel_platform.telemetry.driver_history_service import build_driver_history
+
+    if not get_driver(driver_id):
+        raise HTTPException(status_code=404, detail="Driver not found")
+
+    tenant_id = None
+    try:
+        tenant_id = await resolve_platform_tenant_id()
+    except Exception:
+        tenant_id = None
+
+    try:
+        from database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            payload = await build_driver_history(
+                db,
+                driver_id=driver_id,
+                tenant_id=tenant_id,
+                limit=limit,
+            )
+    except Exception:
+        payload = await build_driver_history(
+            None,
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+
+    if not payload:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return payload
+
+
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate):
     tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
-        d = update_driver(driver_id, body.model_dump(exclude_unset=True))
+        d = await asyncio.to_thread(update_driver, driver_id, body.model_dump(exclude_unset=True))
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
     except ValueError as e:
@@ -1351,7 +1389,7 @@ async def remove_driver(request: Request, driver_id: str):
         delete_driver(driver_id, tenant_id=tenant_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
-
+    return Response(status_code=204)
 
 # --- Office CRM customers (durable, tenant-scoped) ---------------------------------
 
@@ -1379,6 +1417,16 @@ class OfficeCustomerIn(BaseModel):
 
 class OfficeCustomersReplaceIn(BaseModel):
     customers: list[OfficeCustomerIn] = Field(default_factory=list)
+
+
+@router.get("/wallet-registrations")
+async def list_wallet_registrations(request: Request):
+    """My Wallet account signups sealed to this office (home office)."""
+    from ticketing.customer_accounts import list_accounts_for_tenant
+
+    tid = _request_tenant_id(request)
+    items = await list_accounts_for_tenant(tid)
+    return {"items": items, "count": len(items)}
 
 
 @router.get("/customers")
@@ -2344,6 +2392,7 @@ async def admin_chat_threads(
         )
         t["driver_name"] = d.name if d else None
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
+        t["driver_missing"] = d is None
     return {"tenant_id": tenant_id, "threads": threads}
 
 
@@ -2387,9 +2436,13 @@ async def admin_chat_messages(
         limit=limit,
         viewer="office",
     )
+    if driver is None and not messages:
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     counts = unread_counts(tenant_id=tenant_id, driver_id=driver_id)
     return {
         "driver_id": driver_id,
+        "driver_name": driver.name if driver else None,
+        "driver_missing": driver is None,
         "messages": messages,
         "unread": counts.get("office", 0),
     }
@@ -2402,7 +2455,17 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Req
     tenant_id, allow_legacy = await _chat_office_scope(request)
     driver = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy)
     if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
+        # Still allow office reply on an existing thread (driver may be demo-tenant).
+        from travel_platform.driver.chat_store import list_messages
+
+        existing = list_messages(
+            tenant_id=tenant_id,
+            driver_id=driver_id,
+            limit=1,
+            viewer="office",
+        )
+        if not existing and not get_driver(driver_id):
+            raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     try:
         row = append_message(
             tenant_id=tenant_id,

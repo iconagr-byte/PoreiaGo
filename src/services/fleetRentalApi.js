@@ -278,3 +278,38 @@ export async function fetchRentalInspections(bookingId) {
 export async function createRentalInspection(body) {
   return rentalFetch('/inspections', { method: 'POST', body: JSON.stringify(body) });
 }
+
+export async function issueRentalReceipt(bookingId, body = {}) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/issue-receipt`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function confirmRentalBankDeposit(bookingId, body = {}) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/confirm-bank-deposit`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateRentalDamageDeposit(bookingId, action) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/damage-deposit`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+}
+
+export async function scanRentalReminders(withinHours = 24) {
+  return rentalFetch(`/reminders/scan?within_hours=${encodeURIComponent(withinHours)}`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchRentModule() {
+  return rentalFetch('/module');
+}
+
+export async function updateRentModule(body) {
+  return rentalFetch('/module', { method: 'PATCH', body: JSON.stringify(body) });
+}

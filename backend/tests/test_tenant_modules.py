@@ -40,6 +40,17 @@ def test_bus_plan_with_rent_addon():
     assert mods["mode"] == "both"
 
 
+def test_initial_settings_for_bus_plan_with_rent_addon():
+    seed = initial_settings_for_plan(
+        TenantPlan.PROFESSIONAL,
+        office_name="Achillio Travel",
+        rent_addon=True,
+    )
+    assert seed["addons"]["rent"] is True
+    assert seed["modules"]["rent_enabled"] is True
+    assert seed["modules"]["trips_enabled"] is True
+
+
 def test_explicit_modules_override():
     mods = modules_for_settings(
         plan=TenantPlan.STARTER,
@@ -88,7 +99,56 @@ def test_enable_rent_addon_merge():
     bag = enable_rent_addon_in_settings({"theme": {"primary": "#123"}})
     assert bag["addons"]["rent"] is True
     assert bag["modules"]["rent_enabled"] is True
+    assert bag["modules"]["trips_enabled"] is True
     assert bag["theme"]["primary"] == "#123"
+
+
+def test_enable_rent_addon_forces_trips_on():
+    bag = enable_rent_addon_in_settings(
+        {"modules": {"trips_enabled": False, "rent_enabled": False}},
+    )
+    assert bag["modules"]["trips_enabled"] is True
+    assert bag["modules"]["rent_enabled"] is True
+
+
+def test_rent_addon_eligibility_requires_bus_plan():
+    from app.services.tenant_modules import rent_addon_eligibility
+
+    bus = SimpleNamespace(
+        plan=TenantPlan.PROFESSIONAL,
+        is_active=True,
+        settings_json="{}",
+        slug="demo-office",
+        custom_domain=None,
+        subdomain="demo",
+    )
+    ok, err = rent_addon_eligibility(bus, subscription_status="active")
+    assert ok is True
+    assert err == ""
+
+    rent = SimpleNamespace(
+        plan=TenantPlan.RENT,
+        is_active=True,
+        settings_json='{"modules":{"trips_enabled":false,"rent_enabled":true}}',
+        slug="rent-office",
+        custom_domain=None,
+        subdomain="rentco",
+    )
+    ok, err = rent_addon_eligibility(rent, subscription_status="active")
+    assert ok is False
+    assert "αυτόνομο Rent" in err
+
+    canceled = SimpleNamespace(
+        plan=TenantPlan.STARTER,
+        is_active=True,
+        settings_json="{}",
+        slug="bus-office",
+        custom_domain=None,
+        subdomain="busco",
+    )
+    ok, err = rent_addon_eligibility(canceled, subscription_status="canceled")
+    assert ok is False
+    assert "ενεργό συμβόλαιο" in err.lower() or "λεωφορείων" in err
 
 
 def test_disable_rent_addon_keeps_trips():

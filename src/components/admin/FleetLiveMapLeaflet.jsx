@@ -61,6 +61,8 @@ const busIcon = (vehicle) => {
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
+  // Labels float ABOVE the ring via CSS; icon box is only the 52×52 avatar so
+  // iconAnchor = ring center = GPS lat/lng (matches trail tip / Teltonika fix).
   const excursionHtml = excursion
     ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
     : '';
@@ -80,6 +82,7 @@ const busIcon = (vehicle) => {
         <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
+      <div class="fleet-apple-bus-pill">${name} · ${speed} km/h</div>
     </div>`,
     iconSize: [52, iconH],
     iconAnchor: [26, anchorY],

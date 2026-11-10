@@ -5,6 +5,8 @@ import { issueSignedQrToken } from './qrToken.js';
 import { isBookingPaid } from './bookingStore.js';
 import { formatMoney } from '../currency/multiCurrency.js';
 
+const PRINT_STASH_KEY = 'poreiago_ticket_print_stash_v1';
+
 function escapeHtml(s) {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -24,32 +26,100 @@ export function ticketPrintPath(bookingId, { autoPrint = false } = {}) {
   return autoPrint ? `${base}?print=1` : base;
 }
 
+/** iOS/Android installed PWA — `window.print()` is often a silent no-op. */
+export function isStandaloneApp() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.matchMedia?.('(display-mode: standalone)')?.matches) return true;
+    if (window.matchMedia?.('(display-mode: fullscreen)')?.matches) return true;
+    if (window.navigator?.standalone === true) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+export function canUseWindowPrint() {
+  return typeof window !== 'undefined' && typeof window.print === 'function' && !isStandaloneApp();
+}
+
 /**
- * @param {object} booking
- * @param {object} [trip]
- * @param {{ autoPrint?: boolean, companyName?: string }} [opts]
+ * Stash booking payload so `/ticket/print/:id` can render even when localStorage
+ * lookup fails (API-only / race / different id key).
+ * @param {{ booking: object, tripTitle?: string, coverImage?: string, brandLabel?: string, printQr?: string }} payload
  */
-export async function openTicketPrintWindow(booking, trip, opts = {}) {
-  if (!booking) {
-    throw new Error('Δεν υπάρχει κράτηση για εκτύπωση');
+export function stashTicketForPrint(payload) {
+  if (typeof window === 'undefined' || !payload?.booking?.id) return;
+  try {
+    sessionStorage.setItem(
+      PRINT_STASH_KEY,
+      JSON.stringify({
+        ...payload,
+        stashedAt: Date.now(),
+      }),
+    );
+  } catch {
+    /* private mode / quota */
   }
-  if (!isBookingPaid(booking)) {
-    throw new Error('Η κράτηση δεν είναι εξοφλημένη');
-  }
+}
 
-  let qrToken = opts.qrToken || '';
-  if (!qrToken) {
-    try {
-      qrToken = await issueSignedQrToken(booking);
-    } catch {
-      qrToken = booking.pnr || booking.id || 'INVALID';
+/** @param {string} [bookingId] */
+export function consumeTicketPrintStash(bookingId) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(PRINT_STASH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.booking?.id) return null;
+    if (bookingId && String(parsed.booking.id) !== String(bookingId)) {
+      // Also accept saasBookingId match
+      if (String(parsed.booking.saasBookingId || '') !== String(bookingId)) return null;
     }
+    sessionStorage.removeItem(PRINT_STASH_KEY);
+    return parsed;
+  } catch {
+    return null;
   }
+}
 
-  const company = opts.companyName || 'PoreiaGo Travel';
-  const tripTitle = trip?.title || booking.tripTitle || 'Εκδρομή';
-  const passenger = booking.customerName || '—';
-  const seat = booking.seat || booking.seats?.join(', ') || '—';
+export function triggerBrowserPrint() {
+  if (!canUseWindowPrint()) return false;
+  try {
+    window.print();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Download a self-contained HTML ticket (open → Share/Print → PDF on phones).
+ * @param {string} html
+ * @param {string} [filename]
+ */
+export function downloadTicketHtml(html, filename = 'eisitirio.html') {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function buildTicketPrintHtml({
+  booking,
+  tripTitle,
+  company,
+  qrToken,
+  autoPrint = true,
+}) {
+  const passenger =
+    booking.customerName || booking.passengerName || booking.name || '—';
+  const seat = booking.seat || (Array.isArray(booking.seats) ? booking.seats.join(', ') : booking.seats) || '—';
   const pnr = booking.pnr || booking.ticketRef || booking.id;
   const dateStr = booking.date
     ? new Date(booking.date).toLocaleDateString('el-GR', {
@@ -65,10 +135,11 @@ export async function openTicketPrintWindow(booking, trip, opts = {}) {
   const invoice = booking.invoiceNumber || '—';
   const qrSrc = qrImageUrl(qrToken, 220);
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="el">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Εισιτήριο ${escapeHtml(pnr)}</title>
   <style>
     * { box-sizing: border-box; }
@@ -195,16 +266,37 @@ export async function openTicketPrintWindow(booking, trip, opts = {}) {
       line-height: 1.5;
     }
     .footer strong { color: #374151; }
+    .toolbar {
+      max-width: 420px;
+      margin: 0 auto 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .toolbar button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      background: #0f172a;
+      color: #fff;
+    }
     @media print {
       body { background: #fff; padding: 0; }
       .ticket { box-shadow: none; border: none; max-width: 100%; }
-      .no-print { display: none; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
+  <div class="toolbar no-print">
+    <button type="button" onclick="window.print()">Εκτύπωση / PDF</button>
+  </div>
   <p class="no-print" style="text-align:center;color:#666;font-size:13px;margin-bottom:16px;">
-    Προεπισκόπηση εισιτηρίου — Ctrl+P για εκτύπωση ή «Αποθήκευση ως PDF»
+    Προεπισκόπηση εισιτηρίου — «Εκτύπωση / PDF» ή Αποθήκευση ως PDF
   </p>
   <div class="ticket">
     <div class="header">
@@ -256,17 +348,147 @@ export async function openTicketPrintWindow(booking, trip, opts = {}) {
     </div>
   </div>
   <script>
-    ${opts.autoPrint !== false ? 'window.onload = () => setTimeout(() => window.print(), 500);' : ''}
+    ${autoPrint ? 'window.onload = () => setTimeout(() => { try { window.print(); } catch (e) {} }, 400);' : ''}
   </script>
 </body>
 </html>`;
+}
 
+/**
+ * @param {object} booking
+ * @param {object} [trip]
+ * @param {{ autoPrint?: boolean, companyName?: string, qrToken?: string, allowUnpaid?: boolean }} [opts]
+ */
+export async function openTicketPrintWindow(booking, trip, opts = {}) {
+  if (!booking) {
+    throw new Error('Δεν υπάρχει κράτηση για εκτύπωση');
+  }
+  if (!opts.allowUnpaid && !isBookingPaid(booking)) {
+    throw new Error('Η κράτηση δεν είναι εξοφλημένη');
+  }
+
+  // Open *before* any await so the browser keeps the user-gesture (popup blockers).
   const win = window.open('', '_blank', 'width=480,height=820');
   if (!win) {
-    throw new Error('Ο browser μπλόκαρε το popup — επιτρέψτε popups για εκτύπωση');
+    const err = new Error('Ο browser μπλόκαρε το popup — επιτρέψτε popups για εκτύπωση');
+    err.code = 'POPUP_BLOCKED';
+    throw err;
   }
-  win.document.write(html);
-  win.document.close();
+  try {
+    win.document.write(
+      '<!DOCTYPE html><html lang="el"><head><meta charset="utf-8" /><title>Εισιτήριο</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#64748b;">Φόρτωση εισιτηρίου…</body></html>',
+    );
+    win.document.close();
+  } catch {
+    /* ignore */
+  }
+
+  let qrToken = opts.qrToken || '';
+  if (!qrToken) {
+    try {
+      qrToken = await issueSignedQrToken(booking);
+    } catch {
+      qrToken = booking.pnr || booking.id || 'INVALID';
+    }
+  }
+
+  const company = opts.companyName || 'PoreiaGo Travel';
+  const tripTitle = trip?.title || booking.tripTitle || 'Εκδρομή';
+  const html = buildTicketPrintHtml({
+    booking,
+    tripTitle,
+    company,
+    qrToken,
+    autoPrint: opts.autoPrint !== false,
+  });
+
+  try {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    try {
+      win.focus();
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    try {
+      win.close();
+    } catch {
+      /* ignore */
+    }
+    const err = new Error('Αποτυχία ανοίγματος παραθύρου εκτύπωσης');
+    err.code = 'PRINT_WINDOW_FAILED';
+    throw err;
+  }
+}
+
+/**
+ * Wallet / detail CTA: open printable ticket (popup → same-tab → HTML download).
+ * @param {{
+ *   booking: object,
+ *   trip?: object,
+ *   tripTitle?: string,
+ *   coverImage?: string,
+ *   brandLabel?: string,
+ *   navigate?: (path: string) => void,
+ * }} args
+ * @returns {Promise<'popup'|'navigate'|'download'>}
+ */
+export async function startWalletTicketPrint({
+  booking,
+  trip,
+  tripTitle,
+  coverImage,
+  brandLabel = 'My Wallet',
+  navigate,
+}) {
+  if (!booking?.id) {
+    throw new Error('Δεν υπάρχει κράτηση για εκτύπωση');
+  }
+
+  const title = tripTitle || trip?.title || booking.tripTitle || 'Εκδρομή';
+  stashTicketForPrint({
+    booking,
+    tripTitle: title,
+    coverImage: coverImage || trip?.image || '',
+    brandLabel,
+  });
+
+  // Installed PWA: print dialog usually does nothing — download HTML instead.
+  if (isStandaloneApp()) {
+    let qrToken = booking.pnr || booking.id;
+    try {
+      if (isBookingPaid(booking)) qrToken = await issueSignedQrToken(booking);
+    } catch {
+      /* keep PNR */
+    }
+    const html = buildTicketPrintHtml({
+      booking,
+      tripTitle: title,
+      company: brandLabel,
+      qrToken,
+      autoPrint: false,
+    });
+    const pnr = booking.pnr || booking.ticketRef || booking.id;
+    downloadTicketHtml(html, `eisitirio-${pnr}.html`);
+    return 'download';
+  }
+
+  try {
+    await openTicketPrintWindow(booking, trip || { title }, {
+      companyName: brandLabel,
+      allowUnpaid: true,
+      autoPrint: true,
+    });
+    return 'popup';
+  } catch (err) {
+    if (typeof navigate === 'function') {
+      navigate(ticketPrintPath(booking.id, { autoPrint: true }));
+      return 'navigate';
+    }
+    throw err;
+  }
 }
 
 /** Demo ticket (mock booking B-1029) for preview without login. */
