@@ -1,23 +1,85 @@
 /**
- * Driver PWA — HTML5 geolocation watchPosition (high accuracy, ~2s publish).
+ * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 1s).
  */
 
+import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 import { detectIosDevice, iosGeolocationOptions } from './iosPwaGps.js';
 
 /** How often the driver app pushes GPS to the platform. */
-export const DRIVER_GPS_INTERVAL_MS = 2000;
+export const DRIVER_GPS_INTERVAL_MS = LIVE_REFRESH_MS;
 
-/** Hard floor — still well under backend driver_gps_max_per_minute (60). */
-export const DRIVER_GPS_MIN_INTERVAL_MS = 1000;
+/** Shared last fix — SOS reuses this so it never opens a competing high-accuracy request. */
+let sharedLastCoords = null;
 
-/** Prefer a recent good fix over a noisy one. */
-export const DRIVER_GPS_MAX_ACCURACY_M = 80;
+/**
+ * @returns {{ lat: number, lng: number, accuracy_m: number|null, at: number } | null}
+ */
+export function getLastKnownDriverCoords() {
+  return sharedLastCoords ? { ...sharedLastCoords } : null;
+}
 
-/** Absolute junk — drop even when we have no better fix. */
-export const DRIVER_GPS_REJECT_ACCURACY_M = 150;
+function rememberCoords(position) {
+  if (!position?.coords) return;
+  const { latitude, longitude, accuracy } = position.coords;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+  sharedLastCoords = {
+    lat: latitude,
+    lng: longitude,
+    accuracy_m: Number.isFinite(accuracy) ? accuracy : null,
+    at: Date.now(),
+  };
+}
 
-/** Re-send last fix only briefly if getCurrentPosition fails (do not fake freshness forever). */
-export const DRIVER_GPS_KEEPALIVE_MAX_AGE_MS = 15000;
+/**
+ * Coords for SOS / incident — prefer last shift fix; never starts a shift.
+ * Fresh request (if needed) uses low accuracy so it won't fight live GPS.
+ */
+export async function resolveCoordsForSos({ allowFresh = true } = {}) {
+  const known = getLastKnownDriverCoords();
+  if (known) return known;
+
+  if (!allowFresh || !isGeolocationSupported()) {
+    return { lat: 0, lng: 0, accuracy_m: null, at: Date.now(), approximate: true };
+  }
+
+  try {
+    const fresh = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy_m: pos.coords.accuracy,
+            at: Date.now(),
+          }),
+        reject,
+        {
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 60_000,
+        },
+      );
+    });
+    sharedLastCoords = {
+      lat: fresh.lat,
+      lng: fresh.lng,
+      accuracy_m: fresh.accuracy_m ?? null,
+      at: fresh.at,
+    };
+    return fresh;
+  } catch {
+    return { lat: 0, lng: 0, accuracy_m: null, at: Date.now(), approximate: true };
+  }
+}
+
+/**
+ * Ask an *already online* shift to re-publish GPS after SOS.
+ * Must never start a new shift (listener guards on SHIFT_KEY).
+ */
+export function requestDriverGpsKeepalive() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('driver-gps-keepalive', { detail: { reason: 'sos' } }));
+}
 
 /**
  * @param {object} options
@@ -38,13 +100,13 @@ export function startDriverGeolocationWatch({
 
   const isIos = detectIosDevice();
   const publishEveryMs = Math.max(
-    DRIVER_GPS_MIN_INTERVAL_MS,
+    DRIVER_GPS_INTERVAL_MS,
     Number(intervalMs) || DRIVER_GPS_INTERVAL_MS,
   );
   const geoOptions = {
     ...iosGeolocationOptions(isIos),
     // Prefer a fresh fix at least as often as we publish.
-    maximumAge: Math.min(publishEveryMs, isIos ? 2000 : 1500),
+    maximumAge: Math.min(publishEveryMs, isIos ? 1000 : 1000),
   };
 
   let lastEmitAt = 0;
@@ -64,6 +126,8 @@ export function startDriverGeolocationWatch({
 
   const emit = (pos, { force = false } = {}) => {
     if (!pos) return;
+    lastPos = pos;
+    rememberCoords(pos);
     const now = Date.now();
     const acc = accuracyM(pos);
     const goodAge = lastGoodPos ? fixAgeMs(lastGoodPos) : Infinity;

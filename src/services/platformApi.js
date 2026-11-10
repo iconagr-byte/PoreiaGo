@@ -1,13 +1,22 @@
 import { API_BASE } from '../config/api.js';
 import { mockFleet } from '../data/mockData.js';
 import { fileToDriverPhotoDataUrl } from '../lib/drivers/driverPhoto.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
-import { getSaasToken, issueSaasMasterQr, saasFetch } from './saasApi.js';
+import { getSaasToken, getSaasTenantId, issueSaasMasterQr, saasFetch } from './saasApi.js';
 import { normalizeCheckoutSettings } from './checkoutSettingsApi.js';
 import { normalizeBankTransferSettings } from '../lib/payments/bankTransfer.js';
 
-const PLATFORM_SETTINGS_KEY = 'aerostride_platform_settings';
-const MAINT_EVENTS_KEY = 'aerostride_maintenance_events_v1';
+const PLATFORM_SETTINGS_KEY_BASE = 'aerostride_platform_settings';
+const MAINT_EVENTS_KEY_BASE = 'aerostride_maintenance_events_v1';
+
+function platformSettingsKey() {
+  return officeStorageKey(PLATFORM_SETTINGS_KEY_BASE);
+}
+
+function maintEventsKey() {
+  return officeStorageKey(MAINT_EVENTS_KEY_BASE);
+}
 
 export const DEFAULT_PLATFORM_SETTINGS = {
   company_name: 'PoreiaGo Travel',
@@ -25,7 +34,7 @@ export const DEFAULT_PLATFORM_SETTINGS = {
   smtp_from_email: 'noreply@poreiago.app',
   sms_sender_id: 'AEROSTRIDE',
   maintenance_mode: false,
-  checkout_base_url: 'http://localhost:5173',
+  checkout_base_url: 'https://www.poreiago.com',
   checkout_deposit_enabled: true,
   checkout_deposit_percent: 30,
   checkout_bank_transfer_enabled: true,
@@ -43,8 +52,10 @@ async function parseError(res) {
   let detail = err.detail ?? res.statusText ?? 'Request failed';
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
-  } else if (typeof detail === 'object') {
-    detail = JSON.stringify(detail);
+  } else if (typeof detail === 'object' && detail !== null) {
+    const e = new Error(detail.message || JSON.stringify(detail));
+    e.detail = detail;
+    throw e;
   }
   throw new Error(String(detail));
 }
@@ -87,11 +98,16 @@ export function normalizePlatformSettings(form) {
   out.support_email = String(out.support_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.support_email;
   out.smtp_from_email = String(out.smtp_from_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.smtp_from_email;
   out.sms_sender_id = String(out.sms_sender_id || '').trim() || DEFAULT_PLATFORM_SETTINGS.sms_sender_id;
+  const checkout = String(out.checkout_base_url || '').trim().replace(/\/$/, '');
+  out.checkout_base_url =
+    !checkout || /localhost|127\.0\.0\.1/i.test(checkout)
+      ? productionCheckoutFallback()
+      : checkout;
   return out;
 }
 
 function saveSettingsLocally(data) {
-  localStorage.setItem(PLATFORM_SETTINGS_KEY, JSON.stringify(data));
+  localStorage.setItem(platformSettingsKey(), JSON.stringify(data));
 }
 
 /**
@@ -99,11 +115,35 @@ function saveSettingsLocally(data) {
  * preferPublic: skip SaaS JWT (marketing homepage). Stale office tokens on
  * www.poreiago.com must not trip saasFetch → /admin/login.
  */
+function productionCheckoutFallback() {
+  try {
+    const host = String(window.location?.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1') {
+      return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+    }
+    if (/(^|\.)achilliotravel\.com$/.test(host)) {
+      return 'https://www.achilliotravel.com';
+    }
+    return window.location.origin.replace(/\/$/, '') || DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  } catch {
+    return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  }
+}
+
+function healLocalCheckout(data) {
+  const next = { ...DEFAULT_PLATFORM_SETTINGS, ...(data || {}) };
+  const url = String(next.checkout_base_url || '');
+  if (!url || /localhost|127\.0\.0\.1/i.test(url)) {
+    next.checkout_base_url = productionCheckoutFallback();
+  }
+  return next;
+}
+
 export async function fetchPlatformSettings(options = {}) {
   const preferPublic = Boolean(options.preferPublic);
   if (!preferPublic && getSaasToken()) {
     try {
-      const data = await saasFetch('/api/v1/settings/platform');
+      const data = healLocalCheckout(await saasFetch('/api/v1/settings/platform'));
       saveSettingsLocally(data);
       return data;
     } catch {
@@ -113,7 +153,7 @@ export async function fetchPlatformSettings(options = {}) {
   try {
     const res = await adminFetch('/api/admin/platform/settings');
     if (res.ok) {
-      const data = await res.json();
+      const data = healLocalCheckout(await res.json());
       saveSettingsLocally(data);
       return data;
     }
@@ -121,12 +161,12 @@ export async function fetchPlatformSettings(options = {}) {
     /* offline */
   }
   try {
-    const cached = localStorage.getItem(PLATFORM_SETTINGS_KEY);
-    if (cached) return JSON.parse(cached);
+    const cached = localStorage.getItem(platformSettingsKey());
+    if (cached) return healLocalCheckout(JSON.parse(cached));
   } catch {
     /* ignore */
   }
-  return { ...DEFAULT_PLATFORM_SETTINGS };
+  return healLocalCheckout({ ...DEFAULT_PLATFORM_SETTINGS });
 }
 
 export async function updatePlatformSettings(patch) {
@@ -198,9 +238,10 @@ async function updatePlatformSettingsLegacy(body) {
   return { data: body, source: 'local' };
 }
 
-export async function fetchPlatformUsers() {
+export async function fetchPlatformUsers({ allOffices = false } = {}) {
   try {
-    const res = await adminFetch('/api/admin/platform/users');
+    const q = allOffices ? '?all_offices=1' : '';
+    const res = await adminFetch(`/api/admin/platform/users${q}`);
     if (res.ok) return res.json();
   } catch {
     /* offline */
@@ -250,6 +291,58 @@ export async function deletePlatformUser(userId) {
   if (!res.ok && res.status !== 204) await parseError(res);
 }
 
+/** Superadmin / office admin: email a password-reset link for a backoffice user. */
+export async function sendPlatformUserPasswordReset(userId) {
+  const res = await adminFetch(`/api/admin/platform/users/${userId}/send-password-reset`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Platform superadmin: send reset by email (optional tenant scope). */
+export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
+  const res = await adminFetch('/api/admin/platform/password-reset/send', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: request admin password-reset email from /admin/login (no session). */
+export async function requestAdminPasswordReset({ email, host } = {}) {
+  const officeHost =
+    String(host || (typeof window !== 'undefined' ? window.location.hostname : '') || '')
+      .trim()
+      .toLowerCase();
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      ...(officeHost ? { host: officeHost } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: confirm admin password reset with emailed token. */
+export async function confirmAdminPasswordReset({ token, newPassword }) {
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function fetchBackups() {
   try {
     const res = await adminFetch('/api/admin/platform/backups');
@@ -260,8 +353,21 @@ export async function fetchBackups() {
   return [];
 }
 
-export async function createBackup() {
-  const res = await adminFetch('/api/admin/platform/backups', { method: 'POST' });
+/**
+ * @param {{ scope?: 'platform'|'office'|'database', tenantId?: string, clientExtras?: object }} [opts]
+ */
+export async function createBackup(opts = {}) {
+  const scope = opts.scope || 'platform';
+  const body = {
+    scope,
+    tenant_id: opts.tenantId || null,
+    client_extras: opts.clientExtras || null,
+  };
+  const res = await adminFetch('/api/admin/platform/backups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -288,7 +394,7 @@ export async function downloadBackupFile(backupId, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `backup-${backupId}.json`;
+  link.download = filename || `backup-${backupId}`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -297,7 +403,9 @@ const _driversListCache = { key: '', at: 0, rows: null };
 const DRIVERS_LIST_TTL_MS = 20_000;
 
 export async function fetchFleetDrivers(status) {
-  const key = status || '';
+  // Cache key includes tenant so PoreiaGo / Achillio never share a list in-memory.
+  const tid = getSaasTenantId() || '';
+  const key = `${tid}|${status || ''}`;
   const now = Date.now();
   if (
     _driversListCache.rows &&
@@ -320,7 +428,7 @@ export async function fetchFleetDrivers(status) {
     }
     // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
     if (getSaasToken()) {
-      if ([502, 503, 504].includes(res.status)) {
+      if ([404, 502, 503, 504].includes(res.status)) {
         throw new Error(
           'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και πατήστε Δοκιμή ξανά.',
         );
@@ -507,6 +615,20 @@ export async function createFleetVehicle(payload) {
   return res.json();
 }
 
+/** Upload fleet bus photo — returns `{ ok, url }` for public_image_url / gallery_urls. */
+export async function uploadFleetVehiclePhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles/photo-upload', {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    await parseError(res);
+  }
+  return res.json();
+}
+
 export async function fetchFleetVehicle(vehicleId) {
   const res = await adminFetch(
     `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
@@ -663,14 +785,19 @@ export async function fetchFleetAlerts(unresolvedOnly = true) {
   return [];
 }
 
-const RESOLVED_ALERTS_KEY = 'aerostride_fleet_resolved_alerts';
+const RESOLVED_ALERTS_KEY_BASE = 'aerostride_fleet_resolved_alerts';
+
+function resolvedAlertsKey() {
+  return officeStorageKey(RESOLVED_ALERTS_KEY_BASE);
+}
 
 function markAlertResolvedLocal(alertId) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const key = resolvedAlertsKey();
+    const raw = localStorage.getItem(key);
     const ids = raw ? JSON.parse(raw) : [];
     if (!ids.includes(alertId)) ids.push(alertId);
-    localStorage.setItem(RESOLVED_ALERTS_KEY, JSON.stringify(ids));
+    localStorage.setItem(key, JSON.stringify(ids));
   } catch {
     /* ignore */
   }
@@ -678,7 +805,7 @@ function markAlertResolvedLocal(alertId) {
 
 function filterUnresolvedLocal(alerts) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const raw = localStorage.getItem(resolvedAlertsKey());
     const resolved = raw ? new Set(JSON.parse(raw)) : new Set();
     return alerts.filter((a) => !resolved.has(a.id));
   } catch {
@@ -938,7 +1065,7 @@ function getMockVehicles() {
 
 function readLocalMaintenanceEvents() {
   try {
-    const raw = localStorage.getItem(MAINT_EVENTS_KEY);
+    const raw = localStorage.getItem(maintEventsKey());
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -947,7 +1074,7 @@ function readLocalMaintenanceEvents() {
 }
 
 function saveLocalMaintenanceEvents(events) {
-  localStorage.setItem(MAINT_EVENTS_KEY, JSON.stringify(events));
+  localStorage.setItem(maintEventsKey(), JSON.stringify(events));
 }
 
 function getLocalMaintenanceEvents(vehicleId) {
@@ -1067,4 +1194,36 @@ function getMockUsers() {
       created_at: new Date().toISOString(),
     },
   ];
+}
+
+export const DEFAULT_TRIP_REMINDER = {
+  enabled: true,
+  days_before: 3,
+  send_hour: 9,
+  subject: 'Η εκδρομή σου πλησιάζει · {trip}',
+  headline: 'Σε {days} μέρες φεύγεις',
+  body:
+    'Υπενθύμιση για την επερχόμενη εκδρομή σου. Έλεγξε ώρα και θέσεις — το εισιτήριό σου είναι στο My Wallet.',
+};
+
+export async function fetchTripReminderSettings() {
+  const res = await adminFetch('/api/admin/platform/trip-reminder');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία φόρτωσης υπενθύμισης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}
+
+export async function updateTripReminderSettings(patch) {
+  const res = await adminFetch('/api/admin/platform/trip-reminder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία αποθήκευσης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
 }

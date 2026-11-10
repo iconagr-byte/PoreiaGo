@@ -114,10 +114,9 @@ export default function TelemetrySettingsPanel() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start gap-3">
           <span className="material-symbols-outlined text-slate-500 text-[22px]">lock</span>
           <div>
-            <div className="text-sm font-bold text-slate-900">Live χάρτης ~1–2 δευτ. · ETA 5 δευτ.</div>
+            <div className="text-sm font-bold text-slate-900">Live refresh κλειδωμένο στο 1 δευτ.</div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Ο live χάρτης ανανεώνεται περίπου κάθε 1–2 δευτ. όταν υπάρχουν στίγματα· ETA και σχετικά
-              panels παραμένουν στα 5 δευτερόλεπτα.
+              GPS οδηγού, χάρτης στόλου, ETA και live panels ανανεώνονται κάθε 1 δευτερόλεπτο σε όλη την πλατφόρμα.
             </p>
           </div>
         </div>

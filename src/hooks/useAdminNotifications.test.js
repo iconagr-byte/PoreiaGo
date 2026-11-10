@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { dedupeStoredItems } from './useAdminNotifications.js';
+import {
+  alertBelongsToTenant,
+  dedupeStoredItems,
+  isDemoFleetMockAlert,
+  scrubInboxForTenant,
+} from './useAdminNotifications.js';
 
 describe('admin notification chat dedupe', () => {
   it('collapses repeated Νέο μήνυμα οδηγού rows per driver', () => {
@@ -76,5 +81,60 @@ describe('admin notification chat dedupe', () => {
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe('chat-office');
+  });
+});
+
+describe('admin notification tenant seal', () => {
+  it('detects the shared demo ROUTE_DEVIATION mock', () => {
+    expect(
+      isDemoFleetMockAlert({
+        id: 'mock-1',
+        message: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
+        vehicle_id: 'demo-vehicle-1',
+        tenant_id: '00000000-0000-0000-0000-000000000001',
+      }),
+    ).toBe(true);
+    expect(
+      isDemoFleetMockAlert({
+        id: 'alert-real-9',
+        body: 'Αποκλίνουσα διαδρομή — 80m εκτός διαδρόμου',
+        tenantId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      }),
+    ).toBe(false);
+  });
+
+  it('scrubs demo mock from non-demo office inbox', () => {
+    const officeTid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    const rows = scrubInboxForTenant(
+      [
+        {
+          id: 'alert-mock-1',
+          type: 'route_deviation',
+          title: 'Ειδοποίηση στόλου',
+          body: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
+          tenantId: '00000000-0000-0000-0000-000000000001',
+        },
+        {
+          id: 'alert-real',
+          type: 'sos',
+          title: 'SOS οδηγού',
+          body: 'help',
+          tenantId: officeTid,
+        },
+      ],
+      officeTid,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['alert-real']);
+  });
+
+  it('rejects alerts for another tenant', () => {
+    expect(
+      alertBelongsToTenant(
+        { tenant_id: 'tenant-a' },
+        'tenant-b',
+      ),
+    ).toBe(false);
+    expect(alertBelongsToTenant({ tenant_id: 'tenant-a' }, 'tenant-a')).toBe(true);
+    expect(alertBelongsToTenant({}, 'tenant-a')).toBe(true);
   });
 });

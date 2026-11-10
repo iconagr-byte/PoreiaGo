@@ -33,6 +33,25 @@ class PushSubscriptionStoreTests(unittest.TestCase):
         self.assertEqual(len(subs), 1)
         self.assertEqual(subs[0]["endpoint"], "https://push.example/1")
 
+    def test_upsert_fcm_token_subscription(self) -> None:
+        row = store.upsert_subscription(
+            email="driver:x@t1",
+            endpoint="",
+            channel="fcm",
+            fcm_token="tok_abc_123",
+            platform="android",
+            tenant_id="t1",
+            audience="driver",
+            driver_id="drv-1",
+        )
+        self.assertEqual(row["channel"], "fcm")
+        self.assertEqual(row["endpoint"], "fcm:tok_abc_123")
+        self.assertEqual(row["fcm_token"], "tok_abc_123")
+        self.assertEqual(row["platform"], "android")
+        subs = store.list_subscriptions_for_driver("t1", "drv-1")
+        self.assertEqual(len(subs), 1)
+        self.assertEqual(subs[0]["endpoint"], "fcm:tok_abc_123")
+
     def test_delete_subscription(self) -> None:
         store.upsert_subscription(
             email="a@b.com",

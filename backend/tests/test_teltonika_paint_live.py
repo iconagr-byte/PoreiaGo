@@ -1,0 +1,147 @@
+"""Force live-map pin from Teltonika device binding."""
+
+from __future__ import annotations
+
+import asyncio
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+from travel_platform.telemetry.teltonika import device_store as ds
+from travel_platform.telemetry.teltonika.paint_live import paint_live_pin_from_device
+
+
+class TeltonikaPaintLiveTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        path = Path(self.tmp.name) / "devices.json"
+        self.patcher = patch.object(ds, "_store_path", return_value=path)
+        self.patcher.start()
+        self.tenant = "97798681-2f60-4398-b1f6-9eb38dc341b0"
+        self.device = ds.upsert_device(
+            {
+                "imei": "861076085468260",
+                "vehicle_code": "EEX5670",
+                "label": "Λεωφορείο με GPS",
+                "enabled": True,
+            },
+            tenant_id=self.tenant,
+        )
+        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        self.device = ds.get_device_by_imei("861076085468260")
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.tmp.cleanup()
+
+    def test_paints_open_pin_from_last_fix(self):
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device, open_channel=True, reason="imei_accept"
+                )
+            )
+        self.assertTrue(ok)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        self.assertEqual(payload["source"], "teltonika")
+        self.assertFalse(payload.get("hydrated_from_store"))
+        self.assertEqual(payload["vehicle_code"], "EEX5670")
+        self.assertAlmostEqual(float(payload["latitude"]), 40.8, places=4)
+
+    def test_skips_without_coordinates(self):
+        bare = {**self.device, "last_lat": None, "last_lng": None}
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(paint_live_pin_from_device(bare, open_channel=True))
+        self.assertFalse(ok)
+        process.assert_not_awaited()
+
+    def test_move_coords_false_keeps_existing_pin_latlng(self):
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-keep"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 40.801,
+            "lng": 22.052,
+            "speed_kmh": 12.0,
+            "source": "teltonika",
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device,
+                    open_channel=True,
+                    reason="tcp_keepalive",
+                    move_coords=False,
+                )
+            )
+        self.assertTrue(ok)
+        payload = process.await_args.args[0]
+        self.assertAlmostEqual(float(payload["latitude"]), 40.801, places=4)
+        self.assertAlmostEqual(float(payload["longitude"]), 22.052, places=4)
+        self.assertAlmostEqual(float(payload["speed_kmh"]), 12.0, places=1)
+
+    def test_hydrate_skips_when_shift_suppressed_and_offline(self):
+        from travel_platform.telemetry.teltonika import shift_suppress as ss
+
+        ss._suppress_until.clear()
+        ss.suppress_plate_after_shift(self.tenant, "EEX5670", seconds=3600)
+        stale = {
+            **self.device,
+            "last_seen_at": "2020-01-01T00:00:00+00:00",
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.tracker_priority.is_tracker_binding_alive",
+            return_value=False,
+        ):
+            ok = asyncio.run(
+                paint_live_pin_from_device(stale, open_channel=True, reason="hydrate")
+            )
+        self.assertFalse(ok)
+        process.assert_not_awaited()
+        self.assertTrue(ss.is_shift_suppressed(self.tenant, "EEX5670"))
+
+    def test_hydrate_clears_suppress_when_tracker_alive(self):
+        from travel_platform.telemetry.teltonika import shift_suppress as ss
+
+        ss._suppress_until.clear()
+        ss.suppress_plate_after_shift(self.tenant, "EEX5670", seconds=3600)
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.tracker_priority.is_tracker_binding_alive",
+            return_value=True,
+        ):
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device, open_channel=True, reason="tcp_keepalive"
+                )
+            )
+        self.assertTrue(ok)
+        process.assert_awaited()
+        self.assertFalse(ss.is_shift_suppressed(self.tenant, "EEX5670"))
+
+
+if __name__ == "__main__":
+    unittest.main()
