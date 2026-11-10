@@ -259,7 +259,7 @@ class VehicleCreate(BaseModel):
     fuel_cost_total: float = Field(0, ge=0)
     insurance_cost_total: float = Field(0, ge=0)
     category: str = "Standard"
-    seat_count: int = Field(49, ge=8, le=80)
+    seat_count: int = Field(49, ge=2, le=80)
     amenities: list[str] = Field(default_factory=list)
     public_image_url: str = ""
     gallery_urls: list[str] = Field(default_factory=list)
@@ -285,7 +285,7 @@ class VehicleUpdate(BaseModel):
     fuel_cost_total: float | None = Field(None, ge=0)
     insurance_cost_total: float | None = Field(None, ge=0)
     category: str | None = None
-    seat_count: int | None = Field(None, ge=8, le=80)
+    seat_count: int | None = Field(None, ge=2, le=80)
     amenities: list[str] | None = None
     public_image_url: str | None = None
     gallery_urls: list[str] | None = None

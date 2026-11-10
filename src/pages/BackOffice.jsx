@@ -50,6 +50,7 @@ import {
   MARKET_LABELS,
 } from '../lib/trips/tripMarket.js';
 import {
+  createFleetVehicle,
   createMaintenanceEvent,
   fetchFleetAlerts,
   fetchFleetCostReport,
@@ -776,6 +777,18 @@ export default function BackOffice() {
     setSelectedFleetVehicleId(pickId);
     if (pickId) {
       setServiceForm((prev) => ({ ...prev, vehicle_id: pickId }));
+    }
+  };
+
+  const handleCreateFleetVehicle = async (payload) => {
+    setSavingFleetVehicle(true);
+    try {
+      const created = await createFleetVehicle(payload);
+      toast.success(`Το όχημα ${created.plate_number || payload.plate_number} προστέθηκε`);
+      setVehicleModalOpen(false);
+      await reloadFleetData(created.id);
+    } finally {
+      setSavingFleetVehicle(false);
     }
   };
 
