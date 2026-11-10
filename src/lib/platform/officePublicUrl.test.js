@@ -23,7 +23,7 @@ describe('officePublicUrl seal — no Achillio Travel bleed', () => {
     };
     expect(isForbiddenForeignOfficeHost('www.achilliotravel.com', branding)).toBe(true);
     expect(getOfficePublicOrigin(branding)).toBe('https://www.poreiago.com');
-    expect(getOfficeRentWalletUrl(branding)).toBe('https://www.poreiago.com/rent/wallet');
+    expect(getOfficeRentWalletUrl(branding)).toBe('https://www.poreiago.com/wallet?tab=rentals');
     expect(getOfficeShareDisplayName(branding)).toBe('PoreiaGo');
   });
 
@@ -38,7 +38,7 @@ describe('officePublicUrl seal — no Achillio Travel bleed', () => {
     expect(isForbiddenForeignOfficeHost('www.achilliotravel.com', branding)).toBe(false);
     expect(getOfficePublicOrigin(branding)).toBe('https://www.achilliotravel.com');
     expect(getOfficeRentWalletUrl(branding)).toBe(
-      'https://www.achilliotravel.com/rent/wallet',
+      'https://www.achilliotravel.com/wallet?tab=rentals',
     );
     expect(getOfficeShareDisplayName(branding)).toBe('Achillio Travel');
   });

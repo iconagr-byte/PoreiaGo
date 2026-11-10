@@ -12,6 +12,7 @@ import { API_BASE } from '../../config/api.js';
 import { getCustomerToken } from '../auth.js';
 import {
   cancelAdminBooking,
+  deleteAdminBooking,
   patchAdminBooking,
 } from '../../services/adminBookingsApi.js';
 import { confirmBankDepositSecure, recordCashPaymentSecure } from '../../services/paymentSettingsApi.js';
@@ -21,7 +22,7 @@ import {
 } from '../../services/paymentNotificationApi.js';
 import {
   fetchAllBookingsFromServer,
-  syncMyBookingsToServer,
+  fetchMyBookingsFromServer,
   upsertBookingOnServer,
 } from '../../services/customerBookingsApi.js';
 import { CHECK_IN } from './constants.js';
@@ -41,10 +42,19 @@ import {
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
 import { stripDemoBookings } from '../admin/demoCatalog.js';
+import {
+  filterBookingsForWalletOffice,
+  getWalletTenantId,
+  walletOfficeStorageKey,
+} from '../wallet/walletTenantSeal.js';
 
 const STORAGE_KEY_BASE = 'aerostride_bookings_v1';
 
 function storageKey() {
+  // Customer My Wallet: namespace by sealed office. Admin sessions keep officeStorageKey.
+  if (!isAuthenticatedOfficeSession() && getWalletTenantId()) {
+    return walletOfficeStorageKey(STORAGE_KEY_BASE);
+  }
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
@@ -99,11 +109,30 @@ export function mergeBookingsIntoStore(incoming) {
   if (!incoming?.length) return loadBookings();
   const map = new Map(loadBookings().map((b) => [b.id, b]));
   for (const b of incoming) {
-    map.set(b.id, { ...map.get(b.id), ...b });
+    // Server (Postgres) wins on conflict — never keep stale local seats over remote.
+    map.set(b.id, { ...(map.get(b.id) || {}), ...b });
   }
   const merged = [...map.values()];
   saveBookings(merged);
   return merged;
+}
+
+/**
+ * Replace one customer's bookings with the Postgres-reconciled wallet list.
+ * Drops orphans / inflated seat lists that localStorage invented.
+ */
+export function replaceCustomerBookingsInStore(email, remoteBookings) {
+  const key = String(email || '').trim().toLowerCase();
+  const others = loadBookings().filter(
+    (b) => String(b.email || '').toLowerCase() !== key,
+  );
+  const incoming = Array.isArray(remoteBookings) ? remoteBookings.filter(Boolean) : [];
+  const stamped = incoming.map((b) => ({
+    ...b,
+    email: key || b.email,
+  }));
+  saveBookings([...others, ...stamped]);
+  return stamped;
 }
 
 /** Control Panel — φόρτωση από server. */
@@ -117,11 +146,13 @@ export async function loadAllBookingsAsync() {
   return loadBookings();
 }
 
-/** My Wallet — sync κρατήσεων πελάτη με server. */
+/** My Wallet — pull Postgres-reconciled bookings (desktop source of truth). */
 export async function loadBookingsForCustomer(email) {
   const key = String(email || '').trim().toLowerCase();
-  const localForUser = loadBookings().filter(
-    (b) => String(b.email || '').toLowerCase() === key,
+  const sealed = getWalletTenantId();
+  const localForUser = filterBookingsForWalletOffice(
+    loadBookings().filter((b) => String(b.email || '').toLowerCase() === key),
+    sealed,
   );
 
   if (!getCustomerToken()) {
@@ -129,11 +160,16 @@ export async function loadBookingsForCustomer(email) {
   }
 
   try {
-    const synced = await syncMyBookingsToServer(localForUser);
-    mergeBookingsIntoStore(synced);
-    return loadBookings().filter((b) => String(b.email || '').toLowerCase() === key);
+    // Pull-first — never push inflated localStorage seats to the server.
+    const remote = await fetchMyBookingsFromServer();
+    const sealedRemote = filterBookingsForWalletOffice(remote, sealed);
+    replaceCustomerBookingsInStore(key, sealedRemote);
+    return filterBookingsForWalletOffice(
+      loadBookings().filter((b) => String(b.email || '').toLowerCase() === key),
+      sealed,
+    );
   } catch (err) {
-    console.warn('[bookings] customer sync failed', err);
+    console.warn('[bookings] customer pull failed', err);
     return localForUser;
   }
 }
@@ -219,8 +255,11 @@ export function markCheckedIn(bookingId, status = CHECK_IN.BOARDED) {
 }
 
 export async function markCheckedInAsync(bookingId, status = CHECK_IN.BOARDED) {
+  const booking = getBookingById(bookingId);
+  const key =
+    booking?.saasBookingId || booking?.pnr || booking?.ticketRef || bookingId;
   try {
-    const saved = await patchAdminBooking(bookingId, {
+    const saved = await patchAdminBooking(key, {
       checkedIn: true,
       checkInStatus: status,
     });
@@ -307,6 +346,9 @@ function buildLocalBooking({
     saasBookingId: saasMeta?.saasBookingId || null,
     customerId: customer.id,
     customerName: passenger.name.trim(),
+    ...(Array.isArray(passenger.passengers) && passenger.passengers.length
+      ? { passengers: passenger.passengers }
+      : {}),
     tripTitle: trip.title,
     tripId: trip.id,
     date: dep.toISOString().slice(0, 10),
@@ -410,29 +452,43 @@ export async function createBookingFromCheckout({
     balanceDue ?? (paymentPlan === PAYMENT_PLAN_DEPOSIT ? split.balanceDue : 0),
   );
   const paymentMethodMeta = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
-  const tenantId = getSaasTenantId();
+  // Wallet sealed office wins over marketing DEV tenant / empty SaaS session.
+  // Host can still resolve Achillio when both are empty (Capacitor → office API).
+  const tenantId = getWalletTenantId() || getSaasTenantId() || null;
   const extrasList = Array.isArray(extras) ? extras : [];
   const extrasSum = roundMoney(extrasTotal || 0);
   const seatsTotal = roundMoney(seatSubtotal != null ? seatSubtotal : total);
+  const sourceLabel = bookingSource || 'Website (B2C)';
+  const isWalletLive =
+    Boolean(getWalletTenantId()) ||
+    /my wallet|wallet auto/i.test(String(sourceLabel)) ||
+    /wallet auto/i.test(String(agentName || ''));
+  const tripExternalId = Number(trip?.id);
+  const externalTripId =
+    Number.isFinite(tripExternalId) && tripExternalId > 0 ? Math.trunc(tripExternalId) : null;
 
-  if (tenantId) {
+  // Always attempt SaaS guest create for Wallet / sealed / when tenant known.
+  // Previously a 500/network failure silently wrote localStorage only — office saw 0 κρατήσεις.
+  const shouldCommitSaas = isWalletLive || Boolean(tenantId);
+  if (shouldCommitSaas) {
     try {
       const api = await saasCreateGuestBooking({
-        tenantId,
+        tenantId: tenantId || undefined,
         passengerName: passenger.name.trim(),
         passengerEmail: passenger.email.trim(),
         seatLabel: seatList.join(', '),
         amountEur: paidNow,
-        externalTripId: trip.id,
+        externalTripId,
         tripTitle: trip.title,
         paymentMethod: paymentMethod || paymentMethodMeta,
         phone: passenger.phone.trim(),
         seats: seatList,
+        passengers: Array.isArray(passenger.passengers) ? passenger.passengers : undefined,
         paymentPlan,
         totalEur: total,
         balanceDue: remaining,
         depositPercent: pct,
-        source: bookingSource || 'Website (B2C)',
+        source: sourceLabel,
         agentName: agentName || 'Online Auto',
         departureAt: trip.departureTime || null,
       });
@@ -467,6 +523,10 @@ export async function createBookingFromCheckout({
           bankAccountId,
         },
       );
+      // One-shot My Wallet activate after guest checkout (server-minted).
+      if (api.wallet_activate_token) {
+        booking.walletActivateToken = String(api.wallet_activate_token);
+      }
       const saved = addBooking(booking);
       try {
         const sync = await syncTicketForBoarding(saved);
@@ -490,7 +550,8 @@ export async function createBookingFromCheckout({
         passenger_email: passenger.email.trim().toLowerCase(),
       }).catch(() => {});
       await pushBookingToServer(saved);
-      notifyPaymentConfirmationSafe(saved, { paymentMethod, paymentPlan });
+      // Office + customer payment emails are sent server-side from POST /bookings/guest
+      // when amount_paid > 0 (require_office). Skip frontend fire-and-forget to avoid duplicates.
       return saved;
     } catch (err) {
       // Seat conflict / validation — never invent a local double booking.
@@ -500,6 +561,14 @@ export async function createBookingFromCheckout({
         /κατειλημ|seat.?conflict|θέσε/i.test(String(err?.message || ''))
       ) {
         throw err;
+      }
+      // Wallet / sealed office: never pretend success with a local-only pass.
+      if (isWalletLive) {
+        const msg = String(err?.message || '').trim();
+        throw new Error(
+          msg ||
+            'Η κράτηση δεν καταχωρήθηκε στο γραφείο. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.',
+        );
       }
       console.warn('[checkout] SaaS booking failed, using localStorage', err);
     }
@@ -637,7 +706,7 @@ export async function recordCashPayment(bookingId, payload = {}) {
     } catch (syncErr) {
       console.warn('[cash] ticket re-sync failed', syncErr);
     }
-    notifyPaymentConfirmationSafe(normalized, { event: PAYMENT_NOTIFY_EVENTS.CASH_PAYMENT });
+    // Cash confirmation emails (customer + office) are sent server-side.
     return normalized;
   } catch (err) {
     const msg = String(err?.message || '');
@@ -649,6 +718,64 @@ export async function recordCashPayment(bookingId, payload = {}) {
     if (!isOffline) throw err;
     throw new Error('Η καταχώρηση μετρητών απαιτεί σύνδεση με τον server');
   }
+}
+
+/**
+ * Remove a booking from the local office cache (all id aliases).
+ * @param {string} bookingId
+ */
+export function removeBookingFromStore(bookingId) {
+  const key = String(bookingId || '').trim();
+  if (!key) return loadBookings();
+  const next = loadBookings().filter((b) => {
+    const ids = [b.id, b.saasBookingId, b.pnr, b.ticketRef, b.reference_code]
+      .filter(Boolean)
+      .map((v) => String(v));
+    return !ids.includes(key);
+  });
+  saveBookings(next);
+  return next;
+}
+
+/**
+ * Μόνιμη διαγραφή κράτησης (τεστ / λάθος) — Postgres + local cache.
+ * @param {string} bookingId
+ */
+export async function deleteBooking(bookingId) {
+  const booking = getBookingById(bookingId);
+  const key =
+    booking?.saasBookingId ||
+    booking?.pnr ||
+    booking?.id ||
+    bookingId;
+  try {
+    await deleteAdminBooking(key);
+  } catch (err) {
+    // Still purge local cache if server already removed it.
+    if (!/404|not found|δεν βρέθηκε/i.test(String(err?.message || ''))) {
+      throw err;
+    }
+  }
+  // Drop every alias for this row from the office cache.
+  for (const alias of [booking?.id, booking?.saasBookingId, booking?.pnr, bookingId]) {
+    if (alias) removeBookingFromStore(alias);
+  }
+  try {
+    const { notifyBookingsChanged } = await import('./bookingSyncEvents.js');
+    notifyBookingsChanged({
+      reason: 'delete',
+      bookingId: booking?.id || bookingId,
+    });
+  } catch {
+    /* ignore */
+  }
+  dispatchPartnerEvent('booking.deleted', {
+    booking_id: booking?.id || bookingId,
+    trip_id: booking?.tripId,
+    trip_title: booking?.tripTitle,
+    passenger_email: booking?.email,
+  }).catch(() => {});
+  return loadBookings();
 }
 
 /**
@@ -664,8 +791,10 @@ export async function cancelBooking(bookingId) {
     return booking;
   }
 
+  const lookupKey =
+    booking.saasBookingId || booking.pnr || booking.ticketRef || bookingId;
   try {
-    const fromPg = await cancelAdminBooking(bookingId);
+    const fromPg = await cancelAdminBooking(lookupKey);
     mergeBookingsIntoStore([fromPg]);
     dispatchPartnerEvent('booking.cancelled', {
       booking_id: fromPg.id,

@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchPlannedVsActual } from '../../services/telemetryApi.js';
 import { getTripById } from '../../lib/trips/tripStore.js';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 
 const PLANNED = { color: '#16a34a', label: 'Προγραμματισμένη' };
 const ACTUAL = { color: '#0040df', label: 'Πραγματική GPS' };
@@ -152,9 +153,11 @@ export default function FleetRoutePlannedVsActual() {
           <div className="h-[min(60vh,520px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
             <MapContainer center={center} zoom={8} className="h-full w-full" scrollWheelZoom>
               <TileLayer
-                attribution="© OpenStreetMap · © CARTO"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               <FitBounds planned={positionsPlanned} actual={positionsActual} />
               {positionsPlanned.length > 1 ? (
                 <Polyline
