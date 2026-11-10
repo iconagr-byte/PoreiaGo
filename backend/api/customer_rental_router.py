@@ -131,9 +131,25 @@ class GuestRentalLookupBody(BaseModel):
     code: str | None = Field(default=None, max_length=120)
 
 
+class ModifyBookingBody(BaseModel):
+    start_time: str
+    end_time: str
+    pickup_location: str | None = None
+    dropoff_location: str | None = None
+
+
 class ReviewBody(BaseModel):
     rating: int = Field(ge=1, le=5)
     comment: str | None = Field(default=None, max_length=2000)
+
+
+class PickupChecklistBody(BaseModel):
+    tires_ok: bool = False
+    lights_ok: bool = False
+    fluids_ok: bool = False
+    documents_ok: bool = False
+    spare_wheel_ok: bool = False
+    damages_noted: bool = False
 
 
 class CustomerInspectionBody(BaseModel):
@@ -143,6 +159,20 @@ class CustomerInspectionBody(BaseModel):
     damage_notes: str | None = None
     photo_urls: list[str] = Field(default_factory=list)
     signature_url: str | None = None
+    checklist: PickupChecklistBody | None = None
+
+
+class SosBody(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    accuracy: float | None = Field(default=None, ge=0)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class LocationBody(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    accuracy: float | None = Field(default=None, ge=0)
 
 
 def _public_booking(row: dict) -> dict:
