@@ -1,6 +1,6 @@
 /**
- * Rent Wallet — featured rental pass + stack of other vehicle bookings.
- * Separate from bus My Wallet (/wallet).
+ * Rent passes — featured rental pass + stack of other vehicle bookings.
+ * Lives inside unified My Wallet (/wallet?tab=rentals).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -29,6 +29,7 @@ import {
 import { getRentLang, t } from '../../lib/rental/rentI18n.js';
 
 const STATUS_LABEL = {
+  RESERVED: 'Εκκρεμεί πληρωμή',
   CONFIRMED: 'Επιβεβαιωμένη',
   ACTIVE: 'Σε εξέλιξη',
   COMPLETED: 'Ολοκληρωμένη',
@@ -53,8 +54,9 @@ function rankBooking(b) {
   const status = b.rental_status || '';
   if (status === 'ACTIVE') return 0;
   if (status === 'CONFIRMED') return 1;
-  if (status === 'COMPLETED') return 2;
-  return 3;
+  if (status === 'RESERVED') return 2;
+  if (status === 'COMPLETED') return 3;
+  return 4;
 }
 
 function sortBookings(rows) {
@@ -83,6 +85,7 @@ export default function RentalWalletPanel({
   brandLabel = 'Rent Wallet',
   passengerName = '',
   refreshKey = 0,
+  highlightBookingId = '',
   onBookVehicle,
 }) {
   const [rows, setRows] = useState([]);
@@ -120,6 +123,8 @@ export default function RentalWalletPanel({
       const sorted = sortBookings(list || []);
       setRows(sorted);
       setSelectedId((prev) => {
+        const want = String(highlightBookingId || '').trim();
+        if (want && sorted.some((b) => b.id === want)) return want;
         if (prev && sorted.some((b) => b.id === prev)) return prev;
         return sorted[0]?.id || '';
       });
@@ -129,7 +134,7 @@ export default function RentalWalletPanel({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [highlightBookingId]);
 
   useEffect(() => {
     load();

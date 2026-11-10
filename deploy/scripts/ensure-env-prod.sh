@@ -34,6 +34,8 @@ replace_kv() {
 }
 
 echo "==> Ensuring domain vars in $ENV_FILE"
+replace_kv "ENVIRONMENT" "production"
+replace_kv "REQUIRE_PRODUCTION" "1"
 set_kv "API_HOST" "$API_HOST_DEFAULT"
 set_kv "APP_HOST" "$APP_HOST_DEFAULT"
 set_kv "ACME_EMAIL" "$ACME_EMAIL_DEFAULT"
@@ -45,8 +47,35 @@ set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
 set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
-# Demo office signup without real Stripe charge (set to 0 when going live with Stripe).
-set_kv "BILLING_DEMO_MODE" "true"
+# Prefer live billing; force false on every deploy (P1 production readiness).
+replace_kv "BILLING_DEMO_MODE" "false"
+set_kv "RENT_DEMO_FLEET" "false"
+set_kv "ADMIN_AUTH_DISABLED" "0"
+
+# Strong GPS ingest key — required for production boot guard
+if ! grep -q "^TELEMETRY_DEVICE_KEYS=.\+" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  + generated TELEMETRY_DEVICE_KEYS"
+elif grep -qE "^TELEMETRY_DEVICE_KEYS=(dev-gps-key)?$" "$ENV_FILE" 2>/dev/null || \
+     grep -q "^TELEMETRY_DEVICE_KEYS=dev-gps-key" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  ~ replaced weak TELEMETRY_DEVICE_KEYS"
+fi
+
+# Mailbox password encryption (Fernet material) — required by production_guard
+if ! grep -q "^EMAIL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  + generated EMAIL_ENCRYPTION_KEY"
+elif grep -q "aerostride-dev-email-key" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  ~ replaced weak EMAIL_ENCRYPTION_KEY"
+fi
+set_kv "METRICS_PUBLIC" "false"
+set_kv "METRICS_TOKEN" ""
 
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
@@ -148,6 +177,20 @@ set_kv "TWILIO_AUTH_TOKEN" ""
 set_kv "TWILIO_FROM_NUMBER" ""
 set_kv "TWILIO_WHATSAPP_FROM" ""
 
+# Fiscal — Fernet key for Prosvasis/Epsilon secrets in tenants.settings_json
+echo "==> Ensuring FISCAL_ENCRYPTION_KEY"
+if ! grep -q "^FISCAL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  if python3 -c "from cryptography.fernet import Fernet" 2>/dev/null; then
+    _fkey="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  else
+    _fkey="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+  fi
+  replace_kv "FISCAL_ENCRYPTION_KEY" "$_fkey"
+  echo "  + generated FISCAL_ENCRYPTION_KEY"
+fi
+set_kv "AADE_MODE" "stub"
+set_kv "AADE_SECRETS_BACKEND" "env"
+
 # My Wallet Google Sign-In — see deploy/GOOGLE-SIGNIN.md
 echo "==> Ensuring Google Sign-In env keys"
 set_kv "GOOGLE_CLIENT_ID" ""
@@ -161,6 +204,17 @@ if [[ -n "$_g_api" && -z "$_g_vite" ]]; then
 elif [[ -n "$_g_vite" && -z "$_g_api" ]]; then
   replace_kv "GOOGLE_CLIENT_ID" "$_g_vite"
   echo "  ~ synced GOOGLE_CLIENT_ID from VITE_GOOGLE_CLIENT_ID"
+fi
+# Fallback: public client id file (safe to commit — browser-embedded).
+_g_api="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+_g_file="$(dirname "$ENV_FILE")/google-oauth.client-id"
+if [[ -z "$_g_api" && -f "$_g_file" ]]; then
+  _g_fallback="$(grep -v '^[[:space:]]*#' "$_g_file" | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]' || true)"
+  if [[ -n "$_g_fallback" && "$_g_fallback" == *.apps.googleusercontent.com ]]; then
+    replace_kv "GOOGLE_CLIENT_ID" "$_g_fallback"
+    replace_kv "VITE_GOOGLE_CLIENT_ID" "$_g_fallback"
+    echo "  ~ filled GOOGLE_CLIENT_ID from deploy/google-oauth.client-id"
+  fi
 fi
 
 echo "==> .env.prod ready"

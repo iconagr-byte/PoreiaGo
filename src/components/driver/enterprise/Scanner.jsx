@@ -29,6 +29,17 @@ export default function Scanner() {
   const handleScan = useCallback(
     async (raw) => {
       setScanning(false);
+      if (!tripId) {
+        const response = {
+          result: SCAN_RESULT.FAILURE,
+          message: 'Δεν υπάρχει ανοιχτή εκδρομή — περιμένετε ανάθεση από το γραφείο.',
+          ok: false,
+        };
+        setLastResult(response);
+        toast.error(response.message);
+        setTimeout(() => setScanning(true), 1800);
+        return response;
+      }
       const response = await driverCheckin({ qrRaw: raw, tripId });
       setLastResult(response);
       if (response.result === SCAN_RESULT.SUCCESS) {
@@ -67,12 +78,23 @@ export default function Scanner() {
       <div className="text-center pb-1">
         <p className="driver-card-label">E-Manifest</p>
         <h2 className="text-xl font-extrabold tracking-tight">Σάρωση εισιτηρίων</h2>
-        <p className="text-[var(--driver-muted)] text-sm mt-1">Βάρδια #{tripId}</p>
+        <p className="text-[var(--driver-muted)] text-sm mt-1">
+          {tripId ? `Βάρδια #${tripId}` : 'Χωρίς ανοιχτή εκδρομή'}
+        </p>
       </div>
 
+      {!tripId ? (
+        <div className="driver-card text-center">
+          <p className="text-sm font-semibold text-[var(--driver-muted)] leading-relaxed">
+            Δεν μπορείτε να σαρώσετε εισιτήρια πριν το γραφείο ανοίξει / αναθέσει εκδρομή
+            (Master QR ή ανάθεση δρομολογίου).
+          </p>
+        </div>
+      ) : (
       <div className="driver-card p-2">
         <DriverTicketScanner onScan={handleScan} paused={!scanning} />
       </div>
+      )}
 
       {lastResult && (
         <div
