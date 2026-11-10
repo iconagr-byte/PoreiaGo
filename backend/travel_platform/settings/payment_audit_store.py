@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any
 
-_AUDIT_FILE = Path(__file__).resolve().parent / "payment_audit.json"
+_DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or os.getenv("AEROSTRIDE_DATA_DIR") or Path(__file__).resolve().parent)
+_AUDIT_FILE = _DATA_DIR / "payment_audit.json"
 _MAX_ENTRIES = 500
 
 FISCAL_AUDIT_ACTIONS = frozenset({
@@ -51,6 +53,7 @@ def append_payment_audit(
     actor_id: str | None = None,
     detail: str | None = None,
     metadata: dict[str, Any] | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any]:
     entry = {
         "id": uuid.uuid4().hex[:16],
@@ -62,18 +65,31 @@ def append_payment_audit(
         "actor_id": actor_id,
         "detail": detail,
         "metadata": metadata or {},
+        "tenant_id": str(tenant_id).strip() if tenant_id else None,
     }
     rows = _read_all()
     rows.insert(0, entry)
     rows = rows[:_MAX_ENTRIES]
-    _AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _AUDIT_FILE.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+    try:
+        _AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _AUDIT_FILE.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        # Container filesystem may be read-only outside /app/data — never fail the payment.
+        pass
     return entry
 
 
-def list_payment_audit(*, limit: int = 50) -> list[dict[str, Any]]:
+def list_payment_audit(*, limit: int = 50, tenant_id: str | None = None) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 200))
-    return _read_all()[:limit]
+    rows = _read_all()
+    tid = str(tenant_id).strip() if tenant_id else ""
+    if tid:
+        rows = [
+            row
+            for row in rows
+            if not row.get("tenant_id") or str(row.get("tenant_id")) == tid
+        ]
+    return rows[:limit]
 
 
 def filter_payment_audit(

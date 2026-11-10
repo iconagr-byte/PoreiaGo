@@ -1,24 +1,61 @@
-import { API_BASE } from '../config/api.js';
+import { adminAuthHeaders, adminFetch } from './adminApi.js';
+import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
+import { isSaasTokenExpired } from '../lib/saasJwt.js';
+import { getSaasToken } from './saasApi.js';
 
-function parseError(data) {
+function parseError(data, status) {
   const d = data?.detail;
-  if (typeof d === 'string') return d;
-  if (Array.isArray(d)) return d.map((x) => x.msg || x).join(', ');
-  return data?.message || 'Αποτυχία αιτήματος';
+  if (typeof d === 'string' && d.trim()) {
+    if (/invalid token|expired|έληξε|μη έγκυρη|missing bearer/i.test(d) || status === 401) {
+      return 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο';
+    }
+    return d;
+  }
+  if (Array.isArray(d)) {
+    const joined = d.map((x) => x.msg || x).filter(Boolean).join(', ');
+    if (joined) return joined;
+  }
+  if (d && typeof d === 'object') {
+    const nested = d.msg || d.message || d.error;
+    if (typeof nested === 'string' && nested.trim()) return nested;
+  }
+  if (status === 401) return 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο';
+  if (status === 403) return 'Δεν έχετε δικαίωμα στις ρυθμίσεις email';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και δοκιμάστε ξανά';
+  }
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  return status ? `Αποτυχία αιτήματος (${status})` : 'Αποτυχία αιτήματος';
 }
 
 async function request(path, options = {}) {
+  if (!getSaasToken() || isSaasTokenExpired()) {
+    handleAuthFailure('Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο');
+    throw new Error('Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο');
+  }
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+    res = await adminFetch(path, {
       ...options,
+      retries: options.retries ?? 3,
+      headers: {
+        'Content-Type': 'application/json',
+        ...adminAuthHeaders(),
+        ...(options.headers || {}),
+      },
     });
-  } catch {
-    throw new Error('Ο server δεν απαντά. Τρέξτε: npm run dev:backend');
+  } catch (err) {
+    throw new Error(
+      err?.message || 'Ο server δεν απαντά. Περιμένετε λίγο και δοκιμάστε ξανά.',
+    );
   }
+  if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseError(data));
+  if (isAuthFailureStatus(res.status)) {
+    handleAuthFailure(parseError(data, res.status));
+    throw new Error(parseError(data, res.status));
+  }
+  if (!res.ok) throw new Error(parseError(data, res.status));
   return data;
 }
 
@@ -31,6 +68,14 @@ export const updateEmailSettings = (id, body) =>
 export const deleteEmailSettings = (id) =>
   request(`/api/email/settings/${id}`, { method: 'DELETE' });
 export const testEmailConnection = (body) =>
-  request('/api/email/settings/test-connection', { method: 'POST', body: JSON.stringify(body) });
+  request('/api/email/settings/test-connection', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    // IMAP+SMTP can take ~40s; give deploy bounces more retries.
+    retries: 5,
+  });
 export const testSavedEmailConnection = (id) =>
-  request(`/api/email/settings/${id}/test-connection`, { method: 'POST' });
+  request(`/api/email/settings/${id}/test-connection`, {
+    method: 'POST',
+    retries: 5,
+  });
