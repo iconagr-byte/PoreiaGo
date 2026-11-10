@@ -9,6 +9,24 @@ from travel_platform.telemetry.tracker_priority import TRACKER_LIVE_SOURCES, is_
 
 logger = logging.getLogger(__name__)
 
+# Only hardware tracker sources may paint a Teltonika-bound plate.
+TRACKER_LIVE_SOURCES = frozenset({"teltonika", "teltonika_test_ping"})
+
+
+def _meta_plate(meta: dict[str, Any]) -> str:
+    return str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip().upper()
+
+
+def office_plate_has_enabled_tracker(tenant_id: str, vehicle_code: str | None) -> bool:
+    """True when this office plate has an enabled Teltonika IMEI binding."""
+    try:
+        from travel_platform.telemetry.teltonika.device_store import (
+            get_enabled_device_by_vehicle_code,
+        )
+    except Exception:
+        return False
+    return get_enabled_device_by_vehicle_code(str(tenant_id), vehicle_code) is not None
+
 
 def _meta_plate(meta: dict[str, Any]) -> str:
     from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
@@ -52,7 +70,7 @@ def office_allows_tracker_pin(tenant_id: str, meta: dict[str, Any] | None) -> bo
             return True
         plate = normalize_vehicle_plate(row.get("vehicle_code"))
         if code and plate and code == plate:
-            return True
+            return source in TRACKER_LIVE_SOURCES or not source
     return False
 
 

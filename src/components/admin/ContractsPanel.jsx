@@ -65,7 +65,7 @@ function formatDate(iso) {
   try {
     return new Date(iso).toLocaleDateString('el-GR', {
       day: 'numeric',
-      month: 'short',
+      month: 'long',
       year: 'numeric',
     });
   } catch {
@@ -141,6 +141,9 @@ export default function ContractsPanel({
       if (subscription?.interval === 'year' || subscription?.interval === 'month') {
         setInterval(subscription.interval);
       }
+      if (modules?.rent_enabled && modules?.trips_enabled) {
+        setWantRentAddon(true);
+      }
     } catch (e) {
       const raw = String(e?.message || '').trim();
       const friendly =
@@ -182,12 +185,31 @@ export default function ContractsPanel({
   }, [focusRentModule, loading]);
 
   // Sync parent-provided plan/interval during render (avoids setState-in-effect).
-  const [propSeed, setPropSeed] = useState({ plan: initialPlan, interval: initialInterval });
-  if (initialPlan !== propSeed.plan || initialInterval !== propSeed.interval) {
-    setPropSeed({ plan: initialPlan, interval: initialInterval });
+  const [propSeed, setPropSeed] = useState({
+    plan: initialPlan,
+    interval: initialInterval,
+    focusRent: focusRentModule,
+  });
+  if (
+    initialPlan !== propSeed.plan ||
+    initialInterval !== propSeed.interval ||
+    focusRentModule !== propSeed.focusRent
+  ) {
+    setPropSeed({
+      plan: initialPlan,
+      interval: initialInterval,
+      focusRent: focusRentModule,
+    });
     if (initialPlan) setSelectedPlan(initialPlan);
     if (initialInterval) setInterval(initialInterval);
+    if (focusRentModule) setWantRentAddon(true);
   }
+
+  const rentAlreadyOn = Boolean(officeModules?.rent_enabled);
+  const rentOnlySelected = selectedPlan === 'rent';
+  const canAddRentAddon = !rentOnlySelected;
+  const rentAddonEffective = canAddRentAddon && wantRentAddon && !rentAlreadyOn;
+  const rentAddonPrice = rentAddonDisplayPrice(interval, RENT_ADDON);
 
   const startCheckout = async () => {
     if (!isBillablePlanId(selectedPlan)) {
@@ -196,10 +218,11 @@ export default function ContractsPanel({
     }
     setWorking(true);
     try {
-      if (isRentOnlyPlan(selectedPlan)) {
-        await updateRentModule({ rent_enabled: true }).catch(() => null);
-      }
-      const { checkout_url: url } = await createBillingCheckout(selectedPlan, interval);
+      const { checkout_url: url } = await createBillingCheckout(
+        selectedPlan,
+        interval,
+        rentAddonEffective,
+      );
       if (url) window.location.href = url;
       else toast.error('Δεν επιστράφηκε checkout URL');
     } catch (e) {
@@ -216,10 +239,11 @@ export default function ContractsPanel({
     }
     setWorking(true);
     try {
-      if (isRentOnlyPlan(selectedPlan)) {
-        await updateRentModule({ rent_enabled: true }).catch(() => null);
-      }
-      const updated = await startBillingTrial(selectedPlan, interval);
+      const updated = await startBillingTrial(
+        selectedPlan,
+        interval,
+        rentAddonEffective || (rentAlreadyOn && canAddRentAddon),
+      );
       setSub(updated);
       toast.success(`Δωρεάν δοκιμή ${billingConfig?.trial_days || 14} ημερών ενεργοποιήθηκε`);
       const officeModules = await fetchAdminOfficeModules().catch(() => null);
@@ -279,7 +303,10 @@ export default function ContractsPanel({
     icon: 'info',
     className: 'bg-slate-50 text-slate-700 border-slate-200',
   };
-  const sameTrialPlan = onTrial && sub?.plan === selectedPlan;
+  const sameTrialPlan =
+    onTrial &&
+    sub?.plan === selectedPlan &&
+    !(rentAddonEffective && !rentAlreadyOn);
   const hasToken = Boolean(getSaasToken());
   const rentEnabled = Boolean(modules?.rent_enabled);
   const rentOnly = rentEnabled && modules?.trips_enabled === false;
@@ -341,7 +368,7 @@ export default function ContractsPanel({
                 {rentOnly ? 'Rent ενεργό' : 'Rent add-on ενεργό'}
               </span>
             )}
-            {!checkoutReady && !demoMode && billingConfig && (
+            {!checkoutReady && billingConfig && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900">
                 <span className="material-symbols-outlined text-[16px]">info</span>
                 Πληρωμές σε ρύθμιση
@@ -441,6 +468,7 @@ export default function ContractsPanel({
                 const p = displayPrice(plan, interval);
                 const active = selectedPlan === plan.id;
                 const isCurrent = sub?.plan === plan.id;
+                const isRent = plan.id === 'rent';
                 return (
                   <button
                     key={plan.id}
@@ -459,7 +487,7 @@ export default function ContractsPanel({
                         <span
                           className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                             active && !plan.contactSales
-                              ? plan.id === 'rent'
+                              ? isRent
                                 ? 'bg-teal-100 text-teal-800'
                                 : 'bg-primary/15 text-primary'
                               : 'bg-slate-100 text-slate-500'
@@ -483,18 +511,18 @@ export default function ContractsPanel({
                         {plan.highlighted && !isCurrent && (
                           <span
                             className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
-                              plan.id === 'rent'
+                              isRent
                                 ? 'bg-teal-50 text-teal-800 border-teal-200'
                                 : 'bg-primary/10 text-primary border-primary/20'
                             }`}
                           >
-                            {plan.id === 'rent' ? 'Rent μόνο' : 'Προτεινόμενο'}
+                            {isRent ? 'Rent' : 'Προτεινόμενο'}
                           </span>
                         )}
                         {active && !plan.contactSales && (
                           <span
                             className={`material-symbols-outlined text-[22px] ${
-                              plan.id === 'rent' ? 'text-teal-700' : 'text-primary'
+                              isRent ? 'text-teal-700' : 'text-primary'
                             }`}
                           >
                             check_circle
@@ -516,7 +544,11 @@ export default function ContractsPanel({
                     <ul className="mt-4 space-y-1.5 flex-1">
                       {(plan.features || []).map((f) => (
                         <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
-                          <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">
+                          <span
+                            className={`material-symbols-outlined text-[14px] mt-0.5 ${
+                              isRent ? 'text-teal-700' : 'text-primary'
+                            }`}
+                          >
                             check
                           </span>
                           <span>{f}</span>
@@ -678,8 +710,12 @@ export default function ContractsPanel({
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Επιλεγμένο</p>
                 <p className="font-bold text-slate-900 truncate">
-                  {catalogPlan.name} · {BILLING_INTERVALS[interval]?.label} — {quote.label}
+                  {catalogPlan.name}
+                  {rentAddonEffective ? ` + ${RENT_ADDON.name}` : ''}
+                  {' · '}
+                  {BILLING_INTERVALS[interval]?.label} — {quote.label}
                   {quote.suffix || ''}
+                  {rentAddonEffective ? ` + ${rentAddonPrice.label}${rentAddonPrice.suffix || ''}` : ''}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -690,7 +726,11 @@ export default function ContractsPanel({
                     onClick={startCheckout}
                     className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
                   >
-                    {working ? 'Αναμονή…' : 'Ενεργοποίηση / αναβάθμιση'}
+                    {working
+                      ? 'Αναμονή…'
+                      : rentAddonEffective
+                        ? 'Ενεργοποίηση με Ενοικιάσεις'
+                        : 'Ενεργοποίηση / αναβάθμιση'}
                   </button>
                 ) : (
                   <button

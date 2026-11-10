@@ -16,6 +16,9 @@ class DriverNoShiftAutostartTests(unittest.TestCase):
         auth = (ROOT / "src" / "pages" / "driver" / "DriverAuthPage.jsx").read_text(
             encoding="utf-8"
         )
+        invite = (
+            ROOT / "src" / "lib" / "driver" / "applyDriverShiftInvite.js"
+        ).read_text(encoding="utf-8")
         session = (
             ROOT / "src" / "lib" / "driver" / "useDriverShiftSession.js"
         ).read_text(encoding="utf-8")
@@ -24,9 +27,11 @@ class DriverNoShiftAutostartTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("clearDriverShiftLaunchState", gate)
-        self.assertIn("clearDriverShiftLaunchState", auth)
+        self.assertIn("applyDriverShiftInvite", auth)
+        self.assertIn("clearDriverShiftLaunchState", invite)
         self.assertNotIn("requestDriverGpsAutostart()", gate)
         self.assertNotIn("requestDriverGpsAutostart()", auth)
+        self.assertNotIn("requestDriverGpsAutostart()", invite)
 
         self.assertIn("clearDriverShiftLaunchState", session)
         self.assertIn("return false", session)

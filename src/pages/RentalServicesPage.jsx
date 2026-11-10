@@ -1,23 +1,53 @@
 /**
  * Full marketing page for Rent services — shareable for advertising.
  * Route: /rent/services
+ * - Platform host: PoreiaGo marketing + contracts
+ * - Office/tenant host: office-branded services landing → /rent booking
  */
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import RentalOfficeServicesPage from '../components/rental/RentalOfficeServicesPage.jsx';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../lib/rental/rentServicesCatalog.js';
 import {
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
+  mergeRentPlanCatalog,
   rentAddonDisplayPrice,
   rentStandaloneDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
+import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
+import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
+import '../styles/rental-pwa.css';
 
 export default function RentalServicesPage() {
   const lang = getRentLang();
   const en = lang === 'en';
-  const standalonePrice = rentStandaloneDisplayPrice('month');
-  const addonPrice = rentAddonDisplayPrice('month');
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicRentPlanCatalog().then((data) => {
+      if (!cancelled) setRentCatalog(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isTenantStorefrontHost()) {
+    return <RentalOfficeServicesPage />;
+  }
+
+  const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
+  const addon = rentCatalog.addon || RENT_ADDON;
+  const standalonePrice = rentStandaloneDisplayPrice('month', standalone);
+  const addonPrice = rentAddonDisplayPrice('month', addon);
+  const visibleCards = [standalone.visible !== false, addon.visible !== false].filter(Boolean)
+    .length;
+  const rentGridClass =
+    visibleCards <= 1 ? 'grid md:grid-cols-1 max-w-xl gap-6' : 'grid md:grid-cols-2 gap-6';
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
@@ -96,19 +126,35 @@ export default function RentalServicesPage() {
             </h2>
             <p className="mt-3 text-slate-600 leading-relaxed">{t('services_lead', lang)}</p>
           </div>
-          <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          <ul className="grid gap-5 md:gap-6">
             {RENT_SERVICE_FEATURES.map((feature) => {
               const copy = rentServiceCopy(feature, lang);
               return (
                 <li
                   key={feature.id}
-                  className="rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+                  className="rounded-[24px] border border-black/[0.06] bg-white p-6 md:p-7 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
                 >
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-[#0b3d4a] text-white mb-4">
-                    <span className="material-symbols-outlined">{feature.icon}</span>
-                  </span>
-                  <h3 className="font-bold text-lg tracking-tight">{copy.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{copy.copy}</p>
+                  <div className="flex gap-4 items-start">
+                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-[#0b3d4a] text-white">
+                      <span className="material-symbols-outlined">{feature.icon}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-lg tracking-tight">{copy.title}</h3>
+                      <p className="mt-2 text-sm text-slate-600 leading-relaxed">{copy.copy}</p>
+                      {copy.details?.length ? (
+                        <ul className="mt-4 space-y-2">
+                          {copy.details.map((line) => (
+                            <li key={line} className="flex gap-2 text-sm text-slate-700">
+                              <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                                check_circle
+                              </span>
+                              {line}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -128,64 +174,68 @@ export default function RentalServicesPage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <article className="rounded-[28px] border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-6 md:p-8 flex flex-col">
-                <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
-                  {en ? 'Standalone' : 'Αυτόνομο'}
-                </span>
-                <h3 className="mt-4 text-2xl font-bold">{RENT_STANDALONE_PLAN.name}</h3>
-                <p className="text-sm text-slate-600 mt-1">{RENT_STANDALONE_PLAN.tagline}</p>
-                <p className="mt-5 text-3xl font-bold tabular-nums">
-                  {standalonePrice.label}
-                  <span className="text-base font-semibold text-slate-500">
-                    {standalonePrice.suffix}
+            <div className={rentGridClass}>
+              {standalone.visible !== false ? (
+                <article className="rounded-[28px] border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-6 md:p-8 flex flex-col">
+                  <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
+                    {en ? 'Standalone' : standalone.badge}
                   </span>
-                </p>
-                <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
-                  {RENT_STANDALONE_PLAN.features.map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="material-symbols-outlined text-teal-700 text-[18px]">
-                        check_circle
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to={`/grafeia/signup?plan=rent&interval=month`}
-                  className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
-                >
-                  {en ? 'Start Rent-only contract' : 'Ξεκίνα συμβόλαιο μόνο Rent'}
-                </Link>
-              </article>
+                  <h3 className="mt-4 text-2xl font-bold">{standalone.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">{standalone.tagline}</p>
+                  <p className="mt-5 text-3xl font-bold tabular-nums">
+                    {standalonePrice.label}
+                    <span className="text-base font-semibold text-slate-500">
+                      {standalonePrice.suffix}
+                    </span>
+                  </p>
+                  <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
+                    {standalone.features.map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <span className="material-symbols-outlined text-teal-700 text-[18px]">
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    to={`/grafeia/signup?plan=rent&interval=month`}
+                    className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
+                  >
+                    {en ? 'Start Rent-only contract' : standalone.ctaGuest}
+                  </Link>
+                </article>
+              ) : null}
 
-              <article className="rounded-[28px] border border-slate-200 bg-slate-50/80 p-6 md:p-8 flex flex-col">
-                <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
-                  Add-on
-                </span>
-                <h3 className="mt-4 text-2xl font-bold">{RENT_ADDON.name}</h3>
-                <p className="text-sm text-slate-600 mt-1">{RENT_ADDON.tagline}</p>
-                <p className="mt-5 text-3xl font-bold tabular-nums">
-                  {addonPrice.label}
-                  <span className="text-base font-semibold text-slate-500">{addonPrice.suffix}</span>
-                </p>
-                <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
-                  {RENT_ADDON.features.map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="material-symbols-outlined text-slate-700 text-[18px]">
-                        check_circle
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to="/grafeia"
-                  className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-slate-900 text-white font-bold hover:opacity-90"
-                >
-                  {en ? 'Add on a bus contract' : 'Πρόσθεσε σε συμβόλαιο λεωφορείων'}
-                </Link>
-              </article>
+              {addon.visible !== false ? (
+                <article className="rounded-[28px] border border-slate-200 bg-slate-50/80 p-6 md:p-8 flex flex-col">
+                  <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                    {en ? 'Add-on' : addon.badge}
+                  </span>
+                  <h3 className="mt-4 text-2xl font-bold">{addon.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">{addon.tagline}</p>
+                  <div className="mt-5 text-3xl font-bold tabular-nums">
+                    {addonPrice.label}
+                    <span className="text-base font-semibold text-slate-500">{addonPrice.suffix}</span>
+                  </div>
+                  <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
+                    {addon.features.map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <span className="material-symbols-outlined text-slate-700 text-[18px]">
+                          check_circle
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    to="/grafeia"
+                    className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-slate-900 text-white font-bold hover:opacity-90"
+                  >
+                    {en ? 'Add on a bus contract' : addon.ctaGuest}
+                  </Link>
+                </article>
+              ) : null}
             </div>
           </div>
         </section>

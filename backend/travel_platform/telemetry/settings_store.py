@@ -53,7 +53,7 @@ def _defaults() -> TelemetryRuntimeSettings:
         fuel_price_eur_per_liter=s.fuel_price_eur_per_liter,
         gforce_spike_threshold_g=s.gforce_spike_threshold_g,
         eta_refresh_seconds=s.eta_refresh_seconds,
-        driver_stale_seconds=getattr(s, "driver_stale_seconds", 90),
+        driver_stale_seconds=getattr(s, "driver_stale_seconds", 360),
         gps_retention_days=getattr(s, "gps_retention_days", 90),
         driver_gps_max_per_minute=getattr(s, "driver_gps_max_per_minute", 120),
         fleet_webhook_enabled=getattr(s, "fleet_webhook_enabled", True),
