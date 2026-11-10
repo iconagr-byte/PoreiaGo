@@ -1158,7 +1158,7 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'account' && (
-          <div className="wallet-stack">
+          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
