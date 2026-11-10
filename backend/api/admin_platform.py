@@ -89,6 +89,7 @@ from schemas.platform_admin import (
     PlatformUserUpdate,
     AdminPasswordResetSendByUser,
     AdminPasswordResetSendByEmail,
+    AdminPasswordResetRequestPublic,
     AdminPasswordResetConfirm,
     AdminPasswordResetSendResponse,
     VehicleCreate,
@@ -418,6 +419,21 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
     return jwt_tid, False, False
 
 
+async def _fleet_tenant_id(request: Request) -> str:
+    """
+    Office scope for fleet CRUD / list (Διαχείριση Στόλου).
+
+    Achillio Travel Host → Achillio office UUID so DEMO / stale JWT recovery
+    matches the public ``/api/site/fleet?host=www.achilliotravel.com`` showcase
+    the office already published. Otherwise JWT / DomainTenant.
+    """
+    if _host_looks_like_achillio(request):
+        host_tid = await _resolve_achillio_tenant_id_from_request(request)
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
+            return str(host_tid)
+    return str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
+
+
 def _user_response(u) -> PlatformUserResponse:
     # In-memory PlatformUser or dict from Postgres adapter
     if isinstance(u, dict):
@@ -575,6 +591,7 @@ async def _send_reset_for_db_user(
     user,
     *,
     include_reset_url: bool = False,
+    public_base: str | None = None,
 ) -> AdminPasswordResetSendResponse:
     from travel_platform.settings.admin_password_reset import (
         build_reset_url,
@@ -587,7 +604,7 @@ async def _send_reset_for_db_user(
         tenant_id=str(user.tenant_id),
         password_hash=user.password_hash,
     )
-    reset_url = build_reset_url(token)
+    reset_url = build_reset_url(token, public_base=public_base)
     try:
         await send_admin_reset_email(
             to_email=user.email,
@@ -826,6 +843,91 @@ async def send_password_reset_by_email(
         return result
 
 
+@router.post(
+    "/password-reset/request",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def request_admin_password_reset_public(
+    request: Request,
+    body: AdminPasswordResetRequestPublic,
+):
+    """
+    Public forgot-password from office /admin/login.
+
+    Always returns a generic success message (no email enumeration).
+    Scopes to the tenant resolved from Host when on an office subdomain.
+    """
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import (
+        allow_request_attempt,
+        find_users_by_email,
+    )
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_request_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
+    generic = AdminPasswordResetSendResponse(
+        ok=True,
+        message="Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε οδηγίες επαναφοράς (έλεγχος και spam).",
+        email=None,
+        user_id=None,
+        tenant_id=None,
+    )
+
+    email = str(body.email).strip().lower()
+    if not email:
+        return generic
+
+    # Prefer explicit office host from the SPA (API Host is often api.*).
+    host = (
+        str(body.host or "").split(":")[0].strip().lower()
+        or (request.headers.get("origin") or "").replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].strip().lower()
+        or (request.headers.get("host") or "").split(":")[0].strip().lower()
+    )
+    public_base = None
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[
+        0
+    ].strip()
+    if host and host not in ("api.poreiago.com", "localhost", "127.0.0.1"):
+        public_base = f"{proto}://{host}"
+
+    tenant_id = None
+    try:
+        from olympus.tenant.domain_resolver import DomainResolver
+
+        async with AsyncSessionLocal() as db:
+            resolved = await DomainResolver(db).resolve(host)
+            if resolved and resolved.tenant_id:
+                tenant_id = resolved.tenant_id
+    except Exception as exc:
+        logger.warning("password-reset/request host resolve failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            users = await find_users_by_email(db, email)
+            active = [u for u in users if u.is_active]
+            if tenant_id is not None:
+                active = [u for u in active if u.tenant_id == tenant_id]
+            if len(active) != 1:
+                return generic
+            await _send_reset_for_db_user(
+                active[0],
+                include_reset_url=False,
+                public_base=public_base,
+            )
+    except Exception as exc:
+        logger.warning("password-reset/request failed for %s: %s", email, exc)
+    return generic
+
+
 @router.post("/password-reset/confirm")
 async def confirm_admin_password_reset(request: Request, body: AdminPasswordResetConfirm):
     """Public: set a new backoffice password with a signed reset token."""
@@ -1014,6 +1116,30 @@ async def patch_settings(request: Request, body: PlatformSettingsUpdate):
     return _settings_response_from_dict(s.__dict__)
 
 
+@router.get("/trip-reminder")
+async def get_trip_reminder_settings(request: Request):
+    """Office settings for automatic pre-departure reminder emails."""
+    from travel_platform.settings.trip_reminder_store import read_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    return read_trip_reminder_settings(tid)
+
+
+@router.put("/trip-reminder")
+async def put_trip_reminder_settings(request: Request):
+    """Save days-before / hour / copy for trip reminder emails."""
+    from travel_platform.settings.trip_reminder_store import write_trip_reminder_settings
+
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    return write_trip_reminder_settings(body, tid)
+
+
 @router.get("/login-audits")
 async def get_login_audits(
     limit: int = Query(100, ge=1, le=500),
@@ -1021,13 +1147,84 @@ async def get_login_audits(
     success: bool | None = Query(default=None),
     q: str | None = Query(default=None, max_length=120),
 ):
-    """Login history: χρόνος, IP, συσκευή — admin / customer / driver."""
+    """Login history: χρόνος, IP, συσκευή, γραφείο — admin / customer / driver."""
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
     from travel_platform.settings.login_audit_store import actor_type_label, list_login_events
 
-    rows = list_login_events(limit=limit, actor_type=actor_type, success=success, q=q)
+    # Fetch without q first so we can match office labels after DB enrich.
+    fetch_cap = 500 if (q and str(q).strip()) else limit
+    rows = list_login_events(
+        limit=fetch_cap,
+        actor_type=actor_type,
+        success=success,
+        q=None,
+    )
+
+    tenant_ids: set[UUID] = set()
     for row in rows:
+        raw = str(row.get("tenant_id") or "").strip()
+        if not raw:
+            continue
+        try:
+            tenant_ids.add(UUID(raw))
+        except ValueError:
+            continue
+
+    labels: dict[str, dict[str, str | None]] = {}
+    if tenant_ids:
+        try:
+            async with AsyncSessionLocal() as db:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[str(t.id)] = {
+                        "tenant_name": getattr(t, "legal_name", None),
+                        "tenant_slug": getattr(t, "slug", None),
+                    }
+        except Exception:
+            logger.debug("login-audits tenant label enrich failed", exc_info=True)
+
+    needle = " ".join(str(q or "").lower().split()).strip()
+    out: list[dict] = []
+    for row in rows:
+        tid = str(row.get("tenant_id") or "").strip() or None
+        meta = labels.get(tid or "") if tid else None
+        name = (meta or {}).get("tenant_name") if meta else None
+        slug = (meta or {}).get("tenant_slug") if meta else None
+        if name and slug and str(slug) not in str(name):
+            office_label = f"{name} · {slug}"
+        else:
+            office_label = name or slug or (f"Γραφείο {tid[:8]}…" if tid else "Χωρίς γραφείο")
         row["actor_type_label"] = actor_type_label(row.get("actor_type"))
-    return {"items": rows, "total": len(rows)}
+        row["tenant_name"] = name
+        row["tenant_slug"] = slug
+        row["office_label"] = office_label
+        if needle:
+            blob = " ".join(
+                str(x or "")
+                for x in (
+                    office_label,
+                    name,
+                    slug,
+                    tid,
+                    row.get("identity"),
+                    row.get("actor_name"),
+                    row.get("ip"),
+                    row.get("device"),
+                    row.get("detail"),
+                    row.get("actor_id"),
+                )
+            ).lower()
+            if needle not in blob:
+                continue
+        out.append(row)
+        if len(out) >= limit:
+            break
+    return {"items": out, "total": len(out)}
 
 
 @router.get("/drivers", response_model=list[FleetDriverResponse])
@@ -1199,10 +1396,27 @@ async def list_office_customers(
     request: Request,
     service_scope: str | None = Query(default=None, alias="serviceScope"),
 ):
-    from travel_platform.settings.office_customers_store import list_customers
+    from travel_platform.settings.office_customers_store import (
+        has_customer_history,
+        list_customers,
+    )
+    from travel_platform.settings.wallet_crm_bridge import sync_wallet_accounts_into_crm
 
     tid = _request_tenant_id(request)
-    return {"customers": list_customers(tid, service_scope=service_scope)}
+    # Buses CRM: pull My Wallet accounts sealed to this office so Google /
+    # register profiles appear with their wallet name (not only booking surnames).
+    scope = (service_scope or "").strip().lower()
+    if not scope or scope in ("buses", "bus", "excursions"):
+        try:
+            await sync_wallet_accounts_into_crm(tid)
+        except Exception:
+            pass
+    return {
+        "customers": list_customers(tid, service_scope=service_scope),
+        # True even when the live list is empty after soft-deletes — stops
+        # another PC from re-seeding deleted names from localStorage.
+        "hasHistory": has_customer_history(tid, service_scope=service_scope),
+    }
 
 
 @router.post("/customers", status_code=201)
@@ -1210,10 +1424,15 @@ async def create_office_customer(request: Request, body: OfficeCustomerIn):
     from travel_platform.settings.office_customers_store import upsert_customer
 
     tid = _request_tenant_id(request)
+    payload = body.model_dump()
+    # Explicit admin create may revive a previously soft-deleted email.
+    payload["revive"] = True
     try:
-        row = upsert_customer(tid, body.model_dump())
+        row = upsert_customer(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=400, detail="Αποτυχία αποθήκευσης πελάτη")
     return row
 
 
@@ -1224,10 +1443,13 @@ async def update_office_customer(request: Request, customer_id: str, body: Offic
     tid = _request_tenant_id(request)
     payload = body.model_dump()
     payload["id"] = customer_id
+    payload["revive"] = True
     try:
         row = upsert_customer(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="Customer not found")
     return row
 
 
@@ -1277,13 +1499,13 @@ async def post_fleet_dispatch_blocked(body: DispatchBlockedRequest):
 
 @router.get("/fleet/vehicles", response_model=list[VehicleProfileResponse])
 async def get_fleet_vehicles(request: Request):
-    return service_service.list_vehicles(tenant_id=_request_tenant_id(request))
+    return service_service.list_vehicles(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.post("/fleet/vehicles", response_model=VehicleProfileResponse, status_code=201)
 async def post_fleet_vehicle(request: Request, body: VehicleCreate):
     data = body.model_dump(exclude_unset=True)
-    data["tenant_id"] = _request_tenant_id(request)
+    data["tenant_id"] = await _fleet_tenant_id(request)
     try:
         return service_service.create_vehicle(data)
     except Exception as e:
@@ -1330,7 +1552,7 @@ async def upload_fleet_vehicle_photo(file: UploadFile = File(...)):
 
 @router.get("/fleet/vehicles/{vehicle_id}", response_model=VehicleProfileResponse)
 async def get_fleet_vehicle(request: Request, vehicle_id: str):
-    row = service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request))
+    row = service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request))
     if not row:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return row
@@ -1342,7 +1564,7 @@ async def patch_fleet_vehicle(request: Request, vehicle_id: str, body: VehicleUp
         return service_service.update_vehicle(
             vehicle_id,
             body.model_dump(exclude_unset=True),
-            tenant_id=_request_tenant_id(request),
+            tenant_id=await _fleet_tenant_id(request),
         )
     except KeyError:
         raise HTTPException(status_code=404, detail="Vehicle not found") from None
@@ -1352,14 +1574,14 @@ async def patch_fleet_vehicle(request: Request, vehicle_id: str, body: VehicleUp
 
 @router.delete("/fleet/vehicles/{vehicle_id}")
 async def delete_fleet_vehicle(request: Request, vehicle_id: str):
-    if not service_service.delete_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.delete_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"ok": True, "id": vehicle_id}
 
 
 @router.post("/fleet/vehicles/{vehicle_id}/odometer", response_model=VehicleProfileResponse)
 async def sync_vehicle_odometer(request: Request, vehicle_id: str, odometer_km: float):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.sync_odometer_from_telemetry(vehicle_id, odometer_km)
@@ -1369,7 +1591,7 @@ async def sync_vehicle_odometer(request: Request, vehicle_id: str, odometer_km: 
 
 @router.get("/fleet/maintenance-events", response_model=list[MaintenanceEventResponse])
 async def get_maintenance_events(request: Request, vehicle_id: str | None = None):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     if vehicle_id and not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     events = service_service.list_maintenance_events(vehicle_id=vehicle_id)
@@ -1384,7 +1606,7 @@ async def post_maintenance_event(request: Request, body: MaintenanceEventCreate)
     data = body.model_dump(exclude_unset=True)
     vehicle_id = data.get("vehicle_id")
     if not vehicle_id or not service_service.get_vehicle(
-        vehicle_id, tenant_id=_request_tenant_id(request)
+        vehicle_id, tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
@@ -1402,7 +1624,7 @@ async def post_maintenance_attachment(request: Request, event_id: str, file: Upl
     event_rows = service_service.list_maintenance_events()
     event = next((e for e in event_rows if e.get("id") == event_id), None)
     if not event or not service_service.get_vehicle(
-        event.get("vehicle_id"), tenant_id=_request_tenant_id(request)
+        event.get("vehicle_id"), tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Maintenance event not found")
     safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
@@ -1426,7 +1648,7 @@ async def post_maintenance_attachment(request: Request, event_id: str, file: Upl
 
 @router.post("/fleet/alerts/scan", response_model=list[FleetAlertResponse])
 async def post_fleet_alert_scan(request: Request):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     alerts = service_service.scan_predictive_alerts()
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     return [a for a in alerts if a.get("vehicle_id") in owned]
@@ -1434,7 +1656,7 @@ async def post_fleet_alert_scan(request: Request):
 
 @router.get("/fleet/alerts", response_model=list[FleetAlertResponse])
 async def get_fleet_alerts(request: Request, unresolved_only: bool = True):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     alerts = service_service.list_alerts(unresolved_only=unresolved_only)
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     return [a for a in alerts if a.get("vehicle_id") in owned]
@@ -1442,7 +1664,7 @@ async def get_fleet_alerts(request: Request, unresolved_only: bool = True):
 
 @router.post("/fleet/alerts/{alert_id}/resolve", response_model=FleetAlertResponse)
 async def post_fleet_alert_resolve(request: Request, alert_id: str):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     try:
         alert = service_service.resolve_alert(alert_id)
@@ -1457,7 +1679,7 @@ async def post_fleet_alert_resolve(request: Request, alert_id: str):
 async def get_fleet_cost_report(
     request: Request, vehicle_id: str, date_from: date, date_to: date
 ):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.get_vehicle_cost_report(vehicle_id, date_from, date_to)
@@ -1469,7 +1691,7 @@ async def get_fleet_cost_report(
 async def get_fleet_depreciation(
     request: Request, vehicle_id: str, as_of: date | None = None
 ):
-    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.estimate_book_value(vehicle_id, as_of=as_of)
@@ -1479,18 +1701,18 @@ async def get_fleet_depreciation(
 
 @router.get("/fleet/dashboard")
 async def get_fleet_dashboard_cards(request: Request):
-    return service_service.dashboard_cards(tenant_id=_request_tenant_id(request))
+    return service_service.dashboard_cards(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.get("/fleet/availability-board")
 async def get_fleet_availability_board(request: Request):
-    return service_service.list_availability(tenant_id=_request_tenant_id(request))
+    return service_service.list_availability(tenant_id=await _fleet_tenant_id(request))
 
 
 @router.get("/fleet/calendar")
 async def get_fleet_calendar(request: Request, within_days: int = Query(120, ge=7, le=365)):
     return service_service.list_calendar(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         within_days=within_days,
     )
 
@@ -1498,7 +1720,7 @@ async def get_fleet_calendar(request: Request, within_days: int = Query(120, ge=
 @router.get("/fleet/documents")
 async def get_fleet_documents(request: Request, vehicle_id: str | None = None):
     return service_service.list_documents(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         vehicle_id=vehicle_id,
     )
 
@@ -1511,7 +1733,7 @@ async def post_fleet_vehicle_document(
     kind: str = Query("registration"),
     expires_at: date | None = None,
 ):
-    tenant_id = _request_tenant_id(request)
+    tenant_id = await _fleet_tenant_id(request)
     if not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     if not file.filename:
@@ -1547,7 +1769,7 @@ async def post_fleet_vehicle_document(
 @router.delete("/fleet/vehicles/{vehicle_id}/documents/{document_id}")
 async def delete_fleet_vehicle_document(request: Request, vehicle_id: str, document_id: str):
     if not service_service.delete_vehicle_document(
-        vehicle_id, document_id, tenant_id=_request_tenant_id(request)
+        vehicle_id, document_id, tenant_id=await _fleet_tenant_id(request)
     ):
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}
@@ -1565,7 +1787,7 @@ async def get_fleet_document_file(filename: str):
 @router.get("/fleet/expenses", response_model=list[FleetExpenseResponse])
 async def get_fleet_expenses(request: Request, vehicle_id: str | None = None):
     return service_service.list_expenses(
-        tenant_id=_request_tenant_id(request),
+        tenant_id=await _fleet_tenant_id(request),
         vehicle_id=vehicle_id,
     )
 
@@ -1573,7 +1795,7 @@ async def get_fleet_expenses(request: Request, vehicle_id: str | None = None):
 @router.post("/fleet/expenses", response_model=FleetExpenseResponse, status_code=201)
 async def post_fleet_expense(request: Request, body: FleetExpenseCreate):
     data = body.model_dump(exclude_unset=True)
-    data["tenant_id"] = _request_tenant_id(request)
+    data["tenant_id"] = await _fleet_tenant_id(request)
     try:
         return service_service.create_expense(data)
     except KeyError:
@@ -1584,7 +1806,7 @@ async def post_fleet_expense(request: Request, body: FleetExpenseCreate):
 
 @router.delete("/fleet/expenses/{expense_id}")
 async def delete_fleet_expense(request: Request, expense_id: str):
-    if not service_service.delete_expense(expense_id, tenant_id=_request_tenant_id(request)):
+    if not service_service.delete_expense(expense_id, tenant_id=await _fleet_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Expense not found")
     return {"ok": True}
 

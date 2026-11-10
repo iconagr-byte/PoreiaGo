@@ -7,13 +7,16 @@ import {
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
   hydrateCustomersFromServer,
+  preferDisplayName,
   CUSTOMER_SERVICE_BUSES,
   CUSTOMER_SERVICE_RENT,
 } from '../lib/customers/customerStore.js';
 import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRentalApi.js';
-import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
+import { loadBookings, cancelBooking, deleteBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
+import { subscribeOfficeCatalogSync } from '../lib/ticketing/bookingSyncEvents.js';
+import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 import { ensureDriverSession } from '../services/ticketingApi.js';
 import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
@@ -22,6 +25,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
+import AdminMailHeaderButton from '../components/admin/AdminMailHeaderButton.jsx';
 import AdminLanguageSwitcher from '../components/admin/AdminLanguageSwitcher.jsx';
 import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
 import { useUiLang } from '../hooks/useUiLang.js';
@@ -39,6 +43,7 @@ import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
 import { deleteTrip as removeTripFromStore, loadTrips, getTripById } from '../lib/trips/tripStore.js';
 import { hydrateTripsFromServer } from '../services/tripsSyncApi.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
+import { bookingCoverUrl, tripCoverUrl } from '../lib/trips/tripPhotos.js';
 import {
   getTripMarket,
   MARKET_DOMESTIC,
@@ -87,6 +92,7 @@ import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx
 import OfficeSetupWizard, {
   isOfficeSetupComplete,
 } from '../components/admin/OfficeSetupWizard.jsx';
+import OfficeSetupChecklist from '../components/admin/OfficeSetupChecklist.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
@@ -98,6 +104,7 @@ import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
 import { avatarColorClass } from '../lib/admin/avatarColors.js';
 import { computeDashboardKpis } from '../lib/admin/dashboardKpis.js';
+import '../styles/dashboard-apple.css';
 import {
   defaultAdminTabForOfficeMode,
   isAdminTabAllowedForOfficeMode,
@@ -220,9 +227,15 @@ export default function BackOffice() {
   const [brandRefreshKey, setBrandRefreshKey] = useState(0);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [rentSummary, setRentSummary] = useState(null);
-  const [showOfficeSetup, setShowOfficeSetup] = useState(
-    () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
-  );
+  const [showOfficeSetup, setShowOfficeSetup] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+    } catch {
+      /* ignore */
+    }
+    return Boolean(location.state?.officeSetup) || !isOfficeSetupComplete();
+  });
   const officeMode = officeModeFromModules(officeModules);
   const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
@@ -405,8 +418,15 @@ export default function BackOffice() {
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
     }
-    if (location.state?.officeSetup) {
-      setShowOfficeSetup(true);
+    {
+      let forceSetup = Boolean(location.state?.officeSetup);
+      try {
+        const q = new URLSearchParams(location.search || '');
+        if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') forceSetup = true;
+      } catch {
+        /* ignore */
+      }
+      if (forceSetup) setShowOfficeSetup(true);
     }
     if (
       location.state?.routesMarket === MARKET_DOMESTIC ||
@@ -433,6 +453,76 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
+  // Live sync: wallet/native/other-PC deletes appear here without hard refresh.
+  useEffect(() => {
+    if (activeTab !== 'bookings' && activeTab !== 'dashboard' && activeTab !== 'trips') {
+      return undefined;
+    }
+    let cancelled = false;
+    let busy = false;
+    const softReloadBookings = async () => {
+      if (cancelled || busy) return;
+      busy = true;
+      try {
+        const merged = await loadMergedBookings();
+        if (cancelled) return;
+        setBookings(merged);
+        // Wallet/app delete: close open detail if the row is gone from Postgres.
+        setSelectedBooking((prev) => {
+          if (!prev) return null;
+          const aliases = [prev.id, prev.saasBookingId, prev.pnr, prev.ticketRef]
+            .filter(Boolean)
+            .map(String);
+          const still = merged.find((b) => {
+            const keys = [b.id, b.saasBookingId, b.pnr, b.ticketRef]
+              .filter(Boolean)
+              .map(String);
+            return aliases.some((a) => keys.includes(a));
+          });
+          return still || null;
+        });
+      } catch {
+        /* keep last good list */
+      } finally {
+        busy = false;
+      }
+    };
+    const softReloadTrips = async () => {
+      if (cancelled) return;
+      try {
+        const result = await hydrateTripsFromServer();
+        if (!cancelled && result?.trips) setTrips(result.trips);
+        else if (!cancelled) setTrips(loadTrips());
+      } catch {
+        if (!cancelled) setTrips(loadTrips());
+      }
+    };
+    const unsub = subscribeOfficeCatalogSync({
+      onBookings: () => {
+        void softReloadBookings();
+      },
+      onTrips: () => {
+        void softReloadTrips();
+      },
+    });
+    // Poll while the office list is open (wallet delete → desktop within ~2s).
+    const pollMs = Math.max(2000, LIVE_REFRESH_MS * 2);
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (activeTab === 'bookings' || activeTab === 'dashboard') {
+        void softReloadBookings();
+      }
+      if (activeTab === 'bookings' || activeTab === 'trips' || activeTab === 'dashboard') {
+        void softReloadTrips();
+      }
+    }, pollMs);
+    return () => {
+      cancelled = true;
+      unsub();
+      window.clearInterval(pollId);
+    };
+  }, [activeTab]);
+
   // Πελατολόγιο: hydrate buses vs rent CRM separately (never mix lists).
   useEffect(() => {
     if (activeTab !== 'customers' && activeTab !== 'fleet_rental') return;
@@ -442,12 +532,19 @@ export default function BackOffice() {
         ? CUSTOMER_SERVICE_RENT
         : customerServiceScope;
     loadMergedBookings()
-      .then((merged) => {
+      .then(async (merged) => {
         if (cancelled) return;
         setBookings(merged);
-        syncCustomersFromBookings(merged);
         if (scope === CUSTOMER_SERVICE_BUSES) {
-          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+          // Server first so soft-deletes/tombstones from other PCs land before
+          // booking sync (which must not resurrect deleted CRM names).
+          await hydrateCustomersFromServer(CUSTOMER_SERVICE_BUSES);
+          syncCustomersFromBookings(merged);
+          if (!cancelled) {
+            setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+          }
+        } else {
+          syncCustomersFromBookings(merged);
         }
       })
       .catch(() => {
@@ -775,18 +872,35 @@ export default function BackOffice() {
   const renderDashboard = () => {
     if (rentOnly) {
       return (
-        <div className="space-y-stack-lg pb-stack-lg">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700 mb-2">Rent</p>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              Dashboard ενοικιάσεων
-            </h2>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Στόλος, κρατήσεις και check-in — χωρίς εκδρομές λεωφορείου.
+        <div className="dash-apple-shell pb-2">
+          <header className="dash-apple-hero">
+            <h2 className="dash-apple-title">Ενοικιάσεις</h2>
+            <p className="dash-apple-subtitle">
+              Στόλος, κρατήσεις και check-in — με μια ματιά
             </p>
-          </div>
+          </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+          {!showOfficeSetup ? (
+            <OfficeSetupChecklist
+              rentEnabled
+              fleetCount={Array.isArray(fleetVehicles) ? fleetVehicles.length : 0}
+              onOpenDomain={() => {
+                setSettingsSubTab('domain');
+                setActiveTab('settings');
+              }}
+              onOpenPayments={() => {
+                setSettingsSubTab('payments');
+                setActiveTab('settings');
+              }}
+              onOpenAppearance={() => {
+                setSettingsSubTab('domain');
+                setActiveTab('settings');
+              }}
+              onOpenFleet={() => setActiveTab('fleet_rental')}
+            />
+          ) : null}
+
+          <div className="dash-apple-kpi-grid">
             <DashboardKpiCard
               label="Οχήματα"
               value={rentSummary?.vehicles_total ?? '—'}
@@ -809,85 +923,108 @@ export default function BackOffice() {
               label="Ενεργές κρατήσεις"
               value={rentSummary?.active_bookings ?? '—'}
               icon="event"
-              tone="violet"
+              tone="amber"
             />
           </div>
 
-          <div className="bg-white rounded-[24px] border border-teal-100/80 shadow-level-2 p-6 md:p-8">
-            <h3 className="font-headline-md text-lg font-bold text-on-surface mb-2">Γρήγορες ενέργειες</h3>
-            <p className="text-sm text-on-surface-variant mb-5">
-              Άνοιξε το desk Ενοικιάσεις για στόλο, ημερολόγιο και check-in/out.
-            </p>
-            <div className="flex flex-wrap gap-3">
+          <section className="dash-apple-panel">
+            <div className="dash-apple-panel__head">
+              <div>
+                <h3 className="dash-apple-panel__title">Γρήγορες ενέργειες</h3>
+                <p className="dash-apple-panel__meta">
+                  Desk, χάρτης και πελάτες — χωρίς εκδρομές λεωφορείου
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2.5 p-5 sm:p-6">
               <button
                 type="button"
                 onClick={() => {
                   setFleetRentalTab('clients');
                   setActiveTab('fleet_rental');
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+                className="dash-apple-btn dash-apple-btn--primary"
               >
-                <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                <span className="material-symbols-outlined">car_rental</span>
                 Desk ενοικιάσεων
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('fleet_live_map')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+                className="dash-apple-btn dash-apple-btn--ghost"
               >
-                <span className="material-symbols-outlined text-[18px]">map</span>
+                <span className="material-symbols-outlined">map</span>
                 Ζωντανός χάρτης
               </button>
               <button
                 type="button"
                 onClick={goToCustomersHome}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+                className="dash-apple-btn dash-apple-btn--ghost"
               >
-                <span className="material-symbols-outlined text-[18px]">group</span>
+                <span className="material-symbols-outlined">group</span>
                 Πελάτες
               </button>
             </div>
-          </div>
+          </section>
         </div>
       );
     }
 
     return (
-    <div className="space-y-stack-lg pb-stack-lg">
-      <div>
-        <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-          Dashboard Overview
-        </h2>
-      </div>
+    <div className="dash-apple-shell pb-2">
+      <header className="dash-apple-hero">
+        <h2 className="dash-apple-title">Επισκόπηση</h2>
+        <p className="dash-apple-subtitle">Έσοδα, στόλος και κρατήσεις — με μια ματιά</p>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+      {!showOfficeSetup ? (
+        <OfficeSetupChecklist
+          rentEnabled={false}
+          fleetCount={Array.isArray(fleetVehicles) ? fleetVehicles.length : 0}
+          onOpenDomain={() => {
+            setSettingsSubTab('domain');
+            setActiveTab('settings');
+          }}
+          onOpenPayments={() => {
+            setSettingsSubTab('payments');
+            setActiveTab('settings');
+          }}
+          onOpenAppearance={() => {
+            setSettingsSubTab('domain');
+            setActiveTab('settings');
+          }}
+          onOpenFleet={() => setActiveTab('fleet')}
+        />
+      ) : null}
+
+      <div className="dash-apple-kpi-grid">
         <DashboardKpiCard
-          label="Συνολικά Έσοδα"
+          label="Συνολικά έσοδα"
           value={dashboardKpis.totalRevenue}
           icon="payments"
           tone="emerald"
         />
         <DashboardKpiCard
-          label="Ενεργές Κρατήσεις"
+          label="Ενεργές κρατήσεις"
           value={dashboardKpis.activeBookings}
           icon="confirmation_number"
           tone="sky"
         />
         <DashboardKpiCard
-          label="Στόλος Ενεργός"
+          label="Στόλος ενεργός"
           value={dashboardKpis.fleetStatus}
           icon="directions_bus"
-          tone="violet"
+          tone="slate"
         />
         <DashboardKpiCard
-          label="Αναχωρήσεις Σήμερα"
+          label="Αναχωρήσεις σήμερα"
           value={dashboardKpis.todayDepartures}
           icon="schedule"
           tone="amber"
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
+      <div className="dash-apple-split">
         <OfficeWalletShareCard />
         <DriverChatDashboardWidget
           onOpenInbox={() => setActiveTab('driver_chat')}
@@ -895,33 +1032,27 @@ export default function BackOffice() {
         />
       </div>
 
-      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-violet-100/60 flex flex-col min-w-0 overflow-hidden">
-        <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+      <section className="dash-apple-panel mb-4">
+        <div className="dash-apple-panel__head">
           <div>
-            <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
-              Στόλος γραφείου
-            </h3>
-            <p className="text-sm text-on-surface-variant mt-0.5">
+            <h3 className="dash-apple-panel__title">Στόλος γραφείου</h3>
+            <p className="dash-apple-panel__meta">
               {fleetVehicles.length
                 ? `${fleetVehicles.length} οχήματα από τις ρυθμίσεις στόλου`
-                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση Στόλου'}
+                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση στόλου'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveTab('fleet')}
-            className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-          >
+          <button type="button" onClick={() => setActiveTab('fleet')} className="dash-apple-link">
             Διαχείριση
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
         {fleetVehicles.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
-            <p className="font-bold text-gray-900 mt-2">Δεν υπάρχουν οχήματα στον στόλο</p>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Δεν εμφανίζονται demo οχήματα. Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
+          <div className="dash-apple-empty">
+            <span className="material-symbols-outlined">directions_bus</span>
+            <p className="dash-apple-empty__title">Δεν υπάρχουν οχήματα στον στόλο</p>
+            <p className="dash-apple-empty__meta">
+              Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
             </p>
             <button
               type="button"
@@ -929,113 +1060,96 @@ export default function BackOffice() {
                 setActiveTab('fleet');
                 setAddVehicleOpen(true);
               }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+              className="dash-apple-btn dash-apple-btn--primary mt-4"
             >
-              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span className="material-symbols-outlined">add</span>
               Νέο όχημα
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="dash-apple-table">
               <thead>
-                <tr className="bg-surface-container-low/60">
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Όχημα
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Πινακίδα
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Κατάσταση
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Χλμ.
-                  </th>
+                <tr>
+                  <th>Όχημα</th>
+                  <th>Πινακίδα</th>
+                  <th>Κατάσταση</th>
+                  <th>Χλμ.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.04]">
-                {fleetVehicles.slice(0, 8).map((v) => (
-                  <tr
-                    key={v.id}
-                    className="hover:bg-primary/[0.03] cursor-pointer"
-                    onClick={() => setActiveTab('fleet')}
-                  >
-                    <td className="px-4 py-3 font-semibold text-sm text-on-surface">
-                      {v.make} {v.model}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{v.plate_number || '—'}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {v.service_status === 'Urgent'
-                        ? 'Σε Service'
-                        : v.service_status === 'Warning'
-                          ? 'Προειδοποίηση'
-                          : 'Ενεργό'}
-                    </td>
-                    <td className="px-4 py-3 text-sm tabular-nums">
-                      {Number(v.current_odometer || 0).toLocaleString('el-GR')}
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {fleetVehicles.slice(0, 8).map((v) => {
+                  const status =
+                    v.service_status === 'Urgent'
+                      ? { label: 'Σε service', tone: 'urgent' }
+                      : v.service_status === 'Warning'
+                        ? { label: 'Προειδοποίηση', tone: 'warn' }
+                        : { label: 'Ενεργό', tone: 'ok' };
+                  return (
+                    <tr key={v.id} onClick={() => setActiveTab('fleet')}>
+                      <td className="font-semibold tracking-tight">
+                        {v.make} {v.model}
+                      </td>
+                      <td className="font-mono text-[0.84rem] text-[#6e6e73]">
+                        {v.plate_number || '—'}
+                      </td>
+                      <td>
+                        <span className={`dash-apple-status dash-apple-status--${status.tone}`}>
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="tabular-nums tracking-tight">
+                        {Number(v.current_odometer || 0).toLocaleString('el-GR')}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 flex flex-col min-w-0 overflow-hidden">
-          <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
-                Πρόσφατες Κρατήσεις
-              </h3>
-              <p className="text-sm text-on-surface-variant mt-0.5">
-                {bookings.length} {bookings.length === 1 ? 'κράτηση' : 'κρατήσεις'}
-                <span className="hidden sm:inline text-on-surface-variant/70"> · διπλό κλικ για λεπτομέρειες</span>
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={goToBookingsHome}
-              className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-            >
-              Όλες
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </button>
+      <section className="dash-apple-panel">
+        <div className="dash-apple-panel__head">
+          <div>
+            <h3 className="dash-apple-panel__title">Πρόσφατες κρατήσεις</h3>
+            <p className="dash-apple-panel__meta">
+              {bookings.length} {bookings.length === 1 ? 'κράτηση' : 'κρατήσεις'}
+              <span className="hidden sm:inline"> · διπλό κλικ για λεπτομέρειες</span>
+            </p>
           </div>
+          <button type="button" onClick={goToBookingsHome} className="dash-apple-link">
+            Όλες
+            <span className="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+        {bookings.length === 0 ? (
+          <div className="dash-apple-empty">
+            <span className="material-symbols-outlined">confirmation_number</span>
+            <p className="dash-apple-empty__title">Δεν υπάρχουν κρατήσεις ακόμα</p>
+            <p className="dash-apple-empty__meta">Οι νέες κρατήσεις θα εμφανιστούν εδώ.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed min-w-[880px]">
+            <table className="dash-apple-table" style={{ minWidth: 880 }}>
               <thead>
-                <tr className="bg-surface-container-low/60">
-                  <th className="w-[92px] pl-4 sm:pl-5 pr-2 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="w-[22%] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Πελάτης
-                  </th>
-                  <th className="w-[34%] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Δρομολόγιο
-                  </th>
-                  <th className="w-[118px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ημερομηνία
-                  </th>
-                  <th className="w-[132px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Κατάσταση
-                  </th>
-                  <th className="w-[120px] px-3 py-3.5 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    MARK
-                  </th>
-                  <th className="w-[96px] pr-2 pl-2 py-3.5 text-right text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ποσό
-                  </th>
-                  <th className="w-[108px] pr-4 sm:pr-5 pl-2 py-3.5 text-right text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Ενέργειες
-                  </th>
+                <tr>
+                  <th>ID</th>
+                  <th>Πελάτης</th>
+                  <th>Δρομολόγιο</th>
+                  <th>Ημερομηνία</th>
+                  <th>Κατάσταση</th>
+                  <th>MARK</th>
+                  <th style={{ textAlign: 'right' }}>Ποσό</th>
+                  <th style={{ textAlign: 'right' }}>Ενέργειες</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.04]">
-                {bookings.map((booking) => {
-                  const customer = booking.customerName || booking.user || '—';
+              <tbody>
+                {bookings.slice(0, 8).map((booking) => {
+                  const crm = getCustomerByEmail(booking.email, CUSTOMER_SERVICE_BUSES);
+                  const customer =
+                    preferDisplayName(crm?.name, booking.customerName || booking.user) || '—';
                   const route = booking.tripTitle || booking.trip || '—';
                   const amount = booking.amount || (booking.seats ? booking.seats.length * 45 : 45);
                   const balanceDue =
@@ -1046,48 +1160,48 @@ export default function BackOffice() {
                     <tr
                       key={booking.id}
                       onDoubleClick={() => openBookingTicket(booking)}
-                      className="hover:bg-primary/[0.03] transition-colors group cursor-pointer"
                       title="Διπλό κλικ για λεπτομέρειες κράτησης"
                     >
-                      <td className="pl-4 sm:pl-5 pr-2 py-4 whitespace-nowrap">
-                        <span className="font-mono text-sm font-semibold text-primary">{booking.id}</span>
+                      <td>
+                        <span className="font-mono text-[0.84rem] font-semibold text-[#0071e3] tracking-tight">
+                          {booking.id}
+                        </span>
                       </td>
-                      <td className="px-3 py-4 min-w-0">
+                      <td>
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ring-1 ${avatarColorClass(customer)}`}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ring-1 ${avatarColorClass(customer)}`}
                           >
                             {customer.substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-[15px] font-medium text-on-surface truncate">{customer}</span>
+                          <span className="font-medium text-[#1d1d1f] truncate tracking-tight">
+                            {customer}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-3 py-4 min-w-0">
-                        <span
-                          className="text-[15px] text-on-surface block truncate"
-                          title={route}
-                        >
+                      <td>
+                        <span className="block truncate text-[#1d1d1f] tracking-tight" title={route}>
                           {route}
                         </span>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-[15px] text-on-surface-variant">
+                      <td className="whitespace-nowrap text-[#6e6e73] tracking-tight">
                         {booking.date}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full ${bookingStatusBadgeClass(booking.status)}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full tracking-tight ${bookingStatusBadgeClass(booking.status)}`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
                           {booking.status}
                         </span>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <FiscalMarkCell booking={booking} compact />
                       </td>
-                      <td className="pr-2 pl-2 py-4 whitespace-nowrap text-right text-[15px] font-bold text-on-surface tabular-nums">
+                      <td className="whitespace-nowrap text-right font-semibold tabular-nums tracking-tight text-[#1d1d1f]">
                         €{Number(amount).toFixed(2)}
                       </td>
-                      <td className="pr-4 sm:pr-5 pl-2 py-4 whitespace-nowrap text-right">
+                      <td className="whitespace-nowrap text-right">
                         {showCash ? (
                           <button
                             type="button"
@@ -1095,14 +1209,14 @@ export default function BackOffice() {
                               e.stopPropagation();
                               setCashPaymentBooking(booking);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition-colors shadow-sm"
+                            className="dash-apple-btn dash-apple-btn--ghost !py-1.5 !px-2.5 !text-[11px]"
                             title={`Καταχώρηση μετρητών · υπόλοιπο €${balanceDue.toFixed(2)}`}
                           >
-                            <span className="material-symbols-outlined text-[14px]">payments</span>
+                            <span className="material-symbols-outlined">payments</span>
                             Μετρητά
                           </button>
                         ) : (
-                          <span className="text-xs text-on-surface-variant/50">—</span>
+                          <span className="text-xs text-[#c7c7cc]">—</span>
                         )}
                       </td>
                     </tr>
@@ -1111,7 +1225,8 @@ export default function BackOffice() {
               </tbody>
             </table>
           </div>
-        </div>
+        )}
+      </section>
     </div>
   );
   };
@@ -1340,20 +1455,28 @@ export default function BackOffice() {
     }));
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
-    const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);
     const totalExpenses = rows.reduce((sum, f) => sum + Number(f.financials?.expenses || 0), 0);
 
+    const urgentCount = fleetCards?.urgent_count ?? rows.filter((f) => f.service_status === 'Urgent').length;
+    const warnCount = fleetCards?.warning_count ?? rows.filter((f) => f.service_status === 'Warning').length;
+    const alertsCount = fleetCards?.alerts_count ?? fleetAlerts.length;
+    const monthlyCost = Number(fleetCards?.monthly_cost_estimate || totalExpenses || 0);
+
+    const runFleetScan = async () => {
+      const updated = await scanFleetAlerts();
+      setFleetAlerts(updated);
+      const cards = await fetchFleetDashboard();
+      setFleetCards(cards);
+      toast.success('Ολοκληρώθηκε νέος προγνωστικός έλεγχος');
+    };
+
     return (
-      <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="fleet-mgmt-apple fleet-mgmt-shell relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="fleet-mgmt-header">
           <div>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              Διαχείριση Στόλου
-            </h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-              Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
-            </p>
-            <div className="mt-5">
+            <h2>Διαχείριση Στόλου</h2>
+            <p>Οχήματα, συντήρηση και κόστος — καθαρή επισκόπηση χωρίς θόρυβο.</p>
+            <div className="fleet-mgmt-hub-nav">
               <FleetOpsHubNav
                 activeTab="fleet"
                 onNavigate={(id) => {
@@ -1367,16 +1490,14 @@ export default function BackOffice() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setAddVehicleOpen(true)}
-              className="px-6 py-2 bg-gray-900 text-white font-label-md text-label-md rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-md"
-            >
-              <span className="material-symbols-outlined text-sm">add</span> Νέο όχημα
+          <div className="fleet-mgmt-actions">
+            <button type="button" className="fleet-mgmt-btn" onClick={runFleetScan}>
+              <span className="material-symbols-outlined">radar</span>
+              Έλεγχος
             </button>
             <button
               type="button"
+              className="fleet-mgmt-btn"
               onClick={() => {
                 setServiceModalOpen(true);
                 setServiceForm((prev) => ({
@@ -1384,82 +1505,45 @@ export default function BackOffice() {
                   vehicle_id: selectedFleetVehicleId || fleetVehicles[0]?.id || '',
                 }));
               }}
-              className="px-6 py-2 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md"
             >
-              <span className="material-symbols-outlined text-sm">build</span> Καταχώριση Service
-            </button>
-          </div>
-        </div>
-
-        {/* KPI Cards (Hybrid Top) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">directions_bus</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Κατάσταση Στόλου</div>
-              <div className="text-3xl font-display-sm font-bold text-gray-900">{activeFleet} <span className="text-lg text-gray-400">/ {totalFleet} Ενεργά</span></div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">payments</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Συνολικά Έσοδα</div>
-              <div className="text-3xl font-display-sm font-bold text-emerald-600">€{(totalRevenue / 1000).toFixed(1)}k</div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-              <span className="material-symbols-outlined">receipt_long</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Λειτουργικά Έξοδα</div>
-              <div className="text-3xl font-display-sm font-bold text-rose-600">€{(totalExpenses / 1000).toFixed(1)}k</div>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-black/[0.05] shadow-sm flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
               <span className="material-symbols-outlined">build</span>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-gray-500 mb-1">Απαιτούν Άμεση Ενέργεια</div>
-              <div className="text-3xl font-display-sm font-bold text-amber-600">
-                {fleetCards?.urgent_count ?? (totalFleet - activeFleet)} <span className="text-lg text-gray-400">επείγοντα</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4">
-            <div className="text-xs text-gray-500 font-bold uppercase mb-1">Προβλεπτικές ειδοποιήσεις</div>
-            <div className="text-2xl font-bold text-rose-600">{fleetCards?.alerts_count ?? fleetAlerts.length}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4">
-            <div className="text-xs text-gray-500 font-bold uppercase mb-1">Οχήματα σε προειδοποίηση</div>
-            <div className="text-2xl font-bold text-amber-600">{fleetCards?.warning_count ?? 0}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Μηνιαίο κόστος στόλου</div>
-              <div className="text-2xl font-bold text-primary">€{Number(fleetCards?.monthly_cost_estimate || 0).toLocaleString('el-GR')}</div>
-            </div>
+              Service
+            </button>
             <button
               type="button"
-              onClick={async () => {
-                const updated = await scanFleetAlerts();
-                setFleetAlerts(updated);
-                const cards = await fetchFleetDashboard();
-                setFleetCards(cards);
-                toast.success('Ολοκληρώθηκε νέος προγνωστικός έλεγχος');
-              }}
-              className="px-3 py-2 rounded-full bg-primary text-white text-xs font-bold hover:opacity-90"
+              className="fleet-mgmt-btn fleet-mgmt-btn--primary"
+              onClick={() => setAddVehicleOpen(true)}
             >
-              Έλεγχος
+              <span className="material-symbols-outlined">add</span>
+              Νέο όχημα
             </button>
+          </div>
+        </div>
+
+        <div className="fleet-mgmt-kpi">
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Στόλος ενεργός</div>
+            <div className="fleet-mgmt-kpi__value is-ok">
+              {activeFleet} <span>/ {totalFleet}</span>
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Προειδοποιήσεις</div>
+            <div className={`fleet-mgmt-kpi__value${warnCount || alertsCount ? ' is-warn' : ''}`}>
+              {alertsCount} <span>· {warnCount} οχήματα</span>
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Επείγοντα</div>
+            <div className={`fleet-mgmt-kpi__value${urgentCount ? ' is-danger' : ''}`}>
+              {urgentCount}
+            </div>
+          </div>
+          <div className="fleet-mgmt-kpi__card">
+            <div className="fleet-mgmt-kpi__label">Μηνιαίο κόστος</div>
+            <div className="fleet-mgmt-kpi__value is-accent">
+              €{monthlyCost.toLocaleString('el-GR')}
+            </div>
           </div>
         </div>
 
@@ -1497,84 +1581,158 @@ export default function BackOffice() {
         />
 
         {serviceModalOpen && (
-          <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-4">
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const payload = {
-                    ...serviceForm,
-                    mileage: Number(serviceForm.mileage || 0),
-                    cost: Number(serviceForm.cost || 0),
-                    parts_replaced: String(serviceForm.parts_replaced || '')
-                      .split(',')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  };
-                  const event = await createMaintenanceEvent(payload);
-                  for (const file of serviceFiles) {
-                    await uploadMaintenanceAttachment(event.id, file);
+          <div className="fleet-mgmt-apple">
+            <div className="fleet-mgmt-modal-backdrop">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const payload = {
+                      ...serviceForm,
+                      mileage: Number(serviceForm.mileage || 0),
+                      cost: Number(serviceForm.cost || 0),
+                      parts_replaced: String(serviceForm.parts_replaced || '')
+                        .split(',')
+                        .map((x) => x.trim())
+                        .filter(Boolean),
+                    };
+                    const event = await createMaintenanceEvent(payload);
+                    for (const file of serviceFiles) {
+                      await uploadMaintenanceAttachment(event.id, file);
+                    }
+                    toast.success('Το συμβάν συντήρησης αποθηκεύτηκε');
+                    setServiceModalOpen(false);
+                    setServiceFiles([]);
+                    const [vehicles, cards, alerts, events] = await Promise.all([
+                      fetchFleetVehicles(),
+                      fetchFleetDashboard(),
+                      fetchFleetAlerts(true),
+                      fetchMaintenanceEvents(payload.vehicle_id),
+                    ]);
+                    setFleetVehicles(vehicles);
+                    setFleetCards(cards);
+                    setFleetAlerts(alerts);
+                    setFleetVehicleEvents(events);
+                  } catch (err) {
+                    toast.error(err.message || 'Αποτυχία αποθήκευσης συμβάντος συντήρησης');
                   }
-                  toast.success('Το συμβάν συντήρησης αποθηκεύτηκε');
-                  setServiceModalOpen(false);
-                  setServiceFiles([]);
-                  const [vehicles, cards, alerts, events] = await Promise.all([
-                    fetchFleetVehicles(),
-                    fetchFleetDashboard(),
-                    fetchFleetAlerts(true),
-                    fetchMaintenanceEvents(payload.vehicle_id),
-                  ]);
-                  setFleetVehicles(vehicles);
-                  setFleetCards(cards);
-                  setFleetAlerts(alerts);
-                  setFleetVehicleEvents(events);
-                } catch (err) {
-                  toast.error(err.message || 'Αποτυχία αποθήκευσης συμβάντος συντήρησης');
-                }
-              }}
-              className="bg-white rounded-[24px] p-6 w-full max-w-2xl space-y-4 shadow-2xl"
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-bold text-gray-900">Νέο συμβάν συντήρησης</h4>
-                <button type="button" onClick={() => setServiceModalOpen(false)} className="text-gray-500 hover:text-gray-900">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-sm font-medium text-gray-700">Όχημα
-                  <select className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.vehicle_id} onChange={(e) => setServiceForm((p) => ({ ...p, vehicle_id: e.target.value }))}>
-                    {(fleetVehicles.length ? fleetVehicles : rows).map((v) => (
-                      <option key={v.id} value={v.id}>{v.plate_number || v.licensePlate} · {v.make ? `${v.make} ${v.model}` : v.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-sm font-medium text-gray-700">Χιλιόμετρα
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="number" min="0" value={serviceForm.mileage} onChange={(e) => setServiceForm((p) => ({ ...p, mileage: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700">Τύπος service
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.service_type} onChange={(e) => setServiceForm((p) => ({ ...p, service_type: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700">Κόστος (€)
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="number" min="0" step="0.01" value={serviceForm.cost} onChange={(e) => setServiceForm((p) => ({ ...p, cost: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Συνεργείο / Μηχανικός
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.shop_or_mechanic} onChange={(e) => setServiceForm((p) => ({ ...p, shop_or_mechanic: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Ανταλλακτικά (χωρισμένα με κόμμα)
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" value={serviceForm.parts_replaced} onChange={(e) => setServiceForm((p) => ({ ...p, parts_replaced: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Περιγραφή
-                  <textarea className="mt-1 w-full rounded-xl border px-3 py-2" rows={3} value={serviceForm.description} onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))} />
-                </label>
-                <label className="text-sm font-medium text-gray-700 md:col-span-2">Τιμολόγια / Φωτογραφίες
-                  <input className="mt-1 w-full rounded-xl border px-3 py-2" type="file" multiple onChange={(e) => setServiceFiles(Array.from(e.target.files || []))} />
-                </label>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setServiceModalOpen(false)} className="px-4 py-2 rounded-full border font-bold text-sm">Άκυρο</button>
-                <button type="submit" className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm">Αποθήκευση συμβάντος</button>
-              </div>
-            </form>
+                }}
+                className="fleet-mgmt-modal"
+              >
+                <div className="fleet-mgmt-modal__head">
+                  <div>
+                    <h4>Νέο συμβάν συντήρησης</h4>
+                    <p>Καταχώρισε service, κόστος και συνοδευτικά αρχεία.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="fleet-mgmt-icon-btn"
+                    onClick={() => setServiceModalOpen(false)}
+                    aria-label="Κλείσιμο"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+                <div className="fleet-mgmt-form">
+                  <label>
+                    Όχημα
+                    <select
+                      value={serviceForm.vehicle_id}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, vehicle_id: e.target.value }))
+                      }
+                    >
+                      {(fleetVehicles.length ? fleetVehicles : rows).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.plate_number || v.licensePlate} ·{' '}
+                          {v.make ? `${v.make} ${v.model}` : v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Χιλιόμετρα
+                    <input
+                      type="number"
+                      min="0"
+                      value={serviceForm.mileage}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, mileage: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Τύπος service
+                    <input
+                      value={serviceForm.service_type}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, service_type: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Κόστος (€)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={serviceForm.cost}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, cost: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Συνεργείο / Μηχανικός
+                    <input
+                      value={serviceForm.shop_or_mechanic}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, shop_or_mechanic: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Ανταλλακτικά (χωρισμένα με κόμμα)
+                    <input
+                      value={serviceForm.parts_replaced}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, parts_replaced: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Περιγραφή
+                    <textarea
+                      rows={3}
+                      value={serviceForm.description}
+                      onChange={(e) =>
+                        setServiceForm((p) => ({ ...p, description: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="is-wide">
+                    Τιμολόγια / Φωτογραφίες
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => setServiceFiles(Array.from(e.target.files || []))}
+                    />
+                  </label>
+                </div>
+                <div className="fleet-mgmt-modal__foot">
+                  <button
+                    type="button"
+                    className="fleet-mgmt-btn"
+                    onClick={() => setServiceModalOpen(false)}
+                  >
+                    Άκυρο
+                  </button>
+                  <button type="submit" className="fleet-mgmt-btn fleet-mgmt-btn--accent">
+                    Αποθήκευση συμβάντος
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
@@ -1710,23 +1868,35 @@ export default function BackOffice() {
   };
 
   const renderBookings = () => {
-    const handleCheckIn = async (e, bookingId) => {
+    const handleCheckIn = async (e, booking) => {
       e.stopPropagation();
-      const current = bookings.find((b) => b.id === bookingId);
+      const current =
+        booking && typeof booking === 'object'
+          ? booking
+          : bookings.find((b) => b.id === booking);
+      const bookingId = current?.id || booking;
+      const lookupKey =
+        current?.saasBookingId ||
+        current?.pnr ||
+        current?.ticketRef ||
+        bookingId;
       const nextChecked = !current?.checkedIn;
       try {
-        const updated = await patchAdminBooking(bookingId, {
+        const updated = await patchAdminBooking(lookupKey, {
           checkedIn: nextChecked,
           checkInStatus: nextChecked ? 'CHECKED_IN' : 'NONE',
         });
-        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...updated } : b)));
-        toast.success(nextChecked ? 'Επιτυχές Check-In!' : 'Check-In ακυρώθηκε');
-      } catch (err) {
         setBookings((prev) =>
           prev.map((b) =>
-            b.id === bookingId ? { ...b, checkedIn: nextChecked } : b,
+            b.id === bookingId ||
+            b.saasBookingId === lookupKey ||
+            b.pnr === lookupKey
+              ? { ...b, ...updated }
+              : b,
           ),
         );
+        toast.success(nextChecked ? 'Επιτυχές Check-In!' : 'Check-In ακυρώθηκε');
+      } catch (err) {
         toast.error(err.message || 'Αποτυχία ενημέρωσης check-in');
       }
     };
@@ -1745,8 +1915,82 @@ export default function BackOffice() {
       }
     };
 
+    const handleDelete = async (bookingId) => {
+      if (
+        !window.confirm(
+          'Διαγραφή κράτησης οριστικά; Θα φύγει από τη λίστα και θα ελευθερωθούν οι θέσεις. Δεν αναιρείται.',
+        )
+      ) {
+        return;
+      }
+      try {
+        const next = await deleteBooking(bookingId);
+        setBookings(Array.isArray(next) ? next : loadBookings());
+        setSelectedBooking(null);
+        toast.success('Η κράτηση διαγράφηκε');
+      } catch (err) {
+        toast.error(err.message || 'Αποτυχία διαγραφής');
+      }
+    };
+
+    /** Orphan group = bookings left after the trip was deleted from Εκδρομές. */
+    const handleDeleteOrphanGroup = async (group) => {
+      const ids = (group?.bookings || []).map((b) => b.id).filter(Boolean);
+      if (!ids.length) return;
+      if (
+        !window.confirm(
+          `Η εκδρομή «${group.tripTitle}» έχει διαγραφεί, αλλά μένουν ${ids.length} κρατήσεις.\n\nΝα διαγραφούν όλες οριστικά; Δεν αναιρείται.`,
+        )
+      ) {
+        return;
+      }
+      let next = null;
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          next = await deleteBooking(id);
+        } catch {
+          failed += 1;
+        }
+      }
+      setBookings(Array.isArray(next) ? next : loadBookings());
+      setSelectedBooking(null);
+      if (failed) {
+        toast.error(`Διαγράφηκαν ${ids.length - failed}/${ids.length} — ${failed} απέτυχαν`);
+      } else {
+        toast.success(`Διαγράφηκαν ${ids.length} κρατήσεις της διεγραμμένης εκδρομής`);
+      }
+    };
+
     if (selectedBooking) {
-      const currentSelectedBooking = bookings.find(b => b.id === selectedBooking.id) || selectedBooking;
+      const currentSelectedBooking = bookings.find(
+        (b) =>
+          b.id === selectedBooking.id ||
+          (selectedBooking.saasBookingId &&
+            b.saasBookingId === selectedBooking.saasBookingId) ||
+          (selectedBooking.pnr && b.pnr === selectedBooking.pnr),
+      );
+      // Never fall back to a stale selectedBooking — wallet deletes left the
+      // detail pane open with a deleted ticket (BK-F15C6C28 still on screen).
+      if (!currentSelectedBooking) {
+        return (
+          <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in duration-300">
+            <div className="rounded-2xl border border-black/[0.06] bg-white p-8 text-center shadow-sm">
+              <p className="text-lg font-bold text-slate-900">Η κράτηση διαγράφηκε</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Δεν υπάρχει πλέον στη λίστα του γραφείου (διαγραφή από Wallet ή άλλη συσκευή).
+              </p>
+              <button
+                type="button"
+                className="mt-5 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-bold text-white"
+                onClick={() => setSelectedBooking(null)}
+              >
+                Πίσω στις κρατήσεις
+              </button>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
@@ -1757,6 +2001,7 @@ export default function BackOffice() {
             onPrint={(b) => navigate(ticketPrintPath(b.id))}
             onEmail={openEmailFromBooking}
             onCancel={handleCancel}
+            onDelete={handleDelete}
             onOpenCustomer={openCustomerProfile}
             onBookingUpdated={applyBookingUpdate}
           />
@@ -1775,12 +2020,16 @@ export default function BackOffice() {
           tripTitle,
           tripId: trip?.id ?? null,
           draft: trip?.status === 'draft',
+          coverUrl: tripCoverUrl(trip) || '',
           bookings: [],
           dates: new Set(),
         };
       } else if (trip?.id && !groupsByKey[key].tripId) {
         groupsByKey[key].tripId = trip.id;
         groupsByKey[key].draft = trip.status === 'draft';
+        if (!groupsByKey[key].coverUrl) {
+          groupsByKey[key].coverUrl = tripCoverUrl(trip) || '';
+        }
       }
       return groupsByKey[key];
     };
@@ -1805,6 +2054,9 @@ export default function BackOffice() {
       const key = trip ? `trip:${trip.id}` : `title:${tripTitle}`;
       const group = ensureGroup(key, tripTitle, trip);
       group.bookings.push(booking);
+      if (!group.coverUrl) {
+        group.coverUrl = bookingCoverUrl(booking, officeTrips) || '';
+      }
       if (booking.date) group.dates.add(String(booking.date));
       else if (trip?.departureTime) {
         const d = String(trip.departureTime).slice(0, 10);
@@ -1833,7 +2085,14 @@ export default function BackOffice() {
             'el',
           );
         });
-        return { ...group, dates, bookings: sortedBookings };
+        // tripId missing + bookings present ⇒ trip removed from Εκδρομές, orphan accordion.
+        const orphanDeletedTrip = !group.tripId && sortedBookings.length > 0;
+        return {
+          ...group,
+          dates,
+          bookings: sortedBookings,
+          orphanDeletedTrip,
+        };
       })
       .sort((a, b) => {
         // Trips with bookings first, then by title.
@@ -1867,7 +2126,12 @@ export default function BackOffice() {
             type="button"
             onClick={() => {
               setBookingsLoading(true);
-              setTrips(loadTrips());
+              void hydrateTripsFromServer()
+                .then((result) => {
+                  if (result?.trips) setTrips(result.trips);
+                  else setTrips(loadTrips());
+                })
+                .catch(() => setTrips(loadTrips()));
               loadMergedBookings()
                 .then(setBookings)
                 .finally(() => setBookingsLoading(false));
@@ -1906,53 +2170,154 @@ export default function BackOffice() {
           </div>
         ) : null}
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {visibleGroups.map((group) => {
             const key = group.key;
             const isExpanded = expandedTripBookings === key;
             const totalRevenue = group.bookings.reduce((sum, b) => sum + (b.price || 0), 0);
+            const checkedInCount = group.bookings.filter((b) => b.checkedIn).length;
             const dateLabel =
               group.dates.length === 0
                 ? 'Χωρίς ημερομηνία'
                 : group.dates.length === 1
-                  ? `Αναχώρηση: ${group.dates[0]}`
-                  : `${group.dates.length} αναχωρήσεις · ${group.dates[0]} → ${group.dates[group.dates.length - 1]}`;
+                  ? `Αναχώρηση ${group.dates[0]}`
+                  : `${group.dates.length} ημερομηνίες · ${group.dates[0]} → ${group.dates.at(-1)}`;
+            const cover = group.coverUrl || '';
 
             return (
-              <div key={key} className="bg-white rounded-3xl shadow-sm border border-black/[0.05] overflow-hidden transition-all">
+              <div
+                key={key}
+                className={`rounded-3xl border bg-white overflow-hidden transition-all duration-300 ${
+                  isExpanded
+                    ? 'border-primary/25 shadow-[0_12px_40px_-18px_rgba(0,80,180,0.35)]'
+                    : 'border-black/[0.06] shadow-sm hover:border-black/[0.1] hover:shadow-md'
+                }`}
+              >
                 {/* Trip Header (Accordion Toggle) */}
-                <div 
-                  className={`p-6 cursor-pointer hover:bg-gray-50 flex items-center justify-between transition-colors ${isExpanded ? 'border-b border-gray-100 bg-gray-50/50' : ''}`}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  className={`p-3.5 sm:p-4 cursor-pointer flex items-center gap-3.5 sm:gap-4 transition-colors ${
+                    isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : 'hover:bg-slate-50/60'
+                  }`}
                   onClick={() => setExpandedTripBookings(isExpanded ? null : key)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setExpandedTripBookings(isExpanded ? null : key);
+                    }
+                  }}
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[24px]">directions_bus</span>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-gray-900 text-lg truncate flex items-center gap-2">
-                        {group.tripTitle}
-                        {group.draft ? (
-                          <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                            Πρόχειρο
-                          </span>
-                        ) : null}
-                      </h3>
-                      <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
-                    </div>
+                  <div
+                    className="relative h-14 w-20 sm:h-16 sm:w-24 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 ring-1 ring-black/[0.06]"
+                    aria-hidden
+                  >
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">
+                        <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                      </div>
+                    )}
+                    {group.orphanDeletedTrip ? (
+                      <span className="absolute inset-0 bg-rose-900/25" />
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-8 shrink-0">
-                    <div className="hidden md:flex gap-6 text-sm">
-                      <div className="text-center">
-                        <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Κρατήσεις</span>
-                        <span className="font-bold text-gray-900">{group.bookings.length}</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Έσοδα</span>
-                        <span className="font-bold text-primary">€{totalRevenue.toFixed(2)}</span>
-                      </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
+                      <h3 className="font-bold text-gray-900 text-[0.98rem] sm:text-lg truncate max-w-full">
+                        {group.tripTitle}
+                      </h3>
+                      {group.draft ? (
+                        <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                          Πρόχειρο
+                        </span>
+                      ) : null}
+                      {group.orphanDeletedTrip ? (
+                        <span className="shrink-0 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800">
+                          Διαγραμμένη
+                        </span>
+                      ) : null}
                     </div>
-                    <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180 text-primary' : 'text-gray-400'}`}>
+                    <p className="text-[13px] text-slate-500 font-medium mt-0.5 truncate">{dateLabel}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 md:hidden">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                        {group.bookings.length} κρατ.
+                      </span>
+                      <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5">
+                        €{totalRevenue.toFixed(0)}
+                      </span>
+                      {checkedInCount > 0 ? (
+                        <span className="rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5">
+                          {checkedInCount} check-in
+                        </span>
+                      ) : null}
+                    </div>
+                    {group.orphanDeletedTrip ? (
+                      <p className="text-xs text-rose-700/90 mt-1">
+                        Η εκδρομή αφαιρέθηκε — μένουν {group.bookings.length} κρατήσεις
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+                    <div className="hidden md:flex items-stretch gap-3">
+                      <div className="min-w-[4.5rem] rounded-2xl bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                          Κρατήσεις
+                        </span>
+                        <span className="font-bold text-gray-900 text-base leading-none">
+                          {group.bookings.length}
+                        </span>
+                      </div>
+                      <div className="min-w-[5.25rem] rounded-2xl bg-primary/[0.06] border border-primary/10 px-3 py-2 text-center">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-primary/70 mb-0.5">
+                          Έσοδα
+                        </span>
+                        <span className="font-bold text-primary text-base leading-none">
+                          €{totalRevenue.toFixed(2)}
+                        </span>
+                      </div>
+                      {group.bookings.length > 0 ? (
+                        <div className="min-w-[4.5rem] rounded-2xl bg-emerald-50/80 border border-emerald-100 px-3 py-2 text-center">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700/70 mb-0.5">
+                            Check-in
+                          </span>
+                          <span className="font-bold text-emerald-800 text-base leading-none">
+                            {checkedInCount}/{group.bookings.length}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                    {group.orphanDeletedTrip ? (
+                      <button
+                        type="button"
+                        className="hidden sm:inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-rose-800 hover:bg-rose-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOrphanGroup(group);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden>
+                          delete_forever
+                        </span>
+                        Διαγραφή όλων
+                      </button>
+                    ) : null}
+                    <span
+                      className={`material-symbols-outlined text-[26px] transition-transform duration-300 ${
+                        isExpanded ? 'rotate-180 text-primary' : 'text-slate-300'
+                      }`}
+                      aria-hidden
+                    >
                       expand_more
                     </span>
                   </div>
@@ -2058,7 +2423,10 @@ export default function BackOffice() {
                                       className="hover:text-primary transition-colors flex items-center gap-2 text-left"
                                       title="Καρτέλα πελάτη"
                                     >
-                                      {customerData?.name || booking?.customerName || 'Unknown'}
+                                      {preferDisplayName(
+                                        customerData?.name,
+                                        booking?.customerName,
+                                      ) || 'Unknown'}
                                       <span className="material-symbols-outlined text-[16px] text-primary opacity-70 group-hover:opacity-100">
                                         open_in_new
                                       </span>
@@ -2125,14 +2493,16 @@ export default function BackOffice() {
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {booking.checkedIn ? (
                                     <button 
-                                      onClick={(e) => handleCheckIn(e, booking.id)}
+                                      type="button"
+                                      onClick={(e) => handleCheckIn(e, booking)}
                                       className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-sm font-bold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                                     >
                                       <span className="material-symbols-outlined text-[18px]">check_circle</span> Checked
                                     </button>
                                   ) : (
                                     <button 
-                                      onClick={(e) => handleCheckIn(e, booking.id)}
+                                      type="button"
+                                      onClick={(e) => handleCheckIn(e, booking)}
                                       className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors shadow-sm"
                                     >
                                       <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span> Check In
@@ -2169,9 +2539,39 @@ export default function BackOffice() {
       {showOfficeSetup && (
         <OfficeSetupWizard
           rentEnabled={rentMenuVisible}
-          forceOpen={Boolean(location.state?.officeSetup)}
-          onFinished={() => setShowOfficeSetup(false)}
-          onDismiss={() => setShowOfficeSetup(false)}
+          forceOpen={(() => {
+            try {
+              const q = new URLSearchParams(location.search || '');
+              if (q.get('officeSetup') === '1' || q.get('officeSetup') === 'true') return true;
+            } catch {
+              /* ignore */
+            }
+            return Boolean(location.state?.officeSetup);
+          })()}
+          onFinished={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
+          onDismiss={() => {
+            setShowOfficeSetup(false);
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('officeSetup')) {
+                url.searchParams.delete('officeSetup');
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
         />
       )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
@@ -2272,8 +2672,12 @@ export default function BackOffice() {
               <TemplateSearch onUseTemplate={useEmailTemplate} />
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="admin-hdr-cluster shrink-0">
             <AdminLanguageSwitcher />
+            <AdminMailHeaderButton
+              active={activeTab === 'email'}
+              onOpenMailbox={goToEmailMailbox}
+            />
             <AdminNotificationBell
               onNavigate={(tab, extra = {}) => {
                 if (extra.driverId) setChatFocusDriverId(extra.driverId);
@@ -2286,22 +2690,7 @@ export default function BackOffice() {
                 setActiveTab(tab);
               }}
             />
-            <div className="pl-2 sm:pl-3 border-l border-black/[0.06]">
-              <AdminAccountMenu
-                onOpenSettings={() => {
-                  setActiveTab('settings');
-                  setSettingsSubTab(
-                    sanitizeSettingsSubTab(
-                      isSaasSuperAdmin()
-                        ? DEFAULT_PLATFORM_TAB
-                        : DEFAULT_TENANT_SETTINGS_TAB,
-                      isSaasSuperAdmin(),
-                    ),
-                  );
-                  focusSettingsHub();
-                }}
-              />
-            </div>
+            <AdminAccountMenu />
           </div>
         </header>
 

@@ -43,7 +43,9 @@ captures/
 .idea/workspace.xml
 .idea/tasks.xml
 # Keep gradle.xml so Studio defaults to the project wrapper (Gradle 8.x), not IDE Gradle 9.6.
+# Keep runConfigurations/app.xml so Run uses :app (avoids Error running 'app' / Unknown error).
 # .idea/gradle.xml
+# .idea/runConfigurations/
 .idea/assetWizardSettings.xml
 .idea/dictionaries
 .idea/libraries

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -162,11 +164,14 @@ function GoogleUnavailable({ disabled, text = 'signin_with' }) {
  */
 function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
   const { clientId } = useGoogleAuthConfig();
+  const native = isNativeApp();
+  // FedCM / One Tap is unreliable inside Capacitor WebViews — use GIS button modal on tap.
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const label = googleButtonLabel(text);
   const callbackRef = useRef({ onSuccess, onError });
   callbackRef.current = { onSuccess, onError };
+  const useFedcm = !native;
 
   const handleCredential = useCallback((credential) => {
     setBusy(false);
@@ -180,7 +185,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   useEffect(() => {
     const g = typeof window !== 'undefined' ? window.google?.accounts?.id : null;
-    if (!g || !clientId) return undefined;
+    if (!g || !clientId || native) return undefined;
     try {
       g.initialize({
         client_id: clientId,
@@ -189,13 +194,13 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
         cancel_on_tap_outside: true,
         context: text === 'signup_with' ? 'signup' : 'signin',
         ux_mode: 'popup',
-        use_fedcm_for_prompt: true,
+        use_fedcm_for_prompt: useFedcm,
       });
     } catch {
       /* GIS not ready yet — click handler will retry */
     }
     return undefined;
-  }, [clientId, handleCredential, text]);
+  }, [clientId, handleCredential, text, native, useFedcm]);
 
   const openFallback = () => {
     setBusy(false);
@@ -204,6 +209,59 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
+    // Android/iOS: Credential Manager — never GIS inside WebView (origin_mismatch / disallowed_useragent).
+    if (native) {
+      setBusy(true);
+      void (async () => {
+        try {
+          const idToken = await nativeGoogleIdToken(clientId);
+          handleCredential(idToken);
+        } catch (err) {
+          setBusy(false);
+          const msg = String(err?.message || err || '');
+          if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
+            return;
+          }
+          // Never navigate out of the Capacitor app (bridge opened Chrome white page).
+          if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
+            onError?.(
+              'Google Console: λάθος SHA-1 ή package στο Android OAuth client (ή ακόμα διαδίδεται). Τρέξε wallet-google-sha1.ps1, σύγκρινε με το Console, βάλε Test user αν είναι Testing, περίμενε έως μερικές ώρες, ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/not implemented|SocialLogin/i.test(msg)) {
+            onError?.(
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-go.ps1 (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
+          if (/CANNOT use scopes|modifying the main activity/i.test(msg)) {
+            onError?.(
+              'Χρειάζεται νέο Wallet build (χωρίς custom Google scopes). Τρέξε wallet-go.ps1 και ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/audience mismatch/i.test(msg)) {
+            onError?.(
+              'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (ή Actions → Set Google Client ID) και ξαναδοκίμασε σε ~2 λεπτά.',
+            );
+            return;
+          }
+          if (/No credentials available|NoCredential/i.test(msg)) {
+            onError?.(
+              'Δεν υπάρχει Google λογαριασμός στο emulator. Settings → Passwords & accounts → Add account → Google, μετά ξανά Σύνδεση με Google.',
+            );
+            return;
+          }
+          onError?.(
+            msg
+              ? `Google: ${msg}`
+              : 'Η σύνδεση με Google απέτυχε. Μείνε μέσα στο app Wallet (όχι Chrome) και δοκίμασε ξανά.',
+          );
+        }
+      })();
+      return;
+    }
     const g = window.google?.accounts?.id;
     if (!g || !clientId) {
       onError?.('Google Sign-In δεν φόρτωσε. Ανανεώστε τη σελίδα.');
@@ -218,7 +276,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
         cancel_on_tap_outside: true,
         context: text === 'signup_with' ? 'signup' : 'signin',
         ux_mode: 'popup',
-        use_fedcm_for_prompt: true,
+        use_fedcm_for_prompt: useFedcm,
       });
       g.prompt((notification) => {
         // isDismissedMoment also fires after a successful credential — do not
@@ -274,7 +332,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="flex justify-center py-2">
+            <div className="flex flex-col items-center gap-3 py-2">
               <GoogleLogin
                 onSuccess={(response) => {
                   if (!response.credential) {
@@ -285,7 +343,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 }}
                 onError={() => {
                   setBusy(false);
-                  onError?.('Η σύνδεση με Google απέτυχε');
+                  onError?.('Η σύνδεση με Google απέτυχε. Δοκιμάστε ξανά.');
                 }}
                 theme="outline"
                 size="large"

@@ -92,6 +92,14 @@ class AdminPasswordResetSendByEmail(BaseModel):
     )
 
 
+class AdminPasswordResetRequestPublic(BaseModel):
+    """Public forgot-password from /admin/login (no session)."""
+
+    email: EmailStr
+    # Browser office host (API Host is often api.*) — scopes reset to that tenant.
+    host: str | None = Field(None, max_length=255)
+
+
 class AdminPasswordResetConfirm(BaseModel):
     token: str = Field(..., min_length=20, max_length=2048)
     new_password: str = Field(..., min_length=8, max_length=128)

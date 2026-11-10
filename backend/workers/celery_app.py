@@ -32,6 +32,10 @@ celery_app.conf.beat_schedule = {
         "task": "workers.tasks.scan_pre_departure_sms",
         "schedule": crontab(minute="*/5"),
     },
+    "trip-reminder-email": {
+        "task": "workers.tasks.scan_trip_reminder_emails",
+        "schedule": crontab(minute=5),
+    },
     "abandoned-file-carts-recovery": {
         "task": "workers.tasks.scan_abandoned_file_carts",
         "schedule": crontab(minute="*/15"),

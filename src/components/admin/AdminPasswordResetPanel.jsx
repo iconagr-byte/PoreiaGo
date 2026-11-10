@@ -41,6 +41,8 @@ export default function AdminPasswordResetPanel() {
   const [lastResult, setLastResult] = useState(null); // { email, at, resetUrl? }
   const [matches, setMatches] = useState([]);
   const [confirmUser, setConfirmUser] = useState(null);
+  /** Office keys that are collapsed (users hidden). */
+  const [collapsedOffices, setCollapsedOffices] = useState(() => new Set());
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -130,6 +132,24 @@ export default function AdminPasswordResetPanel() {
     const ids = new Set(users.map((u) => String(u.tenant_id || '')).filter(Boolean));
     return ids.size;
   }, [users]);
+
+  // Searching: keep matching offices open so results stay visible.
+  useEffect(() => {
+    if (query.trim()) setCollapsedOffices(new Set());
+  }, [query]);
+
+  const toggleOffice = (key) => {
+    setCollapsedOffices((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const expandAllOffices = () => setCollapsedOffices(new Set());
+  const collapseAllOffices = () =>
+    setCollapsedOffices(new Set(usersByOffice.map((g) => g.key)));
 
   if (!superAdmin) {
     return (
@@ -425,128 +445,192 @@ export default function AdminPasswordResetPanel() {
           )}
         </div>
       ) : (
-        <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="font-bold text-slate-900">Χρήστες ανά γραφείο</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Ομαδοποιημένοι ανά γραφείο — πάτα «Αποστολή» δίπλα στον χρήστη.
-              </p>
-            </div>
-            <div className="relative w-full sm:w-72">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">
-                search
-              </span>
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Αναζήτηση ονόματος / email / γραφείου…"
-                className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
-              />
+        <div className="space-y-4">
+          <div className="rounded-[22px] border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] backdrop-blur">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-[1.05rem] font-bold tracking-tight text-[#1d1d1f]">
+                  Χρήστες ανά γραφείο
+                </h3>
+                <p className="mt-0.5 text-[0.8125rem] tracking-tight text-[#6e6e73]">
+                  Κάθε κάρτα = ένα γραφείο με τους χρήστες του · «Αποστολή link» για reset.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {usersByOffice.length > 1 ? (
+                  <div className="inline-flex rounded-full border border-black/[0.06] bg-[#f5f5f7] p-0.5">
+                    <button
+                      type="button"
+                      onClick={expandAllOffices}
+                      className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f] hover:bg-white"
+                    >
+                      Άνοιγμα όλων
+                    </button>
+                    <button
+                      type="button"
+                      onClick={collapseAllOffices}
+                      className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-[#6e6e73] hover:bg-white"
+                    >
+                      Κλείσιμο
+                    </button>
+                  </div>
+                ) : null}
+                <div className="relative w-full sm:w-72">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#86868b]">
+                    search
+                  </span>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Αναζήτηση ονόματος / email / γραφείου…"
+                    className="w-full rounded-full border border-black/[0.08] bg-[#f5f5f7] py-2.5 pl-9 pr-3 text-sm tracking-tight text-[#1d1d1f] outline-none transition focus:border-[#0071e3]/40 focus:bg-white focus:ring-2 focus:ring-[#0071e3]/15"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           {loadingUsers ? (
-            <div className="flex items-center justify-center gap-2 p-10 text-sm text-slate-400">
+            <div className="flex items-center justify-center gap-2 rounded-[22px] border border-black/[0.06] bg-white p-10 text-sm text-[#86868b]">
               <span className="material-symbols-outlined animate-spin text-[20px]">
                 progress_activity
               </span>
               Φόρτωση χρηστών…
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="p-10 text-center">
-              <span className="material-symbols-outlined text-[36px] text-slate-300">
+            <div className="rounded-[22px] border border-black/[0.06] bg-white p-10 text-center">
+              <span className="material-symbols-outlined text-[36px] text-[#c7c7cc]">
                 person_off
               </span>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm tracking-tight text-[#6e6e73]">
                 {query ? 'Κανένα αποτέλεσμα για την αναζήτηση.' : 'Δεν βρέθηκαν χρήστες.'}
               </p>
               {!query ? (
                 <button
                   type="button"
                   onClick={() => setMode('email')}
-                  className="mt-3 text-sm font-bold text-sky-700 hover:underline"
+                  className="mt-3 text-sm font-semibold text-[#0071e3] hover:opacity-80"
                 >
                   Στείλε με email αντί αυτού
                 </button>
               ) : null}
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {usersByOffice.map((group) => (
-                <section key={group.key} className="bg-white">
-                  <div className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/95 px-5 py-3 backdrop-blur">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-                        <span className="material-symbols-outlined text-[18px]">domain</span>
-                      </span>
-                      <div className="min-w-0">
-                        <h4 className="truncate font-bold text-slate-900">{group.label}</h4>
-                        {group.slug && !group.label.includes(group.slug) ? (
-                          <p className="truncate text-[11px] text-slate-400">{group.slug}</p>
-                        ) : null}
+            <div className="grid gap-4">
+              {usersByOffice.map((group) => {
+                const isCollapsed = collapsedOffices.has(group.key);
+                return (
+                  <section
+                    key={group.key}
+                    className="overflow-hidden rounded-[22px] border border-black/[0.07] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.045)]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleOffice(group.key)}
+                      aria-expanded={!isCollapsed}
+                      className="flex w-full items-center justify-between gap-3 border-b border-black/[0.05] bg-gradient-to-r from-[#f5f5f7] via-white to-white px-4 py-3.5 text-left transition hover:from-[#efeff2] sm:px-5"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1d1d1f] text-white shadow-sm">
+                          <span className="material-symbols-outlined text-[20px]">apartment</span>
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-[0.95rem] font-bold tracking-tight text-[#1d1d1f]">
+                            {group.label}
+                          </h4>
+                          <p className="mt-0.5 truncate text-[11px] tracking-tight text-[#86868b]">
+                            {group.slug && !group.label.includes(group.slug)
+                              ? `${group.slug} · `
+                              : ''}
+                            Γραφείο · πάτα για {isCollapsed ? 'άνοιγμα' : 'κλείσιμο'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 border border-slate-200">
-                      {group.users.length}{' '}
-                      {group.users.length === 1 ? 'χρήστης' : 'χρήστες'}
-                    </span>
-                  </div>
-                  <ul className="divide-y divide-slate-100">
-                    {group.users.map((u) => {
-                      const sending = busyKey === u.id;
-                      return (
-                        <li
-                          key={u.id}
-                          className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/80"
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold tabular-nums tracking-tight text-[#1d1d1f] ring-1 ring-black/[0.06]">
+                          {group.users.length}{' '}
+                          {group.users.length === 1 ? 'χρήστης' : 'χρήστες'}
+                        </span>
+                        <span
+                          className={`flex h-8 w-8 items-center justify-center rounded-full bg-black/[0.04] text-[#6e6e73] transition ${
+                            isCollapsed ? '' : 'rotate-180'
+                          }`}
+                          aria-hidden
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                                u.is_active
-                                  ? 'bg-slate-900 text-white'
-                                  : 'bg-slate-200 text-slate-500'
-                              }`}
+                          <span className="material-symbols-outlined text-[20px]">
+                            expand_more
+                          </span>
+                        </span>
+                      </div>
+                    </button>
+
+                    {!isCollapsed ? (
+                      <ul className="divide-y divide-black/[0.04] bg-[#fafafa]">
+                        {group.users.map((u) => {
+                          const sending = busyKey === u.id;
+                          const roleLabel = ROLE_LABELS[u.role] || u.role || '—';
+                          const roleTone =
+                            u.role === 'admin'
+                              ? 'bg-[#0071e3]/10 text-[#0071e3]'
+                              : u.role === 'driver'
+                                ? 'bg-emerald-500/10 text-emerald-700'
+                                : 'bg-black/[0.05] text-[#6e6e73]';
+                          return (
+                            <li
+                              key={u.id}
+                              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 transition hover:bg-white sm:px-5 sm:pl-7"
                             >
-                              {initials(u.name, u.email)}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-bold text-slate-900 truncate">
-                                  {u.name}
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span
+                                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold tracking-tight ${
+                                    u.is_active
+                                      ? 'bg-[#1d1d1f] text-white'
+                                      : 'bg-[#e8e8ed] text-[#86868b]'
+                                  }`}
+                                >
+                                  {initials(u.name, u.email)}
                                 </span>
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                                  {ROLE_LABELS[u.role] || u.role || '—'}
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="truncate font-semibold tracking-tight text-[#1d1d1f]">
+                                      {u.name}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${roleTone}`}
+                                    >
+                                      {roleLabel}
+                                    </span>
+                                    {!u.is_active ? (
+                                      <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                                        Ανενεργός
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-0.5 truncate text-xs tracking-tight text-[#6e6e73]">
+                                    {u.email}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={Boolean(busyKey) || !u.is_active}
+                                onClick={() => setConfirmUser(u)}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-[#1d1d1f] px-3.5 py-2 text-xs font-semibold tracking-tight text-white transition hover:bg-black disabled:opacity-40"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">
+                                  {sending ? 'progress_activity' : 'lock_reset'}
                                 </span>
-                                {!u.is_active ? (
-                                  <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
-                                    Ανενεργός
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className="text-xs text-slate-500 truncate mt-0.5">
-                                {u.email}
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={Boolean(busyKey) || !u.is_active}
-                            onClick={() => setConfirmUser(u)}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">
-                              {sending ? 'progress_activity' : 'lock_reset'}
-                            </span>
-                            {sending ? 'Αποστολή…' : 'Αποστολή link'}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ))}
+                                {sending ? 'Αποστολή…' : 'Αποστολή link'}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </section>
+                );
+              })}
             </div>
           )}
         </div>

@@ -20,7 +20,16 @@ export async function fetchOfficeCustomers(serviceScope) {
   const res = await adminFetch(`/api/admin/platform/customers${q}`, { retries: 3 });
   if (!res.ok) await parseError(res);
   const data = await res.json();
-  return Array.isArray(data?.customers) ? data.customers : Array.isArray(data) ? data : [];
+  const customers = Array.isArray(data?.customers)
+    ? data.customers
+    : Array.isArray(data)
+      ? data
+      : [];
+  return {
+    customers,
+    // Soft-deleted history counts — empty live list must not re-seed deletes.
+    hasHistory: Boolean(data?.hasHistory) || customers.length > 0,
+  };
 }
 
 /** My Wallet account signups for this office (wallet_tenant_id seal). */

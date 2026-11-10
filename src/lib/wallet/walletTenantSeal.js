@@ -6,6 +6,22 @@
 const WALLET_TENANT_KEY = 'wallet_tenant_id';
 const SCOPED_CACHE_BASES = ['aerostride_bookings_v1', 'wallet_last_pass_v1'];
 
+/** Fired after login/logout when the sealed office changes — reload logo/name. */
+export const WALLET_TENANT_CHANGED_EVENT = 'poreiago:wallet-tenant-changed';
+
+function notifyWalletTenantChanged(tenantId) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(WALLET_TENANT_CHANGED_EVENT, {
+        detail: { tenantId: tenantId || null },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export function getWalletTenantId() {
   if (typeof window === 'undefined') return null;
   return (localStorage.getItem(WALLET_TENANT_KEY) || '').trim() || null;
@@ -34,6 +50,9 @@ export function setWalletTenantId(tenantId) {
   }
   if (tid) localStorage.setItem(WALLET_TENANT_KEY, tid);
   else localStorage.removeItem(WALLET_TENANT_KEY);
+  if (tid !== (prev || '')) {
+    notifyWalletTenantChanged(tid || null);
+  }
 }
 
 export function clearWalletTenantId() {
