@@ -947,7 +947,7 @@ function WalletAuthenticatedApp() {
           />
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-7 max-w-[9.5rem]"
+              className="h-7 max-w-[14.5rem]"
               variant="light"
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
