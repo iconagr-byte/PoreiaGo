@@ -377,6 +377,26 @@ export default function BackOffice() {
     ensureDriverSession();
   }, [navigate]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchRentModule()
+      .then((mod) => {
+        if (!cancelled) setRentModuleEnabled(mod?.rent_enabled !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setRentModuleEnabled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rentModuleEnabled && activeTab === 'fleet_rental') {
+      setActiveTab('dashboard');
+    }
+  }, [rentModuleEnabled, activeTab]);
+
   // Legacy debug tab removed — send any leftover state to the live map.
   useEffect(() => {
     if (activeTab === 'live_tracking') {

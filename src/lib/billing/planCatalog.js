@@ -262,6 +262,15 @@ export function isRentOnlyPlan(planId) {
   return planId === RENT_STANDALONE_PLAN.id;
 }
 
+/** Plans that can be selected at signup / contracts (excludes contact-sales-only). */
+export function selectableAgencyPlans() {
+  return [...AGENCY_PLANS.filter((p) => !p.contactSales), RENT_STANDALONE_PLAN];
+}
+
+export function isRentOnlyPlan(planId) {
+  return planId === RENT_STANDALONE_PLAN.id;
+}
+
 export function displayPrice(plan, interval) {
   if (plan.contactSales || plan.monthlyEur == null) {
     return { amount: null, label: 'Κατόπιν συνεννόησης' };

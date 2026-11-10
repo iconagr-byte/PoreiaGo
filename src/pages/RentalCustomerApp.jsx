@@ -582,6 +582,14 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 </section>
               </div>
             </div>
+
+            <RentalServicesShowcase
+              compact
+              onCta={() => {
+                window.location.assign('/rent/services');
+              }}
+              ctaLabel={t('services_help', getRentLang())}
+            />
           </div>
 
           {/* Platform marketing only — never on tenant office /rent. */}
@@ -1057,6 +1065,9 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
               </dl>
               <RentalInstallPrompt force />
               <div style={{ display: 'grid', gap: '0.6rem', marginTop: '1.25rem' }}>
+                <Link to="/rent/services" className="rent-btn rent-btn-ghost rent-btn-block">
+                  {t('services_help', getRentLang())}
+                </Link>
                 <button
                   type="button"
                   className="rent-btn rent-btn-danger rent-btn-block"

@@ -314,6 +314,7 @@ export default function ContractsPanel({
     onTrial && remaining != null && trialDays > 0
       ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
       : null;
+  const rentOn = rentModule?.rent_enabled !== false;
 
   if (!hasToken) {
     return (
