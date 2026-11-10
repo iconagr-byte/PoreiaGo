@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any
 
-_AUDIT_FILE = Path(__file__).resolve().parent / "payment_audit.json"
+_DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or os.getenv("AEROSTRIDE_DATA_DIR") or Path(__file__).resolve().parent)
+_AUDIT_FILE = _DATA_DIR / "payment_audit.json"
 _MAX_ENTRIES = 500
 
 FISCAL_AUDIT_ACTIONS = frozenset({
@@ -68,8 +70,12 @@ def append_payment_audit(
     rows = _read_all()
     rows.insert(0, entry)
     rows = rows[:_MAX_ENTRIES]
-    _AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _AUDIT_FILE.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+    try:
+        _AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _AUDIT_FILE.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        # Container filesystem may be read-only outside /app/data — never fail the payment.
+        pass
     return entry
 
 

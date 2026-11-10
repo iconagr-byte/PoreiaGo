@@ -1,9 +1,11 @@
 /**
  * Printable rental agreement / paperwork sheet for a booking — includes legal doc pack.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
 import {
+  fetchRentalCheckoutStatus,
+  fetchRentalInspections,
   openRentalContractFile,
   resetRentalSignature,
 } from '../../../services/fleetRentalApi.js';
@@ -12,6 +14,7 @@ import {
   legalPackProgress,
 } from '../../../lib/rental/rentalLegalDocs.js';
 import { paperworkStatusForBooking } from '../../../lib/rental/rentalPaperwork.js';
+import { LIVE_REFRESH_MS } from '../../../lib/liveRefresh.js';
 import RentalLegalDocPack from './RentalLegalDocPack.jsx';
 
 function euro(n) {
@@ -52,24 +55,122 @@ export default function RentalBookingAgreement({
   onOpenCheckIn,
   onOpenCheckout,
   onBookingUpdated,
+  onInspectionsUpdated,
   onToast,
 }) {
   const [booking, setBooking] = useState(bookingProp);
+  const [liveInspections, setLiveInspections] = useState(inspections);
   const [openingContract, setOpeningContract] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
-  useEffect(() => {
-    setBooking(bookingProp);
-  }, [bookingProp]);
+  const [liveHint, setLiveHint] = useState('');
+  const seenPickup = useRef(false);
+  const seenReturn = useRef(false);
+  const primed = useRef(false);
+  const bookingRef = useRef(bookingProp);
 
   const handleUpdated = (updated) => {
-    if (updated?.id) setBooking(updated);
+    if (updated?.id) {
+      setBooking(updated);
+      bookingRef.current = updated;
+    }
     onBookingUpdated?.(updated);
   };
 
+  useEffect(() => {
+    setBooking(bookingProp);
+    bookingRef.current = bookingProp;
+  }, [bookingProp]);
+
+  useEffect(() => {
+    setLiveInspections(inspections);
+  }, [inspections]);
+
+  // Poll this booking's inspections/signature until both check-in & check-out are signed.
+  useEffect(() => {
+    if (!bookingProp?.id) return undefined;
+    const bookingId = bookingProp.id;
+    let cancelled = false;
+    primed.current = false;
+
+    const tick = async () => {
+      try {
+        const [fresh, status] = await Promise.all([
+          fetchRentalInspections(bookingId),
+          fetchRentalCheckoutStatus(bookingId).catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        setLiveInspections((prev) => {
+          const others = (prev || []).filter((i) => i.rental_booking_id !== bookingId);
+          return [...fresh, ...others];
+        });
+        onInspectionsUpdated?.(fresh, bookingId);
+
+        const current = bookingRef.current || bookingProp;
+        if (status?.signed || status?.contract_pdf_url) {
+          const next = {
+            ...current,
+            rental_status: status.rental_status || current.rental_status,
+            contract_status: status.contract_status || current.contract_status,
+            contract_pdf_url: status.contract_pdf_url || current.contract_pdf_url,
+            signature_pending: Boolean(status.signature_pending),
+            contract_issued_at:
+              status.signed && !current.contract_issued_at
+                ? current.contract_issued_at || new Date().toISOString()
+                : current.contract_issued_at,
+          };
+          const changed =
+            next.contract_pdf_url !== current.contract_pdf_url ||
+            next.rental_status !== current.rental_status ||
+            next.contract_status !== current.contract_status ||
+            Boolean(next.signature_pending) !== Boolean(current.signature_pending) ||
+            next.contract_issued_at !== current.contract_issued_at;
+          if (changed) handleUpdated(next);
+        }
+
+        const paper = paperworkStatusForBooking(current, fresh);
+        if (!primed.current) {
+          seenPickup.current = paper.pickupSigned;
+          seenReturn.current = paper.returnSigned;
+          primed.current = true;
+          setLiveHint(
+            paper.pickupSigned && paper.returnSigned
+              ? ''
+              : 'Ζωντανή ενημέρωση υπογραφών…',
+          );
+          return;
+        }
+        if (paper.pickupSigned && !seenPickup.current) {
+          seenPickup.current = true;
+          onToast?.('success', 'Η υπογραφή παραλαβής έφτασε στο γραφείο');
+        }
+        if (paper.returnSigned && !seenReturn.current) {
+          seenReturn.current = true;
+          onToast?.('success', 'Η υπογραφή επιστροφής έφτασε στο γραφείο');
+        }
+        setLiveHint(
+          paper.pickupSigned && paper.returnSigned
+            ? ''
+            : 'Ζωντανή ενημέρωση υπογραφών…',
+        );
+      } catch {
+        /* keep polling */
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, LIVE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll keyed to booking id
+  }, [bookingProp?.id]);
+
   if (!booking) return null;
 
-  const paper = paperworkStatusForBooking(booking, inspections);
-  const legal = legalPackProgress(booking, inspections);
+  const paper = paperworkStatusForBooking(booking, liveInspections);
+  const legal = legalPackProgress(booking, liveInspections);
   const plate = booking.vehicle_plate || vehicle?.plate_number || '—';
   const model = booking.vehicle_model || vehicle?.model || '—';
   const category = booking.vehicle_category || vehicle?.category || '—';
@@ -137,6 +238,12 @@ export default function RentalBookingAgreement({
           <p className="text-xs text-teal-800 font-semibold mt-1">
             Νομικά {legal.signedCount}/{legal.total} · {paper.statusLabel}
           </p>
+          {liveHint ? (
+            <p className="text-xs text-teal-600 mt-1 flex items-center gap-1 print:hidden">
+              <span className="material-symbols-outlined text-[14px] animate-pulse">sync</span>
+              {liveHint}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -304,7 +411,7 @@ export default function RentalBookingAgreement({
 
       <RentalLegalDocPack
         booking={booking}
-        inspections={inspections}
+        inspections={liveInspections}
         officeName={officeName}
         onBookingUpdated={handleUpdated}
         onOpenCheckIn={onOpenCheckIn}
@@ -314,8 +421,16 @@ export default function RentalBookingAgreement({
   );
 }
 
+function signatureSrc(inspection) {
+  const raw = resolveSiteAssetUrl(inspection?.signature_url || '');
+  if (!raw || raw.startsWith('data:')) return raw;
+  const bust = inspection?.updated_at || inspection?.created_at || inspection?.id || '';
+  if (!bust) return raw;
+  return `${raw}${raw.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(bust))}`;
+}
+
 function SignatureBlock({ title, inspection, emptyHint }) {
-  const url = resolveSiteAssetUrl(inspection?.signature_url || '');
+  const url = signatureSrc(inspection);
   return (
     <div className="rounded-xl border border-black/[0.08] p-4 min-h-[10rem]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{title}</p>

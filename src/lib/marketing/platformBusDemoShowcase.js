@@ -6,12 +6,32 @@
 import { mockTrips } from '../../data/mockData.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
 import { normalizeTrip } from '../trips/tripMarket.js';
+import { getWalletTenantId } from '../wallet/walletTenantSeal.js';
+
+/**
+ * My Wallet (incl. Capacitor on localhost) is sealed to a real office —
+ * never treat that checkout as marketing demo simulation.
+ */
+export function isSealedWalletLiveBooking() {
+  return Boolean(getWalletTenantId());
+}
 
 /**
  * Seat map + checkout on poreiago.com (and localhost) are a walkthrough only —
  * no real fleet block, booking, wallet claim, or charge.
+ *
+ * Exception: sealed My Wallet office (Achillio etc.) always uses the live
+ * booking/payment path so the office gets the κρατηση + email + bell.
+ *
+ * @param {string} [hostname]
+ * @param {{ sealedWallet?: boolean }} [options] optional override for tests
  */
-export function isPlatformSeatBookingDemo(hostname) {
+export function isPlatformSeatBookingDemo(hostname, options = {}) {
+  const sealed =
+    typeof options.sealedWallet === 'boolean'
+      ? options.sealedWallet
+      : isSealedWalletLiveBooking();
+  if (sealed) return false;
   return isPlatformMarketingHost(hostname) && !isTenantStorefrontHost(hostname);
 }
 
@@ -56,15 +76,27 @@ export const DEMO_BUS_FLEET = [
 
 /** Domestic-first trip cards for marketing preview. */
 export function getPlatformDemoTrips(limit = 3) {
+  return getPlatformDemoDomesticTrips(limit);
+}
+
+export function getPlatformDemoDomesticTrips(limit = 3) {
   return mockTrips
-    .filter((t) => t && t.id && t.title)
-    .sort((a, b) => {
-      const am = a.market === 'domestic' ? 0 : 1;
-      const bm = b.market === 'domestic' ? 0 : 1;
-      return am - bm;
-    })
+    .filter((t) => t && t.id && t.title && t.market !== 'international' && t.category !== 'international')
     .slice(0, Math.max(1, limit))
     .map(normalizeTrip);
+}
+
+/** International excursion cards for the horizontal «Εξωτερικό» tab. */
+export function getPlatformDemoInternationalTrips(limit = 3) {
+  return mockTrips
+    .filter((t) => t && t.id && t.title && (t.market === 'international' || t.category === 'international'))
+    .slice(0, Math.max(1, limit))
+    .map(normalizeTrip);
+}
+
+/** Alias — horizontal abroad strip uses the same international demo set. */
+export function getPlatformDemoIntlTrips(limit = 3) {
+  return getPlatformDemoInternationalTrips(limit);
 }
 
 export function getPlatformDemoBuses(limit = 3) {
@@ -72,8 +104,8 @@ export function getPlatformDemoBuses(limit = 3) {
 }
 
 export const PLATFORM_OPS_COPY = {
-  kicker: 'Προεπισκόπηση πλατφόρμας',
-  title: 'Έτσι φαίνονται οι εκδρομές και ο στόλος',
+  kicker: 'Λεωφορεία',
+  title: 'Πουλήστε εκδρομές online και εκτελέστε τις χωρίς χάος',
   subtitle:
-    'Κάρτες ταξιδιών και λεωφορεία — όπως θα τα βλέπει ο πελάτης του γραφείου σας στο site σας.',
+    'Κρατήσεις, QR εισιτήρια, θέσεις και στόλος — όπως θα τα βλέπει ο πελάτης στο site του γραφείου σας.',
 };

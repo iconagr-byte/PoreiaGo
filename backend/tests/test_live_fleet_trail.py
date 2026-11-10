@@ -43,6 +43,47 @@ def test_append_and_load_trail_memory():
     asyncio.run(run())
 
 
+def test_process_telemetry_buffers_history_and_trail(monkeypatch):
+    """Shared ingest path (Teltonika + driver) must enqueue PostGIS history + trail."""
+
+    async def run():
+        from uuid import uuid4
+
+        from travel_platform.telemetry.processor import process_telemetry_payload
+
+        tid = str(uuid4())
+        before = pending_count()
+        await process_telemetry_payload(
+            {
+                "tenant_id": tid,
+                "vehicle_code": "EEX5670",
+                "bus_plate": "EEX5670",
+                "latitude": 40.52,
+                "longitude": 22.20,
+                "speed_kmh": 55,
+                "heading_deg": 180,
+                "engine_status": "on",
+                "source": "teltonika",
+                "imei": "861076085468260",
+                "altitude_m": 90,
+                "satellites": 11,
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        assert pending_count() == before + 1
+        from travel_platform.telemetry.processor import get_live_fleet
+
+        fleet = get_live_fleet()
+        vid = fleet.find_vehicle_id(tid, "EEX5670")
+        assert vid
+        trail = await load_trail(tid, vid)
+        assert len(trail) >= 1
+        meta = fleet._vehicles.get(str(vid), {})
+        assert meta.get("tracking_started_at")
+
+    asyncio.run(run())
+
+
 def test_drain_trail_clears_and_persist_queues_history(monkeypatch):
     async def _noop_flush():
         return 0
