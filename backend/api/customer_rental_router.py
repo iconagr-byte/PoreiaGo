@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import os
-import re
-import uuid
-from pathlib import Path
+import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
 from travel_platform.rental import rental_store as store
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
@@ -22,44 +22,73 @@ _MAX_DOC_BYTES = 4 * 1024 * 1024
 _ID_KINDS = frozenset({"id_card", "driving_license"})
 
 
-async def _tenant_id(request: Request) -> str:
-    """Office scope for Wallet rentals — Host/middleware first, Origin fallback."""
-    tid = getattr(request.state, "tenant_id", None)
-    if tid:
-        return str(tid)
+async def _tenant_id(request: Request, account: dict | None = None) -> str:
+    """Office scope for Wallet rentals — JWT seal + Host; never spoof via Origin."""
+    from api.customer_wallet_seal import resolve_sealed_wallet_tenant
 
-    hosts: list[str] = []
-    for header in ("x-forwarded-host", "host", "origin", "referer"):
-        raw = (request.headers.get(header) or "").strip()
-        if not raw:
-            continue
-        value = raw.split(",")[0].strip()
-        if "://" in value:
-            try:
-                from urllib.parse import urlparse
+    jwt_tid = None
+    if account:
+        jwt_tid = account.get("tenant_id")
+    try:
+        return await resolve_sealed_wallet_tenant(request, jwt_tid=jwt_tid)
+    except HTTPException:
+        # Preserve prior demo fallback for local rent catalog without JWT.
+        import os
 
-                value = urlparse(value).hostname or ""
-            except Exception:
-                value = ""
-        value = value.split(":")[0].strip().lower()
-        if value and value not in hosts:
-            hosts.append(value)
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if account is None and (
+            env in ("development", "dev", "local")
+            or os.getenv("ALLOW_DEMO_RENT_FALLBACK", "").lower() in ("1", "true", "yes")
+        ):
+            return DEMO_TENANT_ID
+        raise
+
+
+async def _require_rent_module(request: Request, account: dict | None = None) -> str:
+    """Resolve tenant and block Rent APIs when the office has no active Rent contract."""
+    tid = await _tenant_id(request, account)
+
+    import os
+
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if tid == DEMO_TENANT_ID and env in ("development", "dev", "local"):
+        return tid
 
     try:
-        from middleware.domain_tenant import _is_platform_host, _resolve_host_cached
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import (
+            is_poreiago_platform_office,
+            modules_for_tenant,
+        )
+        from sqlalchemy import select
 
-        for host in hosts:
-            if not host or _is_platform_host(host):
-                continue
-            resolved = await _resolve_host_cached(host)
-            if resolved:
-                request.state.tenant_id = resolved.tenant_id
-                return str(resolved.tenant_id)
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == UUID(str(tid))))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+                )
+            if is_poreiago_platform_office(tenant):
+                return tid
+            mods = modules_for_tenant(tenant)
+            if not mods.get("rent_enabled"):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+                )
+    except HTTPException:
+        raise
     except Exception:
-        pass
+        logger.exception("rent module guard failed for tenant_id=%s", tid)
+        raise HTTPException(
+            status_code=404,
+            detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+        ) from None
 
-    return DEMO_TENANT_ID
-
+    return tid
 
 class CustomerBookingBody(BaseModel):
     vehicle_id: str
@@ -70,16 +99,29 @@ class CustomerBookingBody(BaseModel):
     driver_mode: str = "SELF_DRIVE"
     client_phone: str | None = None
     notes: str | None = None
-    id_document_url: str | None = None
-    driving_license_url: str | None = None
-    date_of_birth: str | None = None
-    license_number: str | None = Field(default=None, max_length=64)
-    license_expires_at: str | None = None
+    extras: list[str] = Field(default_factory=list)
+    marketing_email: bool = False
+    marketing_sms: bool = False
+    payment_method: str | None = None
+    payment_plan: str | None = None
+    deposit_percent: int | None = None
+    amount_paid: float | None = None
+    balance_due: float | None = None
+    payment_status: str | None = None
+    total_cost: float | None = None
+
+
+class GuestRentalLookupBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    reference: str | None = Field(default=None, max_length=120)
+    booking_code: str | None = Field(default=None, max_length=120)
+    code: str | None = Field(default=None, max_length=120)
 
 
 def _public_booking(row: dict) -> dict:
     return {
         "id": row["id"],
+        "reference_code": store._booking_reference_code(row),
         "vehicle_id": row.get("vehicle_id"),
         "client_id": row.get("client_id"),
         "vehicle_plate": row.get("vehicle_plate"),
@@ -91,16 +133,44 @@ def _public_booking(row: dict) -> dict:
         "dropoff_location": row.get("dropoff_location"),
         "total_cost": row.get("total_cost"),
         "pricing": row.get("pricing"),
+        "extras": list(row.get("extras") or []),
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
         "channel": row.get("channel"),
-        "id_verification_status": row.get("id_verification_status"),
-        "has_id_document": bool(row.get("id_document_url")),
-        "has_driving_license": bool(row.get("driving_license_url")),
-        "date_of_birth": row.get("date_of_birth"),
-        "license_number": row.get("license_number"),
-        "license_expires_at": row.get("license_expires_at"),
+        "marketing_email": bool(row.get("marketing_email")),
+        "marketing_sms": bool(row.get("marketing_sms")),
+        "payment_method": row.get("payment_method"),
+        "payment_plan": row.get("payment_plan"),
+        "deposit_percent": row.get("deposit_percent"),
+        "amount_paid": row.get("amount_paid"),
+        "balance_due": row.get("balance_due"),
+        "payment_status": row.get("payment_status"),
         "created_at": row.get("created_at"),
+    }
+
+
+def _public_vehicle_row(r: dict) -> dict:
+    return {
+        "id": r["id"],
+        "plate_number": r.get("plate_number"),
+        "category": r.get("category"),
+        "model": r.get("model"),
+        "seating_capacity": r.get("seating_capacity"),
+        "daily_rate_eur": r.get("daily_rate_eur"),
+        "one_way_surcharge_eur": r.get("one_way_surcharge_eur"),
+        "with_driver_daily_eur": r.get("with_driver_daily_eur"),
+        "photo_url": r.get("photo_url") or ((r.get("photo_urls") or [None])[0]),
+        "photo_urls": list(
+            r.get("photo_urls") or ([] if not r.get("photo_url") else [r.get("photo_url")])
+        ),
+        "description": r.get("description"),
+        "suggested_days": r.get("suggested_days"),
+        "base_total": r.get("base_total"),
+        "driver_surcharge": r.get("driver_surcharge"),
+        "one_way_surcharge": r.get("one_way_surcharge"),
+        "suggested_total": r.get("suggested_total"),
+        "is_one_way": r.get("is_one_way"),
+        "driver_mode": r.get("driver_mode"),
     }
 
 
@@ -108,10 +178,30 @@ def _public_booking(row: dict) -> dict:
 async def rental_catalog(
     request: Request,
     category: str | None = None,
-    _: dict = Depends(get_current_customer),
+    account: dict = Depends(get_current_customer),
 ):
-    vehicles = store.public_catalog(await _tenant_id(request), category=category)
-    return {"vehicles": vehicles, "count": len(vehicles)}
+    tid = await _require_rent_module(request, account)
+    vehicles = store.public_catalog(tid, category=category)
+    return {"vehicles": vehicles, "count": len(vehicles), "tenant_id": tid}
+
+
+@router.post("/public/lookup")
+async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
+    """Guest rental booking lookup by email + RB-… reference (no auth)."""
+    email = str(body.email or "").strip().lower()
+    reference = str(body.reference or body.booking_code or body.code or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Απαιτείται έγκυρο email κράτησης")
+    if not reference or len(reference) < 4:
+        raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
+    row = store.lookup_booking_for_guest(
+        await _require_rent_module(request),
+        email=email,
+        reference=reference,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση ενοικίασης με αυτά τα στοιχεία")
+    return {"ok": True, "booking": _public_booking(row)}
 
 
 @router.get("/public/catalog")
@@ -123,7 +213,7 @@ async def rental_public_catalog(
 
     Booking/availability still requires customer auth.
     """
-    vehicles = store.public_catalog(await _tenant_id(request), category=category)
+    vehicles = store.public_catalog(await _require_rent_module(request), category=category)
     public = []
     for v in vehicles:
         public.append(
@@ -143,46 +233,73 @@ async def rental_public_catalog(
     return {"vehicles": public, "count": len(public)}
 
 
-@router.post("/id-docs/upload")
-async def upload_rental_id_doc(
-    kind: str = Query(..., description="id_card or driving_license"),
-    file: UploadFile = File(...),
-    _: dict = Depends(get_current_customer),
+@router.get("/public/extras")
+async def rental_public_extras(request: Request):
+    """Office-bookable extras catalog (tenant from Host)."""
+    _ = await _require_rent_module(request)
+    items = [
+        {
+            "id": key,
+            "title": spec["title"],
+            "eur_per_day": spec["eur_per_day"],
+        }
+        for key, spec in store.EXTRAS_CATALOG.items()
+    ]
+    return {"extras": items, "count": len(items)}
+
+
+async def _availability_payload(
+    request: Request,
+    *,
+    start_time: str,
+    end_time: str,
+    category: str | None,
+    min_seats: int | None,
+    pickup_location: str | None,
+    dropoff_location: str | None,
+    driver_mode: str | None,
+    account: dict | None = None,
+) -> dict:
+    try:
+        tid = await _require_rent_module(request, account)
+        rows = store.check_availability(
+            tid,
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+            min_seats=min_seats,
+            pickup_location=pickup_location,
+            dropoff_location=dropoff_location,
+            driver_mode=driver_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    public = [_public_vehicle_row(r) for r in rows]
+    return {"vehicles": public, "count": len(public), "tenant_id": tid}
+
+
+@router.get("/public/availability")
+async def rental_public_availability(
+    request: Request,
+    start_time: str = Query(...),
+    end_time: str = Query(...),
+    category: str | None = None,
+    min_seats: int | None = Query(default=None, ge=1, le=80),
+    pickup_location: str | None = None,
+    dropoff_location: str | None = None,
+    driver_mode: str | None = None,
 ):
-    """Customer ID / driving license photo for self-drive wallet bookings."""
-    from travel_platform.media.image_optimize import optimize_driver_photo
-
-    kind_norm = str(kind or "").strip().lower()
-    if kind_norm not in _ID_KINDS:
-        raise HTTPException(status_code=400, detail="Μη έγκυρος τύπος εγγράφου")
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
-    if len(content) > _MAX_DOC_BYTES:
-        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
-
-    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
-    if optimized.ext == ".bin":
-        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
-
-    prefix = "id" if kind_norm == "id_card" else "license"
-    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or prefix).stem)[:40] or prefix
-    filename = f"{prefix}-{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
-
-    _RENTAL_ID_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = _RENTAL_ID_DIR / filename
-    out_path.write_bytes(optimized.content)
-    url = f"/api/site/rental-id/{filename}"
-    return {
-        "ok": True,
-        "kind": kind_norm,
-        "url": url,
-        "filename": filename,
-        "bytes": len(optimized.content),
-        "content_type": optimized.content_type,
-    }
+    """Guest availability for office fleet (no auth) — dates from search bar."""
+    return await _availability_payload(
+        request,
+        start_time=start_time,
+        end_time=end_time,
+        category=category,
+        min_seats=min_seats,
+        pickup_location=pickup_location,
+        dropoff_location=dropoff_location,
+        driver_mode=driver_mode,
+    )
 
 
 @router.get("/availability")
@@ -195,49 +312,19 @@ async def rental_availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
-    _: dict = Depends(get_current_customer),
+    account: dict = Depends(get_current_customer),
 ):
-    try:
-        rows = store.check_availability(
-            await _tenant_id(request),
-            start_time=start_time,
-            end_time=end_time,
-            category=category,
-            min_seats=min_seats,
-            pickup_location=pickup_location,
-            dropoff_location=dropoff_location,
-            driver_mode=driver_mode,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    # Strip internal notes from customer responses.
-    public = []
-    for r in rows:
-        public.append(
-            {
-                "id": r["id"],
-                "plate_number": r.get("plate_number"),
-                "category": r.get("category"),
-                "model": r.get("model"),
-                "seating_capacity": r.get("seating_capacity"),
-                "daily_rate_eur": r.get("daily_rate_eur"),
-                "one_way_surcharge_eur": r.get("one_way_surcharge_eur"),
-                "with_driver_daily_eur": r.get("with_driver_daily_eur"),
-                "photo_url": r.get("photo_url") or ((r.get("photo_urls") or [None])[0]),
-                "photo_urls": list(
-                    r.get("photo_urls") or ([] if not r.get("photo_url") else [r.get("photo_url")])
-                ),
-                "description": r.get("description"),
-                "suggested_days": r.get("suggested_days"),
-                "base_total": r.get("base_total"),
-                "driver_surcharge": r.get("driver_surcharge"),
-                "one_way_surcharge": r.get("one_way_surcharge"),
-                "suggested_total": r.get("suggested_total"),
-                "is_one_way": r.get("is_one_way"),
-                "driver_mode": r.get("driver_mode"),
-            }
-        )
-    return {"vehicles": public, "count": len(public)}
+    return await _availability_payload(
+        request,
+        start_time=start_time,
+        end_time=end_time,
+        category=category,
+        min_seats=min_seats,
+        pickup_location=pickup_location,
+        dropoff_location=dropoff_location,
+        driver_mode=driver_mode,
+        account=account,
+    )
 
 
 @router.get("/bookings")
@@ -245,8 +332,9 @@ async def my_rental_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    rows = store.list_bookings_for_email(await _tenant_id(request), account["email"])
-    return {"bookings": [_public_booking(b) for b in rows], "total": len(rows)}
+    tid = await _require_rent_module(request, account)
+    rows = store.list_bookings_for_email(tid, account["email"])
+    return {"bookings": [_public_booking(b) for b in rows], "total": len(rows), "tenant_id": tid}
 
 
 @router.post("/bookings")
@@ -255,6 +343,7 @@ async def book_rental(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
+    tid = await _require_rent_module(request, account)
     payload = {
         "vehicle_id": body.vehicle_id,
         "client_name": (account.get("name") or account["email"].split("@")[0]).strip(),
@@ -267,15 +356,20 @@ async def book_rental(
         "dropoff_location": (body.dropoff_location or body.pickup_location).strip(),
         "driver_mode": body.driver_mode,
         "notes": body.notes,
-        "id_document_url": body.id_document_url,
-        "driving_license_url": body.driving_license_url,
-        "date_of_birth": body.date_of_birth,
-        "license_number": body.license_number,
-        "license_expires_at": body.license_expires_at,
+        "extras": list(body.extras or []),
         "channel": "WALLET",
+        "marketing_email": bool(body.marketing_email),
+        "marketing_sms": bool(body.marketing_sms),
+        "payment_method": body.payment_method,
+        "payment_plan": body.payment_plan,
+        "deposit_percent": body.deposit_percent,
+        "amount_paid": body.amount_paid,
+        "balance_due": body.balance_due,
+        "payment_status": body.payment_status,
+        "total_cost": body.total_cost,
     }
     try:
-        row = store.create_booking(await _tenant_id(request), payload)
+        row = store.create_booking(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -285,6 +379,15 @@ async def book_rental(
         await notify_rental_booking_to_office(row)
     except Exception:
         # Booking must succeed even if office push fails.
+        pass
+
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_on_create,
+        )
+
+        await notify_rental_customer_on_create(row)
+    except Exception:
         pass
 
     return _public_booking(row)
@@ -298,7 +401,7 @@ async def cancel_my_rental(
 ):
     try:
         row = store.cancel_booking_for_customer(
-            await _tenant_id(request),
+            await _require_rent_module(request, account),
             booking_id,
             email=account["email"],
         )
@@ -309,4 +412,12 @@ async def cancel_my_rental(
         if "δικαίωμα" in msg:
             raise HTTPException(status_code=403, detail=msg) from exc
         raise HTTPException(status_code=400, detail=msg) from exc
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(row)
+    except Exception:
+        pass
     return _public_booking(row)

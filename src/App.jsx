@@ -1,23 +1,33 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useLayoutEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { bootUiLang } from './lib/i18n/uiLang.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
 import { captureRentalInstallPrompt, setupRentalPwa } from './lib/rental/registerRentalPwa.js';
+import { markPreferRentLookup } from './lib/rental/preferRentLookup.js';
 import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import AdminForgotPasswordPage from './pages/AdminForgotPasswordPage';
+import AdminResetPasswordPage from './pages/AdminResetPasswordPage';
 import SeatSelection from './pages/SeatSelection';
+import TripExtrasPage from './pages/TripExtrasPage';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
+import RentWalletRedirect from './pages/RentWalletRedirect.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
+import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
+import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
+import RentalRemoteSignPage from './pages/RentalRemoteSignPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
 import DriverCommandCenter from './pages/driver/DriverCommandCenter';
 import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
+import DriverResetPasswordPage from './pages/driver/DriverResetPasswordPage.jsx';
 import FleetVehicleDetail from './pages/FleetVehicleDetail';
 import TripEditorPage from './pages/admin/TripEditorPage';
 import DriverDetailPage from './pages/admin/DriverDetailPage';
@@ -35,6 +45,7 @@ import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
 import CheckoutPage from './pages/CheckoutPage';
 import BookingLookupPage from './pages/BookingLookupPage';
+import OfficeContactPage from './pages/OfficeContactPage.jsx';
 import CheckoutResumePage from './pages/CheckoutResumePage';
 import TicketPrintPage from './pages/TicketPrintPage.jsx';
 import FiscalReceiptPrintPage from './pages/FiscalReceiptPrintPage.jsx';
@@ -43,6 +54,42 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import BrandingBoot from './components/BrandingBoot.jsx';
 import MaintenanceGate from './components/MaintenanceGate.jsx';
+import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
+import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
+import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
+import WalletNativeSplashGate from './components/wallet/WalletNativeSplashGate.jsx';
+import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
+import DriverNativeBoot from './components/driver/DriverNativeBoot.jsx';
+import NativeUnifiedBoot from './components/native/NativeUnifiedBoot.jsx';
+import { isNativeApp, isNativeDriverApp } from './lib/capacitor/isNativeApp.js';
+import {
+  resolveNativeRoleHomePath,
+} from './lib/capacitor/nativeRoleHome.js';
+import { isNativeUnifiedApp } from './lib/capacitor/nativeAppId.js';
+
+function RentalCustomerAppGated() {
+  return (
+    <RentStorefrontGate>
+      <RentalCustomerApp />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingWizardGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingWizardPage />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingLookupGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingLookupPage />
+    </RentStorefrontGate>
+  );
+}
 
 function RentalPwaBoot() {
   useEffect(() => {
@@ -51,31 +98,90 @@ function RentalPwaBoot() {
     // Capture BIP as early as possible; register SW only on /rent so guests can install.
     captureRentalInstallPrompt();
     if (path === '/rent' || path.startsWith('/rent/')) {
+      markPreferRentLookup();
       setupRentalPwa();
     }
   }, []);
   return null;
 }
 
+/** Any visit under /rent marks the session so /my-booking never sticks as bus lookup. */
+function PreferRentSessionBoot() {
+  const location = useLocation();
+  useEffect(() => {
+    const path = location.pathname || '';
+    if (path === '/rent' || path.startsWith('/rent/')) markPreferRentLookup();
+  }, [location.pathname]);
+  return null;
+}
+
+/** Reset window scroll on route change so links like «Άνοιγμα σελίδας ενοικιάσεων» open at the top. */
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useLayoutEffect(() => {
+    // Keep in-page hash targets (e.g. #session-rent); only reset on path changes without a hash.
+    if (hash) return;
+    window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+}
+
+function UiLangBoot() {
+  useEffect(() => {
+    bootUiLang();
+  }, []);
+  return null;
+}
+
+/** Capacitor shells: never mount marketing HomePage on `/`. */
+function NativeAwareHome() {
+  if (isNativeApp() && isNativeDriverApp()) return <Navigate to="/driver" replace />;
+  if (isNativeApp() && isNativeUnifiedApp()) {
+    return <Navigate to={resolveNativeRoleHomePath()} replace />;
+  }
+  if (isNativeApp()) return <Navigate to="/wallet" replace />;
+  return <HomePage />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <UiLangBoot />
         <BrandingBoot />
         <RentalPwaBoot />
+        <PreferRentSessionBoot />
+        <ScrollToTop />
         <MaintenanceGate>
           <Toaster position="top-center" />
+          <NativeUnifiedBoot />
+          <DriverNativeBoot />
+          <WalletNativeBoot />
+          <WalletNativeShell />
+          <WalletNativeSplashGate>
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
+            <Route path="/wallet/native-google" element={<WalletNativeGoogleBridgePage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            {/* Rent auth lives on /rent (share URL). /rent/login is an alias only. */}
-            <Route path="/rent/login" element={<Navigate to="/rent" replace />} />
+            {/* Rent: green URLs — /rent/login + browse /rent; wallet is unified at /wallet. */}
+            <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
-            <Route path="/rent" element={<RentalCustomerApp />} />
-            <Route path="/rent/*" element={<RentalCustomerApp />} />
-            <Route path="/" element={<HomePage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupGated />} />
+            {/* Legacy marketing URL — same content lives on /rent now. */}
+            <Route path="/rent/services" element={<Navigate to="/rent" replace />} />
+            <Route path="/rent/servises" element={<Navigate to="/rent" replace />} />
+            <Route path="/rent/book/services" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/details" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/payment" element={<RentBookingWizardGated />} />
+            <Route path="/rent/wallet" element={<RentWalletRedirect />} />
+            <Route path="/rent/wallet/*" element={<RentWalletRedirect />} />
+            <Route path="/rent" element={<RentalCustomerAppGated />} />
+            <Route path="/rent/*" element={<RentalCustomerAppGated />} />
+            {/* Contactless rental contract signature (token from SMS/email). */}
+            <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
+            <Route path="/" element={<NativeAwareHome />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
@@ -85,7 +191,10 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/my-booking" element={<BookingLookupPage />} />
+            <Route path="/contact" element={<OfficeContactPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
+            <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
             <Route path="/admin/fleet/:vehicleId" element={<FleetVehicleDetail />} />
@@ -106,6 +215,7 @@ function App() {
             <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />
             <Route path="/driver/auth" element={<DriverAuthPage />} />
+            <Route path="/driver/reset-password" element={<DriverResetPasswordPage />} />
             {/* Alias only — login UI lives in-place on /driver. */}
             <Route path="/driver/login" element={<Navigate to="/driver" replace />} />
             <Route path="/driver/dashboard" element={<Navigate to="/driver" replace />} />
@@ -113,12 +223,14 @@ function App() {
             <Route path="/driver/scan" element={<DriverScan />} />
             <Route path="/select-seat/:tripId" element={<SeatSelection />} />
             <Route path="/select-seat" element={<SeatSelection />} />
+            <Route path="/book/extras/:tripId" element={<TripExtrasPage />} />
             <Route path="/trip/:id" element={<TripDetails />} />
             <Route path="/checkout/:tripId" element={<CheckoutPage />} />
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
           </Routes>
+          </WalletNativeSplashGate>
         </MaintenanceGate>
       </Router>
     </ErrorBoundary>

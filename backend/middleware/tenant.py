@@ -51,11 +51,9 @@ def _jwt_settings() -> tuple[str, str, bool]:
 
 PUBLIC_PATHS = {
     "/health",
-    "/docs",
-    "/openapi.json",
-    "/redoc",
     "/api/v1/health",
     "/api/v1/auth/login",
+    "/api/v1/auth/google",
     "/api/v1/auth/dev-login",
     "/api/v1/auth/refresh",
     "/api/v1/aade/webhook",
@@ -66,7 +64,12 @@ PUBLIC_PATHS = {
     "/api/v1/telemetry/update",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
+    "/api/v1/bookings/occupied-seats",
 }
+
+# Swagger only in non-production (FastAPI also disables docs_url there).
+if os.getenv("ENVIRONMENT", "development").lower() not in ("production", "prod"):
+    PUBLIC_PATHS |= {"/docs", "/openapi.json", "/redoc"}
 
 BILLING_PREFIX = "/api/v1/billing"
 PLATFORM_ADMIN_PREFIX = "/api/v1/platform"
@@ -88,16 +91,36 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
-# JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate.
-# Drivers stay file-backed (fleet_drivers.json). JWT is still sent by the admin UI;
-# we MUST still attach tenant_id from the Bearer token so multi-office creates
-# are not forced into the demo tenant when Host is www/api.poreiago.com.
+# Public POST — password reset confirm / forgot request (no session yet)
+ADMIN_PUBLIC_POST_PREFIXES = (
+    "/api/admin/platform/password-reset/confirm",
+    "/api/admin/platform/password-reset/request",
+)
+
+# Email / mailbox / campaigns — SQLite-backed, must not be world-writable.
+# Require the same admin JWT gate as file-store admin routes.
+EMAIL_ADMIN_PREFIXES = (
+    "/api/email/",
+    "/api/mailbox/",
+    "/api/campaigns/",
+)
+
+# JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate AFTER
+# JWT + admin-role checks. Never leave these unauthenticated.
 FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/site-appearance",
     "/api/admin/platform/settings",
     "/api/admin/platform/branding",
     "/api/admin/platform/seat-pricing",
+    "/api/admin/platform/payment-settings",
+    "/api/admin/platform/bank-accounts",
+    "/api/admin/platform/rent-plan-catalog",
+    "/api/admin/platform/agency-plan-catalog",
     "/api/admin/platform/drivers",
+    # Fleet coaches/vans — JSON file store (same isolation model as drivers).
+    "/api/admin/platform/fleet",
+    # Driver ↔ office chat — JSON file store, must stay office-scoped.
+    "/api/admin/platform/driver-chat",
 )
 
 
@@ -136,18 +159,107 @@ def _attach_bearer_tenant_context(
     roles = list(payload.get("roles") or [])
     if roles:
         request.state.roles = roles
+    if payload.get("impersonating"):
+        request.state.impersonating = True
 
 
 def _requires_jwt(path: str) -> bool:
-    return path.startswith(PLATFORM_PREFIX) or path.startswith(ADMIN_PREFIX)
+    if path.startswith(PLATFORM_PREFIX) or path.startswith(ADMIN_PREFIX):
+        return True
+    return any(path.startswith(p) for p in EMAIL_ADMIN_PREFIXES)
 
 
 def _admin_public_get(path: str, method: str) -> bool:
     return method.upper() == "GET" and any(path.startswith(p) for p in ADMIN_PUBLIC_GET_PREFIXES)
 
 
+def _admin_public_post(path: str, method: str) -> bool:
+    return method.upper() == "POST" and any(path.startswith(p) for p in ADMIN_PUBLIC_POST_PREFIXES)
+
+
 def _is_file_store_admin(path: str) -> bool:
     return any(path.startswith(p) for p in FILE_STORE_ADMIN_PREFIXES)
+
+
+def _is_email_admin(path: str) -> bool:
+    return any(path.startswith(p) for p in EMAIL_ADMIN_PREFIXES)
+
+
+def _admin_auth_disabled_allowed() -> bool:
+    """ADMIN_AUTH_DISABLED is local-dev only — never honor in production."""
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    return env in ("development", "dev", "local", "test")
+
+
+async def _require_admin_bearer(
+    request: Request,
+    jwt_secret: str,
+    jwt_algorithm: str,
+) -> JSONResponse | None:
+    """
+    JWT + admin roles for email/mailbox/campaigns (and similar SQLite admin APIs).
+    Returns an error response, or None when request.state is populated and OK.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
+    token = auth[7:].strip()
+    if not jwt_secret:
+        return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
+    try:
+        payload = jwt.decode(
+            token,
+            jwt_secret,
+            algorithms=[jwt_algorithm],
+            options={"require": ["exp", "sub"]},
+            leeway=60,
+        )
+    except jwt.ExpiredSignatureError:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+        )
+    except jwt.PyJWTError:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+        )
+    raw_tid = payload.get("tenant_id")
+    if not raw_tid:
+        return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
+    try:
+        request.state.tenant_id = UUID(str(raw_tid))
+    except ValueError:
+        return JSONResponse(status_code=403, content={"detail": "Invalid tenant_id"})
+    roles = list(payload.get("roles") or [])
+    request.state.user_id = payload.get("sub")
+    request.state.roles = roles
+    if not set(roles) & ADMIN_ACCESS_ROLES:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Admin access required"},
+        )
+    if payload.get("impersonating"):
+        request.state.impersonating = True
+    # SEAL: Achillio Travel JWT must not serve drivers/settings on poreiago.com
+    # (and the reverse). Same οδηγός appearing / deleting on both URLs.
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+        from travel_platform.settings.office_host_guard import office_host_mismatch_detail
+
+        host = _request_host(request)
+        detail = await office_host_mismatch_detail(
+            host=host,
+            tenant_id=str(request.state.tenant_id),
+            roles=roles,
+            is_platform_host=_is_platform_host(host),
+            impersonating=bool(payload.get("impersonating")),
+        )
+        if detail:
+            return JSONResponse(status_code=403, content={"detail": detail})
+    except Exception:
+        pass
+    return None
 
 
 async def _apply_dev_admin_context(request: Request) -> None:
@@ -221,6 +333,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         jwt_secret, jwt_algorithm, admin_auth_disabled = _jwt_settings()
+        # Never honor ADMIN_AUTH_DISABLED outside local/dev/test.
+        if admin_auth_disabled and not _admin_auth_disabled_allowed():
+            admin_auth_disabled = False
 
         if path in PUBLIC_PATHS:
             return await call_next(request)
@@ -228,16 +343,29 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if not _requires_jwt(path):
             return await call_next(request)
 
-        if path.startswith(ADMIN_PREFIX):
-            if _admin_public_get(path, request.method):
+        # Email / mailbox / campaigns — admin JWT, skip Postgres RLS.
+        if _is_email_admin(path):
+            if admin_auth_disabled:
+                await _apply_dev_admin_context(request)
                 return await call_next(request)
-            if _is_file_store_admin(path):
-                # Keep file-store open (no role/Postgres gate) but bind the office
-                # from the admin JWT so driver create/list is multi-tenant safe.
-                _attach_bearer_tenant_context(request, jwt_secret, jwt_algorithm)
+            err = await _require_admin_bearer(request, jwt_secret, jwt_algorithm)
+            if err is not None:
+                return err
+            return await call_next(request)
+
+        if path.startswith(ADMIN_PREFIX):
+            if _admin_public_get(path, request.method) or _admin_public_post(path, request.method):
                 return await call_next(request)
             if admin_auth_disabled:
                 await _apply_dev_admin_context(request)
+                return await call_next(request)
+            # File-store admin routes still REQUIRE JWT + admin roles.
+            # They only skip the Postgres RLS / suspended-tenant gate below
+            # (storage is JSON files, not tenant RLS sessions).
+            if _is_file_store_admin(path):
+                err = await _require_admin_bearer(request, jwt_secret, jwt_algorithm)
+                if err is not None:
+                    return err
                 return await call_next(request)
 
         if path.startswith(PLATFORM_ADMIN_PREFIX) and admin_auth_disabled:
@@ -257,9 +385,23 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
         token = auth[7:].strip()
         try:
-            payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+            payload = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=[jwt_algorithm],
+                options={"require": ["exp", "sub"]},
+                leeway=60,
+            )
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+            )
         except jwt.PyJWTError:
-            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+            )
 
         tenant_id = payload.get("tenant_id")
         if not tenant_id:
@@ -289,7 +431,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                     content={"detail": "Admin access required"},
                 )
 
-        if not _suspended_tenant_allowed(path, roles):
+        # Skip suspended-tenant gate for file-store routes (handled above) and
+        # for billing/compliance / platform superadmin paths.
+        if not _is_file_store_admin(path) and not _suspended_tenant_allowed(path, roles):
             if not await _tenant_is_active(request.state.tenant_id):
                 return JSONResponse(
                     status_code=403,
