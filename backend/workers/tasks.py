@@ -42,6 +42,22 @@ async def _scan_pre_departure_sms_async() -> dict:
     return await scan_all_trips_pre_departure_sms(minutes_before=5)
 
 
+@celery_app.task(name="workers.tasks.scan_trip_reminder_emails", bind=True, max_retries=2)
+def scan_trip_reminder_emails(self):
+    """Hourly (:05): email customers N days before trip departure."""
+    try:
+        return _run_async(_scan_trip_reminder_emails_async())
+    except Exception as exc:
+        logger.exception("Trip reminder email scan failed")
+        raise self.retry(exc=exc, countdown=180) from exc
+
+
+async def _scan_trip_reminder_emails_async() -> dict:
+    from ticketing.trip_reminder_email import scan_and_send_trip_reminders
+
+    return await scan_and_send_trip_reminders()
+
+
 @celery_app.task(name="workers.tasks.scan_abandoned_file_carts", bind=True, max_retries=3)
 def scan_abandoned_file_carts(self):
     """Every 15m: file-backed abandoned carts → email/SMS recovery."""

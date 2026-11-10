@@ -5,6 +5,10 @@ import { GREECE_CITIES, GREECE_REGIONS } from '../maps/greecePlaces.js';
 
 const OFFICE_DEFAULT = { lat: 37.9838, lng: 23.7275, label: 'Γραφείο' };
 
+/** Default Leaflet view for empty rent booking maps (mainland Greece). */
+export const RENT_MAP_GREECE_CENTER = [38.2, 23.7];
+export const RENT_MAP_GREECE_ZOOM = 6.5;
+
 const ALIASES = {
   γραφειο: OFFICE_DEFAULT,
   γραφείο: OFFICE_DEFAULT,
