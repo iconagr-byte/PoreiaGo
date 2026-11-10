@@ -408,22 +408,6 @@ export async function downloadTripRouteExport(
   URL.revokeObjectURL(url);
 }
 
-function getMockAlerts() {
-  const now = new Date().toISOString();
-  return [
-    {
-      id: 'mock-1',
-      alert_type: 'ROUTE_DEVIATION',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      vehicle_id: 'demo-vehicle-1',
-      trip_id: 1,
-      message: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
-      metadata: { distance_outside_m: 120, buffer_m: 75 },
-      created_at: now,
-    },
-  ];
-}
-
 function getMockFleet() {
   return [
     {
