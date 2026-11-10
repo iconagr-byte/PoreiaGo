@@ -562,6 +562,8 @@ export default function StorefrontDemoPage() {
         <StorefrontFooter
           siteAppearance={siteAppearance}
           templateId={siteAppearance.footer_template || 'classic_columns'}
+          tripsEnabled={tripsEnabled}
+          rentEnabled={rentEnabled}
         />
       </PreviewEditableSection>
 

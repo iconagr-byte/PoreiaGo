@@ -161,6 +161,10 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "footer_hours": "",
+    "footer_tagline": "",
+    "footer_facebook_url": "",
+    "footer_instagram_url": "",
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
@@ -487,7 +491,10 @@ class TenantSiteAppearanceService:
 
         # One-shot heal: persist scrubbed Achillio leftovers so admin sidebar
         # and public hosts stop reloading poison from Postgres.
-        from app.services.tenant_modules import is_poreiago_platform_office
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
 
         if is_poreiago_platform_office(tenant):
             persist = _platform_appearance_needs_persist(
@@ -497,6 +504,26 @@ class TenantSiteAppearanceService:
             if persist:
                 base = dict(stored) if isinstance(stored, dict) else {}
                 base.update(persist)
+                settings["site_appearance"] = base
+                tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+                await self._session.flush()
+
+        # Achillio Travel: seed a public mailbox when footer contact is empty
+        # so storefront «Επικοινωνία» is never blank on achilliotravel.com.
+        if is_achillio_travel_office(tenant):
+            heal: dict[str, Any] = {}
+            if not str(merged.get("footer_contact_email") or "").strip():
+                heal["footer_contact_email"] = "info@achilliotravel.com"
+            if not str(merged.get("footer_hours") or "").strip():
+                heal["footer_hours"] = "Δευτέρα – Παρασκευή, 09:00 – 18:00"
+            if not str(merged.get("footer_tagline") or "").strip():
+                heal["footer_tagline"] = (
+                    "Εκδρομές με λεωφορείο στην Ελλάδα — κράτηση θέσης online."
+                )
+            if heal:
+                merged.update(heal)
+                base = dict(stored) if isinstance(stored, dict) else {}
+                base.update(heal)
                 settings["site_appearance"] = base
                 tenant.settings_json = json.dumps(settings, ensure_ascii=False)
                 await self._session.flush()

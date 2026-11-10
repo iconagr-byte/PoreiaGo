@@ -575,6 +575,45 @@ export default function PageDesignBuilderPanel({
                     onChange={(e) => setForm((p) => ({ ...p, footer_address: e.target.value }))}
                   />
                 </label>
+                <label className="pdw-builder__field">
+                  <span className="pdw-builder__field-label">Ωράριο</span>
+                  <input
+                    className="pdw-builder__input"
+                    placeholder="Δευ–Παρ 09:00–18:00"
+                    value={form.footer_hours || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, footer_hours: e.target.value }))}
+                  />
+                </label>
+                <label className="pdw-builder__field">
+                  <span className="pdw-builder__field-label">Tagline footer</span>
+                  <input
+                    className="pdw-builder__input"
+                    value={form.footer_tagline || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, footer_tagline: e.target.value }))}
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Facebook URL</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_facebook_url || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_facebook_url: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Instagram URL</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_instagram_url || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_instagram_url: e.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
               </div>
             )}
           </div>
