@@ -22,8 +22,11 @@ class TraefikDomainsTests(unittest.TestCase):
         ):
             yaml = render_custom_domains_yaml(["www.achilliotravel.com"])
         self.assertIn("Host(`www.achilliotravel.com`)", yaml)
-        self.assertNotIn("Host(`achilliotravel.com`)", yaml)
+        self.assertIn("Host(`achilliotravel.com`)", yaml)
         self.assertIn('main: "www.achilliotravel.com"', yaml)
+        self.assertIn('main: "achilliotravel.com"', yaml)
+        self.assertIn("tenant-domain-www-achilliotravel-com", yaml)
+        self.assertIn("tenant-domain-apex-achilliotravel-com", yaml)
         self.assertIn("certResolver: letsencrypt", yaml)
         self.assertIn("http://frontend:80", yaml)
         # Platform domains must never be routed here.
@@ -75,6 +78,13 @@ class TraefikDomainsTests(unittest.TestCase):
             self.assertEqual(written, out)
             text = out.read_text(encoding="utf-8")
             self.assertIn("www.achilliotravel.com", text)
+            self.assertIn("Host(`achilliotravel.com`)", text)
+
+    def test_env_can_disable_apex(self):
+        with patch.dict("os.environ", {"TRAEFIK_INCLUDE_APEX": "0"}, clear=False):
+            yaml = render_custom_domains_yaml(["achilliotravel.com"])
+            self.assertIn("Host(`www.achilliotravel.com`)", yaml)
+            self.assertNotIn("Host(`achilliotravel.com`)", yaml)
 
 
 if __name__ == "__main__":

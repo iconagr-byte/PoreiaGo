@@ -265,7 +265,7 @@ class ServiceService:
                 seat_count=seats,
                 amenities=amenities,
                 public_summary=summary,
-                public_image_url="/images/hero-bus-achillio.png",
+                public_image_url="/images/fleet-bus-neutral.png",
                 show_on_website=True,
                 tenant_id=DEMO_TENANT_ID,
             )

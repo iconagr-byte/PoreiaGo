@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
@@ -169,8 +169,9 @@ export default function RentalCatalogPanel({
   const [onlyTopRated, setOnlyTopRated] = useState(false);
   const [details, setDetails] = useState(null);
   const [recentBooked, setRecentBooked] = useState(null);
-  const [idDocs, setIdDocs] = useState(EMPTY_ID);
-  const [uploadingKind, setUploadingKind] = useState('');
+  const [paymentSettings, setPaymentSettings] = useState(null);
+  const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);
+  const [paymentMethod, setPaymentMethod] = useState('card');
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
     try {
       return localStorage.getItem('rent_reminders_enabled_v1') === '1';
@@ -180,16 +181,50 @@ export default function RentalCatalogPanel({
   });
 
   useEffect(() => {
-    setIdDocs(loadSavedIdDocs());
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await fetchPublicPaymentSettings();
+        if (!cancelled) setPaymentSettings(settings);
+      } catch {
+        /* offline — defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  const checkoutSettings = useMemo(
+    () => (paymentSettings ? toLegacyCheckoutShape(paymentSettings) : null),
+    [paymentSettings],
+  );
+  const depositPercent = checkoutSettings?.checkout_deposit_percent ?? 30;
+  const depositEnabled = checkoutSettings?.checkout_deposit_enabled !== false;
+  const paymentPlans = useMemo(
+    () =>
+      depositEnabled
+        ? getRentalPaymentPlans(depositPercent)
+        : getRentalPaymentPlans(depositPercent).slice(0, 1),
+    [depositEnabled, depositPercent],
+  );
+  const paymentMethods = useMemo(
+    () => getCheckoutPaymentMethods(paymentSettings || checkoutSettings || {}),
+    [paymentSettings, checkoutSettings],
+  );
+
   useEffect(() => {
-    try {
-      localStorage.setItem(ID_DOCS_KEY, JSON.stringify(idDocs));
-    } catch {
-      /* ignore */
+    if (!depositEnabled && paymentPlan !== PAYMENT_PLAN_FULL) {
+      setPaymentPlan(PAYMENT_PLAN_FULL);
     }
-  }, [idDocs]);
+  }, [depositEnabled, paymentPlan]);
+
+  useEffect(() => {
+    if (!paymentMethods.length) return;
+    if (!paymentMethods.some((m) => m.id === paymentMethod)) {
+      setPaymentMethod(paymentMethods[0].id);
+    }
+  }, [paymentMethods, paymentMethod]);
 
   const loadMine = useCallback(async () => {
     try {
@@ -377,16 +412,10 @@ export default function RentalCatalogPanel({
     if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
-      const identity =
-        form.driver_mode === 'SELF_DRIVE'
-          ? {
-              id_document_url: idDocs.id_document_url,
-              driving_license_url: idDocs.driving_license_url,
-              date_of_birth: idDocs.date_of_birth,
-              license_number: idDocs.license_number.trim(),
-              license_expires_at: idDocs.license_expires_at,
-            }
-          : {};
+      if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
+        // Demo card capture — same pattern as ticket checkout (no live gateway yet).
+        await new Promise((r) => setTimeout(r, 900));
+      }
       const created = await createCustomerRentalBooking({
         vehicle_id: selectedId,
         start_time: new Date(form.start_time).toISOString(),
@@ -404,11 +433,21 @@ export default function RentalCatalogPanel({
         email: getCustomerEmail() || '',
         phone: form.client_phone || '',
       });
-      toast.success('Η κράτηση ενοικίασης καταχωρήθηκε — εκκρεμεί έλεγχος ταυτότητας');
+      const payNote =
+        created?.payment_status === 'pending'
+          ? ' · εκκρεμεί πληρωμή'
+          : created?.payment_status === 'partial'
+            ? ' · προκαταβολή καταχωρήθηκε'
+            : '';
+      toast.success(`Η κράτηση καταχωρήθηκε${payNote}. Στάλθηκε email επιβεβαίωσης.`);
       setSuggestions([]);
       setSelectedId('');
       setRecentBooked(created);
-      trackFunnel('booking_created', { vehicle_id: selectedId, has_id: Boolean(identity.id_document_url) });
+      trackFunnel('booking_created', {
+        vehicle_id: selectedId,
+        payment_plan: paymentPlan,
+        payment_method: paymentMethod,
+      });
       if (onClearPreferred) onClearPreferred();
       await loadMine();
       if (typeof onBooked === 'function') onBooked(created);
@@ -444,6 +483,10 @@ export default function RentalCatalogPanel({
   })();
   const extrasTotal =
     (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
+  const selectedTotal = Number(selected?.suggested_total || 0) + extrasTotal;
+  const paySplit = computeDepositSplit(selectedTotal, depositPercent);
+  const dueNow = amountDueAtCheckout(selectedTotal, paymentPlan, depositPercent);
+  const isDepositPlan = depositEnabled && paymentPlan === PAYMENT_PLAN_DEPOSIT;
 
   const cancelBooking = async (bookingId) => {
     if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
@@ -515,9 +558,7 @@ export default function RentalCatalogPanel({
           <div className="rent-booking-steps" aria-label="Βήματα κράτησης">
             <span className={preferredVehicle || selectedId ? 'is-done' : 'is-active'}>1. Όχημα</span>
             <span className={form.start_time && form.end_time ? 'is-done' : ''}>2. Ημερομηνίες</span>
-            <span className={idDocs.id_document_url && idDocs.driving_license_url ? 'is-done' : 'is-active'}>
-              3. Ταυτότητα
-            </span>
+            <span className={selectedId ? 'is-active' : ''}>3. Πληρωμή</span>
           </div>
           <div className="wallet-field">
             <label htmlFor="rent-start">Παραλαβή *</label>
@@ -870,15 +911,86 @@ export default function RentalCatalogPanel({
             })}
           </div>
           {selected ? (
-            <button
-              type="button"
-              className="wallet-btn wallet-btn-primary wallet-btn-block"
-              style={{ marginTop: '0.75rem' }}
-              disabled={busy}
-              onClick={book}
-            >
-              Κράτηση · {euro(selected.suggested_total)}
-            </button>
+            <div className="rent-pay-panel">
+              <h3>Πληρωμή</h3>
+              <p className="wallet-panel-lead">
+                Σύνολο {euro(selectedTotal)}
+                {extrasTotal > 0 ? ` (βάση ${euro(selected.suggested_total)} + extras ${euro(extrasTotal)})` : ''}
+              </p>
+              {depositEnabled ? (
+                <div className="rent-pay-plans" role="radiogroup" aria-label="Πλάνο πληρωμής">
+                  {paymentPlans.map((plan) => {
+                    const amount =
+                      plan.id === PAYMENT_PLAN_DEPOSIT ? paySplit.depositAmount : paySplit.total;
+                    const active = paymentPlan === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        className={`rent-pay-plan${active ? ' is-active' : ''}`}
+                        aria-pressed={active}
+                        onClick={() => setPaymentPlan(plan.id)}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden>
+                          {plan.icon}
+                        </span>
+                        <span>
+                          <strong>{plan.label}</strong>
+                          <small>{plan.description}</small>
+                        </span>
+                        <em>{euro(amount)}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div className="rent-pay-methods" role="radiogroup" aria-label="Τρόπος πληρωμής">
+                {paymentMethods.map((m) => {
+                  const active = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`rent-pay-method${active ? ' is-active' : ''}`}
+                      aria-pressed={active}
+                      onClick={() => setPaymentMethod(m.id)}
+                    >
+                      <span className="material-symbols-outlined" aria-hidden>
+                        {m.icon}
+                      </span>
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {isDepositPlan ? (
+                <p className="rent-pay-hint">
+                  Πληρώνετε τώρα {euro(dueNow)} ({paySplit.depositPercent}%). Υπόλοιπο{' '}
+                  {euro(paySplit.balanceDue)} στην παραλαβή.
+                </p>
+              ) : (
+                <p className="rent-pay-hint">Πληρωμή τώρα: {euro(dueNow)}</p>
+              )}
+              {paymentMethod === 'bank_transfer' ? (
+                <p className="rent-pay-hint">
+                  Με τραπεζική μεταφορά η κράτηση δεσμεύεται · θα λάβετε IBAN και αιτιολογία στο email
+                  επιβεβαίωσης.
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-primary wallet-btn-block"
+                style={{ marginTop: '0.75rem' }}
+                disabled={busy}
+                onClick={book}
+              >
+                {busy
+                  ? 'Ολοκλήρωση…'
+                  : paymentMethod === 'bank_transfer'
+                    ? `Κράτηση · κατάθεση ${euro(dueNow)}`
+                    : `Πληρωμή ${euro(dueNow)} · Κράτηση`}
+              </button>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -936,6 +1048,12 @@ export default function RentalCatalogPanel({
                   <h3>
                     {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
                   </h3>
+                  {b.reference_code ? (
+                    <p className="wallet-booking-mono" style={{ fontWeight: 700 }}>
+                      Κωδικός: {b.reference_code}
+                      {b.online_checkin_ready ? ' · Online check-in έτοιμο' : ''}
+                    </p>
+                  ) : null}
                   <p>
                     {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
                   </p>
@@ -945,6 +1063,7 @@ export default function RentalCatalogPanel({
                       ? ` → ${b.dropoff_location}`
                       : ''}
                     {` · ${euro(b.total_cost)} · ${b.rental_status}`}
+                    {b.payment_label ? ` · ${b.payment_label}` : ''}
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <span
@@ -958,21 +1077,18 @@ export default function RentalCatalogPanel({
                     >
                       {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
                     </span>
-                    {b.id_verification_status && b.id_verification_status !== 'not_required' ? (
+                    {paymentStatusLabel(b.payment_status) ? (
                       <span
                         className={`wallet-chip ${
-                          b.id_verification_status === 'verified'
+                          b.payment_status === 'paid'
                             ? 'wallet-chip-ok'
-                            : b.id_verification_status === 'rejected'
-                              ? 'wallet-chip-muted'
-                              : 'wallet-chip-warn'
+                            : b.payment_status === 'partial'
+                              ? 'wallet-chip-warn'
+                              : 'wallet-chip-muted'
                         }`}
                       >
-                        {b.id_verification_status === 'verified'
-                          ? 'Ταυτότητα OK'
-                          : b.id_verification_status === 'rejected'
-                            ? 'Απορρίφθηκε'
-                            : 'Έλεγχος ταυτότητας'}
+                        {paymentStatusLabel(b.payment_status)}
+                        {Number(b.balance_due) > 0 ? ` · υπόλ. ${euro(b.balance_due)}` : ''}
                       </span>
                     ) : null}
                     {b.rental_status === 'CONFIRMED' ? (
@@ -997,7 +1113,14 @@ export default function RentalCatalogPanel({
       {recentBooked ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
           <h2>Μετά την κράτηση</h2>
-          <p className="wallet-panel-lead">Κράτησε υπενθύμιση για παραλαβή/επιστροφή στο κινητό σου.</p>
+          <p className="wallet-panel-lead">
+            Στάλθηκε email επιβεβαίωσης
+            {recentBooked.payment_label ? ` · ${recentBooked.payment_label}` : ''}.
+            {Number(recentBooked.balance_due) > 0
+              ? ` Υπόλοιπο στην παραλαβή: ${euro(recentBooked.balance_due)}.`
+              : ''}{' '}
+            Κράτησε υπενθύμιση για παραλαβή/επιστροφή στο κινητό σου.
+          </p>
           <div className="rent-postbook-actions">
             <button
               type="button"

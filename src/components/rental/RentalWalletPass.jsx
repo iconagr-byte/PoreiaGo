@@ -123,25 +123,16 @@ export default function RentalWalletPass({
           ) : null}
         </div>
 
-        {booking.id_verification_status && booking.id_verification_status !== 'not_required' ? (
-          <div
-            className={`rent-wallet-id ${
-              booking.id_verification_status === 'verified'
-                ? 'is-ok'
-                : booking.id_verification_status === 'rejected'
-                  ? 'is-bad'
-                  : 'is-pending'
-            }`}
-          >
+        {booking.payment_status || booking.payment_label ? (
+          <div className="rent-wallet-pay">
             <span className="material-symbols-outlined" aria-hidden>
-              {booking.id_verification_status === 'verified' ? 'verified_user' : 'badge'}
+              payments
             </span>
             <span>
-              {booking.id_verification_status === 'verified'
-                ? 'Ταυτότητα επαληθεύτηκε'
-                : booking.id_verification_status === 'rejected'
-                  ? 'Έγγραφα απορρίφθηκαν — επικοινωνήστε με το γραφείο'
-                  : 'Έλεγχος ταυτότητας · εκκρεμεί από το γραφείο'}
+              {booking.payment_label || booking.payment_status}
+              {Number(booking.balance_due) > 0
+                ? ` · υπόλοιπο €${Number(booking.balance_due).toFixed(2)}`
+                : ''}
             </span>
           </div>
         ) : null}

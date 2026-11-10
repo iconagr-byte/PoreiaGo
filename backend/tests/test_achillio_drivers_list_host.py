@@ -82,8 +82,8 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
                                     ):
                                         tid, include, claim = await ap._drivers_list_tenant_id(req)
 
-        self.assertEqual(tid, platform)
-        self.assertNotEqual(tid, achillio)
+        self.assertEqual(tid, achillio)
+        self.assertNotEqual(tid, platform)
         self.assertFalse(include)
         self.assertFalse(claim)
 

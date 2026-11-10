@@ -48,7 +48,7 @@ class TeltonikaLiveMapFilterTests(unittest.TestCase):
         self.assertTrue(
             filt.office_allows_tracker_pin(
                 self.tenant,
-                {"imei": "861076085468260", "vehicle_code": "EEX5670"},
+                {"imei": "861076085468260", "vehicle_code": "EEX5670", "source": "teltonika"},
             )
         )
 
@@ -56,7 +56,7 @@ class TeltonikaLiveMapFilterTests(unittest.TestCase):
         self.assertFalse(
             filt.office_allows_tracker_pin(
                 "11111111-1111-1111-1111-111111111111",
-                {"vehicle_code": "EEX5670"},
+                {"vehicle_code": "EEX5670", "source": "teltonika"},
             )
         )
 
