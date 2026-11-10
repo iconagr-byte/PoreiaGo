@@ -530,6 +530,7 @@ class TenantSiteAppearanceResponse(BaseModel):
     trips_layout_template: str = "grid_three"
     trip_card_template: str = "premium"
     footer_template: str = "classic_columns"
+    rent_theme_id: str = "cupertino_soft"
     rent_fleet_layout_template: str = "rent_grid_three"
     rent_fleet_card_template: str = "rent_premium"
     rent_theme_id: str = "aegean_coast"
@@ -628,6 +629,7 @@ class TenantSiteAppearanceUpdate(BaseModel):
     trips_layout_template: str | None = None
     trip_card_template: str | None = None
     footer_template: str | None = None
+    rent_theme_id: str | None = None
     rent_fleet_layout_template: str | None = None
     rent_fleet_card_template: str | None = None
     rent_theme_id: str | None = None
