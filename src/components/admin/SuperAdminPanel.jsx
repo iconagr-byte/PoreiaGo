@@ -87,6 +87,32 @@ const EMPTY_CREATE = {
   admin_password_confirm: '',
 };
 
+/** Mirrors backend is_poreiago_platform_office / is_achillio_travel_office — hide Διαγραφή. */
+const PROTECTED_PLATFORM_SLUGS = new Set([
+  'poreiago',
+  'platform',
+  'demo',
+  'admin-poreiago',
+  'poreiago-saas',
+  'poreiago-platform',
+  'achillio',
+]);
+const ACHILLIO_TRAVEL_SLUGS = new Set(['admin-achillio-gr', 'achillio-travel', 'achilliotravel']);
+
+function isProtectedOfficeTenant(tenant) {
+  const slug = String(tenant?.slug || '').trim().toLowerCase();
+  const subdomain = String(tenant?.subdomain || '').trim().toLowerCase();
+  const domain = String(tenant?.custom_domain || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, '');
+  if (PROTECTED_PLATFORM_SLUGS.has(slug) || PROTECTED_PLATFORM_SLUGS.has(subdomain)) return true;
+  if (ACHILLIO_TRAVEL_SLUGS.has(slug) || ACHILLIO_TRAVEL_SLUGS.has(subdomain)) return true;
+  if (domain && /(^|\.)achilliotravel\.com$/.test(domain)) return true;
+  if (domain && /(^|\.)poreiago\.com$/.test(domain)) return true;
+  return false;
+}
+
 function slugify(value) {
   return String(value || '')
     .normalize('NFD')
@@ -362,6 +388,10 @@ export default function SuperAdminPanel() {
   };
 
   const removeTenant = async (tenant) => {
+    if (isProtectedOfficeTenant(tenant)) {
+      toast.error('Απαγορεύεται η διαγραφή του κεντρικού γραφείου PoreiaGo ή Achillio Travel');
+      return;
+    }
     const label = tenant.legal_name || tenant.slug || 'γραφείο';
     const slug = String(tenant.slug || '').trim();
     if (
@@ -1928,6 +1958,7 @@ function TenantStatusChips({ tenant, compact = false }) {
 function TenantListRow({ tenant, working, onOpen, onEdit, onToggle, onDelete }) {
   const host = officeHost(tenant);
   const canOpen = Boolean(tenant.is_active) && !working;
+  const canDelete = !isProtectedOfficeTenant(tenant);
 
   return (
     <div
@@ -2016,7 +2047,9 @@ function TenantListRow({ tenant, working, onOpen, onEdit, onToggle, onDelete }) 
           icon={tenant.is_active ? 'block' : 'check_circle'}
           label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
         />
-        <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
+        {canDelete ? (
+          <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
+        ) : null}
       </div>
     </div>
   );
@@ -2026,6 +2059,7 @@ function TenantCard({ tenant, working, onOpen, onEdit, onToggle, onDelete }) {
   const plan = PLAN_META[tenant.plan] || PLAN_META.starter;
   const host = officeHost(tenant);
   const canOpen = Boolean(tenant.is_active) && !working;
+  const canDelete = !isProtectedOfficeTenant(tenant);
 
   return (
     <article
@@ -2094,7 +2128,9 @@ function TenantCard({ tenant, working, onOpen, onEdit, onToggle, onDelete }) {
           icon={tenant.is_active ? 'block' : 'check_circle'}
           label={tenant.is_active ? 'Αναστολή' : 'Ενεργό'}
         />
-        <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
+        {canDelete ? (
+          <ActionBtn disabled={working} onClick={onDelete} tone="danger" icon="delete" label="Διαγραφή" />
+        ) : null}
       </div>
       {canOpen ? (
         <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
