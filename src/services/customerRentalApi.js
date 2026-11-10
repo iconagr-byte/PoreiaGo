@@ -110,23 +110,29 @@ export async function createCustomerRentalBooking(body) {
   });
 }
 
-export async function fetchRentalContractTerms() {
-  return customerRentalFetch('/contract');
-}
-
-export async function uploadCustomerRentalSignature(file) {
+export async function uploadCustomerRentalIdDoc(file, kind) {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/customer/rentals/signature-upload`, {
-    method: 'POST',
-    headers: {
-      ...customerAuthHeaders(),
+  const res = await fetch(
+    `${API_BASE}/api/customer/rentals/id-docs/upload?kind=${encodeURIComponent(kind)}`,
+    {
+      method: 'POST',
+      headers: {
+        ...customerAuthHeaders(),
+      },
+      body: form,
     },
-    body: form,
-  });
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.detail || data.message || `Αποτυχία υπογραφής (${res.status})`);
+    const detail = data?.detail;
+    const msg =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data?.message || `Αποτυχία ανεβάσματος (${res.status})`;
+    throw new Error(msg);
   }
   return data;
 }
@@ -135,4 +141,28 @@ export async function cancelCustomerRentalBooking(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
     method: 'POST',
   });
+}
+
+export async function guestRentalLookup({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
+
+export async function guestRentalCheckIn({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/check-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
 }

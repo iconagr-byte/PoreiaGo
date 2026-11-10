@@ -1,6 +1,8 @@
 import { APPLE_MAPBOX_STYLE } from './appleMapTheme.js';
 
 /** Mapbox GL — token από env. Χωρίς token, fallback σε Leaflet. */
+import { APPLE_MAPBOX_STYLE } from './appleMapTheme.js';
+
 export const MAPBOX_TOKEN =
   import.meta.env.VITE_MAPBOX_TOKEN ||
   import.meta.env.VITE_MAPBOX_ACCESS_TOKEN ||

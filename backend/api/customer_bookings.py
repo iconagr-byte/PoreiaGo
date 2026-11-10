@@ -50,6 +50,19 @@ async def _wallet_tenant(request: Request, account: dict) -> str:
     )
 
 
+async def _pull_saas_into_wallet(account: dict, tid: str) -> int:
+    """Office / guest SaaS bookings → wallet SQLite (same email + office)."""
+    try:
+        from app.services.customer_wallet_booking_sync import pull_postgres_bookings_into_wallet
+
+        return await pull_postgres_bookings_into_wallet(
+            customer_email=account["email"],
+            tenant_id=tid,
+        )
+    except Exception:
+        return 0
+
+
 @router.get("/api/customer/bookings")
 async def my_bookings(
     request: Request,

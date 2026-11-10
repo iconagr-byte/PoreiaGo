@@ -1,4 +1,4 @@
-"""Customer PWA fleet rental — catalog, availability, booking, contract, cancel."""
+"""Customer PWA fleet rental — catalog, availability, booking + payment."""
 
 from __future__ import annotations
 
@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
 _DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
-_RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
-_MAX_PHOTO_BYTES = 4 * 1024 * 1024
+_RENTAL_ID_DIR = _DATA_ROOT / "uploads" / "rental_id"
+_MAX_DOC_BYTES = 4 * 1024 * 1024
+_ID_KINDS = frozenset({"id_card", "driving_license"})
 
 
 async def _tenant_id(request: Request, account: dict | None = None) -> str:
@@ -89,6 +90,12 @@ async def _require_rent_module(request: Request, account: dict | None = None) ->
 
     return tid
 
+class CustomerBookingExtras(BaseModel):
+    extra_insurance: bool = False
+    child_seat: bool = False
+    gps_pack: bool = False
+
+
 class CustomerBookingBody(BaseModel):
     vehicle_id: str
     start_time: str
@@ -108,6 +115,13 @@ class CustomerBookingBody(BaseModel):
     balance_due: float | None = None
     payment_status: str | None = None
     total_cost: float | None = None
+
+
+class GuestRentalLookupBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    reference: str | None = Field(default=None, max_length=120)
+    booking_code: str | None = Field(default=None, max_length=120)
+    code: str | None = Field(default=None, max_length=120)
 
 
 class GuestRentalLookupBody(BaseModel):
@@ -201,6 +215,25 @@ async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
     row = store.lookup_booking_for_guest(
         await _require_rent_module(request),
+        email=email,
+        reference=reference,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση ενοικίασης με αυτά τα στοιχεία")
+    return {"ok": True, "booking": _public_booking(row)}
+
+
+@router.post("/public/lookup")
+async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
+    """Guest rental booking lookup by email + RB-… reference (no auth)."""
+    email = str(body.email or "").strip().lower()
+    reference = str(body.reference or body.booking_code or body.code or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Απαιτείται έγκυρο email κράτησης")
+    if not reference or len(reference) < 4:
+        raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
+    row = store.lookup_booking_for_guest(
+        await _tenant_id(request),
         email=email,
         reference=reference,
     )
@@ -330,6 +363,41 @@ async def rental_availability(
         driver_mode=driver_mode,
         account=account,
     )
+
+
+class GuestCheckinBody(BaseModel):
+    surname: str = Field(min_length=2, max_length=120)
+    reference_code: str = Field(min_length=4, max_length=40)
+
+
+@router.post("/public/lookup")
+async def guest_rental_lookup(body: GuestCheckinBody, request: Request):
+    """Guest online check-in lookup — surname + RN- code, office tenant from Host."""
+    row = store.guest_lookup_booking(
+        await _tenant_id(request),
+        surname=body.surname,
+        reference_code=body.reference_code,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση με αυτά τα στοιχεία")
+    return {"booking": _guest_booking_view(row)}
+
+
+@router.post("/public/check-in")
+async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
+    """Confirm online check-in for a rental booking (desk sees ready flag)."""
+    try:
+        row = store.guest_online_checkin(
+            await _tenant_id(request),
+            surname=body.surname,
+            reference_code=body.reference_code,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "booking": _guest_booking_view(row)}
 
 
 @router.get("/bookings")
