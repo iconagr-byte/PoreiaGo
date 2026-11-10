@@ -1,8 +1,13 @@
 /**
  * Client-side demo rent fleet (compact cars + vans).
  * 2025–2026 generation models with matching Wikimedia Commons exterior photos.
- * Used when the public catalog API is empty/unreachable so storefront still looks real.
+ *
+ * Showcase ONLY on the PoreiaGo marketing host (/rent guest landing) so
+ * prospective contract buyers see how the product looks. Never invent fleet
+ * for tenant offices (Achillio, slug.poreiago.com, custom domains).
  */
+
+import { isPlatformMarketingHost } from '../platform/tenantHost.js';
 
 const WM = (path) =>
   `https://upload.wikimedia.org/wikipedia/commons/${path}`;
@@ -10,7 +15,7 @@ const WM = (path) =>
 export const DEMO_RENT_FLEET = [
   {
     id: 'demo-rent-car-i10',
-    category: 'CAR',
+    category: 'MINI',
     model: 'Toyota Aygo X',
     seating_capacity: 4,
     daily_rate_eur: 32,
@@ -22,7 +27,7 @@ export const DEMO_RENT_FLEET = [
   },
   {
     id: 'demo-rent-car-c3',
-    category: 'CAR',
+    category: 'COMPACT',
     model: 'Peugeot 208',
     seating_capacity: 5,
     daily_rate_eur: 38,
@@ -32,11 +37,11 @@ export const DEMO_RENT_FLEET = [
       'thumb/d/d8/Peugeot_208_B_facelift_DSC_7227.jpg/1280px-Peugeot_208_B_facelift_DSC_7227.jpg',
     ),
     description:
-      'Μοντέλο 2026 — συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+      'Μοντέλο 2026 — compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
   },
   {
     id: 'demo-rent-car-yaris',
-    category: 'CAR',
+    category: 'COMPACT',
     model: 'Renault Clio',
     seating_capacity: 5,
     daily_rate_eur: 42,
@@ -46,7 +51,7 @@ export const DEMO_RENT_FLEET = [
       'thumb/c/c6/Renault_Clio_V_%282023%29_1X7A1577.jpg/1280px-Renault_Clio_V_%282023%29_1X7A1577.jpg',
     ),
     description:
-      'Μοντέλο 2026 — συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+      'Μοντέλο 2026 — compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
   },
   {
     id: 'demo-rent-van-transporter',
@@ -78,7 +83,7 @@ export const DEMO_RENT_FLEET = [
   },
   {
     id: 'demo-rent-van-trafic',
-    category: 'VAN',
+    category: 'MINIBUS',
     model: 'Ford Transit Custom',
     seating_capacity: 9,
     daily_rate_eur: 88,
@@ -92,20 +97,61 @@ export const DEMO_RENT_FLEET = [
   },
 ];
 
-export function rentCategoryLabel(category) {
-  const c = String(category || '').toUpperCase();
-  if (c === 'VAN') return 'Van';
-  if (c === 'MINIBUS') return 'Minibus';
-  if (c === 'CAR') return 'Επιβατικό';
-  return category || '';
+export { rentCategoryLabel } from './rentVehicleCategories.js';
+
+/**
+ * @deprecated Prefer isPlatformMarketingHost — kept for call sites / tests.
+ * True on any live PoreiaGo / Achillio customer hostname (incl. platform apex).
+ */
+export function isLiveProductionHost(hostname = '') {
+  const h = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .trim()
+    .toLowerCase();
+  if (!h || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) return false;
+  return (
+    h === 'www.poreiago.com' ||
+    h === 'poreiago.com' ||
+    h.endsWith('.poreiago.com') ||
+    h === 'achilliotravel.com' ||
+    h === 'www.achilliotravel.com' ||
+    h.endsWith('.achilliotravel.com')
+  );
 }
 
-export function withDemoRentFleet(vehicles) {
+/**
+ * When catalog is empty: inject showcase fleet ONLY on PoreiaGo marketing host.
+ * Tenant offices always get the real list (or []).
+ *
+ * @param {unknown} vehicles
+ * @param {{ allowShowcase?: boolean, hostname?: string }} [opts]
+ *   allowShowcase=false — e.g. date search returned no availability (don't fake it)
+ */
+export function withDemoRentFleet(vehicles, opts = {}) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;
+  const allowShowcase = opts.allowShowcase !== false;
+  if (!allowShowcase) return [];
+
+  const hostname =
+    opts.hostname != null
+      ? opts.hostname
+      : typeof window !== 'undefined'
+        ? window.location.hostname
+        : '';
+
+  // No window + no explicit host (SSR / unit without mock) → never invent.
+  if (!hostname && opts.hostname == null && typeof window === 'undefined') return [];
+
+  if (!isPlatformMarketingHost(hostname)) return [];
   return DEMO_RENT_FLEET;
 }
 
 /** True when fleet is the client-only showcase fallback (not office store). */
 export function isClientDemoFleetId(id) {
   return /^demo-rent-(car|van)-/i.test(String(id || ''));
+}
+
+/** True when the list is (or includes) the marketing showcase fleet. */
+export function isClientDemoFleet(vehicles) {
+  if (!Array.isArray(vehicles) || !vehicles.length) return false;
+  return vehicles.some((v) => isClientDemoFleetId(v?.id));
 }

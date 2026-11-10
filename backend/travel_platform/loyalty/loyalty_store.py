@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -11,10 +12,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from app.core.data_paths import poreiago_data_dir, resolve_data_file
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "loyalty_store.json"
+_PACKAGE_DIR = Path(__file__).resolve().parent
+DATA_DIR = poreiago_data_dir()
+STORE_FILE = resolve_data_file("loyalty_store.json", _PACKAGE_DIR / "loyalty_store.json")
 _LOCK = threading.RLock()
 
 TIERS = ("STANDARD", "SILVER", "GOLD", "PLATINUM")
@@ -216,3 +219,35 @@ def post_transaction(tenant_id: str | None, body: dict[str, Any]) -> dict[str, A
         data["transactions"].append(tx)
         _write(data)
         return {"account": deepcopy(account), "transaction": deepcopy(tx)}
+
+
+def delete_account(tenant_id: str | None, account_id: str) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    aid = str(account_id or "").strip()
+    if not aid:
+        return False
+    with _LOCK:
+        data = _read()
+        before = len(data["accounts"])
+        data["accounts"] = [
+            a for a in data["accounts"] if not (a.get("tenant_id") == tid and a.get("id") == aid)
+        ]
+        if len(data["accounts"]) == before:
+            return False
+        data["transactions"] = [
+            t
+            for t in data["transactions"]
+            if not (t.get("tenant_id") == tid and t.get("loyalty_account_id") == aid)
+        ]
+        _write(data)
+        return True
+
+
+def tier_meta() -> dict[str, Any]:
+    return {
+        "tiers": list(TIERS),
+        "tx_types": list(TX_TYPES),
+        "thresholds": [
+            {"tier": tier, "lifetime_miles": float(threshold)} for tier, threshold in TIER_THRESHOLDS
+        ],
+    }

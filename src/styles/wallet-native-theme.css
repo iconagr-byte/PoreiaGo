@@ -1,0 +1,226 @@
+/**
+ * Capacitor PoreiaGo Wallet — native-only visual theme.
+ * Loaded ONLY when isNativeApp() is true (see main.jsx).
+ * Website /wallet and /login never import this file.
+ */
+
+html[data-poreiago-app='wallet'],
+html[data-poreiago-app='wallet'] body,
+html[data-poreiago-app='wallet'] #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #ffffff;
+  overflow-x: hidden;
+}
+
+/* Room for native bottom tabs (auth screens reset below). */
+html[data-poreiago-app='wallet'] body {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
+  padding-bottom: 0;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-back,
+html[data-poreiago-app='wallet'] .rent-auth-back {
+  display: none !important;
+}
+
+/* Full-bleed white auth — no blue website stage / floating card.
+ * Unified shell uses data-poreiago-app=app (role=wallet on /login). */
+html[data-poreiago-app='wallet'] .wallet-auth-stage,
+html[data-poreiago-app='wallet'] .wallet-auth-stage--native,
+html[data-poreiago-app='wallet'] .wallet-auth-shell,
+html[data-poreiago-app='app'] .wallet-auth-stage,
+html[data-poreiago-app='app'] .wallet-auth-stage--native,
+html[data-poreiago-app='app'] .wallet-auth-shell {
+  width: 100% !important;
+  min-height: 100dvh !important;
+  max-width: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(0, 113, 227, 0.1), transparent 55%),
+    #ffffff !important;
+  color: #1d1d1f !important;
+  animation: pgWalletNativeFade 220ms ease-out;
+  overflow-x: hidden;
+}
+
+@keyframes pgWalletNativeFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-scroll,
+html[data-poreiago-app='app'] .wallet-auth-scroll {
+  width: 100% !important;
+  min-height: 100dvh !important;
+  padding: max(2.25rem, calc(env(safe-area-inset-top, 0px) + 1.25rem)) 1.5rem
+    max(1.75rem, env(safe-area-inset-bottom, 0px)) !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-panel,
+html[data-poreiago-app='wallet'] .wallet-auth-card,
+html[data-poreiago-app='app'] .wallet-auth-panel,
+html[data-poreiago-app='app'] .wallet-auth-card {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: auto !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0.5rem 0 1rem !important;
+  overflow: visible !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-hero,
+html[data-poreiago-app='app'] .wallet-auth-hero {
+  margin: 0 0 2.6rem !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-card .wallet-auth-icon,
+html[data-poreiago-app='app'] .wallet-auth-card .wallet-auth-icon {
+  display: grid;
+  place-items: center;
+  width: 5.35rem;
+  height: 5.35rem;
+  margin: 0 auto 1.45rem;
+  font-size: 2.45rem;
+  line-height: 1;
+  color: #ffffff;
+  background: linear-gradient(160deg, #64b5ff 0%, #0071e3 48%, #0055c4 100%);
+  border-radius: 1.4rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.42) inset,
+    0 1px 2px rgba(0, 56, 128, 0.12),
+    0 16px 40px rgba(0, 113, 227, 0.3);
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-card h1,
+html[data-poreiago-app='app'] .wallet-auth-card h1 {
+  font-size: clamp(2.2rem, 7vw, 2.65rem);
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+  overflow: visible;
+}
+
+/*
+ * Android WebView typing: caret can appear while keys are ignored when
+ * font-size < 16px (inherited text-sm on labels) or user-select/pointer-events
+ * are blocked. Apply to ALL native form fields — not only auth cards.
+ */
+html[data-poreiago-app='app'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']),
+html[data-poreiago-app='wallet'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']),
+html[data-poreiago-app='app'] textarea,
+html[data-poreiago-app='wallet'] textarea,
+html[data-poreiago-app='app'] select,
+html[data-poreiago-app='wallet'] select {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+  -webkit-touch-callout: default !important;
+  font-size: max(1rem, 16px) !important;
+  touch-action: manipulation;
+}
+
+/*
+ * backdrop-filter / filter on ancestors breaks IME key delivery in Android
+ * WebView (focused caret, no characters). Kill blur compositing on native.
+ */
+html[data-poreiago-app='app'] *,
+html[data-poreiago-app='wallet'] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Soft-input: stop scroll anchoring from yanking to the top.
+ * Do NOT set overflow-y:auto on html+body+#root together — nested scroll
+ * containers kill Android WebView IME (caret shows, digits never arrive).
+ * Seat map uses a sticky CTA instead of relying on this. */
+html[data-poreiago-app='app'],
+html[data-poreiago-app='wallet'],
+html[data-poreiago-app='app'] body,
+html[data-poreiago-app='wallet'] body {
+  overflow-anchor: none;
+}
+
+/* Checkout card fields: force IME-friendly hit target on Capacitor. */
+html[data-poreiago-app='app'] #checkout-card-number,
+html[data-poreiago-app='app'] #checkout-card-expiry,
+html[data-poreiago-app='app'] #checkout-card-cvv,
+html[data-poreiago-app='wallet'] #checkout-card-number,
+html[data-poreiago-app='wallet'] #checkout-card-expiry,
+html[data-poreiago-app='wallet'] #checkout-card-cvv {
+  touch-action: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+}
+
+
+html[data-poreiago-app='app'] .wallet-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='wallet'] .wallet-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='app'] .rent-auth-card .relative > .material-symbols-outlined,
+html[data-poreiago-app='wallet'] .rent-auth-card .relative > .material-symbols-outlined {
+  pointer-events: none !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-phone-stage,
+html[data-poreiago-app='wallet'] .wallet-phone-stage--native,
+html[data-poreiago-app='wallet'] .wallet-phone-stage--phone {
+  width: 100%;
+  padding: 0;
+  background: #f5f5f7;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app,
+html[data-poreiago-app='wallet'] .wallet-app--phone {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Office logo + name in native top bar — keep mobile-friendly (admin header sizes can be 48–96px). */
+html[data-poreiago-app='wallet'] .wallet-topbar-brand,
+html[data-poreiago-app='app'] .wallet-topbar-brand {
+  max-width: min(14.5rem, 56vw);
+  justify-content: center;
+}
+
+html[data-poreiago-app='wallet'] .wallet-topbar-brand img,
+html[data-poreiago-app='app'] .wallet-topbar-brand img,
+html[data-poreiago-app='wallet'] .office-brand-mark__logo--compact,
+html[data-poreiago-app='app'] .office-brand-mark__logo--compact {
+  max-height: 36px !important;
+  height: 36px !important;
+  max-width: min(140px, 44vw) !important;
+  width: auto !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-topbar-brand img.office-brand-mark__logo--with-name,
+html[data-poreiago-app='app'] .wallet-topbar-brand img.office-brand-mark__logo--with-name {
+  max-height: 28px !important;
+  height: 28px !important;
+  max-width: min(72px, 28vw) !important;
+}

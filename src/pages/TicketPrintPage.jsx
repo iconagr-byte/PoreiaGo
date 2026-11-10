@@ -1,5 +1,6 @@
 /**
- * Printable boarding pass — matches My Wallet pass look.
+ * Printable boarding pass(es) — matches My Wallet pass look.
+ * Multi-seat bookings print one pass + QR per traveler (airline-style).
  * Browser Print → Save as PDF.
  */
 import { useEffect, useState } from 'react';
@@ -7,6 +8,7 @@ import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { formatMoney } from '../lib/currency/multiCurrency.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import { getBookingPassengers } from '../lib/ticketing/bookingPassengers.js';
 import '../styles/wallet-pass.css';
 import '../styles/ticket-print.css';
 
@@ -32,7 +34,7 @@ function TicketQr({ value }) {
   );
 }
 
-function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
+function TicketPassCard({ booking, tripTitle, brandLabel, coverImage, showPrice = true }) {
   const pnr = booking.pnr || booking.ticketRef || booking.id;
   const passenger =
     booking.customerName || booking.passengerName || booking.name || '—';
@@ -47,7 +49,7 @@ function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
   const qrValue = booking._printQr || String(pnr);
 
   return (
-    <article className="ticket-print-pass" aria-label="Εισιτήριο για εκτύπωση">
+    <article className="ticket-print-pass" aria-label={`Εισιτήριο ${passenger}`}>
       <div
         className="ticket-print-hero"
         style={coverImage ? { backgroundImage: `url(${coverImage})` } : undefined}
@@ -76,12 +78,21 @@ function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
           </Field>
           <Field label="Ποσό">
             <strong>
-              {booking.price != null
+              {showPrice && booking.price != null
                 ? formatMoney(booking.price, booking.currency || 'EUR')
                 : '—'}
             </strong>
           </Field>
         </div>
+
+        {showPrice && Array.isArray(booking.extras) && booking.extras.length > 0 ? (
+          <p className="ticket-print-hint" style={{ marginTop: '0.75rem', textAlign: 'left' }}>
+            Υπηρεσίες:{' '}
+            {booking.extras
+              .map((line) => `${line.title}${line.qty > 1 ? ` ×${line.qty}` : ''}`)
+              .join(' · ')}
+          </p>
+        ) : null}
 
         <div className="ticket-print-perforation" aria-hidden />
 
@@ -90,7 +101,11 @@ function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
             <TicketQr value={qrValue} />
           </div>
           <p className="ticket-print-mono ticket-print-pnr-lg">{pnr}</p>
-          <p className="ticket-print-hint">Δείξτε το QR στον οδηγό κατά την επιβίβαση</p>
+          <p className="ticket-print-hint">
+            {booking.seat
+              ? `Δείξτε το QR για τη θέση ${booking.seat} στον οδηγό`
+              : 'Δείξτε το QR στον οδηγό κατά την επιβίβαση'}
+          </p>
         </div>
 
         <p className="ticket-print-footer">
@@ -134,6 +149,7 @@ export default function TicketPrintPage() {
       try {
         const mod = await import('../lib/ticketing/bookingStore.js');
         const { getTripById, loadTrips } = await import('../lib/trips/tripStore.js');
+        const { tripCoverUrl } = await import('../lib/trips/tripPhotos.js');
         const { mockBookings } = await import('../data/mockData.js');
         const { issueSignedQrToken } = await import('../lib/ticketing/qrToken.js');
 
@@ -145,19 +161,32 @@ export default function TicketPrintPage() {
         }
         loadTrips();
         const trip = getTripById(booking.tripId);
-        let printQr = booking.pnr || booking.id;
-        if (mod.isBookingPaid(booking)) {
-          try {
-            printQr = await issueSignedQrToken(booking);
-          } catch {
-            /* keep PNR */
+        const party = getBookingPassengers(booking);
+        const paid = mod.isBookingPaid(booking);
+        const passes = [];
+        for (const pax of party.length ? party : [{ seat: booking.seat || '', name: booking.customerName || '', role: 'booker' }]) {
+          const seatBooking = {
+            ...booking,
+            seat: pax.seat || booking.seat,
+            seats: pax.seat ? [pax.seat] : booking.seats,
+            customerName: pax.name || booking.customerName,
+            passengerName: pax.name || booking.passengerName,
+          };
+          let printQr = booking.pnr || booking.id;
+          if (paid) {
+            try {
+              printQr = await issueSignedQrToken(seatBooking, { seat: pax.seat || '' });
+            } catch {
+              /* keep PNR */
+            }
           }
+          passes.push({ ...seatBooking, _printQr: printQr, _role: pax.role });
         }
         if (!cancelled) {
           setResolved({
-            booking: { ...booking, _printQr: printQr },
+            passes,
             tripTitle: trip?.title || booking.tripTitle || 'Εκδρομή',
-            coverImage: trip?.image || '/images/hero-bus-achillio.png',
+            coverImage: tripCoverUrl(trip),
           });
         }
       } catch (err) {
@@ -173,8 +202,28 @@ export default function TicketPrintPage() {
 
   useEffect(() => {
     if (!autoPrint || !resolved) return undefined;
-    const t = window.setTimeout(() => window.print(), 450);
-    return () => window.clearTimeout(t);
+    let cancelled = false;
+    const run = async () => {
+      // Wait for QR <img> so print preview is not empty.
+      const imgs = Array.from(document.querySelectorAll('.ticket-print-qr-img'));
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((resolve) => {
+                  img.addEventListener('load', resolve, { once: true });
+                  img.addEventListener('error', resolve, { once: true });
+                }),
+        ),
+      );
+      if (!cancelled) window.print();
+    };
+    const t = window.setTimeout(run, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [autoPrint, resolved]);
 
   if (!bookingId || bookingId === 'demo') {
@@ -235,12 +284,18 @@ export default function TicketPrintPage() {
         </div>
       </div>
 
-      <TicketPassCard
-        booking={resolved.booking}
-        tripTitle={resolved.tripTitle}
-        brandLabel={brandLabel}
-        coverImage={resolved.coverImage}
-      />
+      <div className="ticket-print-stack">
+        {resolved.passes.map((passBooking, index) => (
+          <TicketPassCard
+            key={`${passBooking.seat}-${passBooking.customerName}-${index}`}
+            booking={passBooking}
+            tripTitle={resolved.tripTitle}
+            brandLabel={brandLabel}
+            coverImage={resolved.coverImage}
+            showPrice={index === 0}
+          />
+        ))}
+      </div>
     </div>
   );
 }

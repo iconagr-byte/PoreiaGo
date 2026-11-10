@@ -66,18 +66,9 @@ export default function DriverOfficeChatPanel({
         setLoadError('');
         if (data.driver_name) setResolvedName(data.driver_name);
         if (!silent) setLoading(false);
+        // Incoming chat stays in the admin bell inbox — no on-map toast spam.
         for (const m of rows) {
-          if (m.sender === 'driver' && m.id && !seenIdsRef.current.has(m.id)) {
-            if (seenIdsRef.current.size > 0) {
-              toast(`Μήνυμα από ${driverName || data.driver_name || 'οδηγό'}`, {
-                icon: '💬',
-                id: `office-chat-${m.id}`,
-              });
-            }
-            seenIdsRef.current.add(m.id);
-          } else if (m.id) {
-            seenIdsRef.current.add(m.id);
-          }
+          if (m.id) seenIdsRef.current.add(m.id);
         }
         scrollBottom();
         if (Number(data.unread || 0) > 0) {
@@ -96,7 +87,7 @@ export default function DriverOfficeChatPanel({
         }
       }
     },
-    [driverId, driverName],
+    [driverId],
   );
 
   useEffect(() => {

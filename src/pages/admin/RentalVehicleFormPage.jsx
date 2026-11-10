@@ -8,13 +8,11 @@ import {
   updateRentalVehicle,
   uploadRentalInspectionPhoto,
 } from '../../services/fleetRentalApi.js';
-
-const CATEGORIES = [
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'SUV', label: 'SUV' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import {
+  normalizeRentVehicleCategory,
+  RENT_CATEGORY_OPTIONS,
+} from '../../lib/rental/rentVehicleCategories.js';
 
 const STATUSES = [
   { value: 'AVAILABLE', label: 'Διαθέσιμο' },
@@ -26,10 +24,10 @@ const STATUSES = [
 
 const EMPTY = {
   plate_number: '',
-  category: 'VAN',
+  category: 'COMPACT',
   model: '',
   year: '',
-  seating_capacity: 9,
+  seating_capacity: 5,
   current_status: 'AVAILABLE',
   current_mileage: 0,
   daily_rate_eur: 80,
@@ -40,6 +38,8 @@ const EMPTY = {
   photo_urls: [],
   description: '',
   notes: '',
+  legal_deadline: '',
+  insurance_due_date: '',
 };
 
 const inputClass =
@@ -83,10 +83,13 @@ export default function RentalVehicleFormPage() {
         }
         setForm({
           plate_number: v.plate_number || '',
-          category: v.category || 'VAN',
+          category: normalizeRentVehicleCategory(v.category, {
+            seats: v.seating_capacity,
+            model: v.model,
+          }),
           model: v.model || '',
           year: v.year ?? '',
-          seating_capacity: v.seating_capacity ?? 9,
+          seating_capacity: v.seating_capacity ?? 5,
           current_status: v.current_status || 'AVAILABLE',
           current_mileage: v.current_mileage ?? 0,
           daily_rate_eur: v.daily_rate_eur ?? 80,
@@ -101,6 +104,8 @@ export default function RentalVehicleFormPage() {
               : [],
           description: v.description || '',
           notes: v.notes || '',
+          legal_deadline: v.legal_deadline || '',
+          insurance_due_date: v.insurance_due_date || '',
         });
       } catch (err) {
         if (!cancelled) {
@@ -146,6 +151,8 @@ export default function RentalVehicleFormPage() {
       photo_urls: form.photo_urls || [],
       description: form.description?.trim() || null,
       notes: form.notes?.trim() || null,
+      legal_deadline: form.legal_deadline || null,
+      insurance_due_date: form.insurance_due_date || null,
     };
 
     setSaving(true);
@@ -215,7 +222,7 @@ export default function RentalVehicleFormPage() {
 
   if (loading) {
     return (
-      <AdminLayout activeTab="fleet" title={header}>
+      <AdminLayout activeTab="fleet_rental" fleetRentalTab="vehicles" title={header}>
         <p className="text-on-surface-variant">Φόρτωση…</p>
       </AdminLayout>
     );
@@ -242,7 +249,12 @@ export default function RentalVehicleFormPage() {
   );
 
   return (
-    <AdminLayout activeTab="fleet" title={header} footer={actions}>
+    <AdminLayout
+      activeTab="fleet_rental"
+      fleetRentalTab="vehicles"
+      title={header}
+      footer={actions}
+    >
       <form
         id="rental-vehicle-form"
         onSubmit={save}
@@ -275,12 +287,15 @@ export default function RentalVehicleFormPage() {
             <label className="block text-sm">
               <span className="font-bold text-gray-800">Κατηγορία *</span>
               <select className={inputClass} value={form.category} onChange={setField('category')}>
-                {CATEGORIES.map((c) => (
+                {RENT_CATEGORY_OPTIONS.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
                   </option>
                 ))}
               </select>
+              <span className="mt-1 block text-xs text-gray-500">
+                Όπως στα μεγάλα rent-a-car: Mini, Economy, Compact, SUV, Van…
+              </span>
             </label>
             <label className="block text-sm sm:col-span-1">
               <span className="font-bold text-gray-800">Μοντέλο *</span>
@@ -346,6 +361,24 @@ export default function RentalVehicleFormPage() {
                 value={form.gps_device_id}
                 onChange={setField('gps_device_id')}
                 placeholder="π.χ. ίδια με πινακίδα στον ζωντανό χάρτη"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-800">Λήξη ΚΤΕΟ</span>
+              <input
+                type="date"
+                className={inputClass}
+                value={form.legal_deadline}
+                onChange={setField('legal_deadline')}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-800">Λήξη ασφάλειας</span>
+              <input
+                type="date"
+                className={inputClass}
+                value={form.insurance_due_date}
+                onChange={setField('insurance_due_date')}
               />
             </label>
           </div>
@@ -452,7 +485,7 @@ export default function RentalVehicleFormPage() {
                   key={url}
                   className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-black/[0.06] bg-gray-50"
                 >
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveSiteAssetUrl(url) || url} alt="" className="w-full h-full object-cover" />
                   {idx === 0 ? (
                     <span className="absolute left-2 top-2 text-[10px] font-bold uppercase tracking-wide bg-black/70 text-white px-2 py-0.5 rounded-full">
                       Κάλυμμα
@@ -504,7 +537,7 @@ export default function RentalVehicleFormPage() {
           <label className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full min-h-[3.25rem] px-4 py-3 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] text-primary font-bold cursor-pointer hover:bg-primary/[0.06] transition-colors">
             <span className="material-symbols-outlined text-[22px]">add_a_photo</span>
             <span>{uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη φωτογραφιών'}</span>
-            <span className="text-xs font-semibold text-primary/70">JPG, PNG · έως 12</span>
+            <span className="text-xs font-semibold text-primary/70">JPG, PNG, WebP · έως 12 · μέγ. 12 MB</span>
             <input
               type="file"
               accept="image/*"

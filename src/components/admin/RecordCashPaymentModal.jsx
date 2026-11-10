@@ -16,6 +16,19 @@ const CHANNELS = [
   },
 ];
 
+/** Parse amounts typed with Greek/EU comma decimals (e.g. 64,6 → 64.6). */
+export function parseCashAmount(raw) {
+  if (raw == null || raw === '') return NaN;
+  if (typeof raw === 'number') return raw;
+  const cleaned = String(raw)
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/€/g, '')
+    .replace(/\.(?=.*\.)/g, '') // drop thousand separators
+    .replace(',', '.');
+  return Number(cleaned);
+}
+
 export default function RecordCashPaymentModal({
   booking,
   security,
@@ -38,6 +51,7 @@ export default function RecordCashPaymentModal({
   const [receiptNumber, setReceiptNumber] = useState('');
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState([]);
+  const [submitError, setSubmitError] = useState('');
 
   const sec = security || {};
   const needsReference = sec.require_reference_on_confirm !== false;
@@ -50,20 +64,25 @@ export default function RecordCashPaymentModal({
     if (!open || !booking) return;
     setChannel('driver_on_bus');
     setAmount(balanceDue > 0 ? String(balanceDue) : '');
-    setReference('');
+    // Prefill PNR so confirm does not fail on an empty required field.
+    setReference(booking.pnr || booking.id || '');
     setReceiptNumber('');
     setNote('');
     setErrors([]);
+    setSubmitError('');
   }, [open, booking, balanceDue]);
 
   if (!open || !booking) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
+    const amountNum = parseCashAmount(amount);
+    const refValue = (needsReference ? reference : hintReference).trim();
     const payload = {
-      amount: Number(amount),
+      amount: amountNum,
       channel,
-      reference: needsReference ? reference : hintReference,
+      reference: refValue,
     };
     const validationErrors = validateCashPayment(booking, payload, sec);
     if (validationErrors.length) {
@@ -71,13 +90,17 @@ export default function RecordCashPaymentModal({
       return;
     }
     setErrors([]);
-    await onConfirm({
-      amount: payload.amount,
-      channel,
-      reference_code: needsReference ? reference : null,
-      receipt_number: receiptNumber.trim() || null,
-      note: note.trim() || null,
-    });
+    try {
+      await onConfirm({
+        amount: amountNum,
+        channel,
+        reference_code: needsReference ? refValue : null,
+        receipt_number: receiptNumber.trim() || null,
+        note: note.trim() || null,
+      });
+    } catch (err) {
+      setSubmitError(err?.message || 'Αποτυχία καταχώρησης μετρητών');
+    }
   };
 
   return (
@@ -89,15 +112,18 @@ export default function RecordCashPaymentModal({
             Καταχώρηση μετρητών
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Καταγράφει την είσπραξη, ενημερώνει το υπόλοιπο και εκδίδει απόδειξη myDATA.
+            Καταγράφει την είσπραξη, ενημερώνει το υπόλοιπο και ανοίγει το QR εισιτήριο.
           </p>
         </div>
 
         <div className="rounded-xl bg-amber-50/80 border border-amber-200/60 p-3 text-sm space-y-1">
           <p className="font-bold text-gray-900">{booking.customerName || '—'}</p>
-          <p className="text-gray-600">{booking.tripTitle} · {booking.seat || booking.seats?.join(', ')}</p>
+          <p className="text-gray-600">
+            {booking.tripTitle} · {booking.seat || booking.seats?.join(', ')}
+          </p>
           <p className="text-gray-500">
-            {hintReference} · Υπόλοιπο: <strong className="text-amber-800">€{balanceDue.toFixed(2)}</strong>
+            {hintReference} · Υπόλοιπο:{' '}
+            <strong className="text-amber-800">€{balanceDue.toFixed(2)}</strong>
           </p>
         </div>
 
@@ -117,7 +143,9 @@ export default function RecordCashPaymentModal({
                   }`}
                 >
                   <span className="flex items-center gap-2 font-bold text-sm text-gray-900">
-                    <span className="material-symbols-outlined text-[20px] text-amber-600">{c.icon}</span>
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">
+                      {c.icon}
+                    </span>
                     {c.label}
                   </span>
                   <span className="block text-[11px] text-gray-500 mt-1">{c.hint}</span>
@@ -129,9 +157,8 @@ export default function RecordCashPaymentModal({
           <label className="block text-sm">
             <span className="font-bold text-gray-700">Ποσό είσπραξης (€)</span>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
+              inputMode="decimal"
               required
               className="mt-1 w-full rounded-xl border px-3 py-2 font-mono text-lg"
               value={amount}
@@ -172,11 +199,12 @@ export default function RecordCashPaymentModal({
             />
           </label>
 
-          {errors.length > 0 && (
-            <ul className="text-sm text-red-700 space-y-1">
+          {(errors.length > 0 || submitError) && (
+            <ul className="text-sm text-red-700 space-y-1 rounded-xl bg-red-50 border border-red-200 px-3 py-2">
               {errors.map((err) => (
                 <li key={err}>• {err}</li>
               ))}
+              {submitError ? <li>• {submitError}</li> : null}
             </ul>
           )}
 

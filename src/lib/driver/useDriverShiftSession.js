@@ -118,8 +118,10 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const goOffline = useCallback(
     async ({ silent = false } = {}) => {
       clearDriverGpsAutostart();
+      let endedOk = false;
       try {
         const ended = await endDriverShift();
+        endedOk = ended?.ok !== false;
         const push = ended?.notify?.push;
         if (push?.sent > 0) {
           console.info('[shift] end push sent', push.sent);
@@ -129,10 +131,21 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       } catch (err) {
         console.warn('[shift] end notify failed, retrying', err);
         try {
-          await endDriverShift();
+          const ended = await endDriverShift();
+          endedOk = ended?.ok !== false;
         } catch (err2) {
           console.warn('[shift] end notify retry failed', err2);
+          endedOk = false;
         }
+      }
+
+      // Explicit Τέλος βάρδιας must reach the server or the office map keeps the pin.
+      // Silent paths (expired token / page teardown) still clear local GPS.
+      if (!endedOk && !silent) {
+        toast.error(
+          'Το τέλος βάρδιας δεν καταχωρήθηκε — δοκιμάστε ξανά (ο χάρτης μπορεί να σας δείχνει ακόμα ενεργό)',
+        );
+        return;
       }
 
       stopRuntime();
@@ -140,7 +153,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       setGpsError('');
       setStarting(false);
       setShiftFlag(false);
-      if (!silent) {
+      if (!silent && endedOk) {
         toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
       }
     },
@@ -202,18 +215,18 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         return false;
       }
 
-      if (!resume && iosEnv.needsInstallGuidance) {
-        toast(
-          'Στο iPhone προσθέστε την εφαρμογή στην Αρχική (βλ. οδηγίες παρακάτω) για αξιόπιστο GPS.',
-          { icon: '📱', duration: 6000 },
-        );
-      }
-
       startingRef.current = true;
       setStarting(true);
       setOnline(true);
       setShiftFlag(true);
       runningRef.current = true;
+
+      if (!resume) {
+        toast.success('Βάρδια ξεκίνησε', {
+          id: 'driver-shift-started',
+          duration: 2200,
+        });
+      }
 
       // CRITICAL: arm geolocation BEFORE any await — iOS drops permission without a
       // synchronous getCurrentPosition/watchPosition in the user-gesture stack.
@@ -222,11 +235,9 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         onOpen: ({ transport } = {}) => {
           markOnline();
           if (resume) return;
-          if (transport === 'ws') {
-            toast.success('Σύνδεση telemetry OK');
-          } else if (transport === 'http' && !httpFallbackNotified) {
+          // Keep a single status line — don't pile connection toasts on top of start.
+          if (transport === 'http' && !httpFallbackNotified) {
             httpFallbackNotified = true;
-            toast.success('Σύνδεση θέσης OK');
           }
         },
         onError: (err) => {
@@ -284,13 +295,6 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       }
 
       markOnline();
-      if (!resume) {
-        toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
-          icon: '🗺️',
-          duration: 4000,
-          id: 'driver-shift-map-hint',
-        });
-      }
 
       // Non-critical side work AFTER GPS is armed.
       window.setTimeout(() => {
@@ -333,15 +337,12 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       requestWakeLock()
         .then((lock) => {
           wakeRef.current = lock;
-          if (!resume && !isWakeLockSupported()) {
-            toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
-          }
         })
         .catch(() => {});
 
       return true;
     },
-    [goOffline, iosEnv.isIos, iosEnv.needsInstallGuidance, markOnline, sendPosition],
+    [goOffline, iosEnv.isIos, markOnline, sendPosition],
   );
 
   // Keep GPS running while the driver shell is active. Tab changes must not end the shift.
@@ -367,8 +368,14 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     const onVisible = () => {
       if (document.visibilityState === 'visible') ensureRunning();
     };
+    // SOS keepalive: only refresh an already-running shift — never start one.
+    const onKeepalive = () => {
+      if (!isDriverShiftOnline()) return;
+      ensureRunning();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', ensureRunning);
+    window.addEventListener('driver-gps-keepalive', onKeepalive);
 
     // Real document unload (close tab / kill PWA) — clear office pin immediately.
     // App-switch usually only fires visibilitychange; pagehide+persisted=bfcache.
@@ -391,6 +398,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       window.clearInterval(retryId);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', ensureRunning);
+      window.removeEventListener('driver-gps-keepalive', onKeepalive);
       window.removeEventListener('pagehide', onPageHide);
       // Do NOT stopRuntime here — Strict Mode remount would kill GPS.
       // Teardown only when enabled flips false (above) or goOffline/logout.
