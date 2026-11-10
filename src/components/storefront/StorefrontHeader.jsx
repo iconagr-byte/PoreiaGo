@@ -187,9 +187,9 @@ export default function StorefrontHeader({
               Στόλος
             </a>
           ) : null}
-          <a href="#contact" className={navLink}>
+          <Link to="/contact" className={navLink}>
             Επικοινωνία
-          </a>
+          </Link>
           {tripsEnabled ? (
             <Link to="/my-booking" className={navLink}>
               Η κράτησή μου
@@ -254,9 +254,9 @@ export default function StorefrontHeader({
                 Στόλος
               </a>
             ) : null}
-            <a href="#contact" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+            <Link to="/contact" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
               Επικοινωνία
-            </a>
+            </Link>
             {tel ? (
               <a href={tel} onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]" aria-hidden>
