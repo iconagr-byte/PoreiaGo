@@ -1,17 +1,23 @@
 import { API_BASE } from '../config/api.js';
 import { customerAuthHeaders } from './customerAuthApi.js';
+import { saasAuthHeaders } from './saasApi.js';
 
-function parseError(data) {
+function parseError(data, status) {
   const detail = data?.detail;
+  if (status === 401 || status === 403) {
+    return 'Η συνεδρία έληξε ή λείπει σύνδεση γραφείου — συνδεθείτε ξανά.';
+  }
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) return detail.map((d) => d.msg || d).join(', ');
   return data?.message || 'Αποτυχία αιτήματος';
 }
 
 export async function fetchAllLostItems() {
-  const res = await fetch(`${API_BASE}/api/lost-items`);
+  const res = await fetch(`${API_BASE}/api/lost-items`, {
+    headers: saasAuthHeaders(),
+  });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseError(data));
+  if (!res.ok) throw new Error(parseError(data, res.status));
   return data.items || [];
 }
 
@@ -55,10 +61,10 @@ export async function reportLostItem(body) {
 export async function updateLostItemStatus(itemId, status) {
   const res = await fetch(`${API_BASE}/api/lost-items/${encodeURIComponent(itemId)}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: saasAuthHeaders(),
     body: JSON.stringify({ status }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseError(data));
+  if (!res.ok) throw new Error(parseError(data, res.status));
   return data;
 }

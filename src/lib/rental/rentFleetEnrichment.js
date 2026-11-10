@@ -3,7 +3,16 @@
  * Matches known model names; falls back gracefully for custom vehicles.
  */
 
-import { rentCategoryLabel } from './demoRentFleet.js';
+import { DEMO_RENT_FLEET } from './demoRentFleet.js';
+import {
+  normalizeRentVehicleCategory,
+  rentCategoryLabel,
+  rentCategoryMeta,
+} from './rentVehicleCategories.js';
+
+const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
+  DEMO_RENT_FLEET.map((v) => [String(v.model || '').trim().toLowerCase(), v.photo_url]),
+);
 
 /** @typedef {{
  *   headline: string,
@@ -28,24 +37,24 @@ const BY_MODEL = {
     highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
   },
   'peugeot 208': {
-    headline: 'Συμπαγές hatchback 2026',
+    headline: 'Compact hatchback 2026',
     blurb:
-      'Μοντέλο 2026 — συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+      'Μοντέλο 2026 — compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
     transmission: 'Χειροκίνητο',
-    fuel: 'Βενζίνη',
+    fuel: 'Πλήρως ηλεκτρικό',
     doors: 5,
     luggage: '2 βαλίτσες',
-    highlights: ['A/C', 'Bluetooth', 'Οικονομικό'],
+    highlights: ['A/C', 'Bluetooth', 'Πλήρως ηλεκτρικό'],
   },
   'renault clio': {
     headline: 'Ιδανικό για πόλη 2026',
     blurb:
-      'Μοντέλο 2026 — συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+      'Μοντέλο 2026 — compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
     transmission: 'Χειροκίνητο',
-    fuel: 'Βενζίνη',
+    fuel: 'Υβριδικό',
     doors: 5,
     luggage: '2 βαλίτσες',
-    highlights: ['Χαμηλή κατανάλωση', 'Εύκολο πάρκινγκ', 'A/C'],
+    highlights: ['Υβριδική οικονομία', 'Εύκολο πάρκινγκ', 'A/C'],
   },
   'hyundai i10': {
     headline: 'City car',
@@ -58,9 +67,9 @@ const BY_MODEL = {
     highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
   },
   'citroen c3': {
-    headline: 'Συμπαγές hatchback',
+    headline: 'Compact hatchback',
     blurb:
-      'Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+      'Compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
     transmission: 'Χειροκίνητο',
     fuel: 'Βενζίνη',
     doors: 5,
@@ -70,7 +79,7 @@ const BY_MODEL = {
   'toyota yaris': {
     headline: 'Ιδανικό για πόλη',
     blurb:
-      'Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+      'Compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
     transmission: 'Χειροκίνητο',
     fuel: 'Βενζίνη',
     doors: 5,
@@ -171,32 +180,22 @@ function luggageCount(luggage) {
   return m ? Number(m[1]) : null;
 }
 
-function sizeAndGroup(category, seats, model, known) {
-  const cat = String(category || '').toUpperCase();
-  const name = modelKey(model);
-  if (cat === 'VAN' || cat === 'MINIBUS' || (seats && seats >= 8)) {
-    return {
-      group_code: cat === 'MINIBUS' ? 'Ομάδα M' : 'Ομάδα V',
-      size_label: cat === 'MINIBUS' ? 'Minibus' : 'Van',
-    };
-  }
-  if (name.includes('tucson') || known?.headline?.toLowerCase().includes('suv')) {
-    return { group_code: 'Ομάδα D', size_label: 'SUV' };
-  }
-  if (seats && seats <= 4) {
-    return { group_code: 'Ομάδα A', size_label: 'Μικρά' };
-  }
-  if (name.includes('corolla') || (seats && seats >= 5 && known?.doors === 4)) {
-    return { group_code: 'Ομάδα C', size_label: 'Μεσαία' };
-  }
-  return { group_code: 'Ομάδα B', size_label: 'Συμπαγή' };
+function sizeAndGroup(category, seats, model) {
+  const id = normalizeRentVehicleCategory(category, { seats, model });
+  const meta = rentCategoryMeta(id);
+  const letter = meta?.acrissHint || 'C';
+  return {
+    group_code: `Ομάδα ${letter}`,
+    size_label: meta?.shortLabel || meta?.label || id,
+    category_id: id,
+  };
 }
 
 function transmissionLabel(raw) {
   const t = String(raw || '').trim();
-  if (!t) return 'Με ταχύτητες';
+  if (!t) return 'Χειροκίνητο';
   if (/αυτόματο|automatic/i.test(t)) return 'Αυτόματο';
-  return 'Με ταχύτητες';
+  return 'Χειροκίνητο';
 }
 
 /**
@@ -207,7 +206,8 @@ export function enrichRentVehicle(vehicle) {
   const v = vehicle && typeof vehicle === 'object' ? vehicle : {};
   const known = BY_MODEL[modelKey(v.model)] || null;
   const seats = Number(v.seating_capacity) || null;
-  const category = rentCategoryLabel(v.category);
+  const { group_code, size_label, category_id } = sizeAndGroup(v.category, seats, v.model);
+  const category = rentCategoryLabel(category_id);
   const description =
     (known && String(v.description || '').trim().length < 40 ? known.blurb : null) ||
     String(v.description || '').trim() ||
@@ -222,24 +222,34 @@ export function enrichRentVehicle(vehicle) {
       ? [photoUrl]
       : [];
 
-  const luggage = known?.luggage || '';
+  const luggage = known?.luggage || v.luggage || v.luggage_label || '';
   const bags = luggageCount(luggage);
-  const { group_code, size_label } = sizeAndGroup(v.category, seats, v.model, known);
-  const transmission = transmissionLabel(known?.transmission);
+  const transmission = transmissionLabel(known?.transmission || v.transmission);
+  const transmissionKey = /αυτόματο/i.test(transmission) ? 'automatic' : 'manual';
+  const fuel = known?.fuel || v.fuel || v.fuel_type || '';
+  const highlights =
+    (Array.isArray(known?.highlights) && known.highlights.length
+      ? known.highlights
+      : null) ||
+    (Array.isArray(v.highlights) ? v.highlights : []);
 
   return {
     ...v,
+    category: category_id,
     photo_url: photoUrl,
     photo_urls: photoUrls,
     category_label: category,
     display_headline: known?.headline || category || 'Όχημα',
     display_blurb: description,
     transmission,
-    fuel: known?.fuel || '',
-    doors: known?.doors || null,
+    transmission_key: transmissionKey,
+    fuel,
+    fuel_type: v.fuel_type || fuel,
+    doors: known?.doors || v.doors || null,
     luggage,
+    luggage_bags: bags || Number(v.luggage_bags) || 0,
     luggage_label: bags ? `x${bags}` : luggage || 'Αποσκευές',
-    highlights: known?.highlights || [],
+    highlights,
     seats_label: seats ? `${seats} επιβάτες` : '',
     group_code,
     size_label,

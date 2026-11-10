@@ -52,6 +52,19 @@ export async function fetchPublicRentalCatalog(category) {
   return data.vehicles || [];
 }
 
+/** Guest rental booking lookup — email + RB-… (or booking id). */
+export async function lookupPublicRentalBooking({ email, reference }) {
+  const data = await publicRentalFetch('/public/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      reference: String(reference || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
+
 function availabilityParams({
   startTime,
   endTime,

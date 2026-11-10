@@ -146,6 +146,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // API + client heal localhost → office production origin (Achillio / PoreiaGo).
       setForm(await fetchPlatformSettings());
       setDirty(false);
     } catch (err) {
@@ -536,7 +537,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
       <SectionCard
         id="notify"
         icon="mail"
-        title="Ειδοποιήσεις & integrations"
+        title="Ειδοποιήσεις"
         description="SMTP, SMS sender, Master QR διάρκεια και retries για webhooks."
         accent="bg-emerald-600"
       >

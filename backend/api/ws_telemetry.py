@@ -94,7 +94,12 @@ def _decode_driver_token(token: str) -> dict:
 
 def _decode_admin_ws_token(token: str | None) -> dict:
     """Validate admin Bearer/query token for live-map / alerts WebSockets."""
-    if os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes"):
+    from middleware.tenant import _admin_auth_disabled_allowed
+
+    if (
+        _admin_auth_disabled_allowed()
+        and os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes")
+    ):
         return {
             "tenant_id": os.getenv("DEFAULT_TENANT_ID") or str(DEMO_TENANT),
             "roles": ["tenant_admin", "superadmin"],
@@ -343,15 +348,114 @@ async def admin_fleet_egress_ws(
 
     from travel_platform.telemetry.processor import get_live_fleet
 
+    try:
+        from travel_platform.telemetry.teltonika.hydrate_live import (
+            hydrate_tenant_live_from_devices,
+        )
+
+        await hydrate_tenant_live_from_devices(tid)
+    except Exception:
+        pass
+
     live = get_live_fleet()
+    active_rows = await live.list_active_for_admin_async(tenant_uuid)
+    if not active_rows:
+        try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
+                hydrate_tenant_live_from_devices,
+            )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
+
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
+            await hydrate_tenant_live_from_devices(tid, force=True)
+            active_rows = await live.list_active_for_admin_async(tenant_uuid)
+        except Exception:
+            pass
     snapshot = []
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
-    for vehicle in await live.list_active_for_admin_async(tenant_uuid):
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
+    for vehicle in active_rows:
         meta = await live.vehicle_meta_async(tenant_uuid, vehicle.vehicle_id)
         if not meta:
             meta = live._vehicles.get(vehicle.vehicle_id, {})
-        trip_title = await resolve_trip_title(vehicle.trip_id, preferred=meta.get("trip_title"))
+        if not office_allows_live_driver(tid, meta.get("driver_id"), meta):
+            continue
+        from travel_platform.telemetry.active_excursion_resolve import (
+            enrich_meta_with_active_excursion,
+        )
+
+        trip_id, trip_title_hint, meta = enrich_meta_with_active_excursion(
+            tid,
+            meta,
+            vehicle_code=vehicle.vehicle_code,
+            trip_id=vehicle.trip_id,
+        )
+        try:
+            live._vehicles[str(vehicle.vehicle_id)] = {
+                **live._vehicles.get(str(vehicle.vehicle_id), {}),
+                **meta,
+            }
+        except Exception:
+            pass
+        trip_title = await resolve_trip_title(
+            trip_id, preferred=trip_title_hint or meta.get("trip_title")
+        )
+        tracker_signal_at = meta.get("tracker_signal_at")
+        hydrated_from_store = bool(meta.get("hydrated_from_store"))
+        try:
+            from travel_platform.telemetry.tracker_priority import (
+                is_tracker_binding_alive,
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            alive_sec = resolve_tracker_alive_seconds(tid)
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=alive_sec,
+                tenant_id=tid,
+            )
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+
+                device = get_enabled_device_by_vehicle_code(
+                    tid,
+                    meta.get("vehicle_code")
+                    or meta.get("bus_plate")
+                    or vehicle.vehicle_code,
+                )
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                    if "teltonika" not in (gps_sources or []):
+                        gps_sources = ["teltonika", *(gps_sources or [])]
+                    tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
+                    hydrated_from_store = False
+                    if not meta.get("imei") and device.get("imei"):
+                        meta["imei"] = device.get("imei")
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
+            except Exception:
+                pass
+        except Exception:
+            gps_sources = []
+        app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
+        chat_driver_id = str(meta.get("driver_id") or app_driver_id or "").strip() or None
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -359,14 +463,26 @@ async def admin_fleet_egress_ws(
                 "vehicle_code": vehicle.vehicle_code,
                 "bus_plate": meta.get("bus_plate", vehicle.vehicle_code),
                 "driver_name": meta.get("driver_name", "—"),
-                "driver_id": meta.get("driver_id"),
-                "trip_id": vehicle.trip_id,
+                "driver_id": chat_driver_id,
+                "app_driver_id": app_driver_id,
+                "trip_id": trip_id,
                 "trip_title": trip_title or None,
+                "tracking_started_at": meta.get("tracking_started_at"),
                 "lat": vehicle.lat,
                 "lng": vehicle.lng,
                 "speed": vehicle.speed_kmh,
                 "heading": meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(vehicle.engine_on),
+                "idle_seconds_trip": int(vehicle.idle_seconds_trip or 0),
                 "timestamp": vehicle.updated_at.isoformat(),
+                "source": meta.get("source"),
+                "imei": meta.get("imei"),
+                "gps_sources": gps_sources,
+                "app_seen_at": meta.get("app_seen_at"),
+                "tracker_signal_at": tracker_signal_at,
+                "hydrated_from_store": hydrated_from_store,
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))

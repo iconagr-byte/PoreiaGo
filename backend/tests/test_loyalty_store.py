@@ -50,3 +50,26 @@ def test_loyalty_redeem_insufficient_fails():
                 assert False, "expected ValueError"
             except ValueError as exc:
                 assert "Ανεπαρκ" in str(exc)
+
+
+def test_loyalty_delete_account_removes_ledger():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "loyalty_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
+            tid = "99999999-aaaa-bbbb-cccc-dddddddddddd"
+            account = store.upsert_account(tid, {"client_email": "gone@example.com", "display_name": "Gone"})
+            store.post_transaction(
+                tid,
+                {"loyalty_account_id": account["id"], "tx_type": "EARN", "miles": 100},
+            )
+            assert store.delete_account(tid, account["id"]) is True
+            assert store.get_account(tid, account["id"]) is None
+            assert store.list_transactions(tid, account_id=account["id"]) == []
+            assert store.delete_account(tid, account["id"]) is False
+
+
+def test_loyalty_tier_meta():
+    meta = store.tier_meta()
+    assert "SILVER" in meta["tiers"]
+    assert "EARN" in meta["tx_types"]
+    assert any(t["tier"] == "GOLD" for t in meta["thresholds"])
