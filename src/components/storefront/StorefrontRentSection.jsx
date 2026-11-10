@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../../lib/rental/rentServicesCatalog.js';
-import { rentCategoryLabel, withDemoRentFleet } from '../../lib/rental/demoRentFleet.js';
+import { rentCategoryLabel } from '../../lib/rental/demoRentFleet.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 import { countRentFleetByBody } from '../../lib/rental/rentVehicleCategories.js';
 import {

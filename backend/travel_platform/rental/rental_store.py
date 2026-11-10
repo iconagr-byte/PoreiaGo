@@ -163,8 +163,7 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
     return {"lines": lines, "total": round(total, 2), "days": d}
 
 
-# Stable demo fleet (compact cars + vans) — seeded for empty demo offices.
-# Photos are Wikimedia Commons shots of the named models (not mismatched stock cars).
+# Demo fleet marker — used only to purge previously seeded showcase vehicles.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
 _DEMO_BOOKING_MARKER = "demo_rent_booking_v1"
 _WM = "https://upload.wikimedia.org/wikipedia/commons/"
@@ -286,73 +285,15 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
 )
 
 
-def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
-    """Refresh marketing copy + models on seeded demo vehicles (incl. plate remap)."""
-    by_suffix = {spec["id_suffix"]: spec for spec in _DEMO_VEHICLE_SPECS}
-    by_plate = {str(spec["plate_number"]).upper(): spec for spec in _DEMO_VEHICLE_SPECS}
-    updated = 0
-    now = _now()
-    for row in data.get("vehicles") or []:
-        if row.get("tenant_id") != tenant_id:
-            continue
-        if str(row.get("notes") or "") != _DEMO_FLEET_MARKER:
-            continue
-        vid = str(row.get("id") or "")
-        plate = str(row.get("plate_number") or "").strip().upper()
-        spec = by_plate.get(plate)
-        if not spec:
-            suffix = None
-            for key in by_suffix:
-                if vid.endswith(key) or key in vid:
-                    suffix = key
-                    break
-            if not suffix:
-                model = str(row.get("model") or "").strip().lower()
-                for key, candidate in by_suffix.items():
-                    if str(candidate.get("model") or "").strip().lower() == model:
-                        suffix = key
-                        break
-            spec = by_suffix.get(suffix) if suffix else None
-        if not spec:
-            continue
-        changed = False
-        for field, cast in (
-            ("model", str),
-            ("category", str),
-            ("seating_capacity", int),
-            ("daily_rate_eur", float),
-            ("one_way_surcharge_eur", float),
-            ("with_driver_daily_eur", float),
-            ("description", str),
-        ):
-            new_val = cast(spec.get(field))
-            old_val = row.get(field)
-            if field in ("daily_rate_eur", "one_way_surcharge_eur", "with_driver_daily_eur"):
-                try:
-                    if float(old_val or 0) != float(new_val):
-                        row[field] = float(new_val)
-                        changed = True
-                except (TypeError, ValueError):
-                    row[field] = float(new_val)
-                    changed = True
-            elif field == "seating_capacity":
-                if int(old_val or 0) != int(new_val):
-                    row[field] = int(new_val)
-                    changed = True
-            else:
-                if str(old_val or "").strip() != str(new_val or "").strip():
-                    row[field] = new_val
-                    changed = True
-        new_photo = str(spec.get("photo_url") or "").strip()
-        old_photo = str(row.get("photo_url") or "").strip()
-        if new_photo and old_photo != new_photo:
-            row["photo_url"] = new_photo
-            row["photo_urls"] = [new_photo]
-            changed = True
-        if changed:
-            row["updated_at"] = now
-            updated += 1
-    return updated
+def _is_demo_vehicle_row(row: dict[str, Any]) -> bool:
+    notes = str(row.get("notes") or "")
+    if notes == _DEMO_FLEET_MARKER:
+        return True
+    vid = str(row.get("id") or "")
+    if vid.startswith("demo-rent-"):
+        return True
+    plate = str(row.get("plate_number") or "").strip().upper()
+    return plate.startswith("DEMO-C") or plate.startswith("DEMO-V")
 
 
 def demo_rental_fleet_allowed() -> bool:
@@ -378,40 +319,36 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
-        existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
-        if existing:
-            if _refresh_demo_fleet_copy(data, tid):
-                _write(data)
-            return 0
-        now = _now()
-        added = 0
-        for spec in _DEMO_VEHICLE_SPECS:
-            photo = str(spec.get("photo_url") or "").strip() or None
-            row = {
-                "id": f"demo-rent-{tid[:8]}-{spec['id_suffix']}",
-                "tenant_id": tid,
-                "plate_number": spec["plate_number"],
-                "category": spec["category"],
-                "model": spec["model"],
-                "seating_capacity": int(spec["seating_capacity"]),
-                "current_status": "AVAILABLE",
-                "current_mileage": int(spec.get("current_mileage") or 0),
-                "daily_rate_eur": float(spec["daily_rate_eur"]),
-                "one_way_surcharge_eur": float(spec.get("one_way_surcharge_eur") or 0),
-                "with_driver_daily_eur": float(spec.get("with_driver_daily_eur") or 0),
-                "gps_device_id": None,
-                "photo_url": photo,
-                "photo_urls": [photo] if photo else [],
-                "description": spec.get("description"),
-                "notes": _DEMO_FLEET_MARKER,
-                "created_at": now,
-                "updated_at": now,
-            }
-            data["vehicles"].append(row)
-            added += 1
-        if added:
-            _write(data)
-        return added
+        vehicles = list(data.get("vehicles") or [])
+        demo_ids = {
+            str(v.get("id"))
+            for v in vehicles
+            if v.get("tenant_id") == tid and _is_demo_vehicle_row(v)
+        }
+        if not demo_ids:
+            return {"vehicles": 0, "bookings": 0}
+        data["vehicles"] = [
+            v
+            for v in vehicles
+            if not (v.get("tenant_id") == tid and str(v.get("id")) in demo_ids)
+        ]
+        bookings = list(data.get("bookings") or [])
+        kept_bookings = []
+        removed_bookings = 0
+        for b in bookings:
+            if b.get("tenant_id") == tid and str(b.get("vehicle_id") or "") in demo_ids:
+                removed_bookings += 1
+                continue
+            kept_bookings.append(b)
+        data["bookings"] = kept_bookings
+        _write(data)
+        return {"vehicles": len(demo_ids), "bookings": removed_bookings}
+
+
+def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
+    """Deprecated no-op — demo rent fleet is no longer seeded."""
+    purge_demo_rental_fleet(tenant_id)
+    return 0
 
 
 def _ensure_demo_sign_vehicle(tenant_id: str) -> dict[str, Any]:

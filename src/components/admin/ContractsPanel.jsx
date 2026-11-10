@@ -367,7 +367,7 @@ export default function ContractsPanel({
                 {rentOnly ? 'Rent ενεργό' : 'Rent add-on ενεργό'}
               </span>
             )}
-            {!checkoutReady && !demoMode && billingConfig && (
+            {!checkoutReady && billingConfig && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900">
                 <span className="material-symbols-outlined text-[16px]">info</span>
                 Πληρωμές σε ρύθμιση

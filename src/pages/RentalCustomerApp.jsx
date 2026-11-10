@@ -162,11 +162,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((rows) => {
         if (cancelled) return;
         // Showcase: office fleet, or Hertz-like demo cards when empty.
-        setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24)));
+        setHomeFleet(enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24)));
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -770,7 +770,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        const sliced = enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24));
+        const sliced = enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24));
         setHomeFleet(sliced);
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
@@ -784,7 +784,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
