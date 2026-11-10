@@ -56,10 +56,12 @@ async def _require_admin(payload: Annotated[dict, Depends(get_token_payload)]) -
 
 @router.get("/config")
 async def push_config(_: Annotated[dict, Depends(_require_admin)]):
-    ensure_web_push_keys()
+    ensured = ensure_web_push_keys()
+    enabled = web_push_configured()
     return {
-        "enabled": web_push_configured(),
+        "enabled": enabled,
         "public_key": get_public_vapid_key(),
+        "reason": None if enabled else ("ensure_failed" if not ensured else "vapid_not_configured"),
     }
 
 
@@ -68,12 +70,14 @@ async def push_status(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     _: Annotated[dict, Depends(_require_admin)],
 ):
-    ensure_web_push_keys()
+    ensured = ensure_web_push_keys()
+    enabled = web_push_configured()
     subs = list_subscriptions_for_tenant(str(tenant_id), audience="admin")
     return {
-        "enabled": web_push_configured(),
+        "enabled": enabled,
         "subscribed": len(subs) > 0,
         "devices": len(subs),
+        "reason": None if enabled else ("ensure_failed" if not ensured else "vapid_not_configured"),
     }
 
 
@@ -84,6 +88,7 @@ async def push_subscribe(
     _: Annotated[dict, Depends(_require_admin)],
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ):
+    ensure_web_push_keys()
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
     try:
@@ -115,10 +120,19 @@ async def push_unsubscribe(
     return {"ok": True}
 
 
+class AdminPushTestRequest(BaseModel):
+    """Optional email — JWT often has no email claim; client sends saas_user_email."""
+
+    email: EmailStr | None = None
+    # Prefer the browser that clicked «Δοκιμή push» so the phone gets the ping.
+    endpoint: str | None = Field(default=None, min_length=8)
+
+
 @router.post("/test")
 async def push_test(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     payload: Annotated[dict, Depends(_require_admin)],
+    body_in: AdminPushTestRequest = AdminPushTestRequest(),
 ):
     """Send an immediate test Web Push to admin devices for this tenant."""
     from travel_platform.notifications.push_subscription_store import (
@@ -136,22 +150,29 @@ async def push_test(
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
 
-    email = str(payload.get("email") or "").strip().lower()
+    import time
+
+    email = str(body_in.email or payload.get("email") or "").strip().lower()
+    prefer_endpoint = str(body_in.endpoint or "").strip()
     body = {
         "title": "Δοκιμή Push — PoreiaGo",
-        "body": "Οι ειδοποιήσεις βάρδιας λειτουργούν σε αυτόν τον υπολογιστή.",
-        "tag": "admin-push-test",
+        "body": "Οι ειδοποιήσεις γραφείου λειτουργούν σε αυτή τη συσκευή.",
+        "tag": f"admin-push-test-{int(time.time())}",
         "url": "/admin?tab=fleet_live_map",
         "data": {"type": "driver_shift", "event": "test", "tab": "fleet_live_map"},
         "requireInteraction": True,
+        "renotify": True,
     }
 
     seen: set[str] = set()
     attempted = 0
     sent = 0
+    errors: list[str] = []
+    this_device_sent = False
+    this_device_error: str | None = None
 
     async def _try(sub: dict) -> None:
-        nonlocal attempted, sent
+        nonlocal attempted, sent, this_device_sent, this_device_error
         endpoint = str(sub.get("endpoint") or "")
         if not endpoint or endpoint in seen:
             return
@@ -160,6 +181,30 @@ async def push_test(
         result = await send_push_to_subscription(sub, body)
         if result.get("sent"):
             sent += 1
+            if prefer_endpoint and endpoint == prefer_endpoint:
+                this_device_sent = True
+        elif result.get("error"):
+            err = str(result["error"])[:160]
+            errors.append(err)
+            if prefer_endpoint and endpoint == prefer_endpoint:
+                this_device_error = err
+        elif result.get("removed"):
+            err = "ληγμένη εγγραφή push — ενεργοποιήστε ξανά"
+            errors.append(err)
+            if prefer_endpoint and endpoint == prefer_endpoint:
+                this_device_error = err
+
+    # Hit THIS device first (the phone/browser that clicked Δοκιμή).
+    if prefer_endpoint:
+        for pool in (
+            list_subscriptions_for_tenant(str(tenant_id), audience="admin"),
+            list_subscriptions_for_email(email, audience="admin") if email else [],
+            list_all_subscriptions(audience="admin"),
+        ):
+            match = next((s for s in pool if str(s.get("endpoint") or "") == prefer_endpoint), None)
+            if match:
+                await _try(match)
+                break
 
     for sub in list_subscriptions_for_tenant(str(tenant_id), audience="admin"):
         await _try(sub)
@@ -173,6 +218,14 @@ async def push_test(
     if attempted == 0:
         raise HTTPException(
             status_code=404,
-            detail="Δεν υπάρχει εγγραφή push — πατήστε «Ενεργοποίηση push» πρώτα",
+            detail="Δεν υπάρχει εγγραφή push — πατήστε «Ενεργοποίηση push» πρώτα σε ΑΥΤΗ τη συσκευή",
         )
-    return {"ok": True, "attempted": attempted, "sent": sent}
+    return {
+        "ok": True,
+        "attempted": attempted,
+        "sent": sent,
+        "errors": errors[:5],
+        "email": email or None,
+        "this_device_sent": this_device_sent if prefer_endpoint else None,
+        "this_device_error": this_device_error,
+    }

@@ -1,0 +1,58 @@
+/**
+ * Compact labels for live-map bus pins: excursion badge + driver/speed pill.
+ */
+
+import { getTripById } from '../trips/tripStore.js';
+
+export function resolveVehicleTripTitle(vehicle) {
+  if (!vehicle) return '';
+  const direct =
+    vehicle.trip_title ||
+    vehicle.tripTitle ||
+    vehicle.excursion_name ||
+    vehicle.excursionName ||
+    '';
+  if (String(direct).trim()) return String(direct).trim();
+
+  const tripId = vehicle.trip_id ?? vehicle.tripId;
+  if (tripId == null || tripId === '') return '';
+  try {
+    const trip = getTripById(tripId);
+    if (trip?.title) return String(trip.title).trim();
+  } catch {
+    /* office trip catalog may be empty */
+  }
+  return `Εκδρομή #${tripId}`;
+}
+
+/** Dedicated excursion tab above the bus — only when an active trip is bound. */
+export function formatFleetExcursionBadge(vehicle) {
+  if (vehicle?.is_rental || vehicle?.rental_overlay) return '';
+  return resolveVehicleTripTitle(vehicle);
+}
+
+/** True when the bus is bound to an active excursion (live blue trail allowed). */
+export function vehicleHasActiveExcursion(vehicle) {
+  if (!vehicle || vehicle.is_rental || vehicle.rental_overlay) return false;
+  const tripId = Number(vehicle.trip_id ?? vehicle.tripId);
+  if (Number.isFinite(tripId) && tripId > 0) return true;
+  return Boolean(resolveVehicleTripTitle(vehicle));
+}
+
+export function formatFleetBusPillLabel(vehicle, { shortDriver = true } = {}) {
+  const speed = Math.round(Number(vehicle?.speed) || Number(vehicle?.speed_kmh) || 0);
+  if (vehicle?.is_rental || vehicle?.rental_overlay) {
+    const plate = vehicle.bus_plate || vehicle.vehicle_code || vehicle.plate_number || '';
+    const device = vehicle.gps_device_id || vehicle.rental_overlay?.gps_device_id || '';
+    // Fleet hardware identity only — never renter personal name on the live map.
+    if (plate) return `Ενοικίαση · ${plate} · ${speed} km/h`;
+    if (device) return `Ενοικίαση · device ${device} · ${speed} km/h`;
+    return `Ενοικίαση · ${speed} km/h`;
+  }
+  const rawName = String(vehicle?.driver_name || vehicle?.driverName || 'Οδηγός').trim() || 'Οδηγός';
+  const driver = shortDriver ? rawName.split(/\s+/)[0] : rawName;
+  const plate = String(vehicle?.bus_plate || vehicle?.vehicle_code || '').trim();
+  // Excursion title lives on the separate badge above the pin — keep pill short.
+  if (plate) return `${plate} · ${speed} km/h`;
+  return `${driver} · ${speed} km/h`;
+}

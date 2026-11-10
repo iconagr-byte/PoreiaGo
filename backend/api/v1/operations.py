@@ -15,6 +15,7 @@ from schemas.platform.operations import (
     MasterQrExchangeResponse,
     MasterQrIssueRequest,
     MasterQrIssueResponse,
+    TripsListResponse,
     TripsSyncRequest,
     TripsSyncResponse,
     SafetyChecklistSubmit,
@@ -64,6 +65,16 @@ async def exchange_master_qr(
     return MasterQrExchangeResponse(**result)
 
 
+@router.get("/trips", response_model=TripsListResponse)
+async def list_trips(
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.operations.trips_sync import list_office_trips
+
+    rows = await list_office_trips(str(tenant_id))
+    return TripsListResponse(trips=rows, tenant_id=str(tenant_id))
+
+
 @router.post("/trips/sync", response_model=TripsSyncResponse)
 async def sync_trips(
     body: TripsSyncRequest,
@@ -72,7 +83,12 @@ async def sync_trips(
     from travel_platform.operations.trips_sync import sync_trips_to_postgres
 
     payload = [t.model_dump() for t in body.trips]
-    result = await sync_trips_to_postgres(payload, tenant_id=str(tenant_id))
+    result = await sync_trips_to_postgres(
+        payload,
+        tenant_id=str(tenant_id),
+        replace_catalog=bool(body.replace_catalog),
+        prune_missing=bool(getattr(body, "prune_missing", False)),
+    )
     return TripsSyncResponse(**result)
 
 

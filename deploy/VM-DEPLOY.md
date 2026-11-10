@@ -5,12 +5,92 @@
 Το `vm-deploy-all.sh`:
 
 1. `git fetch` + `reset --hard origin/main` (όχι `git pull` — αποφεύγει conflicts από παλιές χειροκίνητες αλλαγές στο VM)
-2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys)
-3. Διορθώνει Traefik (ACME email, απενεργοποίηση λάθος dynamic configs)
+2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys, hybrid provider placeholders)
+3. Επιλέγει edge proxy: **Traefik** (default) ή **Nginx Proxy Manager** (`USE_NPM=1` / auto-detect `nginx-proxy*`)
 4. `npm run build` frontend
 5. `docker build` API
-6. `docker compose up` (Traefik, API, frontend, Postgres, Redis)
+6. `docker compose up` (API, frontend, Postgres, Redis — Traefik μόνο αν δεν τρέχει NPM)
 
+### Contabo / Nginx Proxy Manager
+
+Αν το VPS έχει ήδη **Nginx Proxy Manager** στα ports 80/443 (π.χ. Contabo `169.58.199.186`),
+το deploy **δεν** ξεκινά Traefik — αλλιώς παίρνεις `Bind for 0.0.0.0:80 failed`.
+
+1. Στο `deploy/.env.prod` (συνιστάται· αλλιώς auto-detect από container/image ή κατειλημμένο :80):
+   ```
+   USE_NPM=1
+   EDGE_PROXY=npm
+   ```
+
+2. **Office subdomains (automatic — customers never touch DNS)**  
+   PoreiaGo publishes one platform wildcard so every office opens as
+   `https://{slug}.poreiago.com` without the customer configuring anything:
+
+   | Name | Type | Value |
+   |------|------|-------|
+   | `*` | A | `169.58.199.186` (Contabo) |
+
+   Cloud DNS (project that owns `poreiago.com`) → Add record once, **or** set
+   `GCP_PROJECT_ID` + `GCP_DNS_ZONE` + `GCP_SA_JSON` in repo Actions secrets /
+   `deploy/.env.prod` and run **Ensure platform wildcard DNS** / Deploy VPS
+   (`deploy/scripts/ensure-platform-wildcard-dns.sh`).
+
+   NPM also needs one platform proxy host: `*.poreiago.com` → `127.0.0.1:8003`
+   (+ wildcard SSL). See `deploy/scripts/ensure-npm-platform-wildcard.sh`.
+
+3. NPM proxy hosts (Forward to):
+   | Domain | Forward |
+   |--------|---------|
+   | `api.poreiago.com` | `127.0.0.1:8004` |
+   | `poreiago.com`, `www.poreiago.com` | `127.0.0.1:8003` |
+   | `*.poreiago.com` (all offices) | `127.0.0.1:8003` |
+   | `www.achilliotravel.com`, `achilliotravel.com` | `127.0.0.1:8003` |
+
+### Custom domain για οποιοδήποτε γραφείο (όπως Achillio)
+
+Στο **Domain & εμφάνιση** του γραφείου:
+
+1. Βάλε το apex (π.χ. `myagency.gr`) και **Αποθήκευση**
+2. Στον DNS πάροχο: `www` **CNAME** → `www.poreiago.com` · προαιρετικά `@` **A** → `169.58.199.186`
+3. Πάτα **Έλεγχος DNS** (live CNAME/A) και **Edge sync**
+
+Το API μετά την αποθήκευση: ενημερώνει Traefik YAML (αν υπάρχει), ξαναγράφει το nginx
+`apex-www-redirect.map` (apex→www για κάθε office), και αν στο `.env.prod` έχεις:
+
+```
+EDGE_PROXY=npm
+NPM_API_URL=http://127.0.0.1:81
+NPM_EMAIL=admin@example.com
+NPM_PASSWORD=…
+```
+
+κάνει upsert Proxy Host `www.{domain}` + Redirection Host apex→www (ίδιο pattern με Achillio).
+Χωρίς NPM credentials, το DNS check + nginx map δουλεύουν· το Proxy Host ανοίγεται μία φορά στο NPM UI.
+
+4. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει, ανανεώνει το `dist/`
+   **και** εγκαθιστά το `deploy/nginx/frontend.conf` ώστε το `/api` να πηγαίνει στο api-blue
+   (χωρίς αυτό το Contabo έδινε 405 στο login).
+
+5. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
+
+### Achillio Travel backoffice δεν ανοίγει
+
+Γρήγορο repair στο Contabo (ασφαλές για poreiago.com):
+
+```bash
+cd /opt/poreiago
+# Προαιρετικά — νέος/reset admin μόνο για Achillio Travel (μην το βάλεις στο git):
+# export ACHILLIO_ADMIN_EMAIL='axilleas0@yahoo.gr'
+# export ACHILLIO_ADMIN_PASSWORD='…'
+bash deploy/scripts/repair-achillio-office.sh
+```
+
+Το script: δημιουργεί/διορθώνει το γραφείο `admin-achillio-gr` με
+`custom_domain=achilliotravel.com`, καθαρίζει poisoned domain από το seed `achillio`,
+και φτιάχνει το nginx `/api` proxy.
+
+Live **Aviationstack / Twilio** keys: βάλε τα στο `deploy/.env.prod` (δες `deploy/HYBRID-PROVIDERS.md`).
+Χωρίς keys το hybrid μένει σε stub mode.
 ## Βήμα 1 — GitHub Desktop
 
 Κάνε **Push** στο repo `PoreiaGo` (όλα τα νέα αρχεία).
@@ -79,7 +159,48 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
 
 **Push οδηγού:** Driver → Αρχική → Ενεργοποίηση push → Back Office → Master QR → Push οδηγού
 
+## Custom domain SSL (π.χ. Achillio)
+
+Το `https://www.achilliotravel.com` πρέπει να δείχνει στο **Contabo** (`169.58.199.186`)
+μέσω CNAME στο `www.poreiago.com` (ή A record στο ίδιο IP). Αν ο browser δείχνει
+**«Μη ασφαλής σύνδεση»** στο `https://achilliotravel.com` (χωρίς www), το apex A record
+ακόμα δείχνει στο παλιό hosting (GCP / intechs), όχι στο VPS.
+
+Στο DNS του domain (intechs / όπου είναι τα NS):
+
+| Τύπος | Όνομα | Τιμή |
+|-------|--------|------|
+| A | `@` (achilliotravel.com) | `169.58.199.186` |
+| CNAME | `www` | `www.poreiago.com` |
+
+Μετά το DNS (συνήθως λίγα λεπτά–ώρες), στο NPM:
+
+1. **Redirection Host** (προτιμητέο για Google SERP):  
+   `achilliotravel.com` → `https://www.achilliotravel.com` με **301 Permanent**.  
+   Έτσι το Google ενώνει apex + www σε ένα URL και σταματάει παλιούς τίτλους (π.χ. PoreiaGo).
+2. Ή Proxy Host για το apex με SSL Let’s Encrypt (το nginx κάνει 301 → www όταν
+   περνάει `Host` / `X-Forwarded-Host`).
+
+Στα Proxy Hosts (poreiago + achillio) κράτα **`X-Forwarded-Host` = `$host`** (NPM
+Advanced → custom nginx). Το frontend διαλέγει shell από Host/XFH:
+`index.html` = PoreiaGo, `index.achillio.html` = Achillio Travel. Αν λείπει το
+XFH, το Contabo σερβίρει το default PoreiaGo και το Google δεν πρέπει να βλέπει
+Achillio meta στο `poreiago.com/grafeia`.
+
+Στο Postgres το `tenants.custom_domain` πρέπει να είναι `achilliotravel.com` **μόνο**
+στο γραφείο Achillio Travel (`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh`
+αν λείπει.
+
+Παλιό GCP IP `34.141.98.145` **μην** το αφήνεις στο apex — το HTTPS αποτυγχάνει.
+
 ## Secrets
 
 - `deploy/.env.prod` — δεν ανεβαίνει στο GitHub
 - `deploy/.vapid_private.pem` — δημιουργείται αυτόματα στο VM
+
+## Google Sign-In (My Wallet)
+
+Βλ. **[deploy/GOOGLE-SIGNIN.md](./GOOGLE-SIGNIN.md)**.
+
+Χωρίς `GOOGLE_CLIENT_ID` στο `.env.prod` (ή Actions secret `GOOGLE_CLIENT_ID`)
+το κουμπί Google στο login παραμένει ανενεργό.

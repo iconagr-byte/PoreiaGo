@@ -51,12 +51,16 @@ def stripe_readiness() -> dict:
             missing.append(env_name)
     checkout_ready = not missing
     portal_ready = bool(settings.stripe_secret_key)
-    plans = ["starter", "professional"]
+    # Demo signup only when explicitly enabled — never auto-fallback when Stripe
+    # is missing (that made /grafeia/signup always show «Demo πληρωμή» in prod).
+    demo_mode = bool(getattr(settings, "billing_demo_mode", False))
+    plans = ["starter", "professional", "rent"]
     if settings.stripe_price_enterprise:
         plans.append("enterprise")
     return {
         "checkout_ready": checkout_ready,
         "portal_ready": portal_ready,
+        "demo_mode": demo_mode,
         "missing_env": missing,
         "plans": plans,
         "trial_days": TRIAL_DAYS,
@@ -84,6 +88,9 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
         TenantPlan.ENTERPRISE: (
             settings.stripe_price_enterprise_yearly if yearly else settings.stripe_price_enterprise
         ),
+        TenantPlan.RENT: (
+            settings.stripe_price_rent_yearly if yearly else settings.stripe_price_rent
+        ),
     }
     price_id = mapping.get(plan, "")
     if not price_id and yearly:
@@ -91,6 +98,7 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
             TenantPlan.STARTER: settings.stripe_price_starter,
             TenantPlan.PROFESSIONAL: settings.stripe_price_professional,
             TenantPlan.ENTERPRISE: settings.stripe_price_enterprise,
+            TenantPlan.RENT: settings.stripe_price_rent,
         }
         price_id = mapping_monthly.get(plan, "")
     if not price_id:
@@ -103,10 +111,28 @@ def _plan_base_cents(plan: TenantPlan, *, billing_interval: str = "month") -> in
         TenantPlan.STARTER: 9900,
         TenantPlan.PROFESSIONAL: 29900,
         TenantPlan.ENTERPRISE: 0,
+        TenantPlan.RENT: 14900,
     }.get(plan, 9900)
     if billing_interval == "year" and monthly:
         return monthly * 10
     return monthly
+
+
+def _is_missing_subscription_plan_error(exc: BaseException) -> bool:
+    """True when Postgres/ORM choke on a missing or drifted subscriptions.plan."""
+    msg = str(exc or "").lower()
+    if "subscriptions" in msg and "plan" in msg:
+        return True
+    if "undefinedcolumn" in msg.replace(" ", "") or "undefined column" in msg:
+        return "plan" in msg or "subscription" in msg
+    # asyncpg / SQLAlchemy wrappers
+    orig = getattr(exc, "orig", None)
+    if orig is not None and orig is not exc:
+        return _is_missing_subscription_plan_error(orig)
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and cause is not exc:
+        return _is_missing_subscription_plan_error(cause)
+    return False
 
 
 def _status_from_stripe(raw: str | None) -> SubscriptionStatus:
@@ -134,6 +160,31 @@ class BillingService:
         return result.scalar_one_or_none()
 
     async def get_or_create_subscription(self, tenant: Tenant) -> Subscription:
+        """
+        Load or create the office subscription row.
+
+        Contabo DBs sometimes miss ``subscriptions.plan`` — ORM SELECT then
+        500s on Συμβόλαιο. Heal the column and retry once.
+        """
+        try:
+            return await self._get_or_create_subscription_once(tenant)
+        except Exception as exc:
+            if not _is_missing_subscription_plan_error(exc):
+                raise
+            logger.warning(
+                "subscriptions.plan missing/corrupt — healing then retry tenant=%s",
+                tenant.id,
+            )
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            from app.services.tenant_modules import _heal_subscription_plan_column
+
+            await _heal_subscription_plan_column(self._session)
+            return await self._get_or_create_subscription_once(tenant)
+
+    async def _get_or_create_subscription_once(self, tenant: Tenant) -> Subscription:
         sub = await self.get_subscription(tenant.id)
         if sub:
             return sub
@@ -179,10 +230,11 @@ class BillingService:
         _stripe_client()
         line_items = [{"price": price_id, "quantity": 1}]
         settings = self._settings
-        if settings.stripe_price_metered_bus:
-            line_items.append({"price": settings.stripe_price_metered_bus})
-        if settings.stripe_price_metered_trip:
-            line_items.append({"price": settings.stripe_price_metered_trip})
+        if target_plan != TenantPlan.RENT:
+            if settings.stripe_price_metered_bus:
+                line_items.append({"price": settings.stripe_price_metered_bus})
+            if settings.stripe_price_metered_trip:
+                line_items.append({"price": settings.stripe_price_metered_trip})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -255,10 +307,11 @@ class BillingService:
         _stripe_client()
         line_items = [{"price": price_id, "quantity": 1}]
         settings = self._settings
-        if settings.stripe_price_metered_bus:
-            line_items.append({"price": settings.stripe_price_metered_bus})
-        if settings.stripe_price_metered_trip:
-            line_items.append({"price": settings.stripe_price_metered_trip})
+        if plan != TenantPlan.RENT:
+            if settings.stripe_price_metered_bus:
+                line_items.append({"price": settings.stripe_price_metered_bus})
+            if settings.stripe_price_metered_trip:
+                line_items.append({"price": settings.stripe_price_metered_trip})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -288,6 +341,88 @@ class BillingService:
         await self._session.flush()
         return {"checkout_url": session.url, "session_id": session.id}
 
+    async def create_signup_demo_session(
+        self,
+        *,
+        legal_name: str,
+        admin_email: str,
+        subdomain: str,
+        password: str,
+        plan: TenantPlan = TenantPlan.STARTER,
+        billing_interval: str = "month",
+    ) -> dict:
+        """Provision a new office without Stripe charge (demo / trial signup)."""
+        readiness = stripe_readiness()
+        if not readiness.get("demo_mode"):
+            raise ValueError("Demo signup is disabled — use Stripe checkout")
+        if plan == TenantPlan.ENTERPRISE:
+            raise ValueError("Enterprise requires sales contact")
+
+        subdomain_norm = subdomain.strip().lower()
+        taken = await self._session.execute(
+            select(Tenant.id).where(
+                or_(Tenant.slug == subdomain_norm, Tenant.subdomain == subdomain_norm),
+            ).limit(1),
+        )
+        if taken.scalar_one_or_none():
+            raise ValueError("Subdomain already taken")
+
+        interval = billing_interval if billing_interval in ("month", "year") else "month"
+        isolation = (
+            "database"
+            if plan == TenantPlan.ENTERPRISE
+            else "schema"
+            if plan == TenantPlan.PROFESSIONAL
+            else "shared_rls"
+        )
+        password_hash = hash_password(password)
+        job = TenantProvisioningJob(
+            id=uuid4(),
+            status=ProvisioningJobStatus.PENDING.value,
+            isolation_strategy=isolation,
+            payload={
+                "legal_name": legal_name.strip(),
+                "admin_email": admin_email.lower().strip(),
+                "subdomain": subdomain_norm,
+                "plan": plan.value,
+                "billing_interval": interval,
+                "admin_password_hash": password_hash,
+                "demo": True,
+            },
+        )
+        self._session.add(job)
+        await self._session.flush()
+
+        demo_customer_id = f"demo_cus_{job.id.hex[:16]}"
+        demo_sub_id = f"demo_sub_{job.id.hex[:16]}"
+        provisioning = TenantProvisioningServiceFacade(self._session)
+        tenant = await provisioning.provision_from_stripe_checkout(
+            stripe_customer_id=demo_customer_id,
+            stripe_subscription_id=demo_sub_id,
+            plan=plan,
+            legal_name=legal_name.strip(),
+            admin_email=admin_email.lower().strip(),
+            admin_password_hash=password_hash,
+            subdomain_hint=subdomain_norm,
+        )
+
+        job.tenant_id = tenant.id
+        job.status = ProvisioningJobStatus.COMPLETED.value
+        job.completed_at = datetime.now(timezone.utc)
+        job.stripe_checkout_session_id = f"demo_cs_{job.id.hex[:16]}"
+        await self._session.flush()
+
+        success = self._settings.billing_signup_success_url
+        sep = "&" if "?" in success else "?"
+        checkout_url = f"{success}{sep}demo=1&tenant={tenant.slug}&billing=success"
+        logger.info("Demo signup provisioned: tenant=%s job=%s", tenant.slug, job.id)
+        return {
+            "checkout_url": checkout_url,
+            "session_id": job.stripe_checkout_session_id,
+            "demo": True,
+            "tenant_slug": tenant.slug,
+        }
+
     async def create_portal_session(self, tenant: Tenant) -> dict:
         customer_id = await self.ensure_stripe_customer(tenant)
         _stripe_client()
@@ -304,9 +439,9 @@ class BillingService:
         plan: TenantPlan,
         billing_interval: str = "month",
     ) -> Subscription:
-        """14-day trial without Stripe — only when checkout is not configured."""
+        """14-day trial without Stripe — when demo mode is on or Stripe is not configured."""
         readiness = stripe_readiness()
-        if readiness["checkout_ready"]:
+        if readiness.get("checkout_ready") and not readiness.get("demo_mode"):
             raise ValueError("Stripe checkout is configured — use checkout-session")
         if plan == TenantPlan.ENTERPRISE:
             raise ValueError("Enterprise requires sales contact")
@@ -326,6 +461,32 @@ class BillingService:
         await self._session.flush()
         logger.info("Local trial started: tenant=%s plan=%s", tenant.slug, plan.value)
         return sub
+
+    async def cancel_stripe_subscription_best_effort(self, tenant_id: UUID) -> None:
+        """Cancel remote Stripe subscription before a hard tenant delete (no-op if none)."""
+        sub = await self.get_subscription(tenant_id)
+        if not sub:
+            return
+        stripe_sub_id = str(sub.stripe_subscription_id or "").strip()
+        if not stripe_sub_id or stripe_sub_id.startswith("demo_"):
+            if sub.status != SubscriptionStatus.CANCELED:
+                sub.status = SubscriptionStatus.CANCELED
+                sub.canceled_at = datetime.now(timezone.utc)
+            return
+        try:
+            _stripe_client()
+            stripe.Subscription.cancel(stripe_sub_id)
+            sub.status = SubscriptionStatus.CANCELED
+            sub.canceled_at = datetime.now(timezone.utc)
+            sub.cancel_at_period_end = False
+            logger.info("Stripe subscription canceled before tenant delete: %s", stripe_sub_id)
+        except Exception:
+            logger.warning(
+                "Stripe cancel failed for tenant %s sub %s — continuing local delete",
+                tenant_id,
+                stripe_sub_id,
+                exc_info=True,
+            )
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(
