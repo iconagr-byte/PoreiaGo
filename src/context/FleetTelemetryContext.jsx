@@ -387,9 +387,11 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
     let closed = false;
-    let pollTimer = null;
     let ws = null;
     let mode = 'poll';
+    let pollMs = 3000;
+    let pollTimer = null;
+    let emptyPollStreak = 0;
 
     const wipeVehicles = () => {
       vehicleCountRef.current = 0;
@@ -455,6 +457,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           setPollError('');
           setLastPollAt(new Date());
           setConnected(true);
+          pollMs = 3000;
           if (mode !== 'ws') {
             mode = 'poll';
             setTransport('poll');
@@ -486,7 +489,9 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
-              : raw || 'Αποτυχία φόρτωσης live στόλου';
+              : isGateway
+                ? 'Προσωρινή αποτυχία σύνδεσης με το API (502). Κρατάμε το τελευταίο στίγμα — επανασύνδεση…'
+                : raw || 'Αποτυχία φόρτωσης live στόλου';
           setPollError(msg);
           scheduleNext();
         });
