@@ -1,0 +1,15 @@
+# Public Google OAuth Web Client ID (safe to commit — embedded in the browser).
+# Used as deploy fallback when GOOGLE_CLIENT_ID is unset in .env.prod / Actions secrets.
+# Client Secret is NOT stored here and is not required for GIS ID-token Sign-In.
+#
+# Must be the Web application client in the SAME GCP project as the Android
+# OAuth client (package com.poreiago.wallet + debug SHA-1).
+#
+# Console: Authorized JavaScript origins must include:
+#   https://www.achilliotravel.com
+#   https://achilliotravel.com
+#   https://www.poreiago.com
+#   http://localhost:5173
+#
+# See deploy/GOOGLE-SIGNIN.md
+967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com

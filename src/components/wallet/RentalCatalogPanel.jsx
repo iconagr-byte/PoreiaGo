@@ -8,26 +8,9 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
-import { fetchPublicPaymentSettings } from '../../services/paymentSettingsApi.js';
-import { toLegacyCheckoutShape } from '../../lib/payments/paymentSettings.js';
-import {
-  amountDueAtCheckout,
-  computeDepositSplit,
-  PAYMENT_PLAN_DEPOSIT,
-  PAYMENT_PLAN_FULL,
-} from '../../lib/payments/depositPayment.js';
-import { getCheckoutPaymentMethods } from '../../lib/payments/bankTransfer.js';
-import {
-  getRentalPaymentPlans,
-  paymentStatusLabel,
-} from '../../lib/rental/rentalPayment.js';
+import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
-const CATEGORIES = [
-  { value: '', label: 'Όλες' },
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -238,6 +221,8 @@ export default function RentalCatalogPanel({
         dropoff_location: raw.dropoff_location || f.dropoff_location,
         driver_mode: raw.driver_mode || f.driver_mode,
         client_phone: raw.client_phone || f.client_phone,
+        start_time: raw.start_time || f.start_time,
+        end_time: raw.end_time || f.end_time,
       }));
       if (raw.sortBy) setSortBy(raw.sortBy);
       if (raw.priceCap) setPriceCap(Number(raw.priceCap));
@@ -248,15 +233,19 @@ export default function RentalCatalogPanel({
 
   useEffect(() => {
     try {
+      const prev = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       localStorage.setItem(
         PREFS_KEY,
         JSON.stringify({
+          ...prev,
           category: form.category,
           min_seats: form.min_seats,
           pickup_location: form.pickup_location,
           dropoff_location: form.dropoff_location,
           driver_mode: form.driver_mode,
           client_phone: form.client_phone,
+          start_time: form.start_time,
+          end_time: form.end_time,
           sortBy,
           priceCap,
         }),
@@ -329,10 +318,10 @@ export default function RentalCatalogPanel({
       return;
     }
     if (!validateDates()) return;
-    if (!paymentMethods.length) {
-      toast.error('Δεν υπάρχουν διαθέσιμοι τρόποι πληρωμής');
-      return;
-    }
+    const extras = [];
+    if (form.extra_insurance) extras.push('extra_insurance');
+    if (form.child_seat) extras.push('child_seat');
+    if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
       if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
@@ -347,14 +336,7 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
-        extras: {
-          extra_insurance: Boolean(form.extra_insurance),
-          child_seat: Boolean(form.child_seat),
-          gps_pack: Boolean(form.gps_pack),
-        },
-        payment_plan: paymentPlan,
-        payment_method: paymentMethod,
-        deposit_percent: depositPercent,
+        extras,
       });
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({
