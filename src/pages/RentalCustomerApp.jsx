@@ -72,6 +72,7 @@ import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import OfficeLoginLink from '../components/storefront/OfficeLoginLink.jsx';
 import LoginPage from './LoginPage.jsx';
+import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 

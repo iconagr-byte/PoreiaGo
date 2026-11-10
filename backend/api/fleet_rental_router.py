@@ -211,6 +211,7 @@ async def availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    branch: str | None = None,
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
@@ -224,6 +225,7 @@ async def availability(
             pickup_location=pickup_location,
             dropoff_location=dropoff_location,
             driver_mode=driver_mode,
+            branch=branch,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

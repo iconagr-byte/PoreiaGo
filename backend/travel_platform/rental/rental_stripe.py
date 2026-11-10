@@ -39,13 +39,16 @@ def create_rental_payment_intent(
         import stripe
 
         stripe.api_key = secret
+        meta = {
+            "rental_booking_id": bid,
+            "tenant_id": tid,
+            # Also set booking_id for shared webhook handlers that expect it.
+            "booking_id": bid,
+        }
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="eur",
-            metadata={
-                "rental_booking_id": bid,
-                "tenant_id": tid,
-            },
+            metadata=meta,
             automatic_payment_methods={"enabled": True},
         )
         pi_id = getattr(intent, "id", None) or (intent.get("id") if isinstance(intent, dict) else None)
@@ -74,3 +77,78 @@ def create_rental_payment_intent(
             "currency": "eur",
             "error": str(exc),
         }
+
+
+def create_damage_deposit_hold(
+    booking: dict[str, Any],
+    tenant_id: str | None = None,
+) -> dict[str, Any]:
+    """Optional separate PaymentIntent for damage deposit (manual capture / hold).
+
+    When Stripe unavailable, stores pending_hold amount on the booking JSON only.
+    """
+    from travel_platform.rental import rental_store as store
+
+    secret = _stripe_secret()
+    tid = str(tenant_id or booking.get("tenant_id") or "")
+    bid = str(booking.get("id") or "")
+    amount = float(booking.get("damage_deposit_eur") or store.DEFAULT_DAMAGE_DEPOSIT_EUR)
+    amount_cents = max(0, int(round(amount * 100)))
+    if amount_cents <= 0:
+        return {"demo": True, "held": False, "amount_cents": 0}
+
+    if not secret:
+        try:
+            store.patch_booking_fields(
+                tid,
+                bid,
+                {"damage_deposit_status": "pending_hold", "damage_deposit_eur": amount},
+            )
+        except Exception:
+            pass
+        return {"demo": True, "held": False, "amount_cents": amount_cents, "pending_hold": True}
+
+    try:
+        import stripe
+
+        stripe.api_key = secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency="eur",
+            capture_method="manual",
+            metadata={
+                "rental_booking_id": bid,
+                "tenant_id": tid,
+                "purpose": "damage_deposit",
+            },
+            automatic_payment_methods={"enabled": True},
+        )
+        pi_id = getattr(intent, "id", None) or (intent.get("id") if isinstance(intent, dict) else None)
+        client_secret = getattr(intent, "client_secret", None) or (
+            intent.get("client_secret") if isinstance(intent, dict) else None
+        )
+        if pi_id:
+            store.patch_booking_fields(
+                tid,
+                bid,
+                {
+                    "damage_deposit_intent_id": pi_id,
+                    "damage_deposit_status": "pending_hold",
+                    "damage_deposit_eur": amount,
+                },
+            )
+        return {
+            "demo": False,
+            "client_secret": client_secret,
+            "payment_intent_id": pi_id,
+            "amount_cents": amount_cents,
+            "currency": "eur",
+        }
+    except Exception as exc:
+        logger.warning("damage deposit PI failed booking=%s: %s", bid, exc)
+        store.patch_booking_fields(
+            tid,
+            bid,
+            {"damage_deposit_status": "pending_hold", "damage_deposit_eur": amount},
+        )
+        return {"demo": True, "held": False, "amount_cents": amount_cents, "error": str(exc)}

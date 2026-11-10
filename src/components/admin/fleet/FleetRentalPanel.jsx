@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import {
   createRentalBooking,
   createRentalInspection,
+  confirmRentalBankDeposit,
   deleteRentalVehicle,
   fetchRentalAvailability,
   fetchRentalBookings,
@@ -17,6 +18,7 @@ import {
   fetchRentalVehicles,
   issueRentalReceipt,
   updateRentalBookingStatus,
+  updateRentalDamageDeposit,
   updateRentalIdVerification,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';

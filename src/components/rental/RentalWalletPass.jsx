@@ -14,7 +14,7 @@ const STATUS_LABEL = {
 function formatWhen(iso) {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('el-GR', {
+    return new Date(iso).toLocaleString(getRentLang() === 'en' ? 'en-GB' : 'el-GR', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -36,6 +36,14 @@ function statusClass(status) {
   return 'is-warn';
 }
 
+function depositLabel(status, lang) {
+  if (status === 'held') return t('deposit_held', lang);
+  if (status === 'released') return t('deposit_released', lang);
+  if (status === 'captured') return t('deposit_captured', lang);
+  if (status === 'pending_hold') return '…';
+  return null;
+}
+
 export default function RentalWalletPass({
   booking,
   brandLabel = 'Rent Wallet',
@@ -47,7 +55,11 @@ export default function RentalWalletPass({
   onContract,
   onCheckIn,
   onCheckOut,
+  onReview,
+  reviewBusy = false,
 }) {
+  const lang = getRentLang();
+
   if (!booking) {
     return (
       <section className="wallet-pass-empty rent-wallet-empty" aria-label="Rent Wallet">
@@ -55,13 +67,10 @@ export default function RentalWalletPass({
           <span className="material-symbols-outlined wallet-pass-empty-icon" aria-hidden>
             directions_car
           </span>
-          <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα ενοικίαση</h2>
-          <p className="wallet-pass-empty-copy">
-            Κλείστε όχημα από την εφαρμογή ενοικίασης — η κράτηση εμφανίζεται εδώ στο Rent Wallet,
-            χωριστά από τα εισιτήρια λεωφορείου.
-          </p>
+          <h2 className="wallet-pass-empty-title">{t('wallet_empty_title', lang)}</h2>
+          <p className="wallet-pass-empty-copy">{t('wallet_empty_copy', lang)}</p>
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
-            Βρες όχημα
+            {t('find_vehicle', lang)}
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
@@ -72,11 +81,12 @@ export default function RentalWalletPass({
   }
 
   const status = booking.rental_status || 'CONFIRMED';
-  const label = STATUS_LABEL[status] || status;
+  const label = rentStatusLabel(status, lang);
   const code = booking.id || '—';
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
   const qrValue = `RENT:${code}`;
+  const dep = depositLabel(booking.damage_deposit_status, lang);
 
   return (
     <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">
@@ -95,7 +105,7 @@ export default function RentalWalletPass({
       <div className="wallet-pass-card wallet-pass-card-enter">
         <div className="wallet-pass-card-top">
           <div className="min-w-0">
-            <p className="wallet-pass-kicker">Πελάτης</p>
+            <p className="wallet-pass-kicker">{t('customer', lang)}</p>
             <p className="wallet-pass-passenger truncate">{passengerName || '—'}</p>
           </div>
           <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
@@ -103,15 +113,15 @@ export default function RentalWalletPass({
 
         <div className="wallet-pass-meta">
           <div>
-            <p className="wallet-pass-kicker">Παραλαβή</p>
+            <p className="wallet-pass-kicker">{t('pickup', lang)}</p>
             <p className="wallet-pass-meta-value">{pickup}</p>
           </div>
           <div>
-            <p className="wallet-pass-kicker">Κωδικός</p>
+            <p className="wallet-pass-kicker">{t('code', lang)}</p>
             <p className="wallet-pass-meta-value wallet-pass-mono">{code}</p>
           </div>
           <div>
-            <p className="wallet-pass-kicker">Ποσό</p>
+            <p className="wallet-pass-kicker">{t('amount', lang)}</p>
             <p className="wallet-pass-meta-value">€{Number(booking.total_cost || 0).toFixed(2)}</p>
           </div>
           {booking.payment_status || booking.payment_method ? (
@@ -150,7 +160,7 @@ export default function RentalWalletPass({
             {dropoff !== pickup ? ` → ${dropoff}` : ''}
           </span>
           <span className="rent-wallet-mode">
-            {booking.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
+            {booking.driver_mode === 'WITH_DRIVER' ? t('with_driver', lang) : t('self_drive', lang)}
           </span>
         </div>
 
@@ -174,7 +184,7 @@ export default function RentalWalletPass({
               disabled={cancelling}
               onClick={() => onCancel(booking)}
             >
-              {cancelling ? 'Ακύρωση…' : 'Ακύρωση κράτησης'}
+              {cancelling ? t('cancelling', lang) : t('cancel', lang)}
             </button>
           ) : null}
           {status === 'CONFIRMED' && !onCancel ? (
@@ -184,22 +194,32 @@ export default function RentalWalletPass({
           ) : null}
           {onModify ? (
             <button type="button" className="wallet-btn wallet-btn-block" onClick={onModify}>
-              Αλλαγή ημερομηνιών
+              {t('modify_dates', lang)}
             </button>
           ) : null}
           {onCheckIn ? (
             <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckIn}>
-              Check-in
+              {t('check_in', lang)}
             </button>
           ) : null}
           {onCheckOut ? (
             <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckOut}>
-              Check-out
+              {t('check_out', lang)}
+            </button>
+          ) : null}
+          {status === 'COMPLETED' && onReview ? (
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-block"
+              disabled={reviewBusy}
+              onClick={() => onReview(booking)}
+            >
+              {t('review', lang)}
             </button>
           ) : null}
           {onContract ? (
             <button type="button" className="wallet-btn wallet-btn-block" onClick={onContract}>
-              Λήψη σύμβασης
+              {t('contract', lang)}
             </button>
           ) : null}
           {booking.contract_accepted ? (
@@ -207,12 +227,12 @@ export default function RentalWalletPass({
               <span className="material-symbols-outlined" aria-hidden>
                 draw
               </span>
-              Σύμβαση υπογεγραμμένη
+              {t('contract_signed', lang)}
               {booking.contract_version ? ` · ${booking.contract_version}` : ''}
             </p>
           ) : null}
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
-            Νέα κράτηση
+            {t('new_booking', lang)}
           </button>
         </div>
       </div>

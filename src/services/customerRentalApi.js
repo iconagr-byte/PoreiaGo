@@ -73,6 +73,7 @@ function availabilityParams({
   pickupLocation,
   dropoffLocation,
   driverMode,
+  branch,
 }) {
   const params = new URLSearchParams({
     start_time: startTime,

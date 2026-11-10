@@ -4,7 +4,9 @@ import {
   cancelCustomerRentalBooking,
   createCustomerRentalBooking,
   createCustomerRentalPaymentIntent,
+  confirmCustomerRentalPayment,
   fetchCustomerRentalAvailability,
+  fetchCustomerRentalBranches,
   fetchMyRentalBookings,
   uploadCustomerRentalIdDoc,
 } from '../../services/customerRentalApi.js';
@@ -13,6 +15,8 @@ import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
+
+const AGE_BY_CATEGORY = { CAR: 21, VAN: 23, MINIBUS: 25 };
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -52,7 +56,6 @@ const EMPTY = {
 const PREFS_KEY = 'rent_booking_prefs_v1';
 const FUNNEL_KEY = 'rent_funnel_events_v1';
 const ID_DOCS_KEY = 'rent_id_docs_v1';
-const MIN_DRIVER_AGE = 21;
 
 const EMPTY_ID = {
   id_document_url: '',
@@ -92,12 +95,27 @@ function trackFunnel(step, meta = {}) {
   }
 }
 
-function trustBadge(vehicleId = '') {
+function trustBadge(vehicle) {
+  if (vehicle?.trust?.real && vehicle.trust.rating != null) {
+    return {
+      rating: Number(vehicle.trust.rating),
+      booked: Number(vehicle.trust.booked || vehicle.rating_count || 0),
+      real: true,
+    };
+  }
+  if (vehicle?.rating_avg != null) {
+    return {
+      rating: Number(vehicle.rating_avg),
+      booked: Number(vehicle.rating_count || 0),
+      real: true,
+    };
+  }
+  const vehicleId = vehicle?.id || vehicle || '';
   let sum = 0;
   for (const ch of String(vehicleId)) sum += ch.charCodeAt(0);
   const rating = 4.4 + (sum % 6) * 0.1;
   const booked = 8 + (sum % 37);
-  return { rating: Math.min(4.9, Number(rating.toFixed(1))), booked };
+  return { rating: Math.min(4.9, Number(rating.toFixed(1))), booked, real: false };
 }
 
 function asDateValue(iso) {
@@ -183,6 +201,24 @@ export default function RentalCatalogPanel({
       return false;
     }
   });
+  const [stripePay, setStripePay] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [branchFilter, setBranchFilter] = useState('');
+  const lang = getRentLang();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCustomerRentalBranches()
+      .then((rows) => {
+        if (!cancelled) setBranches(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBranches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,6 +366,7 @@ export default function RentalCatalogPanel({
         pickupLocation: form.pickup_location,
         dropoffLocation: form.dropoff_location,
         driverMode: form.driver_mode,
+        branch: branchFilter || undefined,
       });
       setSuggestions(rows);
       const preferredId = preferredVehicle?.id;
@@ -381,9 +418,12 @@ export default function RentalCatalogPanel({
       toast.error('Συμπληρώστε ημερομηνία γέννησης');
       return false;
     }
+    const selectedVehicle = suggestions.find((v) => v.id === selectedId);
+    const cat = selectedVehicle?.category || form.category || 'CAR';
+    const minAge = AGE_BY_CATEGORY[String(cat).toUpperCase()] || 21;
     const age = ageFromDob(idDocs.date_of_birth);
-    if (age == null || age < MIN_DRIVER_AGE) {
-      toast.error(`Ελάχιστη ηλικία οδηγού: ${MIN_DRIVER_AGE} ετών`);
+    if (age == null || age < minAge) {
+      toast.error(`${t('min_age', lang)}: ${minAge} (${cat})`);
       return false;
     }
     if (!idDocs.license_number.trim()) {
@@ -434,7 +474,9 @@ export default function RentalCatalogPanel({
       if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
         try {
           const pi = await createCustomerRentalPaymentIntent(created.id);
-          if (pi?.demo) {
+          if (pi?.client_secret) {
+            setStripePay({ clientSecret: pi.client_secret, bookingId: created.id });
+          } else if (pi?.demo) {
             await new Promise((r) => setTimeout(r, 900));
           }
         } catch {
@@ -451,9 +493,9 @@ export default function RentalCatalogPanel({
       });
       const payNote =
         created?.payment_status === 'pending'
-          ? ' · εκκρεμεί πληρωμή'
+          ? ` · ${t('payment_pending', lang)}`
           : created?.payment_status === 'partial'
-            ? ' · προκαταβολή καταχωρήθηκε'
+            ? ` · ${t('payment_partial', lang)}`
             : '';
       toast.success(`Η κράτηση καταχωρήθηκε${payNote}. Στάλθηκε email επιβεβαίωσης.`);
       setSuggestions([]);
@@ -475,11 +517,13 @@ export default function RentalCatalogPanel({
   };
 
   const selected = suggestions.find((v) => v.id === selectedId);
+  const selectedMinAge =
+    AGE_BY_CATEGORY[String(selected?.category || form.category || 'CAR').toUpperCase()] || 21;
 
   const sortedSuggestions = [...suggestions]
     .filter((v) => Number(v.suggested_total || 0) <= Number(priceCap || 999999))
     .filter((v) => (onlyWithPhotos ? vehiclePhotos(v).length > 0 : true))
-    .filter((v) => (onlyTopRated ? trustBadge(v.id).rating >= 4.7 : true))
+    .filter((v) => (onlyTopRated ? trustBadge(v).rating >= 4.7 : true))
     .sort((a, b) => {
       if (sortBy === 'price_asc') return Number(a.suggested_total || 0) - Number(b.suggested_total || 0);
       if (sortBy === 'price_desc') return Number(b.suggested_total || 0) - Number(a.suggested_total || 0);
@@ -624,11 +668,29 @@ export default function RentalCatalogPanel({
             >
               {CATEGORIES.map((c) => (
                 <option key={c.value || 'all'} value={c.value}>
-                  {c.label}
+                  {c.labelKey ? t(c.labelKey, lang) : c.label}
                 </option>
               ))}
             </select>
           </div>
+          {branches.length > 1 ? (
+            <div className="wallet-field">
+              <label htmlFor="rent-branch">{t('branch', lang)}</label>
+              <select
+                id="rent-branch"
+                className="wallet-select"
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+              >
+                <option value="">{t('all_categories', lang)}</option>
+                {branches.map((b) => (
+                  <option key={b.branch_name} value={b.branch_name}>
+                    {b.branch_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="wallet-field">
             <label htmlFor="rent-seats">Ελάχ. θέσεις</label>
             <input
@@ -751,7 +813,7 @@ export default function RentalCatalogPanel({
             <div className="rent-id-panel">
               <h3>Ταυτότητα & δίπλωμα</h3>
               <p className="wallet-field-hint">
-                Απαιτείται για self-drive · ελάχιστη ηλικία {MIN_DRIVER_AGE}. Τα έγγραφα ελέγχονται από το γραφείο.
+                Απαιτείται για self-drive · {t('min_age', lang)} {selectedMinAge}. Τα έγγραφα ελέγχονται από το γραφείο.
               </p>
               <div className="rent-id-uploads">
                 <label className={`rent-id-upload${idDocs.id_document_url ? ' is-done' : ''}`}>
@@ -901,7 +963,7 @@ export default function RentalCatalogPanel({
             {sortedSuggestions.map((v) => {
               const photos = vehiclePhotos(v);
               const isSelected = selectedId === v.id;
-              const trust = trustBadge(v.id);
+              const trust = trustBadge(v);
               return (
                 <label
                   key={v.id}
@@ -1047,7 +1109,7 @@ export default function RentalCatalogPanel({
                 onClick={book}
               >
                 {busy
-                  ? 'Ολοκλήρωση…'
+                  ? '…'
                   : paymentMethod === 'bank_transfer'
                     ? `Κράτηση · κατάθεση ${euro(dueNow)}`
                     : `Πληρωμή ${euro(dueNow)} · Κράτηση`}
@@ -1234,6 +1296,23 @@ export default function RentalCatalogPanel({
             </button>
           </div>
         </section>
+      ) : null}
+
+      {stripePay?.clientSecret ? (
+        <RentalStripePay
+          clientSecret={stripePay.clientSecret}
+          onClose={() => setStripePay(null)}
+          onSuccess={async () => {
+            try {
+              await confirmCustomerRentalPayment(stripePay.bookingId);
+              toast.success(t('pay_success', lang));
+              setStripePay(null);
+              await loadMine();
+            } catch (err) {
+              toast.error(err.message || 'Payment confirm failed');
+            }
+          }}
+        />
       ) : null}
     </div>
   );
