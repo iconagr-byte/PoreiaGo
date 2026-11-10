@@ -284,11 +284,11 @@ export function getOfficeRentUrl(branding = {}, options = {}) {
   return `${origin}/rent`;
 }
 
-/** Rent My Wallet — green product, separate from bus /wallet. */
+/** Rent passes live in unified My Wallet (?tab=rentals). Legacy /rent/wallet redirects. */
 export function getOfficeRentWalletUrl(branding = {}, options = {}) {
   const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
-  if (!origin) return '/rent/wallet';
-  return `${origin}/rent/wallet`;
+  if (!origin) return '/wallet?tab=rentals';
+  return `${origin}/wallet?tab=rentals`;
 }
 
 /** Rent Wallet login — green auth page. */

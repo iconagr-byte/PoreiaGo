@@ -50,6 +50,25 @@ export async function upsertBookingOnServer(booking) {
   return data;
 }
 
+/**
+ * Permanent delete — Postgres office booking + wallet cache.
+ * Desktop «Κρατήσεις» drops the row on the next live sync.
+ */
+export async function deleteMyBookingOnServer(bookingId) {
+  const id = String(bookingId || '').trim();
+  if (!id) throw new Error('Λείπει το id κράτησης');
+  const res = await fetch(
+    `${API_BASE}/api/customer/bookings/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: customerAuthHeaders(),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parseError(data));
+  return data;
+}
+
 /** Signed live-track URL για επιβάτη (χάρτης + ETA). */
 export async function fetchCustomerBookingTrackLink(bookingId) {
   const res = await fetch(

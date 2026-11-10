@@ -8,9 +8,11 @@ import {
   updateFleetVehicle,
   uploadFleetVehiclePhoto,
 } from '../services/platformApi.js';
+import {
+  FLEET_VEHICLE_CATEGORIES,
+  fleetCategoryLabel,
+} from '../lib/fleet/fleetVehicleCategories.js';
 import { resolveSiteAssetUrl } from '../services/siteAppearanceApi.js';
-
-const CATEGORIES = ['Luxury Coach', 'Premium Express', 'Standard', 'Van'];
 
 const AMENITY_PRESETS = [
   'Wi-Fi onboard',
@@ -344,7 +346,9 @@ export default function FleetVehicleDetail() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
               <div>
                 <div className="text-xs font-bold text-gray-400 uppercase mb-1">Κατηγορία</div>
-                <div className="font-bold text-gray-900">{vehicle.category}</div>
+                <div className="font-bold text-gray-900">
+                  {fleetCategoryLabel(vehicle.category)}
+                </div>
               </div>
               <div>
                 <div className="text-xs font-bold text-gray-400 uppercase mb-1">Θέσεις</div>
@@ -438,9 +442,9 @@ export default function FleetVehicleDetail() {
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {FLEET_VEHICLE_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
                   </option>
                 ))}
               </select>
