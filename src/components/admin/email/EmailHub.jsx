@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  readActiveEmailAccountId,
+  reconcileActiveEmailAccountId,
+  writeActiveEmailAccountId,
+} from '../../../lib/email/activeEmailAccount.js';
 import { fetchEmailSettings } from '../../../services/emailSettingsApi.js';
 import EmailMailbox from './EmailMailbox.jsx';
 import MarketingDashboard from './MarketingDashboard.jsx';
@@ -8,17 +13,15 @@ import EmailSettingsPanel from './EmailSettingsPanel.jsx';
 import '../../../styles/emailMailbox.css';
 
 const TABS = [
-  { id: 'settings', label: 'Ρυθμίσεις Email' },
   { id: 'mailbox', label: 'Mailbox' },
+  { id: 'settings', label: 'Ρυθμίσεις Email' },
   { id: 'marketing', label: 'Marketing' },
   { id: 'automations', label: 'Αυτοματισμοί' },
 ];
 
-const STORAGE_KEY = 'email_active_account';
-
 export default function EmailHub({ intent = null, onIntentHandled }) {
   const [tab, setTab] = useState('mailbox');
-  const [accountId, setAccountId] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
+  const [accountId, setAccountId] = useState(() => readActiveEmailAccountId());
   const [accounts, setAccounts] = useState([]);
   const [composeLaunch, setComposeLaunch] = useState(null);
   const [marketingDraft, setMarketingDraft] = useState(null);
@@ -26,6 +29,7 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
 
   useEffect(() => {
     if (!intent) return;
+    // Sidebar «Email» → mailbox. Only jump to settings when explicitly requested.
     setTab(intent.hubTab || 'mailbox');
     if (intent.connectEmail) {
       setTab('settings');
@@ -47,13 +51,17 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
       .then((list) => {
         setAccounts(list);
         if (!list.length) {
-          setTab('settings');
-          setOpenConnectWizard(true);
+          // Stay on Mailbox (empty + banner). Do not force «Ρυθμίσεις Email».
+          setAccountId('');
+          writeActiveEmailAccountId('');
+          return;
         }
-        if (!accountId && list[0]) {
-          setAccountId(list[0].id);
-          localStorage.setItem(STORAGE_KEY, list[0].id);
-        }
+        // Reconcile localStorage against server list — stale EMS ids cause Sync "Account not found".
+        setAccountId((prev) => {
+          const next = reconcileActiveEmailAccountId(list, prev);
+          writeActiveEmailAccountId(next);
+          return next;
+        });
       })
       .catch((err) => {
         toast.error(err.message || 'Αποτυχία φόρτωσης λογαριασμών email', {
@@ -64,7 +72,7 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
 
   const selectAccount = (id) => {
     setAccountId(id);
-    localStorage.setItem(STORAGE_KEY, id);
+    writeActiveEmailAccountId(id);
   };
 
   return (

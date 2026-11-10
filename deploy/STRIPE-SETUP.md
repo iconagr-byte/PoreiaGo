@@ -37,15 +37,14 @@ curl -s https://api.poreiago.com/api/v1/billing/config
 
 `checkout_ready: true` → το Stripe Checkout δουλεύει.
 
-## Δωρεάν δοκιμή / Demo πληρωμή (χωρίς Stripe)
+## Demo πληρωμή (μόνο με ρητό flag)
 
-- Αν **δεν** είναι ρυθμισμένο το Stripe, το signup στο `/grafeia/signup` ανοίγει αυτόματα σε **demo mode** (χωρίς χρέωση, trial 14 ημερών).
-- Αν το Stripe είναι ρυθμισμένο αλλά θέλετε demo για δοκιμή νέου γραφείου:
+Το demo signup **δεν** ανοίγει αυτόματα όταν λείπει το Stripe. Χωρίς keys η σελίδα `/grafeia/signup` δείχνει «Πληρωμές σε ρύθμιση».
+
+Για προσωρινό demo (χωρίς χρέωση) μόνο αν το χρειάζεστε ρητά:
 
 ```bash
-BILLING_DEMO_MODE=1
+BILLING_DEMO_MODE=true
 ```
 
-στο `deploy/.env.prod`, μετά redeploy.
-
-Μέχρι να ρυθμιστεί το Stripe, στο admin → **Συμβόλαιο** εμφανίζεται **«Ξεκινήστε δωρεάν δοκιμή 14 ημερών»** — ενεργοποιεί trial στο panel χωρίς πληρωμή.
+στο `deploy/.env.prod`, μετά redeploy. Σε production κρατήστε `BILLING_DEMO_MODE=false` και ρυθμίστε τα `STRIPE_*` παραπάνω.

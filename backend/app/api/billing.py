@@ -29,6 +29,7 @@ from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
 from app.services.billing_service import BillingService, stripe_readiness
 from app.services.tenant_modules import (
+    apply_known_office_rent_policy,
     enable_rent_addon_in_settings,
     initial_settings_for_plan,
     is_achillio_travel_office,
@@ -65,18 +66,39 @@ async def get_subscription(
 ):
     tenant = await _load_tenant(db, tenant_id)
     billing = BillingService(db)
-    sub = await billing.get_or_create_subscription(tenant)
+    try:
+        sub = await billing.get_or_create_subscription(tenant)
+    except Exception:
+        # Last resort: heal schema (subscriptions.plan) then retry once.
+        logger.exception("billing subscription load failed tenant=%s — healing", tenant_id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        from app.services.tenant_modules import _heal_subscription_plan_column
+
+        await _heal_subscription_plan_column(db)
+        try:
+            sub = await billing.get_or_create_subscription(tenant)
+        except Exception as exc:
+            logger.exception("billing subscription still failing after heal")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία φόρτωσης συνδρομής — δοκιμάστε Ανανέωση ή επικοινωνήστε με υποστήριξη.",
+            ) from exc
+    plan = getattr(sub.plan, "value", None) or str(sub.plan or tenant.plan.value)
+    status_val = getattr(sub.status, "value", None) or str(sub.status or "trialing")
     return BillingSubscriptionResponse(
         tenant_id=tenant.id,
-        plan=sub.plan.value,
-        status=sub.status.value,
+        plan=plan,
+        status=status_val,
         is_active=tenant.is_active,
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=sub.stripe_subscription_id,
         current_period_end=sub.current_period_end,
         trial_ends_at=sub.trial_ends_at,
-        cancel_at_period_end=sub.cancel_at_period_end,
-        base_amount_cents=sub.base_amount_cents,
+        cancel_at_period_end=bool(sub.cancel_at_period_end),
+        base_amount_cents=int(sub.base_amount_cents or 0),
     )
 
 
@@ -87,11 +109,25 @@ async def get_office_modules(
 ):
     """Authenticated office product modules — drives Back Office nav for Rent-only."""
     tenant = await _load_tenant(db, tenant_id)
+    # Keep PoreiaGo platform Rent-on (and Achillio Rent-off) even if settings drifted.
+    try:
+        updated = apply_known_office_rent_policy(tenant)
+        if updated is not None:
+            tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+            await db.commit()
+            await db.refresh(tenant)
+    except Exception:
+        logger.debug("apply_known_office_rent_policy skipped on /modules", exc_info=True)
+
     mods = modules_for_tenant(tenant)
     if is_achillio_travel_office(tenant):
         kind = "achillio_travel"
     elif is_poreiago_platform_office(tenant):
         kind = "poreiago_platform"
+        # Response must advertise Rent for the Super Admin sidebar.
+        mods = {**mods, "rent_enabled": True, "trips_enabled": True}
+        if mods.get("mode") == "trips_only":
+            mods["mode"] = "both"
     else:
         kind = "customer"
     return OfficeModulesResponse(
@@ -226,6 +262,14 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
 
     readiness = stripe_readiness()
     use_demo = bool(readiness.get("demo_mode"))
+    if not use_demo and not readiness.get("checkout_ready"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Οι online πληρωμές ρυθμίζονται ακόμα (λείπει Stripe). "
+                "Επικοινωνήστε με την υποστήριξη PoreiaGo για ενεργοποίηση συμβολαίου."
+            ),
+        )
 
     async with AsyncSessionLocal() as db:
         try:

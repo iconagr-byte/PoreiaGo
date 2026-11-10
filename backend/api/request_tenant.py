@@ -46,8 +46,9 @@ async def public_tenant_id(request: "Request", *, allow_demo_fallback: bool = Tr
     if tid:
         return str(tid)
 
+    # Only proxy Host headers — never Origin/Referer (client-spoofable office switch).
     hosts: list[str] = []
-    for header in ("x-forwarded-host", "host", "origin", "referer"):
+    for header in ("x-forwarded-host", "host"):
         raw = (request.headers.get(header) or "").strip()
         if not raw:
             continue

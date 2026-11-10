@@ -1,146 +1,344 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
+import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
+import { isPlatformMarketingHost } from '../../lib/platform/tenantHost.js';
+
+/** Browse items live only in the Μενού dropdown (no duplicate top-bar links). */
+const BOOKING_NAV_ITEMS = [
+  { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
+  { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
+];
+
+const MARKETING_NAV_ITEMS = [
+  {
+    id: 'session-rent-capabilities',
+    el: 'Τι μπορείς',
+    en: 'Capabilities',
+    icon: 'auto_awesome',
+  },
+  {
+    id: 'session-rent-contracts',
+    el: 'Συμβόλαιο',
+    en: 'Contract',
+    icon: 'contract',
+  },
+  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works', icon: 'route' },
+  { id: 'rent-guest-services', el: 'Υπηρεσίες', en: 'Services', icon: 'verified_user' },
+];
+
+function phoneHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : '';
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const block = id === 'rent-guest-search' ? 'center' : 'start';
+  // Prefer scrolling the guest home scroller (phone chrome); fall back to window.
+  const scroller = el.closest?.('.rent-home') || el.closest?.('.rent-main');
+  if (scroller && scroller !== document.documentElement) {
+    const topBar = document.querySelector('.rent-app--guest .rent-topbar');
+    const offset = (topBar?.offsetHeight || 0) + 12;
+    const elTop = el.getBoundingClientRect().top;
+    const scrollerTop = scroller.getBoundingClientRect().top;
+    const nextTop = scroller.scrollTop + (elTop - scrollerTop) - offset;
+    scroller.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+    return;
+  }
+  el.scrollIntoView({ behavior: 'smooth', block });
+}
 
 /**
- * Guest header — booking / account / language.
- * Hard hrefs to green Rent URLs so we never land on bus /my-booking|/wallet.
+ * Guest header — Menu (left, beside brand) + lang / Sign in / My Wallet.
+ * Browse links (Αναζήτηση, Στόλος, …) live only in the Μενού dropdown.
+ * Pass `brand` to place the logo immediately before the menu control.
+ * My Wallet opens unified /wallet?tab=rentals — same shell as bus tickets.
  */
-export default function RentGuestTopActions({ onAccount } = {}) {
+export default function RentGuestTopActions({
+  brand = null,
+  onAccount,
+  onFindVehicle,
+  phone = '',
+} = {}) {
   const [lang, setLang] = useState(() => getRentLang());
-  const [bookingOpen, setBookingOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef(null);
+  const menuBtnRef = useRef(null);
+  const tel = phoneHref(phone);
+  const showMarketingNav = isPlatformMarketingHost();
+  const navItems = useMemo(
+    () =>
+      showMarketingNav ? [...BOOKING_NAV_ITEMS, ...MARKETING_NAV_ITEMS] : BOOKING_NAV_ITEMS,
+    [showMarketingNav],
+  );
 
   useEffect(() => {
-    if (!bookingOpen && !accountOpen) return undefined;
+    markPreferRentLookup();
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
     const onDoc = (e) => {
-      if (!rootRef.current?.contains(e.target)) {
-        setBookingOpen(false);
-        setAccountOpen(false);
+      if (!rootRef.current?.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        menuBtnRef.current?.focus?.();
       }
     };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [bookingOpen, accountOpen]);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   const el = lang !== 'en';
+  const menuLabel = el ? 'Μενού' : 'Menu';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
-  const findLabel = el ? 'Εύρεση κράτησης Rent' : 'Find rent booking';
-  const walletLabel = 'Rent Wallet';
+  const findLabel = el ? 'Βρες όχημα' : 'Find a car';
+  const walletLabel = 'My Wallet';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
-  const accountAria = el ? 'Λογαριασμός' : 'Account';
+  const walletTitle = el ? 'My Wallet ενοικιάσεων' : 'Rent My Wallet';
+  const supportLabel = el ? 'Κλήση' : 'Call';
+  const checkInHint = 'Online check-in';
+  const browseKicker = el ? 'Περιήγηση' : 'Browse';
+  const accountKicker = el ? 'Λογαριασμός' : 'Account';
+
+  const switchLang = (next) => {
+    const value = setRentLang(next);
+    setLang(value);
+    try {
+      window.dispatchEvent(new Event('rent-lang-change'));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const close = () => setMenuOpen(false);
+
+  const goSection = (id) => {
+    close();
+    scrollToSection(id);
+  };
+
+  const menu = (
+    <div className="rent-top-chip-wrap rent-top-chip-wrap--left" ref={rootRef}>
+      <button
+        ref={menuBtnRef}
+        type="button"
+        className={`rent-top-chip rent-top-chip--menu${menuOpen ? ' is-open' : ''}`}
+        aria-label={menuLabel}
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+        title={menuLabel}
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <span className="material-symbols-outlined" aria-hidden>
+          {menuOpen ? 'close' : 'menu'}
+        </span>
+        <span className="rent-top-chip-label">{menuLabel}</span>
+      </button>
+      {menuOpen ? (
+        <div className="rent-top-menu rent-top-menu--guest rent-top-menu--left" role="menu">
+          <p className="rent-top-menu-kicker">{browseKicker}</p>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => goSection(item.id)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                {item.icon}
+              </span>
+              {el ? item.el : item.en}
+            </button>
+          ))}
+
+          <div
+            className="rent-top-menu-lang"
+            role="group"
+            aria-label={el ? 'Γλώσσα' : 'Language'}
+          >
+            <span className="rent-top-menu-lang-label">
+              {el ? 'Γλώσσα' : 'Language'}
+            </span>
+            <div className="rent-top-lang rent-top-lang--menu">
+              <button
+                type="button"
+                className={lang === 'el' ? 'is-active' : ''}
+                aria-pressed={lang === 'el'}
+                onClick={() => switchLang('el')}
+              >
+                ΕΛ
+              </button>
+              <button
+                type="button"
+                className={lang === 'en' ? 'is-active' : ''}
+                aria-pressed={lang === 'en'}
+                onClick={() => switchLang('en')}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+
+          <div className="rent-top-menu-sep" role="separator" />
+
+          <button
+            type="button"
+            role="menuitem"
+            className="rent-top-menu-item"
+            onClick={() => {
+              close();
+              if (typeof onFindVehicle === 'function') onFindVehicle();
+              else scrollToSection('rent-guest-search');
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              travel_explore
+            </span>
+            {findLabel}
+          </button>
+          <a
+            href="/rent/my-booking"
+            role="menuitem"
+            className="rent-top-menu-item"
+            onClick={close}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              confirmation_number
+            </span>
+            {bookingLabel}
+          </a>
+          <span className="rent-top-menu-item rent-top-menu-item--static" role="menuitem">
+            <span className="rent-top-trust-dot" aria-hidden />
+            {checkInHint}
+          </span>
+          {tel ? (
+            <a href={tel} role="menuitem" className="rent-top-menu-item" onClick={close}>
+              <span className="material-symbols-outlined" aria-hidden>
+                call
+              </span>
+              {supportLabel}
+            </a>
+          ) : null}
+
+          <div className="rent-top-menu-sep" role="separator" />
+          <p className="rent-top-menu-kicker">{accountKicker}</p>
+          <button
+            type="button"
+            role="menuitem"
+            className="rent-top-menu-item"
+            onClick={() => {
+              close();
+              onAccount?.();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              login
+            </span>
+            {loginLabel}
+          </button>
+          <Link
+            to="/rent/register"
+            role="menuitem"
+            className="rent-top-menu-item"
+            state={{ from: '/wallet?tab=rentals', rentEntrance: true }}
+            onClick={close}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              person_add
+            </span>
+            {registerLabel}
+          </Link>
+
+          <a href="/wallet?tab=rentals" role="menuitem" className="rent-top-menu-cta" onClick={close}>
+            <span className="material-symbols-outlined" aria-hidden>
+              account_balance_wallet
+            </span>
+            {walletLabel}
+          </a>
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
-    <div className="rent-top-actions" ref={rootRef}>
-      <div className="rent-top-chip-wrap">
-        <button
-          type="button"
-          className={`rent-top-chip${bookingOpen ? ' is-open' : ''}`}
-          aria-expanded={bookingOpen}
-          aria-haspopup="menu"
-          onClick={() => {
-            setBookingOpen((v) => !v);
-            setAccountOpen(false);
-          }}
-        >
-          <span className="material-symbols-outlined" aria-hidden>
-            confirmation_number
-          </span>
-          <span className="rent-top-chip-label">{bookingLabel}</span>
-          <span className="material-symbols-outlined rent-top-chip-caret" aria-hidden>
-            expand_more
-          </span>
-        </button>
-        {bookingOpen ? (
-          <div className="rent-top-menu" role="menu">
-            {/* Plain <a href> — full navigation to green Rent routes only. */}
-            <a
-              href="/rent/wallet"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => setBookingOpen(false)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                account_balance_wallet
-              </span>
-              {walletLabel}
-            </a>
-            <a
-              href="/rent/my-booking"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => setBookingOpen(false)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                search
-              </span>
-              {findLabel}
-            </a>
-          </div>
-        ) : null}
+    <>
+      <div className="rent-topbar-start">
+        {brand}
+        {menu}
       </div>
 
-      <div className="rent-top-chip-wrap">
+      <div className="rent-top-actions">
+        <div
+          className="rent-top-lang rent-top-lang--bar"
+          role="group"
+          aria-label={el ? 'Γλώσσα' : 'Language'}
+        >
+          <button
+            type="button"
+            className={lang === 'el' ? 'is-active' : ''}
+            aria-pressed={lang === 'el'}
+            onClick={() => switchLang('el')}
+          >
+            ΕΛ
+          </button>
+          <button
+            type="button"
+            className={lang === 'en' ? 'is-active' : ''}
+            aria-pressed={lang === 'en'}
+            onClick={() => switchLang('en')}
+          >
+            EN
+          </button>
+        </div>
+
+        {tel ? (
+          <a
+            href={tel}
+            className="rent-top-icon-btn rent-top-icon-btn--soft"
+            aria-label={supportLabel}
+            title={supportLabel}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              call
+            </span>
+          </a>
+        ) : null}
+
         <button
           type="button"
-          className={`rent-top-icon-btn${accountOpen ? ' is-open' : ''}`}
-          aria-label={accountAria}
-          aria-expanded={accountOpen}
-          aria-haspopup="menu"
-          title={accountAria}
-          onClick={() => {
-            setAccountOpen((v) => !v);
-            setBookingOpen(false);
-          }}
+          className="rent-top-icon-btn rent-top-icon-btn--soft"
+          aria-label={loginLabel}
+          title={loginLabel}
+          onClick={() => onAccount?.()}
         >
           <span className="material-symbols-outlined" aria-hidden>
             person
           </span>
         </button>
-        {accountOpen ? (
-          <div className="rent-top-menu rent-top-menu--account" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => {
-                setAccountOpen(false);
-                onAccount?.();
-              }}
-            >
-              {loginLabel}
-            </button>
-            <Link
-              to="/rent/register"
-              role="menuitem"
-              className="rent-top-menu-item"
-              state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
-              onClick={() => setAccountOpen(false)}
-            >
-              {registerLabel}
-            </Link>
-          </div>
-        ) : null}
-      </div>
 
-      <div className="rent-top-lang" role="group" aria-label={el ? 'Γλώσσα' : 'Language'}>
-        <button
-          type="button"
-          className={lang === 'el' ? 'is-active' : ''}
-          onClick={() => setLang(setRentLang('el'))}
+        <a
+          href="/wallet?tab=rentals"
+          className="rent-top-chip rent-top-chip--wallet"
+          title={walletTitle}
+          aria-label={walletTitle}
         >
-          ΕΛ
-        </button>
-        <button
-          type="button"
-          className={lang === 'en' ? 'is-active' : ''}
-          onClick={() => setLang(setRentLang('en'))}
-        >
-          EN
-        </button>
+          <span className="material-symbols-outlined" aria-hidden>
+            account_balance_wallet
+          </span>
+          <span className="rent-top-chip-wallet-label">{walletLabel}</span>
+        </a>
       </div>
-    </div>
+    </>
   );
 }

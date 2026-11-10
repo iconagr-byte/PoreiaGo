@@ -8,7 +8,13 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import {
+  clearPreferRentLookup,
+  hasPreferRentLookup,
+  referrerLooksLikeRent,
+} from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { fetchOfficeModules, shouldShowRentStorefront } from '../services/officeModulesApi.js';
 import '../styles/booking-lookup.css';
 
 const EMAIL_KEY = 'poreiago_lookup_email_v1';
@@ -40,25 +46,24 @@ export default function BookingLookupPage() {
   const [fieldError, setFieldError] = useState({ email: '', reference: '' });
   const [helpOpen, setHelpOpen] = useState(false);
   const [phone, setPhone] = useState('');
-
   useEffect(() => {
     let cancelled = false;
-    // Rent deep-link / RB-… code landed on bus lookup → send to green Rent flow.
+    // Rent deep-link / RB-… / session from /rent → never stay on bus ticket finder (if Rent enabled).
     const qRef = (
       searchParams.get('ref') ||
       searchParams.get('reference') ||
       searchParams.get('code') ||
       ''
     ).toUpperCase();
-    const fromRent =
-      searchParams.get('from') === 'rent' ||
-      (typeof document !== 'undefined' &&
-        /\/rent(\/|$|\?)/.test(String(document.referrer || '')));
-    if (fromRent || qRef.startsWith('RB-')) {
-      const qs = searchParams.toString();
-      navigate(`/rent/my-booking${qs ? `?${qs}` : ''}`, { replace: true });
-      return undefined;
-    }
+    const forceBus = searchParams.get('product') === 'bus' || searchParams.get('bus') === '1';
+    const preferRent =
+      !forceBus &&
+      (searchParams.get('from') === 'rent' ||
+        searchParams.get('product') === 'rent' ||
+        hasPreferRentLookup() ||
+        referrerLooksLikeRent() ||
+        qRef.startsWith('RB-'));
+
     const qEmail = searchParams.get('email') || '';
     let saved = '';
     try {
@@ -66,10 +71,43 @@ export default function BookingLookupPage() {
     } catch {
       /* ignore */
     }
-    if (!cancelled) {
-      setEmail((qEmail || saved).trim().toLowerCase());
-      if (qRef) setReference(normalizeReference(qRef));
-    }
+
+    fetchOfficeModules()
+      .then((modules) => {
+        if (cancelled) return;
+        const rentOk = shouldShowRentStorefront(modules);
+        const rentOnly =
+          Boolean(modules?.rent_enabled) && modules?.trips_enabled === false;
+
+        // Office is rent-only, or session/ref clearly rent → rent lookup (no chooser).
+        if ((preferRent && rentOk) || (rentOnly && rentOk)) {
+          const qs = searchParams.toString();
+          const hasLookup = Boolean(
+            searchParams.get('email') ||
+              searchParams.get('ref') ||
+              searchParams.get('reference') ||
+              searchParams.get('code'),
+          );
+          const target =
+            hasLookup || qRef.startsWith('RB-') || rentOnly
+              ? '/rent/my-booking'
+              : '/wallet?tab=rentals';
+          navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
+          return;
+        }
+        if (preferRent && !rentOk) {
+          clearPreferRentLookup();
+        }
+
+        setEmail((qEmail || saved).trim().toLowerCase());
+        if (qRef) setReference(normalizeReference(qRef));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setEmail((qEmail || saved).trim().toLowerCase());
+        if (qRef) setReference(normalizeReference(qRef));
+      });
+
     fetchSiteAppearance()
       .then((data) => {
         if (!cancelled) setPhone(String(data?.footer_contact_phone || '').trim());

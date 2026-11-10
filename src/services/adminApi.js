@@ -7,6 +7,8 @@ import { getSaasToken, saasAuthHeaders } from './saasApi.js';
 export { getSaasToken };
 
 export function adminAuthHeaders(extra = {}) {
+  // Tenant scope comes from JWT only — never send a client Host override
+  // (spoofable). Achillio recovery uses proxied Host + Achillio JWT.
   return { ...saasAuthHeaders(), ...extra };
 }
 
@@ -38,7 +40,8 @@ function networkAdminError() {
  */
 export async function adminFetch(path, options = {}) {
   const attempts = Math.max(1, Number(options.retries) || 3);
-  const { retries: _ignored, ...fetchOpts } = options;
+  const { retries, ...fetchOpts } = options;
+  void retries;
   const isFormData =
     typeof FormData !== 'undefined' && fetchOpts.body instanceof FormData;
   // FormData must not send Content-Type: application/json (breaks multipart + auth proxies).
@@ -51,7 +54,9 @@ export async function adminFetch(path, options = {}) {
         ...fetchOpts,
         headers: { ...baseHeaders, ...(fetchOpts.headers || {}) },
       });
-      if ([502, 503, 504].includes(res.status) && i < attempts - 1) {
+      if ([502, 503, 504, 404].includes(res.status) && i < attempts - 1) {
+        // 404 here is usually Traefik mid-deploy ("404 page not found"), not a
+        // real missing drivers route — retry like other bounce codes.
         await new Promise((r) => setTimeout(r, 450 * (i + 1)));
         continue;
       }

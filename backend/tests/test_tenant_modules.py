@@ -12,6 +12,7 @@ from app.services.tenant_modules import (
     is_poreiago_platform_office,
     modules_for_settings,
     modules_for_tenant,
+    resolve_provision_plan_and_settings,
 )
 
 
@@ -54,6 +55,33 @@ def test_initial_settings_for_rent_plan():
     assert seed["site_appearance"]["rent_office_name"] == "Achillio Travel"
     assert seed["site_appearance"]["footer_brand_name"] == "Achillio Travel"
     assert "Το όχημά σας" in seed["site_appearance"]["rent_hero_title"]
+    assert seed["site_appearance"]["hero_image_url"] == "/images/rent-hero-coastal-v2.jpg"
+    assert seed["site_appearance"]["rent_hero_image_url"] == "/images/rent-hero-coastal-v2.jpg"
+    assert "hero-bus-achillio" not in seed["site_appearance"]["hero_image_url"]
+
+
+def test_resolve_provision_service_modes():
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.STARTER, service_mode="buses"
+    )
+    assert plan is TenantPlan.STARTER
+    assert settings["modules"]["trips_enabled"] is True
+    assert settings["modules"]["rent_enabled"] is False
+
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.STARTER, service_mode="rent", office_name="Demo Rent"
+    )
+    assert plan is TenantPlan.RENT
+    assert settings["modules"]["rent_enabled"] is True
+    assert settings["modules"]["trips_enabled"] is False
+
+    plan, settings = resolve_provision_plan_and_settings(
+        plan=TenantPlan.PROFESSIONAL, service_mode="both"
+    )
+    assert plan is TenantPlan.PROFESSIONAL
+    assert settings["modules"]["trips_enabled"] is True
+    assert settings["modules"]["rent_enabled"] is True
+    assert settings["addons"]["rent"] is True
 
 
 def test_enable_rent_addon_merge():
@@ -153,6 +181,64 @@ def test_poreiago_platform_seed_slug_keeps_rent():
     assert updated is not None
     assert updated["modules"]["rent_enabled"] is True
     assert updated["modules"]["trips_enabled"] is True
+
+
+def test_poreiago_seed_slug_keeps_rent_even_if_legal_or_domain_drift():
+    """Production seed slug=achillio must stay PoreiaGo platform (not bus-only)."""
+    tenant = SimpleNamespace(
+        slug="achillio",
+        custom_domain="panel.example.com",
+        legal_name="Office Main",
+        subdomain="achillio",
+        plan=TenantPlan.PROFESSIONAL,
+        settings_json='{"modules":{"rent_enabled":false,"trips_enabled":true}}',
+    )
+    assert is_achillio_travel_office(tenant) is False
+    assert is_poreiago_platform_office(tenant) is True
+    updated = apply_known_office_rent_policy(tenant)
+    assert updated is not None
+    assert updated["modules"]["rent_enabled"] is True
+
+
+def test_poreiago_seed_slug_not_confused_with_achillio_travel():
+    seed = SimpleNamespace(
+        slug="achillio",
+        custom_domain=None,
+        legal_name="Achillio Travel",
+        subdomain="achillio",
+    )
+    assert is_achillio_travel_office(seed) is False
+    assert is_poreiago_platform_office(seed) is True
+
+    # Stolen domain on platform seed must still count as PoreiaGo (not Travel).
+    poisoned = SimpleNamespace(
+        slug="achillio",
+        custom_domain="www.achilliotravel.com",
+        legal_name="Achillio Travel",
+        subdomain="achillio",
+    )
+    assert is_achillio_travel_office(poisoned) is False
+    assert is_poreiago_platform_office(poisoned) is True
+
+    travel = SimpleNamespace(
+        slug="admin-achillio-gr",
+        custom_domain="achilliotravel.com",
+        legal_name="Achillio Travel",
+        subdomain="admin-achillio-gr",
+    )
+    assert is_achillio_travel_office(travel) is True
+    assert is_poreiago_platform_office(travel) is False
+
+
+def test_poreiago_platform_detected_by_domain():
+    tenant = SimpleNamespace(
+        slug="office-main",
+        custom_domain="www.poreiago.com",
+        legal_name="PoreiaGo SaaS",
+        subdomain="office-main",
+    )
+    assert is_poreiago_platform_office(tenant) is True
+    assert is_achillio_travel_office(tenant) is False
 
 
 def test_achillio_policy_disables_rent_only_for_that_office():
