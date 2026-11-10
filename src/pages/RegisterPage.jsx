@@ -14,6 +14,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { sendWalletClaimBookingEmail } from '../lib/wallet/sendClaimBookingEmail.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
@@ -99,10 +100,7 @@ export default function RegisterPage() {
   }, []);
 
   useEffect(() => {
-    if (
-      location.pathname === '/register' &&
-      isRentReturn(location.state?.from)
-    ) {
+    if (location.pathname === '/register' && isRentReturn(location.state?.from)) {
       navigate('/rent/register', { replace: true, state: location.state });
     }
   }, [location.pathname, location.state, navigate]);
@@ -458,6 +456,146 @@ export default function RegisterPage() {
               ) : null}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`wallet-auth-stage${desktop ? ' wallet-auth-stage--desktop' : ''}`}>
+      <div className="wallet-auth-shell">
+        <div className="wallet-auth-scroll">
+          {desktop ? (
+            <aside className="wallet-auth-aside wallet-auth-aside--left" aria-label="Τι είναι το My Wallet">
+              <p className="wallet-auth-aside-kicker">
+                {claim ? 'Κράτηση έτοιμη · My Wallet' : 'My Wallet · Λεωφορεία'}
+              </p>
+              <h2 className="wallet-auth-aside-title">
+                {claim ? (
+                  <>
+                    Αποθηκεύστε το
+                    <br />
+                    εισιτήριό σας
+                  </>
+                ) : (
+                  <>
+                    Τα εισιτήριά σας,
+                    <br />
+                    πάντα στο κινητό
+                  </>
+                )}
+              </h2>
+              <p className="wallet-auth-aside-lead">
+                {claim
+                  ? 'Με έναν λογαριασμό ανοίγετε το QR επιβίβασης, βλέπετε τη θέση και έχετε το εισιτήριο offline.'
+                  : 'Κρατήσεις λεωφορείου, QR επιβίβασης και ιστορικό ταξιδιών σε ένα μέρος.'}
+              </p>
+              <ul className="wallet-auth-aside-list">
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    qr_code_2
+                  </span>
+                  <div>
+                    <strong>QR επιβίβασης</strong>
+                    <span>Δείξτε το στον οδηγό χωρίς email ή PDF.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    confirmation_number
+                  </span>
+                  <div>
+                    <strong>Όλες οι κρατήσεις</strong>
+                    <span>Προσεχή και παλαιά ταξίδια σε μία λίστα.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    notifications_active
+                  </span>
+                  <div>
+                    <strong>Ενημερώσεις διαδρομής</strong>
+                    <span>Υπενθυμίσεις και αλλαγές ώρας.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    lock
+                  </span>
+                  <div>
+                    <strong>Ασφαλής λογαριασμός</strong>
+                    <span>Τα δεδομένα μένουν στο γραφείο σας.</span>
+                  </div>
+                </li>
+              </ul>
+            </aside>
+          ) : null}
+
+          <div className="wallet-auth-panel">
+            <div className="wallet-auth-card">{formBody}</div>
+            <Link to="/" className="wallet-auth-back">
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Επιστροφή στην Αρχική
+            </Link>
+          </div>
+
+          {desktop ? (
+            <aside className="wallet-auth-aside wallet-auth-aside--right" aria-label="Πώς λειτουργεί">
+              <p className="wallet-auth-aside-kicker">Πώς λειτουργεί</p>
+              <h2 className="wallet-auth-aside-title wallet-auth-aside-title--sm">
+                {claim ? (
+                  <>
+                    Από την εγγραφή
+                    <br />
+                    στην επιβίβαση
+                  </>
+                ) : (
+                  <>
+                    Τρεις απλά
+                    <br />
+                    βήματα
+                  </>
+                )}
+              </h2>
+              <ol className="wallet-auth-aside-steps">
+                <li>
+                  <span className="wallet-auth-aside-step">1</span>
+                  <div>
+                    <strong>Δημιουργήστε λογαριασμό</strong>
+                    <span>
+                      {claim
+                        ? 'Χρησιμοποιήστε το email της κράτησης.'
+                        : 'Email και κωδικός — λιγότερο από ένα λεπτό.'}
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">2</span>
+                  <div>
+                    <strong>Ανοίξτε το My Wallet</strong>
+                    <span>
+                      {claim
+                        ? 'Το εισιτήριο εμφανίζεται αυτόματα στο pass.'
+                        : 'Βλέπετε κρατήσεις και θέση σε μία οθόνη.'}
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">3</span>
+                  <div>
+                    <strong>Επιβιβαστείτε με QR</strong>
+                    <span>Δείξτε το στον οδηγό — χωρίς χαρτί.</span>
+                  </div>
+                </li>
+              </ol>
+              {claim ? (
+                <p className="wallet-auth-aside-note">
+                  <strong>Συμβουλή:</strong> μετά την εγγραφή ανοίγει κατευθείαν το εισιτήριο με το
+                  QR.
+                </p>
+              ) : null}
+            </aside>
+          ) : null}
         </div>
       </div>
     </div>

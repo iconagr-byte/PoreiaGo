@@ -151,63 +151,6 @@ export default function RentalWalletPass({
           </div>
         ) : null}
 
-        {booking.damage_deposit_eur != null && Number(booking.damage_deposit_eur) > 0 ? (
-          <div className="rent-wallet-pay">
-            <span className="material-symbols-outlined" aria-hidden>
-              shield
-            </span>
-            <span>
-              {t('damage_deposit', lang)} €{Number(booking.damage_deposit_eur).toFixed(2)}
-              {dep ? ` · ${dep}` : ''}
-            </span>
-          </div>
-        ) : null}
-
-        {booking.branch_name ? (
-          <p className="rent-wallet-afm">
-            {t('branch', lang)}: {booking.branch_name}
-          </p>
-        ) : null}
-
-        {booking.fiscal_mark ? (
-          <div className="rent-wallet-fiscal">
-            <span className="material-symbols-outlined" aria-hidden>
-              receipt_long
-            </span>
-            <span>
-              Απόδειξη {booking.fiscal_mark}
-              {booking.fiscal_amount != null ? ` · €${Number(booking.fiscal_amount).toFixed(2)}` : ''}
-            </span>
-          </div>
-        ) : null}
-
-        {booking.client_afm ? (
-          <p className="rent-wallet-afm">ΑΦΜ {booking.client_afm}</p>
-        ) : null}
-
-        {booking.id_verification_status && booking.id_verification_status !== 'not_required' ? (
-          <div
-            className={`rent-wallet-id ${
-              booking.id_verification_status === 'verified'
-                ? 'is-ok'
-                : booking.id_verification_status === 'rejected'
-                  ? 'is-bad'
-                  : 'is-pending'
-            }`}
-          >
-            <span className="material-symbols-outlined" aria-hidden>
-              {booking.id_verification_status === 'verified' ? 'verified_user' : 'badge'}
-            </span>
-            <span>
-              {booking.id_verification_status === 'verified'
-                ? 'Ταυτότητα επαληθεύτηκε'
-                : booking.id_verification_status === 'rejected'
-                  ? 'Έγγραφα απορρίφθηκαν — επικοινωνήστε με το γραφείο'
-                  : 'Έλεγχος ταυτότητας · εκκρεμεί από το γραφείο'}
-            </span>
-          </div>
-        ) : null}
-
         <div className="rent-wallet-route">
           <span className="material-symbols-outlined" aria-hidden>
             trip_origin

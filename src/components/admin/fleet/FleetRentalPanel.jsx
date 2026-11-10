@@ -102,6 +102,7 @@ function statusChip(status) {
 export default function FleetRentalPanel({
   onOpenLiveMap,
   onOpenCustomer,
+  onBackToOffice,
   initialTab,
   activeTab: controlledTab,
   onTabChange,
@@ -568,6 +569,16 @@ export default function FleetRentalPanel({
               <span className="material-symbols-outlined">car_rental</span>
             </div>
             <div className="min-w-0">
+              {typeof onBackToOffice === 'function' ? (
+                <button
+                  type="button"
+                  onClick={onBackToOffice}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 mb-1.5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                  Πίσω στο γραφείο
+                </button>
+              ) : null}
               <h2 className="rental-apple-title">Ενοικιάσεις</h2>
               <p className="rental-apple-subtitle">
                 Στόλος, κρατήσεις, χαρτούρα συμβολαίων, check-in/out με υπογραφή — GPS μόνο από
@@ -852,11 +863,19 @@ export default function FleetRentalPanel({
                       <p className="text-xs text-gray-500">
                         {formatWhen(b.start_time)} → {formatWhen(b.end_time)} · {b.pickup_location}
                         {` · ${bookingSource(b)}`}
+                        {b.reference_code ? ` · ${b.reference_code}` : ''}
                       </p>
                     </div>
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.rental_status)}`}>
-                      {b.rental_status}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {b.online_checkin_ready ? (
+                        <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-teal-100 text-teal-800">
+                          Online check-in
+                        </span>
+                      ) : null}
+                      <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.rental_status)}`}>
+                        {b.rental_status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
