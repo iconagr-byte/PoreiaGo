@@ -1010,7 +1010,7 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         pass
 
     removed: list[str] = []
-    if tenant_id and driver_id:
+    if driver_id:
         try:
             removed = await get_live_fleet().remove_driver_vehicles(
                 tenant_id,

@@ -431,13 +431,14 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     };
   }, [online, enabled]);
 
-  const toggle = useCallback(() => {
+  const toggle = useCallback(async () => {
     if (online || starting || runningRef.current || isDriverShiftOnline()) {
       void goOffline();
     } else {
       // User tap — best chance for iOS permission prompt.
       void goOnline({ resume: false });
     }
+    await goOnline({ resume: false });
   }, [online, starting, goOffline, goOnline]);
 
   return {
