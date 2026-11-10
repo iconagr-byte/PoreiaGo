@@ -872,7 +872,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
             <span className="material-symbols-outlined" aria-hidden>
               account_balance_wallet
             </span>
-            My Wallet
+            Rent Wallet
           </button>
         </header>
 

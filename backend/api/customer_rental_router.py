@@ -119,6 +119,13 @@ class GuestRentalLookupBody(BaseModel):
     code: str | None = Field(default=None, max_length=120)
 
 
+class GuestRentalLookupBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    reference: str | None = Field(default=None, max_length=120)
+    booking_code: str | None = Field(default=None, max_length=120)
+    code: str | None = Field(default=None, max_length=120)
+
+
 def _public_booking(row: dict) -> dict:
     return {
         "id": row["id"],
@@ -197,6 +204,25 @@ async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
     row = store.lookup_booking_for_guest(
         await _require_rent_module(request),
+        email=email,
+        reference=reference,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση ενοικίασης με αυτά τα στοιχεία")
+    return {"ok": True, "booking": _public_booking(row)}
+
+
+@router.post("/public/lookup")
+async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
+    """Guest rental booking lookup by email + RB-… reference (no auth)."""
+    email = str(body.email or "").strip().lower()
+    reference = str(body.reference or body.booking_code or body.code or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Απαιτείται έγκυρο email κράτησης")
+    if not reference or len(reference) < 4:
+        raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
+    row = store.lookup_booking_for_guest(
+        await _tenant_id(request),
         email=email,
         reference=reference,
     )
