@@ -13,8 +13,8 @@ import EmailSettingsPanel from './EmailSettingsPanel.jsx';
 import '../../../styles/emailMailbox.css';
 
 const TABS = [
-  { id: 'settings', label: 'Ρυθμίσεις Email' },
   { id: 'mailbox', label: 'Mailbox' },
+  { id: 'settings', label: 'Ρυθμίσεις Email' },
   { id: 'marketing', label: 'Marketing' },
   { id: 'automations', label: 'Αυτοματισμοί' },
 ];
@@ -29,6 +29,7 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
 
   useEffect(() => {
     if (!intent) return;
+    // Sidebar «Email» → mailbox. Only jump to settings when explicitly requested.
     setTab(intent.hubTab || 'mailbox');
     if (intent.connectEmail) {
       setTab('settings');
@@ -50,8 +51,7 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
       .then((list) => {
         setAccounts(list);
         if (!list.length) {
-          setTab('settings');
-          setOpenConnectWizard(true);
+          // Stay on Mailbox (empty + banner). Do not force «Ρυθμίσεις Email».
           setAccountId('');
           writeActiveEmailAccountId('');
           return;

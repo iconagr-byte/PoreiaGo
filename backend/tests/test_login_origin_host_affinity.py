@@ -12,12 +12,20 @@ from fastapi import Request
 from app.api.auth import _browser_office_host
 
 
-def _request(*, host: str, origin: str | None = None, referer: str | None = None) -> Request:
+def _request(
+    *,
+    host: str,
+    origin: str | None = None,
+    referer: str | None = None,
+    office_host: str | None = None,
+) -> Request:
     headers = [(b"host", host.encode())]
     if origin:
         headers.append((b"origin", origin.encode()))
     if referer:
         headers.append((b"referer", referer.encode()))
+    if office_host:
+        headers.append((b"x-office-host", office_host.encode()))
     scope = {
         "type": "http",
         "asgi": {"version": "3.0"},
@@ -67,6 +75,21 @@ class BrowserOfficeHostTests(unittest.TestCase):
             return_value="api.poreiago.com",
         ):
             self.assertEqual(_browser_office_host(req), "www.achilliotravel.com")
+
+    def test_x_office_host_wins_on_shared_api(self):
+        req = _request(
+            host="api.poreiago.com",
+            origin="https://www.poreiago.com",
+            office_host="dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com",
+        )
+        with patch(
+            "middleware.domain_tenant._request_host",
+            return_value="api.poreiago.com",
+        ):
+            self.assertEqual(
+                _browser_office_host(req),
+                "dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com",
+            )
 
 
 if __name__ == "__main__":

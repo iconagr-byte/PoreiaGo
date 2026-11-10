@@ -11,6 +11,8 @@ import {
   jitterLatLng,
   placesFromBookings,
   resolvePlaceSync,
+  RENT_MAP_GREECE_CENTER,
+  RENT_MAP_GREECE_ZOOM,
 } from '../../../lib/rental/geocodePlace.js';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
@@ -100,7 +102,13 @@ function pinIcon(color, selected) {
 function FitPins({ pins, focusId }) {
   const map = useMap();
   useEffect(() => {
-    if (!pins.length) return;
+    // Leaflet often boots at world zoom when the container sizes late — always
+    // re-assert Greece when there are no pins yet.
+    map.invalidateSize();
+    if (!pins.length) {
+      map.setView(RENT_MAP_GREECE_CENTER, RENT_MAP_GREECE_ZOOM, { animate: false });
+      return;
+    }
     const focus = focusId ? pins.find((p) => p.id === focusId) : null;
     if (focus) {
       map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 12), { duration: 0.55 });
@@ -630,8 +638,10 @@ export default function RentalCalendarBoard({
             </div>
           ) : null}
           <MapContainer
-            center={[38.5, 23.5]}
-            zoom={6}
+            center={RENT_MAP_GREECE_CENTER}
+            zoom={RENT_MAP_GREECE_ZOOM}
+            minZoom={5}
+            maxZoom={18}
             className="h-full w-full"
             scrollWheelZoom
           >

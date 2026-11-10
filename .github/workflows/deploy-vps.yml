@@ -80,15 +80,21 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd -e deploy/.env.prod -e deploy/.vapid_private.pem
-            # Optional: inject Google OAuth Web Client ID
-            # Priority: Actions secret → workflow_dispatch input → deploy/google-oauth.client-id
-            GOOGLE_CID='${{ secrets.GOOGLE_CLIENT_ID }}'
+            # Inject Google OAuth Web Client ID into .env.prod.
+            # Priority: committed deploy/google-oauth.client-id (source of truth for
+            # Wallet/Android Capgo project) → workflow_dispatch input → Actions secret.
+            # Preferring the repo file avoids a stale GOOGLE_CLIENT_ID secret keeping
+            # an old GCP project id (audience mismatch after native Sign-In).
+            GOOGLE_CID=""
+            if [ -f deploy/google-oauth.client-id ]; then
+              GOOGLE_CID="$(grep -v '^[[:space:]]*#' deploy/google-oauth.client-id | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')"
+              echo "  ~ using GOOGLE_CLIENT_ID from deploy/google-oauth.client-id"
+            fi
             if [ -z "$GOOGLE_CID" ]; then
               GOOGLE_CID='${{ github.event.inputs.google_client_id }}'
             fi
-            if [ -z "$GOOGLE_CID" ] && [ -f deploy/google-oauth.client-id ]; then
-              GOOGLE_CID="$(grep -v '^[[:space:]]*#' deploy/google-oauth.client-id | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')"
-              echo "  ~ using GOOGLE_CLIENT_ID from deploy/google-oauth.client-id"
+            if [ -z "$GOOGLE_CID" ]; then
+              GOOGLE_CID='${{ secrets.GOOGLE_CLIENT_ID }}'
             fi
             ENVF=/opt/poreiago/deploy/.env.prod
             if [ -n "$GOOGLE_CID" ] && [ -f "$ENVF" ]; then

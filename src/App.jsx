@@ -10,12 +10,14 @@ import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import AdminForgotPasswordPage from './pages/AdminForgotPasswordPage';
 import AdminResetPasswordPage from './pages/AdminResetPasswordPage';
 import SeatSelection from './pages/SeatSelection';
 import TripExtrasPage from './pages/TripExtrasPage';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
+import RentWalletRedirect from './pages/RentWalletRedirect.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
 import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
@@ -43,6 +45,7 @@ import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
 import CheckoutPage from './pages/CheckoutPage';
 import BookingLookupPage from './pages/BookingLookupPage';
+import OfficeContactPage from './pages/OfficeContactPage.jsx';
 import CheckoutResumePage from './pages/CheckoutResumePage';
 import TicketPrintPage from './pages/TicketPrintPage.jsx';
 import FiscalReceiptPrintPage from './pages/FiscalReceiptPrintPage.jsx';
@@ -54,7 +57,15 @@ import MaintenanceGate from './components/MaintenanceGate.jsx';
 import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
 import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
 import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
-import { isNativeApp } from './lib/capacitor/isNativeApp.js';
+import WalletNativeSplashGate from './components/wallet/WalletNativeSplashGate.jsx';
+import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
+import DriverNativeBoot from './components/driver/DriverNativeBoot.jsx';
+import NativeUnifiedBoot from './components/native/NativeUnifiedBoot.jsx';
+import { isNativeApp, isNativeDriverApp } from './lib/capacitor/isNativeApp.js';
+import {
+  resolveNativeRoleHomePath,
+} from './lib/capacitor/nativeRoleHome.js';
+import { isNativeUnifiedApp } from './lib/capacitor/nativeAppId.js';
 
 function RentalCustomerAppGated() {
   return (
@@ -122,8 +133,12 @@ function UiLangBoot() {
   return null;
 }
 
-/** Capacitor Wallet: never mount marketing HomePage on `/`. */
+/** Capacitor shells: never mount marketing HomePage on `/`. */
 function NativeAwareHome() {
+  if (isNativeApp() && isNativeDriverApp()) return <Navigate to="/driver" replace />;
+  if (isNativeApp() && isNativeUnifiedApp()) {
+    return <Navigate to={resolveNativeRoleHomePath()} replace />;
+  }
   if (isNativeApp()) return <Navigate to="/wallet" replace />;
   return <HomePage />;
 }
@@ -139,14 +154,18 @@ function App() {
         <ScrollToTop />
         <MaintenanceGate>
           <Toaster position="top-center" />
+          <NativeUnifiedBoot />
+          <DriverNativeBoot />
           <WalletNativeBoot />
           <WalletNativeShell />
+          <WalletNativeSplashGate>
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
+            <Route path="/wallet/native-google" element={<WalletNativeGoogleBridgePage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
+            {/* Rent: green URLs — /rent/login + browse /rent; wallet is unified at /wallet. */}
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
             <Route path="/rent/my-booking" element={<RentBookingLookupGated />} />
@@ -156,7 +175,8 @@ function App() {
             <Route path="/rent/book/services" element={<RentBookingWizardGated />} />
             <Route path="/rent/book/details" element={<RentBookingWizardGated />} />
             <Route path="/rent/book/payment" element={<RentBookingWizardGated />} />
-            <Route path="/rent/wallet" element={<RentalCustomerAppGated />} />
+            <Route path="/rent/wallet" element={<RentWalletRedirect />} />
+            <Route path="/rent/wallet/*" element={<RentWalletRedirect />} />
             <Route path="/rent" element={<RentalCustomerAppGated />} />
             <Route path="/rent/*" element={<RentalCustomerAppGated />} />
             {/* Contactless rental contract signature (token from SMS/email). */}
@@ -171,7 +191,9 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/my-booking" element={<BookingLookupPage />} />
+            <Route path="/contact" element={<OfficeContactPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
             <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
@@ -208,6 +230,7 @@ function App() {
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
           </Routes>
+          </WalletNativeSplashGate>
         </MaintenanceGate>
       </Router>
     </ErrorBoundary>

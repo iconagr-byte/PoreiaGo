@@ -1,13 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getCustomerEmail, getCustomerToken, isCustomer } from '../lib/auth.js';
 import {
+  getCustomerEmail,
+  getCustomerName,
+  getCustomerPhone,
+  getCustomerToken,
+  isCustomer,
+  loginAsCustomer,
+} from '../lib/auth.js';
+import CustomerLoginModal from '../components/auth/CustomerLoginModal.jsx';
+import { consumeWalletMagic, fetchCustomerMe } from '../services/customerAuthApi.js';
+import {
+  clearWalletClaim,
   saveWalletClaim,
   walletClaimAuthPath,
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+} from '../lib/wallet/walletBookTrip.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
   buildBookingPassengers,
@@ -18,8 +32,8 @@ import {
   clearPendingCheckout,
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
-import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
 import {
@@ -41,11 +55,22 @@ import { maskIban } from '../lib/payments/ibanValidation.js';
 import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/checkoutSettingsApi.js';
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
-import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
+import GreekFriendlyNameInput from '../components/checkout/GreekFriendlyNameInput.jsx';
+import CheckoutCardPaymentFields from '../components/checkout/CheckoutCardPaymentFields.jsx';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Do NOT pin scroll with scrollTo while focused — that kills Android IME after 1 digit.
+  const fromWallet = isWalletBookFlow(location.state);
+  const bookState = fromWallet ? location.state : undefined;
+  const seedTrip = officeTripFromWalletState(location.state, tripId);
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
+    seedTrip,
+    fromWallet,
+  });
   const [processing, setProcessing] = useState(false);
   const [demoDone, setDemoDone] = useState(null);
   const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);
@@ -54,24 +79,58 @@ export default function CheckoutPage() {
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const [ibanRevealed, setIbanRevealed] = useState(false);
   const [form, setForm] = useState({
-    name: '',
+    name: getCustomerName() || '',
     email: getCustomerEmail() || '',
-    phone: '',
+    phone: getCustomerPhone() || '',
     cardNumber: '',
     expiry: '',
     cvv: '',
   });
   const [companionNames, setCompanionNames] = useState([]);
-  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
+  const cardFieldsRef = useRef(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [accountReady, setAccountReady] = useState(
+    () => Boolean(isCustomer() && getCustomerToken()),
+  );
 
-  const trip = useMemo(() => {
-    const id = Number(tripId);
-    if (!id) return null;
-    const found = loadTrips().find((t) => t.id === id) || null;
-    if (found) return found;
-    if (isDemo) return loadPlatformDemoTrips().find((t) => t.id === id) || null;
-    return null;
-  }, [tripId, isDemo]);
+  // Keep identity until logout: hydrate form from JWT + /api/auth/me.
+  useEffect(() => {
+    if (!getCustomerToken() || !isCustomer()) {
+      setAccountReady(false);
+      return undefined;
+    }
+    setAccountReady(true);
+    let cancelled = false;
+    fetchCustomerMe()
+      .then((me) => {
+        if (cancelled || !me?.email) return;
+        loginAsCustomer(
+          me.email,
+          {
+            name: me.name,
+            phone: me.phone,
+            picture: me.picture,
+            provider: me.provider,
+            customerId: me.customer_id,
+            tenant_id: me.tenant_id,
+          },
+          getCustomerToken(),
+        );
+        setForm((prev) => ({
+          ...prev,
+          name: me.name || prev.name || '',
+          email: me.email || prev.email || '',
+          phone: me.phone || prev.phone || '',
+        }));
+        setAccountReady(true);
+      })
+      .catch(() => {
+        /* stale token — keep localStorage prefill; user can re-login */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const pending = useMemo(() => loadPendingCheckout(), [tripId]);
   const seatCodes = useMemo(() => seatListFromBooking(pending?.seats || ''), [pending?.seats]);
@@ -153,12 +212,12 @@ export default function CheckoutPage() {
   }, [depositEnabled, paymentPlan]);
 
   useEffect(() => {
-    if (demoDone) return;
-    if (!trip || !pending || pending.tripId !== trip.id) {
-      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true });
-      else navigate('/', { replace: true });
+    if (demoDone || tripLoading) return;
+    if (!trip || !pending || String(pending.tripId) !== String(trip.id)) {
+      if (trip) navigate(`/select-seat/${trip.id}`, { replace: true, state: bookState });
+      else navigate(fromWallet ? '/wallet' : '/', { replace: true });
     }
-  }, [trip, pending, navigate, demoDone]);
+  }, [trip, tripLoading, pending, navigate, demoDone, bookState, fromWallet]);
 
   useEffect(() => {
     if (isDemo || !trip || !pending) return;
@@ -178,7 +237,7 @@ export default function CheckoutPage() {
       <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
         <MinimalPageBackground />
         <div className="relative z-10 max-w-lg mx-auto">
-          <div className="bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-6 md:p-8 shadow-sm text-center">
+          <div className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-6 md:p-8 shadow-sm text-center">
             <span className="material-symbols-outlined text-4xl text-emerald-600 mb-3">check_circle</span>
             <p className="text-sm font-semibold text-emerald-700 mb-1">Demo πληρωμή προσομοιώθηκε</p>
             <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-2">
@@ -199,10 +258,10 @@ export default function CheckoutPage() {
                 Ξανά επιλογή θέσης
               </Link>
               <Link
-                to="/#platform-trips"
+                to={fromWallet ? '/wallet' : '/#platform-trips'}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-on-primary px-5 py-3 text-sm font-bold hover:opacity-90"
               >
-                Πίσω στις εκδρομές
+                {fromWallet ? 'Πίσω στο Wallet' : 'Πίσω στις εκδρομές'}
               </Link>
             </div>
           </div>
@@ -211,7 +270,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (!trip || !pending || pending.tripId !== trip.id) {
+  if (tripLoading || !trip || !pending || pending.tripId !== trip.id) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center">
         <MinimalPageBackground />
@@ -232,17 +291,19 @@ export default function CheckoutPage() {
   const total = checkoutTotal;
 
   const handleChange = (field) => (e) => {
-    let { value } = e.target;
-    if (field === 'cardNumber') {
-      value = value.replace(/\D/g, '').slice(0, 16);
-      value = value.replace(/(.{4})/g, '$1 ').trim();
-    }
-    if (field === 'expiry') {
-      value = value.replace(/\D/g, '').slice(0, 4);
-      if (value.length >= 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
-    }
-    if (field === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
+    const { value } = e.target;
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAccountLogin = (profile) => {
+    setAccountReady(true);
+    setForm((prev) => ({
+      ...prev,
+      name: profile?.name || prev.name || '',
+      email: profile?.email || prev.email || '',
+      phone: profile?.phone || prev.phone || '',
+    }));
+    toast.success('Συνδεθήκατε — τα στοιχεία σας μένουν μέχρι Έξοδο· το γραφείο βλέπει ποιος κλείνει');
   };
 
   const validate = () => {
@@ -264,16 +325,29 @@ export default function CheckoutPage() {
       return false;
     }
     if (paymentMethod === 'card') {
-      const digits = form.cardNumber.replace(/\s/g, '');
+      const card = cardFieldsRef.current?.getValues?.() || {
+        cardNumber: form.cardNumber,
+        expiry: form.expiry,
+        cvv: form.cvv,
+      };
+      // Keep form in sync for any downstream readers (demo / analytics).
+      setForm((prev) => ({
+        ...prev,
+        cardNumber: card.cardNumber || '',
+        expiry: card.expiry || '',
+        cvv: card.cvv || '',
+      }));
+      const digits = String(card.cardNumber || '').replace(/\s/g, '');
       if (digits.length < 16) {
         toast.error('Συμπληρώστε τον αριθμό κάρτας');
         return false;
       }
-      if (!/^\d{2}\/\d{2}$/.test(form.expiry)) {
+      const expDigits = String(card.expiry || '').replace(/\D/g, '');
+      if (expDigits.length !== 4) {
         toast.error('Μη έγκυρη λήξη (MM/YY)');
         return false;
       }
-      if (form.cvv.length < 3) {
+      if (String(card.cvv || '').replace(/\D/g, '').length < 3) {
         toast.error('Συμπληρώστε CVV');
         return false;
       }
@@ -341,6 +415,8 @@ export default function CheckoutPage() {
         extras: Array.isArray(pending.extras) ? pending.extras : [],
         extrasTotal: Number(pending.extrasTotal) || 0,
         seatSubtotal: Number(pending.seatSubtotal) || null,
+        bookingSource: fromWallet ? 'My Wallet' : undefined,
+        agentName: fromWallet ? 'Wallet Auto' : undefined,
       });
       clearPendingCheckout();
       const resumeToken = getStoredResumeToken();
@@ -365,6 +441,51 @@ export default function CheckoutPage() {
         return;
       }
 
+      // Guest checkout → auto-create My Wallet from email (one-shot server token).
+      const activateToken = booking.walletActivateToken;
+      if (activateToken) {
+        try {
+          const profile = await consumeWalletMagic(activateToken);
+          loginAsCustomer(
+            profile.email,
+            {
+              name: profile.name || form.name,
+              picture: profile.picture,
+              provider: profile.provider || 'magic',
+              phone: profile.phone || form.phone,
+              customerId: profile.customer_id,
+              tenant_id: profile.tenant_id,
+            },
+            profile.access_token,
+          );
+          clearWalletClaim();
+          try {
+            const { upsertBookingOnServer } = await import(
+              '../services/customerBookingsApi.js'
+            );
+            await upsertBookingOnServer(booking);
+          } catch {
+            /* wallet can still show local + claim later */
+          }
+          toast.success(
+            isBankTransfer
+              ? 'Κράτηση OK — δημιουργήθηκε My Wallet με το εισιτήριό σας'
+              : 'Πληρωμή OK — ανοίγει το My Wallet με το εισιτήριό σας',
+          );
+          navigate('/wallet', {
+            replace: true,
+            state: walletHomeNavState({
+              highlightBooking: profile.highlight_booking || booking.id,
+              fromClaim: true,
+            }),
+          });
+          return;
+        } catch (activateErr) {
+          console.warn('[checkout] auto wallet activate failed', activateErr);
+          /* fall through to manual claim */
+        }
+      }
+
       const claim = saveWalletClaim({
         email: form.email,
         name: form.name,
@@ -375,23 +496,34 @@ export default function CheckoutPage() {
       });
       toast.success(
         isBankTransfer
-          ? 'Κράτηση OK — δημιουργήστε My Wallet για το εισιτήριο'
-          : 'Πληρωμή OK — δημιουργήστε My Wallet για να δείτε το εισιτήριο',
+          ? 'Κράτηση OK — ολοκληρώστε My Wallet για το εισιτήριο'
+          : 'Πληρωμή OK — ολοκληρώστε My Wallet για το εισιτήριο',
       );
       navigate(walletClaimAuthPath({ preferLogin: false }), {
         replace: true,
         state: walletClaimNavState(claim),
       });
-    } catch {
-      toast.error('Αποτυχία πληρωμής. Δοκιμάστε ξανά.');
+    } catch (err) {
+      const msg = String(err?.message || err?.detail || '').trim();
+      toast.error(
+        msg && msg.length < 180
+          ? msg
+          : 'Αποτυχία πληρωμής. Δοκιμάστε ξανά.',
+      );
     } finally {
       setProcessing(false);
     }
   };
 
+  const nativeApp = isNativeApp();
+
   return (
-    <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
-      <MinimalPageBackground />
+    <div
+      className="relative min-h-screen bg-surface py-6 px-4 md:py-10"
+      style={{ overflowAnchor: 'none' }}
+    >
+      {/* Decorative blur orbs break Android WebView IME — skip on Capacitor. */}
+      {nativeApp ? null : <MinimalPageBackground />}
       <div className="relative z-10 max-w-5xl mx-auto">
         <button
           type="button"
@@ -424,49 +556,107 @@ export default function CheckoutPage() {
           <p className="text-sm text-on-surface-variant mt-1">
             {isDemo
               ? 'Προεπισκόπηση διαδικασίας κράτησης θέσης'
-              : 'Ασφαλής πληρωμή · μετά δημιουργείτε My Wallet για το εισιτήριο'}
+              : accountReady
+                ? 'Ασφαλής πληρωμή · το εισιτήριο μπαίνει στο My Wallet σας'
+                : 'Ασφαλής πληρωμή με email · μετά ανοίγει αυτόματα το My Wallet'}
           </p>
         </div>
 
         <form onSubmit={handlePay} className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-5">
-            <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+            <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
               <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">person</span>
                 Στοιχεία επιβάτη
               </h2>
+
+              {!isDemo ? (
+                <div
+                  className={`mb-5 rounded-2xl border px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 ${
+                    accountReady
+                      ? 'border-emerald-200/80 bg-emerald-50/80'
+                      : 'border-primary/20 bg-primary/[0.06]'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-on-surface">
+                      {accountReady
+                        ? 'Συνδεδεμένος λογαριασμός'
+                        : 'Έχετε ήδη My Wallet;'}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                      {accountReady
+                        ? `Η κράτηση θα συνδεθεί με ${form.email || 'τον λογαριασμό σας'} και θα εμφανιστεί στο My Wallet.`
+                        : 'Μπορείτε να κλείσετε με email — μετά την πληρωμή ανοίγει αυτόματα λογαριασμός My Wallet. Αν έχετε ήδη, συνδεθείτε.'}
+                    </p>
+                  </div>
+                  {!accountReady ? (
+                    <button
+                      type="button"
+                      onClick={() => setLoginOpen(true)}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full bg-primary text-white px-4 py-2.5 text-sm font-bold shadow-sm hover:opacity-95"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                        login
+                      </span>
+                      Log in
+                    </button>
+                  ) : (
+                    <span className="material-symbols-outlined text-emerald-600 text-[28px] shrink-0" aria-hidden>
+                      verified_user
+                    </span>
+                  )}
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="block sm:col-span-2 text-sm">
+                <label className="block sm:col-span-2">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">
                     Ονοματεπώνυμο αγοραστή
                     {seatCodes[0] ? ` · θέση ${seatCodes[0]}` : ''}
                   </span>
-                  <input
+                  <GreekFriendlyNameInput
                     required
+                    name="passenger-name"
+                    enterKeyHint="next"
                     value={form.name}
-                    onChange={handleChange('name')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    onChange={(value) => setForm((prev) => ({ ...prev, name: value }))}
+                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                     placeholder="π.χ. Μαρία Παπαδοπούλου"
                   />
                 </label>
-                <label className="block text-sm">
+                <label className="block">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">Email</span>
                   <input
                     required
                     type="email"
+                    name="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    enterKeyHint="next"
                     value={form.email}
                     onChange={handleChange('email')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    readOnly={accountReady}
+                    className={`mt-1 w-full rounded-xl border border-surface-container px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none ${
+                      accountReady
+                        ? 'bg-surface-container/80 text-on-surface cursor-default'
+                        : 'bg-surface-container-low'
+                    }`}
+                    title={accountReady ? 'Email λογαριασμού My Wallet' : undefined}
                   />
                 </label>
-                <label className="block text-sm">
+                <label className="block">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">Τηλέφωνο</span>
                   <input
                     required
                     type="tel"
+                    name="phone"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
                     value={form.phone}
                     onChange={handleChange('phone')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                     placeholder="+30 694 …"
                   />
                 </label>
@@ -483,25 +673,25 @@ export default function CheckoutPage() {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {companionSeats.map((seat, index) => (
-                      <label key={seat} className="block text-sm">
+                      <label key={seat} className="block">
                         <span className="font-bold text-on-surface-variant text-xs uppercase">
                           Επιβάτης · θέση {seat}
                         </span>
-                        <input
+                        <GreekFriendlyNameInput
                           required
+                          name={`companion-${seat}`}
                           minLength={2}
+                          enterKeyHint="next"
                           value={companionNames[index] || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
+                          onChange={(value) => {
                             setCompanionNames((prev) => {
                               const next = [...prev];
                               next[index] = value;
                               return next;
                             });
                           }}
-                          className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                          className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 text-base focus:ring-2 focus:ring-primary focus:outline-none"
                           placeholder="Ονοματεπώνυμο συνεπιβάτη"
-                          autoComplete="off"
                         />
                       </label>
                     ))}
@@ -511,7 +701,7 @@ export default function CheckoutPage() {
             </section>
 
             {depositEnabled && (
-              <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+              <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
                 <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
                   Επιλογή πληρωμής
@@ -576,7 +766,7 @@ export default function CheckoutPage() {
               </section>
             )}
 
-            <section className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
+            <section className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm">
               <h2 className="font-bold text-on-surface mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">payments</span>
                 {isDepositPlan ? 'Πληρωμή προκαταβολής online' : 'Τρόπος πληρωμής'}
@@ -599,41 +789,7 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {paymentMethod === 'card' && (
-                <div className="space-y-4 p-4 rounded-xl bg-surface-container-low border border-surface-container">
-                  <label className="block text-sm">
-                    <span className="font-bold text-xs text-on-surface-variant uppercase">Αριθμός κάρτας</span>
-                    <input
-                      inputMode="numeric"
-                      value={form.cardNumber}
-                      onChange={handleChange('cardNumber')}
-                      className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                      placeholder="4242 4242 4242 4242"
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="block text-sm">
-                      <span className="font-bold text-xs text-on-surface-variant uppercase">Λήξη</span>
-                      <input
-                        value={form.expiry}
-                        onChange={handleChange('expiry')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                        placeholder="MM/YY"
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      <span className="font-bold text-xs text-on-surface-variant uppercase">CVV</span>
-                      <input
-                        inputMode="numeric"
-                        value={form.cvv}
-                        onChange={handleChange('cvv')}
-                        className="mt-1 w-full rounded-xl border border-surface-container bg-white px-3 py-2.5 font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                        placeholder="123"
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
+              {paymentMethod === 'card' ? <CheckoutCardPaymentFields ref={cardFieldsRef} /> : null}
 
               {paymentMethod === 'paypal' && (
                 <p className="text-sm text-on-surface-variant p-4 rounded-xl bg-[#0070ba]/10 border border-[#0070ba]/20">
@@ -744,7 +900,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm lg:sticky lg:top-6">
+            <div className="bg-surface-container-lowest rounded-2xl border border-black/[0.05] p-5 md:p-6 shadow-sm lg:sticky lg:top-6">
               <h2 className="font-bold text-on-surface mb-4">Σύνοψη παραγγελίας</h2>
 
               {trip.image && (
@@ -893,6 +1049,14 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={handleAccountLogin}
+        prefillEmail={form.email}
+        registerFrom={`/checkout/${tripId || ''}`}
+      />
     </div>
   );
 }

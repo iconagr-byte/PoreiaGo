@@ -1,3 +1,7 @@
+// Stable IDEA module name → poreiago.app.main (shared Run config).
+// Open this android/ folder in Android Studio — not the repo root.
+rootProject.name = 'poreiago'
+
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')

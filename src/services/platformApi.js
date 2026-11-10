@@ -314,6 +314,24 @@ export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
   return res.json();
 }
 
+/** Public: request admin password-reset email from /admin/login (no session). */
+export async function requestAdminPasswordReset({ email, host } = {}) {
+  const officeHost =
+    String(host || (typeof window !== 'undefined' ? window.location.hostname : '') || '')
+      .trim()
+      .toLowerCase();
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      ...(officeHost ? { host: officeHost } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 /** Public: confirm admin password reset with emailed token. */
 export async function confirmAdminPasswordReset({ token, newPassword }) {
   const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/confirm`, {
@@ -1176,4 +1194,36 @@ function getMockUsers() {
       created_at: new Date().toISOString(),
     },
   ];
+}
+
+export const DEFAULT_TRIP_REMINDER = {
+  enabled: true,
+  days_before: 3,
+  send_hour: 9,
+  subject: 'Η εκδρομή σου πλησιάζει · {trip}',
+  headline: 'Σε {days} μέρες φεύγεις',
+  body:
+    'Υπενθύμιση για την επερχόμενη εκδρομή σου. Έλεγξε ώρα και θέσεις — το εισιτήριό σου είναι στο My Wallet.',
+};
+
+export async function fetchTripReminderSettings() {
+  const res = await adminFetch('/api/admin/platform/trip-reminder');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία φόρτωσης υπενθύμισης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
+}
+
+export async function updateTripReminderSettings(patch) {
+  const res = await adminFetch('/api/admin/platform/trip-reminder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία αποθήκευσης (${res.status})`);
+  }
+  return { ...DEFAULT_TRIP_REMINDER, ...(await res.json()) };
 }

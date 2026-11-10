@@ -63,9 +63,13 @@ class GuestBookingLookup(BaseModel):
 
 
 class GuestBookingCreate(BaseModel):
-    """B2C / office checkout — no JWT; tenant_id scopes the organization."""
+    """B2C / office checkout — no JWT; tenant_id scopes the organization.
 
-    tenant_id: UUID
+    ``tenant_id`` is optional when the request Host resolves to an office
+    (Achillio custom domain / Capacitor → www.achilliotravel.com).
+    """
+
+    tenant_id: UUID | None = None
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None
@@ -119,6 +123,12 @@ class BookingResponse(BaseModel):
     metadata_json: dict | None = None
 
     model_config = {"from_attributes": True}
+
+
+class GuestBookingResponse(BookingResponse):
+    """Guest B2C create — optional one-shot token to open My Wallet without a password."""
+
+    wallet_activate_token: str | None = None
 
 
 class FiscalInvoiceResponse(BaseModel):
@@ -308,6 +318,8 @@ class PlatformTenantCreateRequest(BaseModel):
     legal_name: str = Field(min_length=2, max_length=255)
     subdomain: str = Field(min_length=2, max_length=64)
     plan: str = "starter"
+    # buses = trips only · rent = rent-only plan · both = bus plan + rent add-on
+    service_mode: str = "buses"
     vat_number: str | None = None
     admin_email: EmailStr
     admin_password: str = Field(min_length=8, max_length=128)
@@ -328,6 +340,9 @@ class PlatformTenantUpdateRequest(BaseModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     admin_notes: str | None = None
+    # SuperAdmin: set / reset the office admin login password (min 8).
+    admin_password: str | None = Field(default=None, min_length=8, max_length=128)
+    admin_email: EmailStr | None = None
 
 
 class PlatformOverviewResponse(BaseModel):
@@ -395,9 +410,24 @@ class TenantDnsInstructionsResponse(BaseModel):
     cname_host: str
     cname_target: str
     alternate_www_host: str | None = None
+    apex_host: str | None = None
+    apex_a_record: str | None = None
     subdomain_cname_host: str | None = None
     subdomain_cname_target: str | None = None
     notes: list[str] = Field(default_factory=list)
+
+
+class TenantDomainDnsCheckResponse(BaseModel):
+    domain: str = ""
+    www_ok: bool = False
+    apex_ok: bool = False
+    ready_for_tls: bool = False
+    ingress_cname: str = "www.poreiago.com"
+    ingress_ip: str = "169.58.199.186"
+    message: str = ""
+    www: dict[str, object] | None = None
+    apex: dict[str, object] | None = None
+    edge: dict[str, object] | None = None
 
 
 class TenantBrandingSettingsResponse(BaseModel):
@@ -439,6 +469,9 @@ class TenantSiteAppearanceResponse(BaseModel):
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
+    hero_overlay_opacity: int = 100
+    hero_image_fit: str = "cover"
+    hero_height_vh: int = 88
     hero_badge: str = ""
     hero_title: str = ""
     hero_title_accent: str = ""
@@ -513,6 +546,14 @@ class TenantSiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = []
+    wallet_home_news: list[dict] = []
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
 
 
 class TenantSiteAppearanceUpdate(BaseModel):
@@ -526,6 +567,9 @@ class TenantSiteAppearanceUpdate(BaseModel):
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
+    hero_overlay_opacity: int | None = None
+    hero_image_fit: str | None = None
+    hero_height_vh: int | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None
@@ -596,6 +640,14 @@ class TenantSiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 class TenantPlatformSettingsResponse(BaseModel):
