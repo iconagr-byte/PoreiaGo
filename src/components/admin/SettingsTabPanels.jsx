@@ -11,8 +11,11 @@ import GdprCompliancePanel from './GdprCompliancePanel.jsx';
 import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
+import AdminPasswordResetPanel from './AdminPasswordResetPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
 import BackupPanel from './BackupPanel.jsx';
+import TeltonikaDevicesPanel from './TeltonikaDevicesPanel.jsx';
+import TripReminderSettingsPanel from './TripReminderSettingsPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { PLATFORM_ONLY_TAB_IDS } from '../../lib/admin/settingsTabs.js';
 
@@ -32,8 +35,11 @@ export default function SettingsTabPanels({
   }
 
   if (tab === 'tenants') return <SuperAdminPanel />;
+  if (tab === 'password_reset') return <AdminPasswordResetPanel />;
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
   if (tab === 'backup') return <BackupPanel />;
+  if (tab === 'telematics') return <TeltonikaDevicesPanel />;
+  if (tab === 'trip_reminder') return <TripReminderSettingsPanel />;
 
   if (tab === 'platform') {
     return (

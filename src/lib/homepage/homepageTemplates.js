@@ -292,10 +292,10 @@ export const RENT_FLEET_LAYOUT_TEMPLATES = [
   },
   {
     id: 'rent_scroll',
-    label: 'Οριζόντιο scroll',
-    description: 'Swipe καρουζέλ — γρήγορη περιήγηση στόλου στο κινητό.',
-    icon: 'swipe',
-    tags: ['Mobile'],
+    label: 'Πλέγμα wrap',
+    description: 'Ίδιο με 3στήλο πλέγμα — χωρίς οριζόντιο scroll.',
+    icon: 'grid_view',
+    tags: ['Grid'],
   },
   {
     id: 'rent_list',
@@ -404,9 +404,17 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
-  /** International section — stacked horizontal cards between Greece and fleet. */
-  intl_trips_layout_template: 'editorial_stack',
-  intl_trip_card_template: 'abroad_horizontal',
+  rent_theme_id: 'aegean_coast',
+  rent_hero_style: 'coastal',
+  rent_hero_layout: 'strip',
+  rent_hero_image_url: '/images/rent-hero-coastal-v2.jpg',
+  rent_header_style: 'glass',
+  rent_accent_color: '#0a7a6c',
+  rent_secondary_color: '#0b3d4a',
+  rent_surface_color: '#f0fdfa',
+  /** Kept in sync with trips_* — one card style for Greece + abroad. */
+  intl_trips_layout_template: 'grid_three',
+  intl_trip_card_template: 'premium',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
   trips_section_subtitle:
@@ -414,7 +422,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη.',
+    'Διεθνείς εκδρομές με λεωφορείο — ίδια εμφάνιση κάρτας με τις εγχώριες.',
 };
 
 export function getTemplateById(list, id) {
@@ -522,7 +530,7 @@ export function rentFleetGridClass(layoutId) {
     case 'rent_featured':
       return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_scroll':
-      return 'flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory list-none p-0 m-0';
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_list':
       return 'flex flex-col gap-3 max-w-3xl list-none p-0 m-0';
     case 'rent_grid_three':
@@ -532,9 +540,6 @@ export function rentFleetGridClass(layoutId) {
 }
 
 export function rentFleetCardWrapperClass(layoutId, index = 0) {
-  if (layoutId === 'rent_scroll') {
-    return 'snap-start shrink-0 w-[min(86vw,300px)]';
-  }
   if (layoutId === 'rent_featured' && index === 0) {
     return 'md:col-span-2';
   }

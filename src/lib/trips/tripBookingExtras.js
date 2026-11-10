@@ -3,11 +3,17 @@
  * Office catalog lives on site appearance → trip_extra_options.
  */
 
+/** Icons known to render as literal text (ligature missing) → safe substitutes. */
+const BROKEN_TRIP_EXTRA_ICONS = {
+  tour_guide: 'flag',
+  sos: 'health_and_safety',
+};
+
 export const TRIP_EXTRA_ICON_OPTIONS = [
   'restaurant',
   'shield_with_heart',
   'luggage',
-  'tour_guide',
+  'flag',
   'museum',
   'local_cafe',
   'hotel',
@@ -17,6 +23,12 @@ export const TRIP_EXTRA_ICON_OPTIONS = [
   'spa',
   'celebration',
 ];
+
+export function normalizeTripExtraIcon(icon) {
+  const raw = String(icon || '').trim();
+  if (!raw) return 'verified_user';
+  return BROKEN_TRIP_EXTRA_ICONS[raw] || raw;
+}
 
 /** Sensible starter catalog for small offices (3–6 items). */
 export const DEFAULT_TRIP_EXTRA_OPTIONS = [
@@ -52,7 +64,7 @@ export const DEFAULT_TRIP_EXTRA_OPTIONS = [
   },
   {
     id: 'guided_tour',
-    icon: 'tour_guide',
+    icon: 'flag',
     title: 'Ξενάγηση',
     blurb: 'Τοπικός ξεναγός στον προορισμό — μικρή ομάδα.',
     includes: ['Ξενάγηση 1–2 ώρες'],
@@ -88,7 +100,7 @@ export function createTripExtraOption(partial = {}) {
     : 'per_person';
   return {
     id,
-    icon: String(partial.icon || 'verified_user').trim() || 'verified_user',
+    icon: normalizeTripExtraIcon(partial.icon || 'verified_user'),
     title: String(partial.title || '').trim(),
     blurb: String(partial.blurb || '').trim(),
     includes,

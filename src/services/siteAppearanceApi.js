@@ -8,8 +8,6 @@ import {
   scrubAchillioBrandForPlatformHost,
 } from '../lib/branding/platformStorefrontGuard.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
-import { fileToLogoDataUrl } from '../lib/branding/logoImage.js';
-import { fileToTripCoverDataUrl } from '../lib/trips/tripImage.js';
 
 // v3: tenant-scoped cache — never reuse Achillio Travel brand across offices.
 const STORAGE_KEY_BASE = 'aerostride_site_appearance_v3';
@@ -18,19 +16,27 @@ function appearanceStorageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
-function finalizeAppearance(data = {}) {
+function finalizeAppearance(data = {}, opts = {}) {
   const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
   // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
-  return scrubAchillioBrandForPlatformHost(merged);
+  // Native Wallet passes skipScrub so sealed-office branding is never wiped on localhost.
+  return scrubAchillioBrandForPlatformHost(merged, opts);
 }
 
 export const DEFAULT_SITE_APPEARANCE = {
   logo_url: '',
   logo_height_px: 40,
   logo_max_width_px: 180,
+  logo_radius_px: 0,
+  logo_padding_px: 0,
+  logo_bg_mode: 'none',
+  logo_shadow: false,
   logo_show_name: true,
   hero_image_url: '',
   hero_image_focal: 'center',
+  hero_overlay_opacity: 100,
+  hero_image_fit: 'cover',
+  hero_height_vh: 88,
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
   hero_title_accent: 'Άνεση, ασφάλεια & θέση εξασφαλισμένη.',
@@ -46,12 +52,34 @@ export const DEFAULT_SITE_APPEARANCE = {
   footer_contact_email: '',
   footer_contact_phone: '',
   footer_address: '',
+  footer_hours: '',
+  footer_tagline: '',
+  footer_facebook_url: '',
+  footer_instagram_url: '',
   rent_office_name: '',
+  rent_logo_url: '',
+  rent_logo_show_name: true,
+  rent_logo_height_px: 40,
+  rent_logo_max_width_px: 160,
+  rent_logo_radius_px: 0,
+  rent_logo_padding_px: 0,
+  rent_logo_bg_mode: 'none',
+  rent_logo_shadow: false,
+  rent_header_compact: false,
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
-  rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
+  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+  rent_guest_hero_title_accent: '— στόλος γραφείου · κράτηση σε λεπτά',
   rent_guest_hero_copy: '',
+  rent_guest_hero_benefits: [
+    'Δωρεάν ακύρωση στις περισσότερες κρατήσεις',
+    'Πολλαπλά σημεία παραλαβής',
+    'Υποστήριξη γραφείου & οδική βοήθεια',
+  ],
+  rent_search_show_dropoff_toggle: true,
+  rent_search_show_promo: true,
+  rent_search_submit_label: 'Αναζήτηση',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
   rent_coverage_options: [],
@@ -82,12 +110,47 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_slider_options: {},
   rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
+  /** My Wallet «Αρχική» — empty → fall back to hero / brand in resolveWalletHomeFeed */
+  wallet_home_hook: '',
+  wallet_home_headline: '',
+  wallet_home_body: '',
+  wallet_home_image_url: '',
+  wallet_home_services: [
+    {
+      icon: 'confirmation_number',
+      title: 'Online κράτηση',
+      body: 'Κλείστε θέση σε λίγα βήματα από το κινητό.',
+    },
+    {
+      icon: 'qr_code_2',
+      title: 'Ψηφιακό εισιτήριο',
+      body: 'Το εισιτήριό σας πάντα στο Wallet.',
+    },
+    {
+      icon: 'support_agent',
+      title: 'Υποστήριξη γραφείου',
+      body: 'Είμαστε δίπλα σας πριν και κατά το ταξίδι.',
+    },
+  ],
+  wallet_home_news: [],
+  wallet_home_show_trips: true,
+  wallet_home_trips_title: 'Επερχόμενες εκδρομές',
   updated_at: null,
 };
 
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
-  throw new Error(err.detail || res.statusText || 'Request failed');
+  let detail = err.detail || res.statusText || 'Request failed';
+  if (Array.isArray(detail)) {
+    detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
+  } else if (typeof detail === 'object' && detail) {
+    detail = detail.message || JSON.stringify(detail);
+  }
+  const raw = String(detail || '').trim();
+  if (/internal server error/i.test(raw) || res.status >= 500) {
+    throw new Error('Σφάλμα server — δοκιμάστε μικρότερο JPG/PNG ή κάντε επανασύνδεση');
+  }
+  throw new Error(raw || 'Request failed');
 }
 
 function cacheLocally(data) {
@@ -128,20 +191,55 @@ export function resolveSiteAssetUrl(url) {
   return url;
 }
 
-export async function fetchSiteAppearance(host = typeof window !== 'undefined' ? window.location.hostname : '') {
+/**
+ * Public site appearance.
+ * @param {string|{ host?: string, tenantId?: string }} [hostOrOpts]
+ *   Native Wallet passes sealed `tenantId` because Host is localhost.
+ */
+export async function fetchSiteAppearance(
+  hostOrOpts = typeof window !== 'undefined' ? window.location.hostname : '',
+) {
+  let host =
+    typeof hostOrOpts === 'string'
+      ? hostOrOpts
+      : String(hostOrOpts?.host || (typeof window !== 'undefined' ? window.location.hostname : ''));
+  let tenantId =
+    typeof hostOrOpts === 'object' && hostOrOpts
+      ? String(hostOrOpts.tenantId || '').trim()
+      : '';
+
+  // Capacitor / platform host: use sealed wallet office for logo + name.
+  if (!tenantId) {
+    try {
+      const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+      const { isNativeApp } = await import('../lib/capacitor/isNativeApp.js');
+      const { isPlatformMarketingHost } = await import('../lib/platform/tenantHost.js');
+      const sealed = getWalletTenantId();
+      if (sealed && (isNativeApp() || isPlatformMarketingHost(host))) {
+        tenantId = sealed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
-    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
-    const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
+    const qs = new URLSearchParams();
+    if (tenantId) qs.set('tenant_id', tenantId);
+    else if (host) qs.set('host', host);
+    const q = qs.toString() ? `?${qs}` : '';
+    const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = finalizeAppearance(data);
+      // Sealed tenant_id = real office (native Capacitor) — never scrub logo/name.
+      const merged = finalizeAppearance(data, { skipScrub: Boolean(tenantId) });
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || finalizeAppearance({});
+  return loadCached() || finalizeAppearance({}, { skipScrub: Boolean(tenantId) });
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */
@@ -150,6 +248,17 @@ export async function fetchAdminSiteAppearance() {
     try {
       const data = await saasFetch('/api/v1/branding/site-appearance');
       const merged = finalizeAppearance(data);
+      // Keep a just-uploaded office-assets logo if the GET came back empty
+      // (persist race) or scrub wiped it before tenant_slug was present.
+      const cached = loadCached();
+      if (
+        !merged.logo_url &&
+        cached?.logo_url &&
+        (String(cached.logo_url).startsWith('/api/site/office-assets/') ||
+          String(cached.logo_url).startsWith('/api/site/assets/'))
+      ) {
+        merged.logo_url = cached.logo_url;
+      }
       cacheLocally(merged);
       return merged;
     } catch {
@@ -171,8 +280,15 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      // Keep client patch on top — older API schemas may omit layout keys.
+      // Keep client patch on top — older API schemas may omit layout keys;
+      // never let host scrubbers wipe a logo/hero the office just uploaded.
       const merged = finalizeAppearance({ ...data, ...patch });
+      if (Object.prototype.hasOwnProperty.call(patch, 'logo_url') && patch.logo_url) {
+        merged.logo_url = patch.logo_url;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'hero_image_url') && patch.hero_image_url) {
+        merged.hero_image_url = patch.hero_image_url;
+      }
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
@@ -220,20 +336,38 @@ async function updateSiteAppearanceLegacy(patch) {
 }
 
 export async function uploadSiteAsset(kind, file) {
-  // SaaS / office tenants: persist logo in Postgres site_appearance so the
-  // storefront (host-resolved) actually receives it. File-store upload alone
-  // only updates the shared platform JSON and was invisible on office sites.
+  // SaaS / office tenants: multipart upload to tenant-scoped disk + short URL
+  // in Postgres. Data URLs in settings_json caused 500s on large logos.
   if (getSaasToken()) {
-    const url =
-      kind === 'hero' ? await fileToTripCoverDataUrl(file) : await fileToLogoDataUrl(file);
-    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
-    const saved = await updateSiteAppearance({ [key]: url });
-    return {
-      ok: true,
-      kind,
-      url,
-      appearance: saved.data,
-    };
+    const form = new FormData();
+    form.append('file', file);
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'POST', body: form, retries: 3 },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance || data.url) {
+      const key =
+        kind === 'logo'
+          ? 'logo_url'
+          : kind === 'rent_logo'
+            ? 'rent_logo_url'
+            : 'hero_image_url';
+      const merged = finalizeAppearance({
+        ...(data.appearance || {}),
+        [key]: data.url || data.appearance?.[key] || '',
+      });
+      // Always pin the uploaded URL after finalize (marketing-host scrub must not win).
+      if (data.url) merged[key] = data.url;
+      cacheLocally(merged);
+      return { ...data, appearance: merged };
+    }
+    return data;
   }
 
   const form = new FormData();
@@ -254,10 +388,22 @@ export async function uploadSiteAsset(kind, file) {
 
 export async function clearSiteAsset(kind) {
   if (getSaasToken()) {
-    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
-    const value = kind === 'logo' ? '' : DEFAULT_SITE_APPEARANCE.hero_image_url;
-    const saved = await updateSiteAppearance({ [key]: value });
-    return { ok: true, appearance: saved.data };
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'DELETE', retries: 3 },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance) {
+      const merged = finalizeAppearance(data.appearance);
+      cacheLocally(merged);
+      return { ok: true, appearance: merged };
+    }
+    return { ok: true, appearance: data.appearance };
   }
 
   const res = await adminFetch(

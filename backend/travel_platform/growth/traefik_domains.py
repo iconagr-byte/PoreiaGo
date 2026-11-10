@@ -43,8 +43,8 @@ def platform_ingress_ips() -> set[str]:
     """IPs that count as “points at PoreiaGo” for apex DNS checks."""
     raw = (os.getenv("PLATFORM_INGRESS_IP") or os.getenv("PLATFORM_INGRESS_IPS") or "").strip()
     ips = {p.strip() for p in raw.split(",") if p.strip()}
-    # Well-known production ingress (www.poreiago.com) — safe default for Achillio.
-    ips.add("34.141.98.145")
+    # Well-known production ingress (www/api.poreiago.com on Contabo).
+    ips.add("169.58.199.186")
     return ips
 
 
