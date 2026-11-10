@@ -396,6 +396,16 @@
   margin-bottom: 0.5rem;
 }
 
+.pg-hub-qr--mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0.28rem;
+  box-sizing: border-box;
+  shape-rendering: crispEdges;
+}
+
 .pg-hub-qr i {
   aspect-ratio: 1;
   border-radius: 1px;

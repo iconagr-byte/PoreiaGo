@@ -1,4 +1,5 @@
 /** CSS product mockups for the marketing hub — no external assets. */
+import MockBoardingQr from './MockBoardingQr.jsx';
 
 export function HeroProductStage() {
   return (
@@ -46,11 +47,7 @@ export function HeroProductStage() {
           <p className="pg-hub-phone-kicker">My Wallet</p>
           <strong>Εισιτήριο</strong>
           <span className="pg-hub-phone-trip">Σαντορίνη · Αύριο 07:30</span>
-          <div className="pg-hub-qr">
-            {Array.from({ length: 36 }).map((_, i) => (
-              <i key={i} className={i % 3 === 0 || i % 7 === 0 ? 'on' : ''} />
-            ))}
-          </div>
+          <MockBoardingQr className="pg-hub-qr pg-hub-qr--mark" />
           <span className="pg-hub-phone-seat">Θέση 12A · Ελένη Κ.</span>
         </div>
       </div>
