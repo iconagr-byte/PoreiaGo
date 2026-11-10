@@ -350,8 +350,9 @@ export default function RentPlanCardsEditor() {
       setAddon(a);
       setSavedSnapshot(serializeSnapshot(saved.sectionTitle, s, a));
       toast.success(
-        `Αποθηκεύτηκε · ${saved.standalone.name} €${saved.standalone.monthlyEur}/μήνα`,
+        `Αποθηκεύτηκε · ${saved.standalone.name} €${saved.standalone.monthlyEur}/μήνα — ενημερώνονται /grafeia & hero`,
       );
+      window.dispatchEvent(new Event('rent-plan-catalog-changed'));
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
     } finally {
@@ -374,11 +375,11 @@ export default function RentPlanCardsEditor() {
     <form onSubmit={onSave} className="rent-plan-editor space-y-4">
       <div className="rent-plan-editor-hero">
         <div className="min-w-0">
-          <p className="rent-plan-editor-kicker">Marketing · /grafeia</p>
-          <h3 className="rent-plan-editor-hero-title">Κάρτες συμβολαίων Rent</h3>
+          <p className="rent-plan-editor-kicker">Marketing · σελίδα συμβολαίων SaaS</p>
+          <h3 className="rent-plan-editor-hero-title">Κάρτες τιμών ενοικιάσεων</h3>
           <p className="rent-plan-editor-hero-copy">
-            Επεξεργασία τίτλων, τιμών και features. Η τιμή είναι για εμφάνιση — το Stripe δεν
-            αλλάζει αυτόματα.
+            Τιμές και κείμενα για τη δημόσια σελίδα /grafeia. Η χαρτούρα κάθε κράτησης (υπογραφές,
+            σύμβαση) είναι στο μενού «Χαρτούρα».
           </p>
         </div>
         <div className="rent-plan-editor-hero-actions">

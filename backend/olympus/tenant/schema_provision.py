@@ -70,7 +70,7 @@ async def _ensure_table(session: AsyncSession, schema: str, table: str) -> None:
             CREATE TABLE IF NOT EXISTS {qualified} (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 tenant_id UUID NOT NULL,
-                trip_id UUID,
+                trip_id INTEGER,
                 customer_user_id UUID,
                 reference_code VARCHAR(32) NOT NULL,
                 status VARCHAR(32) NOT NULL DEFAULT 'pending',

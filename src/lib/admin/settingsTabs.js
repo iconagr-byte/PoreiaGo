@@ -6,11 +6,12 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'fiscal', label: 'Φορολογία', icon: 'receipt_long', section: 'office' },
   { id: 'contracts', label: 'Συμβόλαιο', icon: 'description', section: 'office' },
   { id: 'compliance', label: 'GDPR & Audit', icon: 'shield', section: 'office' },
-  { id: 'homepage', label: 'Αρχική σελίδα', icon: 'home', section: 'office' },
+  { id: 'logins', label: 'Συνδέσεις', icon: 'login', section: 'office' },
+  { id: 'homepage', label: 'Σχεδιασμός σελίδων', icon: 'web', section: 'office' },
   { id: 'domain', label: 'Domain', icon: 'language', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
-  { id: 'drivers', label: 'Οδηγοί', icon: 'badge', section: 'office' },
-  { id: 'telematics', label: 'Telematics', icon: 'tune', section: 'office' },
+  { id: 'telematics', label: 'Teltonika GPS', icon: 'sensors', section: 'office' },
+  { id: 'trip_reminder', label: 'Υπενθύμιση εκδρομής', icon: 'event_upcoming', section: 'office' },
 ];
 
 /** Settings relevant for a Rent-only office (no bus driver portal settings). */
@@ -20,6 +21,7 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
   'fiscal',
   'contracts',
   'compliance',
+  'logins',
   'homepage',
   'domain',
   'users',
@@ -28,8 +30,8 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
 
 export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
+  { id: 'password_reset', label: 'Κωδικοί', icon: 'lock_reset', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
-  { id: 'integrations', label: 'Integrations', icon: 'key', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
@@ -67,6 +69,10 @@ export function settingsTabsForRole(isSuperAdmin, officeMode = 'trips_only') {
 export function sanitizeSettingsSubTab(tab, isSuperAdmin, officeMode = 'trips_only') {
   const fallback = isSuperAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   if (!tab) return fallback;
+  // Removed from UI — old bookmarks / ?sub=integrations land on SaaS Infra.
+  if (tab === 'integrations') {
+    return isSuperAdmin ? 'saas_infra' : DEFAULT_TENANT_SETTINGS_TAB;
+  }
   if (PLATFORM_ONLY_TAB_IDS.has(tab) && !isSuperAdmin) return DEFAULT_TENANT_SETTINGS_TAB;
   const allowed = new Set(settingsTabsForRole(isSuperAdmin, officeMode).map((t) => t.id));
   return allowed.has(tab) ? tab : fallback;
