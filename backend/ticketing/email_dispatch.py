@@ -72,14 +72,22 @@ def _html_to_plain(text: str) -> str:
     return html.unescape(stripped).strip()
 
 
-def _build_message(to: str, subject: str, body_html: str) -> tuple[str, MIMEMultipart]:
+def _build_message(
+    to: str,
+    subject: str,
+    body_html: str,
+    *,
+    reply_to: str | None = None,
+) -> tuple[str, MIMEMultipart]:
     from_addr = os.getenv("SMTP_FROM", "noreply@aerostride.app")
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
     msg["To"] = to
-    reply = _reply_to()
-    if reply:
+    reply = (reply_to or "").strip() if reply_to else ""
+    if not reply or "@" not in reply:
+        reply = _reply_to() or ""
+    if reply and "@" in reply:
         msg["Reply-To"] = reply
     plain = _html_to_plain(body_html)
     msg.attach(MIMEText(plain, "plain", "utf-8"))
@@ -121,6 +129,9 @@ async def _try_send_via_tenant_mailbox(
     to: str,
     subject: str,
     body_html: str,
+    *,
+    reply_to: str | None = None,
+    allow_self_send: bool = True,
 ) -> str | None:
     """Prefer the office Email Hub SMTP (e.g. Achillio info@…) when configured."""
     tid = str(tenant_id or "").strip()
@@ -136,11 +147,28 @@ async def _try_send_via_tenant_mailbox(
         account = await get_settings(str(accounts[0]["id"]), with_password=True)
         if not account or not str(account.get("smtp_host") or "").strip():
             return None
+        from_addr = str(
+            account.get("email_address") or account.get("mail_username") or ""
+        ).strip().lower()
+        # Self-send (info@ → info@) via the same SMTP often never lands in INBOX.
+        # Prefer platform SMTP so the office mailbox receives a real inbound message.
+        if (
+            not allow_self_send
+            and from_addr
+            and from_addr == str(to or "").strip().lower()
+        ):
+            logger.info(
+                "Skipping tenant self-SMTP tenant=%s to=%s — using platform SMTP",
+                tid,
+                to,
+            )
+            return None
         ref = await send_email_smtp(
             account,
             to=to,
             subject=subject,
             body_html=body_html,
+            reply_to=reply_to or "",
         )
         logger.info(
             "Booking/office email sent via tenant mailbox tenant=%s from=%s to=%s",
@@ -159,6 +187,15 @@ async def _try_send_via_tenant_mailbox(
         return None
 
 
+def is_delivered_email_ref(ref: str | None) -> bool:
+    """True only for refs that indicate a real SMTP handoff (not log/spam soft success)."""
+    r = str(ref or "")
+    return bool(
+        r.startswith("email-smtp-")
+        or r.startswith("email-tenant-smtp-")
+    )
+
+
 async def send_email(
     to: str,
     subject: str,
@@ -166,18 +203,29 @@ async def send_email(
     *,
     skip_queue: bool = False,
     tenant_id: str | None = None,
+    reply_to: str | None = None,
+    allow_tenant_self_send: bool = True,
+    skip_spam_filter: bool = False,
 ) -> str:
     from_addr = os.getenv("SMTP_FROM", "noreply@aerostride.app")
     ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
 
-    allowed, block_reason = check_email_spam_filter(to, tenant_id=tenant_id)
-    if not allowed:
-        _append_log(f"[{ts}] SPAM_BLOCKED to={to} reason={block_reason} subject={subject}")
-        logger.info("Email blocked by spam filter to=%s reason=%s", to, block_reason)
-        return f"email-spam-blocked-{to}"
+    if not skip_spam_filter:
+        allowed, block_reason = check_email_spam_filter(to, tenant_id=tenant_id)
+        if not allowed:
+            _append_log(f"[{ts}] SPAM_BLOCKED to={to} reason={block_reason} subject={subject}")
+            logger.info("Email blocked by spam filter to=%s reason=%s", to, block_reason)
+            return f"email-spam-blocked-{to}"
 
     if tenant_id:
-        tenant_ref = await _try_send_via_tenant_mailbox(tenant_id, to, subject, body_html)
+        tenant_ref = await _try_send_via_tenant_mailbox(
+            tenant_id,
+            to,
+            subject,
+            body_html,
+            reply_to=reply_to,
+            allow_self_send=allow_tenant_self_send,
+        )
         if tenant_ref:
             _append_log(
                 f"[{ts}] EMAIL_TENANT to={to} tenant={tenant_id} subject={subject} ref={tenant_ref}"
@@ -194,7 +242,7 @@ async def send_email(
             logger.info("%s → %s", msg, NOTIFICATION_LOG)
         return f"email-log-{to}"
 
-    from_addr, mime = _build_message(to, subject, body_html)
+    from_addr, mime = _build_message(to, subject, body_html, reply_to=reply_to)
     max_retries, base_sec = _retry_settings()
     last_error: Exception | None = None
 

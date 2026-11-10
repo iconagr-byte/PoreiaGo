@@ -26,6 +26,7 @@ export default function OfficeContactPage() {
   const [form, setForm] = useState(EMPTY);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -54,17 +55,37 @@ export default function OfficeContactPage() {
     setForm((f) => ({ ...f, [key]: e.target.value }));
   };
 
+  const validateLocal = () => {
+    const name = String(form.name || '').trim();
+    const email = String(form.email || '').trim();
+    const message = String(form.message || '').trim();
+    if (name.length < 2) return 'Συμπληρώστε το ονοματεπώνυμό σας.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Μη έγκυρο email.';
+    if (message.length < 10) return 'Το μήνυμα πρέπει να έχει τουλάχιστον 10 χαρακτήρες.';
+    return '';
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (sending) return;
+    const localErr = validateLocal();
+    if (localErr) {
+      setFormError(localErr);
+      toast.error(localErr);
+      return;
+    }
+    setFormError('');
     setSending(true);
     try {
       await submitOfficeContact(form);
       setSent(true);
       setForm(EMPTY);
+      setFormError('');
       toast.success('Το μήνυμα στάλθηκε στο γραφείο.');
     } catch (err) {
-      toast.error(err?.message || 'Αποτυχία αποστολής.');
+      const msg = err?.message || 'Αποτυχία αποστολής.';
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }
@@ -135,6 +156,11 @@ export default function OfficeContactPage() {
             </div>
           ) : (
             <form className="oc-form" onSubmit={onSubmit} noValidate>
+              {formError ? (
+                <div className="oc-error" role="alert">
+                  {formError}
+                </div>
+              ) : null}
               <div className="oc-row">
                 <div className="oc-field">
                   <label htmlFor="oc-name">Ονοματεπώνυμο *</label>
