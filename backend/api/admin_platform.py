@@ -128,7 +128,7 @@ def _driver_response(d, *, enrich_safety: bool = False) -> FleetDriverResponse:
         salary_per_km=d.salary_per_km,
         salary_per_trip=d.salary_per_trip,
         current_balance=d.current_balance,
-        safety_score=safety,
+        safety_score=d.safety_score,
         trips_completed=d.trips_completed,
         total_km=d.total_km,
         license_expires_at=d.license_expires_at,
@@ -1331,7 +1331,7 @@ async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate
     if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
-        d = update_driver(driver_id, body.model_dump(exclude_unset=True))
+        d = await asyncio.to_thread(update_driver, driver_id, body.model_dump(exclude_unset=True))
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
     except ValueError as e:
@@ -1351,7 +1351,7 @@ async def remove_driver(request: Request, driver_id: str):
         delete_driver(driver_id, tenant_id=tenant_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
-
+    return Response(status_code=204)
 
 # --- Office CRM customers (durable, tenant-scoped) ---------------------------------
 

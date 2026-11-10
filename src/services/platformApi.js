@@ -439,7 +439,7 @@ export async function fetchFleetDrivers(status) {
   } catch (err) {
     if (getSaasToken()) throw err;
   }
-  return getMockDrivers();
+  throw new Error(String(detail));
 }
 
 /** Invalidate after create/update/delete so the next list fetch is fresh. */
@@ -481,7 +481,7 @@ export async function fetchFleetDriver(driverId) {
   } catch (err) {
     if (getSaasToken()) throw err;
   }
-  return getMockDrivers().find((d) => d.id === driverId) || null;
+  throw new Error(String(detail));
 }
 
 export async function createFleetDriver(body) {
