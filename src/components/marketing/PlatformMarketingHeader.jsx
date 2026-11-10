@@ -66,14 +66,8 @@ export default function PlatformMarketingHeader() {
       <div className="pm-header-inner">
         <PlatformBrand variant="light" />
 
-        <nav className="pm-nav pm-nav--slim" aria-label="Κύριο μενού">
-          <a href="#choose-service" className="pm-nav-quiet" onClick={closeAll}>
-            Υπηρεσίες
-          </a>
-        </nav>
-
         <div className="pm-header-actions">
-          {/* Desktop-only — on phone these live in the drawer so the mark stays full-width */}
+          {/* Desktop-only login — Συμβόλαια / Υπηρεσίες live in page body + mobile drawer */}
           <Link to="/admin/login" className="pm-header-login pm-header-desktop-only">
             Σύνδεση
           </Link>
@@ -87,15 +81,6 @@ export default function PlatformMarketingHeader() {
               account_balance_wallet
             </span>
             <span className="pm-header-cta__label">My Wallet</span>
-          </Link>
-          <Link
-            to="/grafeia"
-            className="pm-header-cta pm-header-cta--contracts pm-header-desktop-only"
-          >
-            Συμβόλαια
-            <span className="material-symbols-outlined" aria-hidden>
-              arrow_forward
-            </span>
           </Link>
           <button
             type="button"
