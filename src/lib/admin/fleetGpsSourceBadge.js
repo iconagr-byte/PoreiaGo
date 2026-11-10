@@ -3,10 +3,10 @@
  */
 
 const SOURCE_FRESH_MS = 90_000;
-/** Match Teltonika Codec TCP idle timeout — parked AVL is often rarer than 90s. */
-const TELTONIKA_BADGE_FRESH_MS = 300_000;
-/** Keep «GPS οχήματος» after a brief server/App-only poll gap. */
-const TELTONIKA_STICKY_MS = 300_000;
+/** Align with backend alive window — unplugged GPS must drop «active» quickly. */
+const TELTONIKA_BADGE_FRESH_MS = 90_000;
+/** Brief sticky only — covers multi-worker poll gaps, not power-cut lag. */
+const TELTONIKA_STICKY_MS = 90_000;
 
 /** plate → sticky-until epoch ms — survives intermittent App-only polls. */
 const stickyTeltonikaUntil = new Map();
@@ -115,31 +115,35 @@ export function resolveFleetGpsSources(vehicle) {
       ? vehicle.gpsSources
       : [];
 
-  // Trust server gps_sources for the dual badge. Offline devices omit
-  // teltonika server-side; do not second-guess a listed open channel.
+  const parkedHydrate = Boolean(vehicle.hydrated_from_store || vehicle.hydratedFromStore);
+  const teltonikaFresh = isTeltonikaSignalFresh(vehicle);
+
+  // Trust server gps_sources — but never keep «GPS οχήματος» on a parked /
+  // hydrated pin with a stale tracker signal (power cut / last-known ghost).
   for (const item of listed) {
     const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
+    if (kind === 'teltonika' && parkedHydrate && !teltonikaFresh) continue;
     push(kind);
   }
 
-  if (isTeltonikaSignalFresh(vehicle)) push('teltonika');
+  if (teltonikaFresh) push('teltonika');
   else if (
     kindFromRaw(vehicle?.source || vehicle?.gps_source || vehicle?.gpsSource) === 'teltonika' &&
-    !vehicle.hydrated_from_store &&
-    !vehicle.hydratedFromStore &&
+    !parkedHydrate &&
     isFresh(vehicle.timestamp || vehicle.updated_at, TELTONIKA_BADGE_FRESH_MS)
   ) {
     push('teltonika');
   } else if (
     vehicle?.imei &&
-    !vehicle.hydrated_from_store &&
-    !vehicle.hydratedFromStore &&
+    !parkedHydrate &&
     isFresh(
       vehicle.tracker_signal_at || vehicle.trackerSignalAt || vehicle.timestamp,
       TELTONIKA_BADGE_FRESH_MS,
     )
   ) {
     push('teltonika');
+  } else if (parkedHydrate && !teltonikaFresh) {
+    clearStickyTeltonika(plate);
   }
 
   if (isAppSeenFresh(vehicle)) push('app');

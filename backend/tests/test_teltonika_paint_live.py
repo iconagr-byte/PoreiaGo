@@ -63,6 +63,85 @@ class TeltonikaPaintLiveTests(unittest.TestCase):
         self.assertFalse(ok)
         process.assert_not_awaited()
 
+    def test_move_coords_false_keeps_existing_pin_latlng(self):
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-keep"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 40.801,
+            "lng": 22.052,
+            "speed_kmh": 12.0,
+            "source": "teltonika",
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device,
+                    open_channel=True,
+                    reason="tcp_keepalive",
+                    move_coords=False,
+                )
+            )
+        self.assertTrue(ok)
+        payload = process.await_args.args[0]
+        self.assertAlmostEqual(float(payload["latitude"]), 40.801, places=4)
+        self.assertAlmostEqual(float(payload["longitude"]), 22.052, places=4)
+        self.assertAlmostEqual(float(payload["speed_kmh"]), 12.0, places=1)
+
+    def test_hydrate_skips_when_shift_suppressed_and_offline(self):
+        from travel_platform.telemetry.teltonika import shift_suppress as ss
+
+        ss._suppress_until.clear()
+        ss.suppress_plate_after_shift(self.tenant, "EEX5670", seconds=3600)
+        stale = {
+            **self.device,
+            "last_seen_at": "2020-01-01T00:00:00+00:00",
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.tracker_priority.is_tracker_binding_alive",
+            return_value=False,
+        ):
+            ok = asyncio.run(
+                paint_live_pin_from_device(stale, open_channel=True, reason="hydrate")
+            )
+        self.assertFalse(ok)
+        process.assert_not_awaited()
+        self.assertTrue(ss.is_shift_suppressed(self.tenant, "EEX5670"))
+
+    def test_hydrate_clears_suppress_when_tracker_alive(self):
+        from travel_platform.telemetry.teltonika import shift_suppress as ss
+
+        ss._suppress_until.clear()
+        ss.suppress_plate_after_shift(self.tenant, "EEX5670", seconds=3600)
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.tracker_priority.is_tracker_binding_alive",
+            return_value=True,
+        ):
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device, open_channel=True, reason="tcp_keepalive"
+                )
+            )
+        self.assertTrue(ok)
+        process.assert_awaited()
+        self.assertFalse(ss.is_shift_suppressed(self.tenant, "EEX5670"))
+
 
 if __name__ == "__main__":
     unittest.main()

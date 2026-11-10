@@ -45,6 +45,8 @@ class LiveVehicleResponse(BaseModel):
     driver_name: str | None = None
     bus_plate: str | None = None
     heading_deg: float | None = None
+    altitude_m: float | None = None
+    satellites: int | None = None
     driver_id: str | None = None
     # Soft-ack: driver PWA id when Teltonika owns the pin (chat / photo).
     app_driver_id: str | None = None
@@ -135,11 +137,13 @@ class TelemetryAlertResponse(BaseModel):
     id: str
     alert_type: str
     tenant_id: str
-    vehicle_id: str
-    trip_id: int | None
+    # Optional — NEW_BOOKING / office events have no vehicle.
+    vehicle_id: str | None = None
+    trip_id: int | None = None
     message: str
     metadata: dict | None = None
     created_at: str
+    severity: str | None = None
 
 
 class TripRoutePointResponse(BaseModel):
@@ -409,6 +413,8 @@ class TeltonikaDeviceUpsert(BaseModel):
 
 
 class TeltonikaDeviceResponse(BaseModel):
+    model_config = {"extra": "ignore"}
+
     id: str
     imei: str
     tenant_id: str
@@ -423,6 +429,9 @@ class TeltonikaDeviceResponse(BaseModel):
     last_lng: float | None = None
     last_speed_kmh: float | None = None
     points_accepted: int = 0
+    last_hw_lat: float | None = None
+    last_hw_lng: float | None = None
+    last_fix_source: str | None = None
 
 
 class TeltonikaServerStatusResponse(BaseModel):
@@ -445,6 +454,8 @@ class TeltonikaTestPingRequest(BaseModel):
     latitude: float | None = Field(None, ge=-90, le=90)
     longitude: float | None = Field(None, ge=-180, le=180)
     speed_kmh: float = Field(0, ge=0, le=300)
+    # True = use last Codec/hardware fix only (never browser/PC geolocation).
+    use_hardware: bool = False
 
 
 class TeltonikaTestPingResponse(BaseModel):
@@ -453,3 +464,5 @@ class TeltonikaTestPingResponse(BaseModel):
     latitude: float
     longitude: float
     source: str = "test_ping"
+    # Where coords came from for Δοκιμαστικό pin (last_hw | live_fleet | browser).
+    fix_origin: str | None = None

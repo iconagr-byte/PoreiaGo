@@ -91,9 +91,10 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
-# Public POST — password reset confirm (token in body, no session yet)
+# Public POST — password reset confirm / forgot request (no session yet)
 ADMIN_PUBLIC_POST_PREFIXES = (
     "/api/admin/platform/password-reset/confirm",
+    "/api/admin/platform/password-reset/request",
 )
 
 # Email / mailbox / campaigns — SQLite-backed, must not be world-writable.

@@ -37,6 +37,24 @@ router = APIRouter(tags=["telemetry"])
 ingest_router = APIRouter(prefix="/telemetry", tags=["telemetry-ingest"])
 
 
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def verify_device_key(x_device_key: str | None = Header(default=None, alias="X-Device-Key")) -> str:
     env = os.getenv("ENVIRONMENT", "development").lower()
     raw = (os.getenv("TELEMETRY_DEVICE_KEYS") or "").strip()
@@ -131,11 +149,20 @@ async def fleet_live(
     # Empty map but online IMEI in device store — force paint once (Achillio).
     if not vehicles:
         try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
             from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
                 hydrate_tenant_live_from_devices,
             )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
 
-            n = await hydrate_tenant_live_from_devices(str(tenant_id), force=True)
+            tid = str(tenant_id)
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
+            n = await hydrate_tenant_live_from_devices(tid, force=True)
             if n:
                 vehicles = await live.list_active_for_admin_async(tenant_id)
                 log.info(
@@ -221,12 +248,9 @@ async def fleet_live(
                     str(tenant_id),
                     meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
                 )
-                from travel_platform.telemetry.tracker_priority import (
-                    DEVICE_ONLINE_BADGE_SECONDS,
-                )
-
-                badge_alive = max(alive_sec, DEVICE_ONLINE_BADGE_SECONDS)
-                if is_tracker_binding_alive(device, max_age_sec=badge_alive):
+                # Only clear parked hydrate when the IMEI is truly live (≤ alive).
+                # Do not use a longer badge window — that faked "active" after unplug.
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
                     if "teltonika" not in (gps_sources or []):
                         gps_sources = ["teltonika", *(gps_sources or [])]
                     tracker_signal_at = (
@@ -235,6 +259,16 @@ async def fleet_live(
                     hydrated_from_store = False
                     if not meta.get("imei") and device.get("imei"):
                         meta["imei"] = device.get("imei")
+                # Dual chip: fresh App soft-ack + live IMEI → both on the pin.
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
             except Exception:
                 pass
             rows.append(
@@ -252,6 +286,8 @@ async def fleet_live(
                     driver_name=meta.get("driver_name"),
                     bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
                     heading_deg=meta.get("heading_deg"),
+                    altitude_m=_safe_float(meta.get("altitude_m")),
+                    satellites=_safe_int(meta.get("satellites")),
                     driver_id=chat_driver_id,
                     app_driver_id=app_driver_id,
                     photo_url=media.get("photo_url"),

@@ -16,6 +16,15 @@ export default function RentGuestHero({
   brandLabel = 'Poreiago Rent',
   logoUrl = '',
   brandSubtitle = '',
+  logoHeightPx,
+  logoMaxWidthPx,
+  logoRadiusPx,
+  logoPaddingPx,
+  logoBgMode,
+  logoShadow,
+  heroStyle = 'coastal',
+  heroLayout: heroLayoutProp = 'strip',
+  heroImageUrl = '',
   title,
   titleAccent,
   copy,
@@ -32,8 +41,17 @@ export default function RentGuestHero({
   );
   const slider = readPageSlider(siteAppearance, 'rent');
 
+  const heroMode = String(heroStyle || 'coastal').trim().toLowerCase() || 'coastal';
+  const heroLayout = String(heroLayoutProp || 'strip').trim().toLowerCase() || 'strip';
+  const photoSrc = String(heroImageUrl || '').trim() || RENT_GUEST_HERO_IMAGE;
+
   return (
-    <section className="rent-hero rent-hero--landing rent-hero--booking" aria-label="Ενοικίαση">
+    <section
+      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode} rent-hero-layout--${heroLayout}`}
+      data-rent-hero={heroMode}
+      data-rent-hero-layout={heroLayout}
+      aria-label="Ενοικίαση"
+    >
       <div className="rent-hero-media" aria-hidden={!slider.enabled}>
         {slider.enabled ? (
           <SiteHeroSlider
@@ -48,7 +66,8 @@ export default function RentGuestHero({
           />
         ) : (
           <img
-            src={RENT_GUEST_HERO_IMAGE}
+            key={photoSrc}
+            src={photoSrc}
             alt=""
             width={3840}
             height={2160}
@@ -70,6 +89,12 @@ export default function RentGuestHero({
             showName
             subtitle={brandSubtitle}
             variant="onDark"
+            logoHeightPx={logoHeightPx}
+            logoMaxWidthPx={logoMaxWidthPx}
+            logoRadiusPx={logoRadiusPx}
+            logoPaddingPx={logoPaddingPx}
+            logoBgMode={logoBgMode}
+            logoShadow={logoShadow}
           />
         </div>
 

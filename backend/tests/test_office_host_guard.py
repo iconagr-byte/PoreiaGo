@@ -9,6 +9,7 @@ from uuid import uuid4
 from travel_platform.settings.office_host_guard import (
     host_is_shared_api,
     host_looks_like_achillio_travel,
+    login_host_forced_tenant_id,
     office_host_mismatch_detail,
 )
 
@@ -106,6 +107,32 @@ class OfficeHostGuardTests(unittest.IsolatedAsyncioTestCase):
                 impersonating=True,
             )
         self.assertIsNone(detail)
+
+    async def test_office_subdomain_forces_resolved_tenant(self):
+        office_id = uuid4()
+        resolved = type("R", (), {"tenant_id": office_id, "is_active": True})()
+        with patch("app.core.database.AsyncSessionLocal") as session_local, patch(
+            "olympus.tenant.domain_resolver.DomainResolver",
+        ) as resolver_cls:
+            cm = AsyncMock()
+            db = AsyncMock()
+            cm.__aenter__.return_value = db
+            cm.__aexit__.return_value = None
+            session_local.return_value = cm
+            resolver_cls.return_value.resolve = AsyncMock(return_value=resolved)
+
+            forced = await login_host_forced_tenant_id(
+                "dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com",
+                is_platform_host=False,
+            )
+        self.assertEqual(forced, office_id)
+
+    async def test_platform_host_does_not_force_office(self):
+        forced = await login_host_forced_tenant_id(
+            "www.poreiago.com",
+            is_platform_host=True,
+        )
+        self.assertIsNone(forced)
 
 
 if __name__ == "__main__":

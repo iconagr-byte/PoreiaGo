@@ -11,6 +11,7 @@ import {
 } from '../../lib/admin/fleetVehicleDetails.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchFleetVehicles } from '../../services/platformApi.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 import {
   createTeltonikaDevice,
   deleteTeltonikaDevice,
@@ -55,6 +56,23 @@ function deviceSignalFresh(d, maxMs = 90_000) {
   const t = new Date(raw).getTime();
   if (!Number.isFinite(t)) return false;
   return Date.now() - t <= maxMs;
+}
+
+/** Match backend hardware_last_fix — never browser/manual last_lat on the map. */
+function hardwareCoords(d) {
+  if (!d) return null;
+  const hwLat = d.last_hw_lat;
+  const hwLng = d.last_hw_lng;
+  if (hwLat != null && hwLng != null && Number.isFinite(Number(hwLat)) && Number.isFinite(Number(hwLng))) {
+    return { lat: Number(hwLat), lng: Number(hwLng) };
+  }
+  const src = String(d.last_fix_source || '')
+    .trim()
+    .toLowerCase();
+  if (!['teltonika', 'tracker', 'hardware'].includes(src)) return null;
+  if (d.last_lat == null || d.last_lng == null) return null;
+  if (!Number.isFinite(Number(d.last_lat)) || !Number.isFinite(Number(d.last_lng))) return null;
+  return { lat: Number(d.last_lat), lng: Number(d.last_lng) };
 }
 
 function deviceStatus(d, liveCodes) {
@@ -122,12 +140,16 @@ function FitPins({ pins }) {
       map.setView(DEFAULT_CENTER, 6);
       return;
     }
-    if (pins.length === 1) {
-      map.setView([pins[0].lat, pins[0].lng], 13);
+    const count = pins.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    // 1 στίγμα → κοντινό street zoom · περισσότερα → χαμηλότερο maxZoom.
+    if (count === 1) {
+      map.setView([pins[0].lat, pins[0].lng], maxZoom, { animate: true });
       return;
     }
     const bounds = L.latLngBounds(pins.map((p) => [p.lat, p.lng]));
-    map.fitBounds(bounds.pad(0.35), { maxZoom: 14, animate: true });
+    map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
   }, [pins, map]);
   return null;
 }
@@ -252,22 +274,18 @@ export default function TeltonikaDevicesPanel() {
     [fleetByPlate, liveFleet],
   );
 
-  /** Live last-fix pins from the device store + any explicit test pins. */
+  /** Live last-fix pins — Codec last_hw / Teltonika source only (never PC last_lat). */
   const liveDevicePins = useMemo(() => {
     return devices
-      .filter(
-        (d) =>
-          d?.enabled !== false &&
-          d?.last_lat != null &&
-          d?.last_lng != null &&
-          Number.isFinite(Number(d.last_lat)) &&
-          Number.isFinite(Number(d.last_lng)),
-      )
-      .map((d) =>
-        buildTestPin(d, d.last_lat, d.last_lng, {
+      .map((d) => {
+        if (d?.enabled === false) return null;
+        const hw = hardwareCoords(d);
+        if (!hw) return null;
+        return buildTestPin(d, hw.lat, hw.lng, {
           online: deviceSignalFresh(d),
-        }),
-      );
+        });
+      })
+      .filter(Boolean);
   }, [devices, buildTestPin]);
 
   const mapPins = useMemo(() => {
@@ -319,13 +337,21 @@ export default function TeltonikaDevicesPanel() {
     setTestingId(deviceId);
     try {
       const body = {};
-      const latSrc = coordsOverride?.lat ?? testCoords.lat;
-      const lngSrc = coordsOverride?.lng ?? testCoords.lng;
-      const latN = Number(latSrc);
-      const lngN = Number(lngSrc);
-      if (Number.isFinite(latN) && Number.isFinite(lngN) && latSrc !== '' && lngSrc !== '') {
-        body.latitude = latN;
-        body.longitude = lngN;
+      // Δοκιμαστικό pin → always hardware IMEI fix (never browser / leftover Lat/Lng).
+      const forceHardware = !coordsOverride || coordsOverride.useHardware === true;
+      if (forceHardware) {
+        body.use_hardware = true;
+      } else {
+        const latSrc = coordsOverride?.lat ?? '';
+        const lngSrc = coordsOverride?.lng ?? '';
+        const latN = Number(latSrc);
+        const lngN = Number(lngSrc);
+        if (Number.isFinite(latN) && Number.isFinite(lngN) && latSrc !== '' && lngSrc !== '') {
+          body.latitude = latN;
+          body.longitude = lngN;
+        } else {
+          body.use_hardware = true;
+        }
       }
       const res = await testPingTeltonikaDevice(deviceId, body);
       const pin = buildTestPin(
@@ -339,8 +365,16 @@ export default function TeltonikaDevicesPanel() {
         return [...rest, pin];
       });
       setSelectedId(deviceId);
+      const origin =
+        res.fix_origin === 'live_fleet'
+          ? 'Teltonika live'
+          : res.fix_origin === 'last_hw'
+            ? 'Teltonika last Codec'
+            : forceHardware
+              ? 'Teltonika'
+              : 'υπολογιστής';
       toast.success(
-        `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+        `${origin}: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
       );
       await load();
     } catch (err) {
@@ -350,25 +384,13 @@ export default function TeltonikaDevicesPanel() {
     }
   };
 
+  /** «Η θέση μου» = last Codec / live Teltonika for the selected bus — never office PC. */
   const useMyLocation = () => {
     if (!selectedId) {
       toast.error('Διάλεξε συσκευή');
       return;
     }
-    if (!navigator.geolocation) {
-      toast.error('Δεν υποστηρίζεται geolocation');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lng = pos.coords.longitude.toFixed(6);
-        setTestCoords({ lat: String(lat), lng: String(lng) });
-        onTestPing(selectedId, { lat: String(lat), lng: String(lng) });
-      },
-      () => toast.error('Αποτυχία ανάγνωσης θέσης'),
-      { enableHighAccuracy: true, timeout: 12000 },
-    );
+    onTestPing(selectedId);
   };
 
   const clearTestPins = () => {
@@ -377,51 +399,50 @@ export default function TeltonikaDevicesPanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white shadow-sm">
-        <div className="relative p-6 sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
-            <span className="material-symbols-outlined text-[16px]">sensors</span>
-            Teltonika FTC961
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-900 text-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-4">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
+            <span className="material-symbols-outlined text-[14px]">sensors</span>
+            FTC961
           </div>
-          <h2 className="mt-3 text-2xl font-bold tracking-tight">GPS Tracker (Codec 8)</h2>
-          <p className="mt-2 text-sm text-white/70 max-w-2xl leading-relaxed">
-            Δέσε το IMEI της συσκευής με πινακίδα/όχημα. Στο Configurator βάλε Server IP = VPS και
-            Port = {status?.port || 5027} (TCP Codec 8 / 8E).
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <h2 className="text-sm font-bold tracking-tight sm:text-base">GPS Tracker · Codec 8</h2>
+          <span className="hidden text-[11px] text-white/55 lg:inline">
+            IMEI → πινακίδα · Configurator IP = VPS · Port {status?.port || 5027}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5 text-[10px] font-semibold sm:text-[11px]">
             <span
-              className={`rounded-full px-3 py-1.5 ${
-                status?.listening ? 'bg-emerald-500/20 text-emerald-100' : 'bg-rose-500/20 text-rose-100'
+              className={`rounded-md px-2 py-0.5 ${
+                status?.listening ? 'bg-emerald-500/25 text-emerald-100' : 'bg-rose-500/25 text-rose-100'
               }`}
             >
-              {status?.listening ? 'TCP listening' : 'TCP offline'}
+              {status?.listening ? 'TCP on' : 'TCP off'}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Endpoint: {status?.public_endpoint || '—'}
+            <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono">
+              {status?.public_endpoint || '—'}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Συνδέσεις: {status?.active_connections ?? 0}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              Conn {status?.active_connections ?? 0}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Packets OK: {status?.packets_ok ?? 0}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              OK {status?.packets_ok ?? 0}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Test pins: {mapPins.length}
+            <span className="rounded-md bg-white/10 px-2 py-0.5">
+              Pins {mapPins.length}
             </span>
           </div>
           {status?.last_error ? (
-            <p className="mt-3 text-xs text-amber-200/90">Σφάλμα: {status.last_error}</p>
+            <p className="w-full text-[11px] text-amber-200/90">Σφάλμα: {status.last_error}</p>
           ) : null}
         </div>
       </div>
 
       <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ζωντανή τελευταία θέση από το tracker · δοκιμαστικό pin / Η θέση μου από πάνω.
+            <h3 className="font-bold text-base text-slate-900">Χάρτης συσκευών GPS</h3>
+            <p className="text-[11px] text-slate-500">
+              Ζωντανή θέση Teltonika · «Η θέση μου» / δοκιμαστικό pin από πάνω.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -445,7 +466,7 @@ export default function TeltonikaDevicesPanel() {
             </button>
           </div>
         </div>
-        <div className="relative h-[18rem] sm:h-[22rem] bg-slate-100">
+        <div className="relative h-[min(70vh,42rem)] min-h-[28rem] bg-slate-100">
           <MapContainer
             key={`teltonika-map-${mapPins.map((p) => p.id).join('-') || 'empty'}`}
             center={DEFAULT_CENTER}
@@ -510,8 +531,9 @@ export default function TeltonikaDevicesPanel() {
         <div>
           <h3 className="font-bold text-lg text-slate-900">Μενού τεστ GPS</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. Δοκιμαστικό pin / Η θέση μου
-            αντικαθιστούν προσωρινά. Ζωντανός χάρτης στόλου → κουμπί δεξιά.
+            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. «Η θέση μου» και «Δοκιμαστικό
+            pin» = σήμα από το GPS hardware (IMEI), όχι από τον υπολογιστή του γραφείου. Ζωντανός
+            χάρτης → δεξιά.
           </p>
         </div>
 
@@ -553,23 +575,24 @@ export default function TeltonikaDevicesPanel() {
           </label>
         </div>
         <p className="text-[11px] text-slate-500">
-          Άδειο Lat/Lng στο Δοκιμαστικό pin → last fix ή Αθήνα. «Η θέση μου» βάζει αμέσως pin στη
-          θέση σου.
+          «Η θέση μου» και δοκιμαστικό pin αγνοούν Lat/Lng φόρμας και παίρνουν το τελευταίο Codec /
+          live fix του tracker (όχι geolocation browser).
         </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={useMyLocation}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+            disabled={!selectedId || testingId === selectedId}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">near_me</span>
-            Η θέση μου
+            {testingId === selectedId ? 'Teltonika…' : 'Η θέση μου'}
           </button>
           <button
             type="button"
             onClick={() => onTestPing(selectedId)}
             disabled={!selectedId || testingId === selectedId}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">my_location</span>
             {testingId === selectedId ? 'Test…' : 'Δοκιμαστικό pin'}

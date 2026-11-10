@@ -20,9 +20,10 @@ TRACKER_LIVE_SOURCES = frozenset(
 
 # Prefer tracker while a live pin reports within this window (seconds).
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
-# Codec TCP read timeout is 300s; reconnect gaps are longer when parked.
-# Badge/device-online must not drop «GPS οχήματος» between sparse AVL / TCP flaps.
-DEVICE_ONLINE_BADGE_SECONDS = 900
+# Badge / «GPS οχήματος» online window — keep aligned with alive.
+# Was 900s and kept buses looking active ~15 min after GPS power cut.
+# Open Codec TCP still counts as online via is_tracker_binding_alive().
+DEVICE_ONLINE_BADGE_SECONDS = 90
 
 
 # Greek lookalikes → Latin so App/Teltonika plates collapse to one key.
@@ -111,8 +112,8 @@ def resolve_live_gps_sources(
     elif is_phone_source(meta.get("source")) and pin_age is not None and pin_age <= alive:
         out.append("app")
 
-    # Device online (TCP last_seen) → always advertise Teltonika on the badge.
-    # Use the longer Codec window so parked / sparse AVL still shows both chips.
+    # Device online (fresh last_seen or open Codec TCP) → advertise Teltonika.
+    # Keep window = alive so unplugged GPS stops looking "active" within ~90s.
     if check_device_store and "teltonika" not in out:
         tid = str(tenant_id or meta.get("tenant_id") or "").strip()
         plate = meta_plate(meta)
@@ -169,8 +170,9 @@ def is_tracker_binding_alive(
     age = age_seconds(tracker.get("last_seen_at"), now=now)
     if age is not None and age <= max(1, int(max_age_sec)):
         return True
-    # Same-worker TCP session — durable last_seen is refreshed by keepalive,
-    # but treat an open socket as online immediately.
+    # Open Codec TCP on this worker counts as online (reconnect before AVL).
+    # Keepalive refreshes last_seen only while the socket is open; dead peers
+    # after power-cut are closed via SO_KEEPALIVE (~90s), then hydrate drops.
     try:
         from travel_platform.telemetry.teltonika.tcp_server import is_imei_tcp_connected
 
@@ -360,6 +362,11 @@ def prefer_meta_for_plate(
         return a
     if b_fresh and not a_fresh:
         return b
+    # Both hardware-fresh → newer tracker_signal owns lat/lng (not App updated_at).
+    if a_fresh and b_fresh:
+        a_sig = _meta_updated_rank({"updated_at": a.get("tracker_signal_at")})
+        b_sig = _meta_updated_rank({"updated_at": b.get("tracker_signal_at")})
+        return a if a_sig >= b_sig else b
     a_tracker = is_tracker_source(a.get("source")) or bool(
         a.get("imei") and not is_phone_source(a.get("source"))
     )
@@ -412,8 +419,9 @@ def is_teltonika_preferred_for_plate(
     Return (prefer_teltonika, binding).
 
     prefer_teltonika=True → skip phone GPS on the live map (soft-ack only).
-    Only when a fresh Teltonika pin exists on the live fleet — never based on
-    device last_seen alone (that can blank the map when the queue lags).
+    True when a fresh Teltonika live pin exists *or* the IMEI binding is alive
+    (last_seen / open TCP). Ingress paints the hardware pin before soft-ack
+    so the map is never blanked when only last_seen is fresh.
 
     Sync path uses in-memory fleet only. Prefer
     ``is_teltonika_preferred_for_plate_async`` on ingress (Redis-aware).
@@ -432,6 +440,10 @@ def is_teltonika_preferred_for_plate(
     alive_sec = int(max_age_sec if max_age_sec is not None else resolve_tracker_alive_seconds(tenant_id))
     meta = _live_fleet_tracker_meta(str(tenant_id), vehicle_code)
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+    # Fresh IMEI last_seen / open TCP — soft-ack App so dual badge stays up
+    # even before the live-fleet meta row is refreshed on this worker.
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
         return True, tracker
 
     return False, tracker
@@ -464,6 +476,8 @@ async def is_teltonika_preferred_for_plate_async(
         now=now,
     )
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
         return True, tracker
 
     return False, tracker

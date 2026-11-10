@@ -222,15 +222,11 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             tenant_id,
             plate,
         )
-        # Device online (fresh last_seen) but live pin missing/stale — paint
-        # last fix first, then soft-ack App so both badges show on one pin.
-        if (
-            tracker
-            and not prefer_tracker
-            and is_tracker_binding_alive(
-                tracker,
-                max_age_sec=resolve_tracker_alive_seconds(tenant_id),
-            )
+        # Device online but live pin missing/stale — paint last fix first, then
+        # soft-ack App so both badges show on one pin (never soft-ack with no pin).
+        if tracker and is_tracker_binding_alive(
+            tracker,
+            max_age_sec=resolve_tracker_alive_seconds(tenant_id),
         ):
             try:
                 from travel_platform.telemetry.teltonika.paint_live import (
@@ -352,7 +348,6 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     try:
         from travel_platform.telemetry.processor import get_live_fleet
         from travel_platform.telemetry.tracker_priority import (
-            DEVICE_ONLINE_BADGE_SECONDS,
             is_tracker_binding_alive,
             resolve_live_gps_sources,
             resolve_tracker_alive_seconds,
@@ -367,7 +362,6 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         meta.setdefault("source", payload.get("source") or "driver_pwa")
         meta["app_seen_at"] = app_seen_at or meta.get("app_seen_at")
         alive = resolve_tracker_alive_seconds(tenant_id)
-        badge_alive = max(alive, DEVICE_ONLINE_BADGE_SECONDS)
         gps_sources = resolve_live_gps_sources(
             meta, max_age_sec=alive, tenant_id=tenant_id
         ) or ["app"]
@@ -376,7 +370,7 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         tracker_signal_at = meta.get("tracker_signal_at")
         imei = imei or meta.get("imei")
         bound = tracker if isinstance(tracker, dict) else None
-        if bound and is_tracker_binding_alive(bound, max_age_sec=badge_alive):
+        if bound and is_tracker_binding_alive(bound, max_age_sec=alive):
             if "teltonika" not in gps_sources:
                 gps_sources = ["teltonika", *gps_sources]
             tracker_signal_at = bound.get("last_seen_at") or tracker_signal_at

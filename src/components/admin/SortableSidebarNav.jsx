@@ -35,10 +35,12 @@ import {
   suggestTabForServiceMode,
 } from '../../lib/admin/navServiceScope.js';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
+import { useUiLang } from '../../hooks/useUiLang.js';
+import { tNavItem } from '../../lib/i18n/t.js';
 
-function DualScopeBadge() {
+function DualScopeBadge({ label }) {
   return (
-    <span className="admin-nav-dual-badge" title="Γραφείο — όλες οι υπηρεσίες" aria-label="Γραφείο">
+    <span className="admin-nav-dual-badge" title={label} aria-label={label}>
       <span className="admin-nav-dual-badge-icon" aria-hidden>
         <span className="material-symbols-outlined">directions_bus</span>
       </span>
@@ -49,10 +51,10 @@ function DualScopeBadge() {
   );
 }
 
-function SharedScopeChip() {
+function SharedScopeChip({ label }) {
   return (
-    <span className="admin-nav-shared-chip" title="Γραφείο — κεντρικά εργαλεία" aria-label="Γραφείο">
-      Γραφείο
+    <span className="admin-nav-shared-chip" title={label} aria-label={label}>
+      {label}
     </span>
   );
 }
@@ -98,9 +100,11 @@ export default function SortableSidebarNav({
   officeMode = 'trips_only',
   rentEnabled = true,
 }) {
+  const { t } = useUiLang();
   const superAdmin = isSaasSuperAdmin();
   const rentOnly = officeMode === 'rent_only';
   const showServiceSwitch = rentEnabled && !rentOnly;
+  const officeLabel = t('hub_settings_kicker');
   const [layout, setLayout] = useState(() => ensureFactoryNavReset(superAdmin));
   const [storedServiceMode, setStoredServiceMode] = useState(() => loadNavServiceMode());
   const [dragState, setDragState] = useState({
@@ -344,6 +348,8 @@ export default function SortableSidebarNav({
     const dragging = dragState.draggingId === item.id;
     const shared = isSharedNavItem(item);
     const accent = navAccent(item);
+    const label =
+      rentOnly && item.id === 'customers' ? t('customers_short') : tNavItem(item);
     return (
       <div
         className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
@@ -369,7 +375,7 @@ export default function SortableSidebarNav({
           onClick={() => handleClick(item)}
           className={buttonClass(item, { cardStyle })}
           data-accent={accent}
-          title={shared ? `${item.label} · γραφείο` : item.label}
+          title={shared ? t('shared_office', { label }) : label}
         >
           <span className={`admin-nav-icon${cardStyle ? ' admin-nav-icon--circle' : ''}`}>
             <span
@@ -379,11 +385,13 @@ export default function SortableSidebarNav({
               {item.icon}
             </span>
           </span>
-          <span className="admin-nav-label">
-            {rentOnly && item.id === 'customers' ? 'Πελάτες' : item.label}
-          </span>
+          <span className="admin-nav-label">{label}</span>
           {shared && showServiceSwitch ? (
-            cardStyle ? <SharedScopeChip /> : <DualScopeBadge />
+            cardStyle ? (
+              <SharedScopeChip label={officeLabel} />
+            ) : (
+              <DualScopeBadge label={officeLabel} />
+            )
           ) : null}
           {cardStyle ? (
             <span className="material-symbols-outlined admin-nav-mini-chevron" aria-hidden>
@@ -526,7 +534,12 @@ export default function SortableSidebarNav({
 
         {rentOnly ? (
           <div className="admin-nav-zone admin-nav-zone--shared">
-            <ZoneHeader tone="shared" icon="apartment" title="Γραφείο" subtitle="Κεντρικά εργαλεία" />
+            <ZoneHeader
+              tone="shared"
+              icon="apartment"
+              title={officeLabel}
+              subtitle={t('hub_settings_sub_office')}
+            />
             {renderItemList(mainItems, 'main', { cardStyle: true })}
           </div>
         ) : (
@@ -536,8 +549,8 @@ export default function SortableSidebarNav({
                 <ZoneHeader
                   tone="shared"
                   icon="hub"
-                  title="Γραφείο"
-                  subtitle="Κεντρικά εργαλεία"
+                  title={officeLabel}
+                  subtitle={t('hub_settings_sub_office')}
                 />
                 {renderItemList(sharedItems, 'main', { cardStyle: true })}
               </div>
@@ -546,39 +559,34 @@ export default function SortableSidebarNav({
             {showBusesPin && !showSharedZone ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε τη <strong>Διαχείριση Λεωφορείων</strong> κάτω — το μενού εμφανίζεται δεξιά.
+                  {t('hub_buses')} — {t('hub_buses_title')}
                 </p>
               </div>
             ) : null}
 
             {showServiceSwitch && serviceMode === 'rent' ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
-                <p className="admin-nav-rent-hint-text">
-                  Τα εργαλεία ενοικίασης ανοίγουν από την κάρτα <strong>Ενοικιάσεις</strong> κάτω.
-                  Για εκδρομές / οδηγούς πατήστε <strong>Όλα</strong> ή <strong>Λεωφ.</strong> πάνω.
-                </p>
+                <p className="admin-nav-rent-hint-text">{t('rent_tools_hint')}</p>
               </div>
             ) : null}
 
             {showServiceSwitch && serviceMode === 'buses' ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε τη <strong>Διαχείριση Λεωφορείων</strong> κάτω — στόλος και GPS στα δεξιά.
+                  {t('hub_buses')} — {t('nav_fleet_live_map')}
                 </p>
               </div>
             ) : null}
 
             {menuLooksEmpty ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
-                <p className="admin-nav-rent-hint-text mb-2">
-                  Το μενού φαίνεται άδειο. Επαναφέρετε την προεπιλογή.
-                </p>
+                <p className="admin-nav-rent-hint-text mb-2">{t('reset_menu')}</p>
                 <button
                   type="button"
                   onClick={resetMenu}
                   className="w-full rounded-xl bg-slate-900 text-white text-xs font-bold py-2.5 hover:bg-slate-800"
                 >
-                  Επαναφορά μενού
+                  {t('reset_menu')}
                 </button>
               </div>
             ) : null}
@@ -595,8 +603,8 @@ export default function SortableSidebarNav({
             className={`admin-nav-service-card admin-nav-service-card--buses admin-nav-service-card--single${
               busesHubActive ? ' is-active' : ''
             }`}
-            title="Διαχείριση Λεωφορείων · πίσω στις καρτέλες (κορυφή)"
-            aria-label="Διαχείριση Λεωφορείων"
+            title={t('hub_buses_title')}
+            aria-label={t('hub_buses')}
             aria-current={busesHubActive ? 'page' : undefined}
           >
             <span className="admin-nav-service-card-icon" aria-hidden>
@@ -605,7 +613,7 @@ export default function SortableSidebarNav({
               </span>
             </span>
             <span className="admin-nav-service-card-copy">
-              <span className="admin-nav-service-card-title">Διαχείριση Λεωφορείων</span>
+              <span className="admin-nav-service-card-title">{t('hub_buses')}</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
@@ -620,7 +628,7 @@ export default function SortableSidebarNav({
             className={`admin-nav-service-card admin-nav-service-card--rent${
               rentDeskActive ? ' is-active' : ''
             }`}
-            title="Υπηρεσία ενοικίασης"
+            title={t('hub_rent_title')}
             aria-current={rentDeskActive ? 'page' : undefined}
           >
             <span className="admin-nav-service-card-glow" aria-hidden />
@@ -630,9 +638,9 @@ export default function SortableSidebarNav({
               </span>
             </span>
             <span className="admin-nav-service-card-copy">
-              <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
-              <span className="admin-nav-service-card-title">Ενοικιάσεις</span>
-              <span className="admin-nav-service-card-sub">Desk · στόλος · /rent app</span>
+              <span className="admin-nav-service-card-kicker">{t('hub_rent_kicker')}</span>
+              <span className="admin-nav-service-card-title">{t('hub_rent')}</span>
+              <span className="admin-nav-service-card-sub">{t('hub_rent_sub')}</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
@@ -646,7 +654,7 @@ export default function SortableSidebarNav({
           className={`admin-nav-service-card admin-nav-service-card--settings${
             settingsActive ? ' is-active' : ''
           }`}
-          title="Ρυθμίσεις · πίσω στις καρτέλες (κορυφή)"
+          title={t('hub_settings_title')}
           aria-current={settingsActive ? 'page' : undefined}
         >
           <span className="admin-nav-service-card-icon" aria-hidden>
@@ -655,10 +663,10 @@ export default function SortableSidebarNav({
             </span>
           </span>
           <span className="admin-nav-service-card-copy">
-            <span className="admin-nav-service-card-kicker">Γραφείο</span>
-            <span className="admin-nav-service-card-title">Ρυθμίσεις</span>
+            <span className="admin-nav-service-card-kicker">{t('hub_settings_kicker')}</span>
+            <span className="admin-nav-service-card-title">{t('hub_settings')}</span>
             <span className="admin-nav-service-card-sub">
-              {showServiceSwitch ? 'Εκδρομές & ενοικιάσεις' : 'Εμφάνιση · πληρωμές · συμβόλαια'}
+              {showServiceSwitch ? t('hub_settings_sub_both') : t('hub_settings_sub_office')}
             </span>
           </span>
           <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>

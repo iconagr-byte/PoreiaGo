@@ -120,26 +120,75 @@ function pickHydratedFromStore(msg, prev) {
   return Boolean(prev?.hydrated_from_store);
 }
 
+/** ~3m — ignore App/jitter polls that would restart pin animation. */
+const COORDS_NEAR_DEG = 0.00003;
+
+function coordsNear(aLat, aLng, bLat, bLng) {
+  return (
+    Number.isFinite(aLat) &&
+    Number.isFinite(aLng) &&
+    Number.isFinite(bLat) &&
+    Number.isFinite(bLng) &&
+    Math.abs(aLat - bLat) < COORDS_NEAR_DEG &&
+    Math.abs(aLng - bLng) < COORDS_NEAR_DEG
+  );
+}
+
 function normalizeVehicle(msg, id, prev) {
-  const targetLat = Number(msg.lat ?? msg.latitude);
-  const targetLng = Number(msg.lng ?? msg.longitude);
+  let targetLat = Number(msg.lat ?? msg.latitude);
+  let targetLng = Number(msg.lng ?? msg.longitude);
   if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
-  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
-  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
   const appSeenAt = pickAppSeenAt(msg, prev);
   const listed = listedGpsSources(msg);
   const appDriverId = pickAppDriverId(msg, prev);
   const appStillLive = Boolean(appSeenAt && isChannelFresh(appSeenAt));
   const trackerSignal =
     msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null;
+  const hydrated = pickHydratedFromStore(msg, prev);
   const listedTeltonika =
     Array.isArray(listed) && listed.some((s) => gpsSourceKind(s) === 'teltonika');
+  const signalFresh = isChannelFresh(trackerSignal, SOURCE_FRESH_MS);
+  // Parked/hydrated + stale signal must not keep «GPS οχήματος» on the map.
   const keepTeltonika = Boolean(
-    listedTeltonika ||
-      isChannelFresh(trackerSignal, 300_000) ||
-      ((prev?.gps_sources || []).includes('teltonika') &&
-        isChannelFresh(prev?.tracker_signal_at, 300_000)),
+    signalFresh ||
+      (listedTeltonika && !hydrated) ||
+      (!hydrated &&
+        (prev?.gps_sources || []).includes('teltonika') &&
+        isChannelFresh(prev?.tracker_signal_at, SOURCE_FRESH_MS)),
   );
+  const msgSource = gpsSourceKind(msg.source);
+  // Hardware owns the pin while Teltonika is live — ignore App lat/lng frames
+  // that were making the bus jump between phone GPS and vehicle GPS.
+  if (
+    prev &&
+    keepTeltonika &&
+    msgSource === 'app' &&
+    Number.isFinite(prev.targetLat) &&
+    Number.isFinite(prev.targetLng)
+  ) {
+    targetLat = prev.targetLat;
+    targetLng = prev.targetLng;
+  }
+  const prevTargetLat = Number.isFinite(prev?.targetLat) ? prev.targetLat : prev?.lat;
+  const prevTargetLng = Number.isFinite(prev?.targetLng) ? prev.targetLng : prev?.lng;
+  const unchanged = Boolean(
+    prev && coordsNear(prevTargetLat, prevTargetLng, targetLat, targetLng),
+  );
+  const prevLat = unchanged
+    ? Number.isFinite(prev?.lat)
+      ? prev.lat
+      : targetLat
+    : Number.isFinite(prev?.lat)
+      ? prev.lat
+      : targetLat;
+  const prevLng = unchanged
+    ? Number.isFinite(prev?.lng)
+      ? prev.lng
+      : targetLng
+    : Number.isFinite(prev?.lng)
+      ? prev.lng
+      : targetLng;
+  const nowAnim = typeof performance !== 'undefined' ? performance.now() : 0;
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -157,13 +206,18 @@ function normalizeVehicle(msg, id, prev) {
     lng: prevLng,
     targetLat,
     targetLng,
-    prevLat,
-    prevLng,
+    prevLat: unchanged ? targetLat : prevLat,
+    prevLng: unchanged ? targetLng : prevLng,
     speed: msg.speed ?? msg.speed_kmh ?? 0,
     heading: msg.heading ?? msg.heading_deg,
     timestamp: msg.timestamp || msg.updated_at,
     accuracy_m: msg.accuracy_m ?? null,
-    altitude_m: msg.altitude_m ?? null,
+    altitude_m: msg.altitude_m ?? prev?.altitude_m ?? null,
+    satellites: msg.satellites ?? prev?.satellites ?? null,
+    engine_on:
+      msg.engine_on ?? msg.engineOn ?? msg.engine_status ?? prev?.engine_on ?? null,
+    idle_seconds_trip:
+      msg.idle_seconds_trip ?? msg.idleSecondsTrip ?? prev?.idle_seconds_trip ?? null,
     boarding: msg.boarding ?? null,
     sensors: msg.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
@@ -180,7 +234,7 @@ function normalizeVehicle(msg, id, prev) {
       keepApp: appStillLive,
       keepTeltonika,
     }),
-    animStart: typeof performance !== 'undefined' ? performance.now() : 0,
+    animStart: unchanged && prev?.animStart != null ? prev.animStart : nowAnim,
   };
 }
 
@@ -530,8 +584,26 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           }
           if (msg.type === 'fleet_driver_offline') {
             // Instant pin drop — do not wait for the next HTTP poll.
+            // «Τέλος βάρδιας» hard-clears every pin for that driver (App + GPS).
             setVehicles((prev) => {
-              const next = dropOfflineVehicles(prev, msg);
+              let next = dropOfflineVehicles(prev, msg);
+              if (String(msg.reason || '') === 'shift_end' && msg.driver_id != null) {
+                const did = String(msg.driver_id);
+                const cleared = { ...next };
+                for (const [key, row] of Object.entries(cleared)) {
+                  const belongs =
+                    String(row.driver_id || '') === did ||
+                    String(row.app_driver_id || '') === did;
+                  if (!belongs) continue;
+                  try {
+                    clearStickyTeltonika(row);
+                  } catch {
+                    /* ignore */
+                  }
+                  delete cleared[key];
+                }
+                next = cleared;
+              }
               vehicleCountRef.current = Object.keys(next).length;
               return next;
             });

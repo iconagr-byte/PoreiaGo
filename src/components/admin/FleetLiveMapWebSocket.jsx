@@ -7,6 +7,7 @@ import {
   mapSosAlertsWithCoords,
 } from '../../lib/admin/fleetMapAlerts.js';
 import {
+  fleetTelemetryIndicators,
   formatBoardingLabel,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
@@ -15,10 +16,16 @@ import {
   resolveVehicleTripTitle,
   vehicleHasActiveExcursion,
 } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
+import { formatTeltonikaEmptyMapHint } from '../../lib/admin/teltonikaMapPresence.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
 import { collapseVehicleListByPlate } from '../../lib/admin/fleetPinDedupe.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
+import { fetchTeltonikaDevices } from '../../services/telemetryApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
@@ -37,6 +44,9 @@ export default function FleetLiveMapWebSocket() {
   const [showPlaces, setShowPlaces] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [rentalOverlays, setRentalOverlays] = useState([]);
+  const [teltonikaDevices, setTeltonikaDevices] = useState([]);
+  /** 'loading' | 'ready' | 'error' — never claim unbound before fetch settles. */
+  const [teltonikaDevicesStatus, setTeltonikaDevicesStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +60,38 @@ export default function FleetLiveMapWebSocket() {
     };
     load();
     const timer = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [tenantId]);
+
+  // When the live fleet is empty, explain Teltonika online/offline (not a map bug).
+  useEffect(() => {
+    let cancelled = false;
+    let hadReady = false;
+    setTeltonikaDevicesStatus((prev) => {
+      if (prev === 'ready') {
+        hadReady = true;
+        return prev;
+      }
+      return 'loading';
+    });
+    const load = async () => {
+      try {
+        const rows = await fetchTeltonikaDevices();
+        if (cancelled) return;
+        setTeltonikaDevices(Array.isArray(rows) ? rows : []);
+        setTeltonikaDevicesStatus('ready');
+        hadReady = true;
+      } catch {
+        if (cancelled) return;
+        // Keep last good list on 502 blips — never flash «no IMEI bound».
+        setTeltonikaDevicesStatus(hadReady ? 'ready' : 'error');
+      }
+    };
+    load();
+    const timer = setInterval(load, 15_000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -147,8 +189,9 @@ export default function FleetLiveMapWebSocket() {
 
       {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          Δεν υπάρχουν ενεργοί οδηγοί. Στην PWA πατήστε «Έναρξη βάρδιας», επιτρέψτε τοποθεσία και
-          περιμένετε μήνυμα επιβεβαίωσης θέσης — μετά hard-refresh αυτόν τον χάρτη.
+          {formatTeltonikaEmptyMapHint(teltonikaDevices, teltonikaDevicesStatus)} Η «Έναρξη
+          βάρδιας» αφορά μόνο το App οδηγού — όταν και τα δύο κανάλια είναι ζωντανά, στο εικονίδιο
+          φαίνονται «GPS οχήματος» + «App».
         </p>
       ) : null}
 
@@ -212,6 +255,8 @@ export default function FleetLiveMapWebSocket() {
                 {mapVehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
                   const active = (selected?.id || selectedId) === v.id;
+                  const indicators = fleetTelemetryIndicators(v);
+                  const gpsSources = resolveFleetGpsSources(v);
                   return (
                     <li key={v.id}>
                       <button
@@ -252,12 +297,33 @@ export default function FleetLiveMapWebSocket() {
                               })()}
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--fleet-secondary)]">
-                              <span>{Math.round(v.speed || 0)} km/h</span>
                               <span>
                                 {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
                               </span>
                               <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
                               {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
+                            </div>
+                            <div className="fleet-apple-telemetry-chips">
+                              {indicators.map((chip) => (
+                                <span
+                                  key={chip.key}
+                                  className={`fleet-apple-telemetry-chip${chip.tone ? ` fleet-apple-telemetry-chip--${chip.tone}` : ''}`}
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">{chip.label}</span>
+                                  <span className="fleet-apple-telemetry-chip__value">{chip.value}</span>
+                                </span>
+                              ))}
+                              {gpsSources.map((kind) => (
+                                <span
+                                  key={`gps-${kind}`}
+                                  className="fleet-apple-telemetry-chip fleet-apple-telemetry-chip--gps"
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">GPS</span>
+                                  <span className="fleet-apple-telemetry-chip__value">
+                                    {formatFleetGpsSourceChipLabel(kind)}
+                                  </span>
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>

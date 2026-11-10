@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import {
   DEFAULT_RENT_APP_BRANDING,
+  rentBrandMarkStyleVars,
   splitRentBrandLabel,
 } from '../../lib/rental/rentAppBranding.js';
 
@@ -21,6 +22,10 @@ export default function RentBrandMark({
   variant = 'default',
   logoHeightPx,
   logoMaxWidthPx,
+  logoRadiusPx,
+  logoPaddingPx,
+  logoBgMode,
+  logoShadow,
 } = {}) {
   const [imgBroken, setImgBroken] = useState(false);
   const name = String(label || '').trim() || DEFAULT_LABEL;
@@ -29,21 +34,24 @@ export default function RentBrandMark({
   const sub = String(subtitle || '').trim();
   const showSub = Boolean(sub) && sub.toLowerCase() !== name.toLowerCase();
   const onDark = variant === 'onDark';
+  const bgMode = String(logoBgMode || 'none').trim().toLowerCase();
   const rootClass = [
     'rent-brand-mark',
     compact ? 'rent-brand-mark--compact' : '',
     onDark ? 'rent-brand-mark--on-dark' : '',
+    bgMode !== 'none' ? `rent-brand-mark--bg-${bgMode}` : '',
   ]
     .filter(Boolean)
     .join(' ');
 
-  const sizeStyle = {};
-  if (logoHeightPx != null && Number.isFinite(Number(logoHeightPx))) {
-    sizeStyle['--rent-logo-h'] = `${Number(logoHeightPx)}px`;
-  }
-  if (logoMaxWidthPx != null && Number.isFinite(Number(logoMaxWidthPx))) {
-    sizeStyle['--rent-logo-max-w'] = `${Number(logoMaxWidthPx)}px`;
-  }
+  const sizeStyle = rentBrandMarkStyleVars({
+    logoHeightPx,
+    logoMaxWidthPx,
+    logoRadiusPx,
+    logoPaddingPx,
+    logoBgMode,
+    logoShadow,
+  });
 
   const wordmark = (
     <span className="rent-brand-mark-copy">

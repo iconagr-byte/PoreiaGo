@@ -9,7 +9,11 @@ from uuid import uuid4
 
 from app.models.subscription import SubscriptionStatus
 from app.models.tenant import Tenant, TenantPlan
-from app.services.billing_service import BillingService, stripe_readiness
+from app.services.billing_service import (
+    BillingService,
+    _is_missing_subscription_plan_error,
+    stripe_readiness,
+)
 
 
 class StripeReadinessTests(unittest.TestCase):
@@ -46,7 +50,59 @@ class StripeReadinessTests(unittest.TestCase):
         self.assertTrue(data["demo_mode"])
 
 
+class MissingPlanColumnDetectionTests(unittest.TestCase):
+    def test_detects_undefined_plan_column(self):
+        self.assertTrue(
+            _is_missing_subscription_plan_error(
+                Exception('column subscriptions.plan does not exist'),
+            ),
+        )
+        self.assertTrue(
+            _is_missing_subscription_plan_error(
+                Exception('UndefinedColumn: column "plan" of relation "subscriptions"'),
+            ),
+        )
+        self.assertFalse(
+            _is_missing_subscription_plan_error(Exception("tenant not found")),
+        )
+
+
 class LocalTrialTests(unittest.IsolatedAsyncioTestCase):
+    async def test_get_or_create_heals_missing_plan_column(self):
+        tenant = Tenant(
+            id=uuid4(),
+            slug="demo",
+            legal_name="Demo",
+            subdomain="demo",
+            plan=TenantPlan.STARTER,
+            is_active=True,
+        )
+        session = AsyncMock()
+        billing = BillingService(session)
+        healed = MagicMock(
+            plan=TenantPlan.STARTER,
+            status=SubscriptionStatus.TRIALING,
+            stripe_subscription_id=None,
+            base_amount_cents=9900,
+            cancel_at_period_end=False,
+            current_period_end=None,
+            trial_ends_at=None,
+        )
+        billing._get_or_create_subscription_once = AsyncMock(
+            side_effect=[
+                Exception('column subscriptions.plan does not exist'),
+                healed,
+            ],
+        )
+        with patch(
+            "app.services.tenant_modules._heal_subscription_plan_column",
+            new_callable=AsyncMock,
+        ) as heal:
+            sub = await billing.get_or_create_subscription(tenant)
+        self.assertIs(sub, healed)
+        heal.assert_awaited_once()
+        self.assertEqual(billing._get_or_create_subscription_once.await_count, 2)
+
     async def test_start_local_trial_when_stripe_not_ready(self):
         tenant = Tenant(
             id=uuid4(),

@@ -361,10 +361,18 @@ async def admin_fleet_egress_ws(
     active_rows = await live.list_active_for_admin_async(tenant_uuid)
     if not active_rows:
         try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
             from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
                 hydrate_tenant_live_from_devices,
             )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
 
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
             await hydrate_tenant_live_from_devices(tid, force=True)
             active_rows = await live.list_active_for_admin_async(tenant_uuid)
         except Exception:
@@ -426,18 +434,22 @@ async def admin_fleet_egress_ws(
                     or meta.get("bus_plate")
                     or vehicle.vehicle_code,
                 )
-                from travel_platform.telemetry.tracker_priority import (
-                    DEVICE_ONLINE_BADGE_SECONDS,
-                )
-
-                badge_alive = max(alive_sec, DEVICE_ONLINE_BADGE_SECONDS)
-                if is_tracker_binding_alive(device, max_age_sec=badge_alive):
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
                     if "teltonika" not in (gps_sources or []):
                         gps_sources = ["teltonika", *(gps_sources or [])]
                     tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
                     hydrated_from_store = False
                     if not meta.get("imei") and device.get("imei"):
                         meta["imei"] = device.get("imei")
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
             except Exception:
                 pass
         except Exception:
@@ -460,6 +472,10 @@ async def admin_fleet_egress_ws(
                 "lng": vehicle.lng,
                 "speed": vehicle.speed_kmh,
                 "heading": meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(vehicle.engine_on),
+                "idle_seconds_trip": int(vehicle.idle_seconds_trip or 0),
                 "timestamp": vehicle.updated_at.isoformat(),
                 "source": meta.get("source"),
                 "imei": meta.get("imei"),
