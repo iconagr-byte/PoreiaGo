@@ -208,15 +208,14 @@ export default function DailyManifest() {
       <div className="driver-stack">
         <div className="driver-card driver-card-accent">
           <p className="driver-card-label">Σημερινό δρομολόγιο</p>
-          <h2 className="text-xl font-extrabold mt-1 tracking-tight">Χωρίς εκδρομή</h2>
+          <h2 className="text-lg font-extrabold mt-1 tracking-tight">Αναμονή ανάθεσης</h2>
           <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)] leading-relaxed">
-            Δεν φορτώνεται εκδρομή ούτε κάτοψη λεωφορείου μέχρι το γραφείο να ανοίξει /
-            αναθέσει δρομολόγιο (Master QR ή ανάθεση).
+            Όταν το γραφείο ανοίξει τη βάρδια, θα εμφανιστούν εκδρομή και επιβάτες εδώ.
           </p>
           <button
             type="button"
             onClick={() => loadAll({ silent: false })}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--driver-yellow-soft)] border border-[var(--driver-yellow)]/30 px-3 py-2 text-sm font-bold"
+            className="mt-4 inline-flex items-center justify-center gap-2 min-h-[2.85rem] w-full rounded-xl bg-[var(--driver-yellow-soft)] border border-[var(--driver-yellow)]/30 px-3 py-2.5 text-sm font-bold"
           >
             <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[20px]">
               refresh

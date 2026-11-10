@@ -20,6 +20,14 @@ import {
 import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
+import { fetchFleetDrivers, fetchFleetVehicles } from '../../services/platformApi.js';
+
+function plateNorm(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}
 
 function FitRoute({ positions }) {
   const map = useMap();
@@ -207,6 +215,9 @@ export default function FleetRoutePlayback() {
   const [speed, setSpeed] = useState(8);
   const [exporting, setExporting] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState('all');
+  const [catalogDrivers, setCatalogDrivers] = useState([]);
+  const [catalogVehicles, setCatalogVehicles] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const scrubbing = useRef(false);
 
   const allPoints = route?.points || [];
@@ -229,6 +240,27 @@ export default function FleetRoutePlayback() {
     row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [index]);
 
+  // Office catalog — drivers + buses even when nobody is live on the map.
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogLoading(true);
+    Promise.all([
+      fetchFleetDrivers().catch(() => []),
+      fetchFleetVehicles().catch(() => []),
+    ])
+      .then(([drivers, fleet]) => {
+        if (cancelled) return;
+        setCatalogDrivers(Array.isArray(drivers) ? drivers : []);
+        setCatalogVehicles(Array.isArray(fleet) ? fleet : []);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const liveVehicles = useMemo(() => {
     return (vehicles || [])
       .filter((v) => Number.isFinite(Number(v.lat)) && Number.isFinite(Number(v.lng)))
@@ -244,24 +276,100 @@ export default function FleetRoutePlayback() {
           plate: v.bus_plate || v.vehicle_code || '',
           title: trip || '',
           tracking_started_at: v.tracking_started_at || null,
+          live: true,
         };
       });
   }, [vehicles]);
+
+  const vehicleByPlate = useMemo(() => {
+    const map = new Map();
+    for (const v of catalogVehicles) {
+      const plate = plateNorm(v?.plate_number || v?.vehicle_code);
+      if (!plate) continue;
+      map.set(plate, {
+        id: String(v?.id || plate),
+        plate: String(v?.plate_number || v?.vehicle_code || '').trim(),
+      });
+    }
+    return map;
+  }, [catalogVehicles]);
 
   const driverOptions = useMemo(() => {
     const map = new Map();
     for (const v of liveVehicles) {
       if (!v.driver_id) continue;
-      map.set(v.driver_id, {
-        id: v.driver_id,
-        name: v.name,
+      map.set(String(v.driver_id), {
+        id: String(v.driver_id),
+        name: `${v.name}${v.plate ? ` · ${v.plate}` : ''}`,
         trip_id: v.trip_id,
         plate: v.plate,
         vehicle_id: v.vehicle_id,
+        live: true,
       });
     }
-    return [...map.values()];
-  }, [liveVehicles]);
+    for (const d of catalogDrivers) {
+      const id = String(d?.id || '').trim();
+      if (!id || map.has(id)) continue;
+      const plate = String(d.license_plate || d.vehicle_code || '').trim();
+      const linked = plate ? vehicleByPlate.get(plateNorm(plate)) : null;
+      const label = String(d.name || 'Οδηγός').trim();
+      map.set(id, {
+        id,
+        name: plate ? `${label} · ${plate}` : label,
+        trip_id: null,
+        plate: linked?.plate || plate,
+        vehicle_id: linked?.id || '',
+        live: false,
+      });
+    }
+    return [...map.values()].sort((a, b) => {
+      if (a.live !== b.live) return a.live ? -1 : 1;
+      return String(a.name).localeCompare(String(b.name), 'el');
+    });
+  }, [liveVehicles, catalogDrivers, vehicleByPlate]);
+
+  const busOptions = useMemo(() => {
+    const map = new Map();
+    const seenPlates = new Set();
+    for (const v of liveVehicles) {
+      const plate = String(v.plate || '').trim();
+      const id = String(v.vehicle_id || plate || '').trim();
+      if (!id) continue;
+      if (plate) seenPlates.add(plateNorm(plate));
+      map.set(id, {
+        id,
+        plate: plate || id,
+        label: `${plate || 'Όχημα'}${v.name ? ` · ${v.name}` : ''} · live`,
+        trip_id: v.trip_id,
+        driver_id: v.driver_id,
+        live: true,
+      });
+    }
+    for (const v of catalogVehicles) {
+      const id = String(v?.id || '').trim();
+      const plate = String(v?.plate_number || v?.vehicle_code || '').trim();
+      if (!id && !plate) continue;
+      const key = id || plate;
+      const pKey = plateNorm(plate);
+      if (map.has(key) || (pKey && seenPlates.has(pKey))) continue;
+      if (pKey) seenPlates.add(pKey);
+      const make = String(v?.make || '').trim();
+      const model = String(v?.model || '').trim();
+      const meta = [make, model].filter(Boolean).join(' ');
+      map.set(key, {
+        id: key,
+        plate,
+        label: meta ? `${plate || key} · ${meta}` : plate || key,
+        trip_id: null,
+        driver_id: '',
+        live: false,
+      });
+    }
+    return [...map.values()].sort((a, b) => {
+      if (a.live !== b.live) return a.live ? -1 : 1;
+      return String(a.plate).localeCompare(String(b.plate), 'el');
+    });
+  }, [liveVehicles, catalogVehicles]);
 
   useEffect(() => {
     if (urlFilters.tripId) setTripId(urlFilters.tripId);
@@ -304,8 +412,9 @@ export default function FleetRoutePlayback() {
     const hasTrip = Number.isFinite(tid) && tid >= 1;
     const vid = String(vehicleId || '').trim();
     const code = String(vehicleCode || '').trim();
+    // Catalog driver may only carry a plate — still loadable by vehicle_code.
     if (!hasTrip && !vid && !code) {
-      setError('Επιλέξτε όχημα από τον live χάρτη ή εισάγετε αριθμό δρομολογίου');
+      setError('Επιλέξτε οδηγό ή λεωφορείο (ή πινακίδα / δρομολόγιο) και πατήστε Φόρτωση');
       return;
     }
     const { from, to } = resolveDateRange(dateFilter, customDate);
@@ -334,12 +443,12 @@ export default function FleetRoutePlayback() {
               : dateFilter !== 'all'
                 ? `την ${dateFilter}`
                 : 'την επιλεγμένη περίοδο';
-      const liveHint =
+      const emptyExtra =
         liveVehicles.length > 0
-          ? ' Επιλέξτε ενεργό όχημα από το μενού παρακάτω.'
-          : ' Βεβαιωθείτε ότι ο οδηγός έχει ανοιχτή βάρδια ή ότι το Teltonika στέλνει GPS.';
+          ? ' Δοκιμάστε ενεργό όχημα από τον live χάρτη παρακάτω.'
+          : ' Αν δεν υπάρχει ιστορικό, ελέγξτε ότι το όχημα/οδηγός έστελνε GPS στην περίοδο.';
       applyRouteData(data, {
-        emptyHint: `Δεν βρέθηκαν GPS σημεία ${scope}.${liveHint}`,
+        emptyHint: `Δεν βρέθηκαν GPS σημεία ${scope}.${emptyExtra}`,
       });
     } catch (err) {
       setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
@@ -535,6 +644,7 @@ export default function FleetRoutePlayback() {
             <span className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Οδηγός</span>
             <select
               value={driverId}
+              disabled={catalogLoading && driverOptions.length === 0}
               onChange={(e) => {
                 const id = e.target.value;
                 setDriverId(id);
@@ -549,17 +659,64 @@ export default function FleetRoutePlayback() {
                 }
                 const match = driverOptions.find((d) => d.id === id);
                 setDriverLabel(match?.name || '');
-                if (match?.trip_id) setTripId(String(match.trip_id));
-                if (match?.vehicle_id) setVehicleId(match.vehicle_id);
-                if (match?.plate) setVehicleCode(match.plate);
+                setTripId(match?.trip_id ? String(match.trip_id) : '');
+                setVehicleId(match?.vehicle_id || '');
+                setVehicleCode(match?.plate || '');
               }}
-              className="max-w-[200px] rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold truncate"
+              className="min-w-[160px] max-w-[220px] rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold truncate"
             >
-              <option value="">Όλοι οδηγοί</option>
+              <option value="">
+                {catalogLoading && driverOptions.length === 0 ? 'Φόρτωση οδηγών…' : 'Όλοι οδηγοί'}
+              </option>
               {driverOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                   {d.trip_id ? ` · #${d.trip_id}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Λεωφορείο</span>
+            <select
+              value={vehicleId || vehicleCode}
+              disabled={catalogLoading && busOptions.length === 0}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) {
+                  setVehicleId('');
+                  setVehicleCode('');
+                  return;
+                }
+                const live = liveVehicles.find(
+                  (v) =>
+                    String(v.vehicle_id) === String(id) ||
+                    plateNorm(v.plate) === plateNorm(id),
+                );
+                if (live) {
+                  loadFromLiveVehicle(live);
+                  return;
+                }
+                const match = busOptions.find(
+                  (b) => b.id === id || plateNorm(b.plate) === plateNorm(id),
+                );
+                setTripId(match?.trip_id ? String(match.trip_id) : '');
+                setVehicleId(match?.id || id);
+                setVehicleCode(match?.plate || id);
+                if (match?.driver_id) {
+                  setDriverId(String(match.driver_id));
+                  const d = driverOptions.find((x) => x.id === String(match.driver_id));
+                  setDriverLabel(d?.name || '');
+                }
+              }}
+              className="min-w-[140px] max-w-[200px] rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold truncate"
+            >
+              <option value="">
+                {catalogLoading && busOptions.length === 0 ? 'Φόρτωση στόλου…' : 'Όλα τα λεωφορεία'}
+              </option>
+              {busOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
                 </option>
               ))}
             </select>
@@ -598,6 +755,13 @@ export default function FleetRoutePlayback() {
           </button>
         </div>
       </div>
+
+      {!catalogLoading && driverOptions.length === 0 && busOptions.length === 0 ? (
+        <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+          Δεν βρέθηκαν οδηγοί ή λεωφορεία στο γραφείο. Προσθέστε τα από Οδηγοί / Στόλος και
+          ξαναφορτώστε τη σελίδα.
+        </p>
+      ) : null}
 
       {(driverLabel || filterHint || tripId) && (
         <p className="text-sm text-sky-900 bg-sky-50 border border-sky-100 rounded-xl px-4 py-3">

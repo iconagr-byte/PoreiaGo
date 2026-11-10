@@ -6,13 +6,8 @@
 
 export const WALLET_BRAND_SPLASH_KEY = 'pg_wallet_splash_v1';
 
+/** Generic brand-only splash — no marketing copy. */
 export const WALLET_SPLASH_BRAND = 'PoreiaGo';
-
-/** Quality-first hook under the wordmark (Qatar-style secondary line). */
-export const WALLET_SPLASH_HOOK = 'Αξιοπιστία σε κάθε διαδρομή';
-
-export const WALLET_SPLASH_SUPPORT =
-  'Ασφάλεια · άνεση · εμπιστοσύνη — η εμπειρία που αξίζει κάθε ταξιδιώτης.';
 
 /** Resets every time the Capacitor WebView loads the JS bundle. */
 let seenThisRuntime = false;
@@ -33,5 +28,5 @@ export function markWalletBrandSplashSeen() {
   }
 }
 
-/** Auto-advance delay (ms) — enough to read the brand, then continue. */
-export const WALLET_SPLASH_DURATION_MS = 2800;
+/** Auto-advance delay (ms) — brand beat, then continue. */
+export const WALLET_SPLASH_DURATION_MS = 2200;

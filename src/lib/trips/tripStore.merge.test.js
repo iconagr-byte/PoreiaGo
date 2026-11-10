@@ -31,7 +31,7 @@ vi.mock('../../services/hybridTripApi.js', () => ({
 
 import { loadTrips, mergeServerTripsIntoStore, saveTrips } from './tripStore.js';
 
-describe('mergeServerTripsIntoStore pruneMissingLocal', () => {
+describe('mergeServerTripsIntoStore pruneMissing', () => {
   beforeEach(() => {
     localStorage.clear();
     saveTrips([
@@ -62,24 +62,24 @@ describe('mergeServerTripsIntoStore pruneMissingLocal', () => {
   it('drops local trips deleted on the server when pruning', () => {
     const result = mergeServerTripsIntoStore(
       [{ id: 101, title: 'Keep', destination: 'A', price: 10, status: 'published' }],
-      { pruneMissingLocal: true },
+      { pruneMissing: true },
     );
     expect(result.removed).toBe(2);
     expect(result.trips.map((t) => t.id)).toEqual([101]);
     expect(loadTrips().map((t) => t.id)).toEqual([101]);
   });
 
-  it('keeps local-only ghosts when pruneMissingLocal is false', () => {
+  it('keeps local-only ghosts when pruneMissing is false', () => {
     const result = mergeServerTripsIntoStore(
       [{ id: 101, title: 'Keep', destination: 'A', price: 10, status: 'published' }],
-      { pruneMissingLocal: false },
+      { pruneMissing: false },
     );
     expect(result.removed).toBe(0);
     expect(result.trips.map((t) => t.id).sort((a, b) => a - b)).toEqual([101, 102, 103]);
   });
 
   it('clears all local trips when server catalog is empty and pruning', () => {
-    const result = mergeServerTripsIntoStore([], { pruneMissingLocal: true });
+    const result = mergeServerTripsIntoStore([], { pruneMissing: true });
     expect(result.removed).toBe(3);
     expect(result.trips).toEqual([]);
     expect(loadTrips()).toEqual([]);

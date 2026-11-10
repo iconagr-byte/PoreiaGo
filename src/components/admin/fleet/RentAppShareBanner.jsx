@@ -102,13 +102,13 @@ export default function RentAppShareBanner() {
           </div>
           <div className="min-w-0">
             <p className="font-bold tracking-tight">
-              Rent Wallet · /rent/wallet
+              My Wallet · /wallet?tab=rentals
               {officeName ? (
                 <span className="ml-1.5 font-semibold text-[#6e6e73]">· {officeName}</span>
               ) : null}
             </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
-              Πράσινο My Wallet ενοικίασης — χωριστά από το μπλε /wallet λεωφορείων. Σκανάρετε για
+              My Wallet με καρτέλα Ενοικιάσεις — ίδιο πορτοφόλι με τα εισιτήρια. Σκανάρετε για
               σύνδεση, κρατήσεις και εγκατάσταση.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
@@ -121,12 +121,12 @@ export default function RentAppShareBanner() {
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <a
-                href={rentUrl || '/rent/wallet'}
+                href={rentUrl || '/wallet?tab=rentals'}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#0b3d4a] text-white text-xs font-bold shadow-md shadow-teal-900/20"
               >
-                Άνοιγμα /rent/wallet
+                Άνοιγμα My Wallet
                 <span className="material-symbols-outlined text-[16px]">open_in_new</span>
               </a>
               <button

@@ -1,6 +1,6 @@
 {
   "appId": "com.poreiago.wallet",
-  "appName": "PoreiaGo Wallet",
+  "appName": "PoreiaGo",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,
@@ -29,7 +29,7 @@
       "enabled": true
     },
     "SplashScreen": {
-      "launchAutoHide": true,
+      "launchAutoHide": false,
       "backgroundColor": "#ffffff",
       "showSpinner": false,
       "launchFadeOutDuration": 150

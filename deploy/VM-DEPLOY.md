@@ -22,19 +22,36 @@
    EDGE_PROXY=npm
    ```
 
-2. NPM proxy hosts (Forward to):
+2. **Office subdomains (automatic — customers never touch DNS)**  
+   PoreiaGo publishes one platform wildcard so every office opens as
+   `https://{slug}.poreiago.com` without the customer configuring anything:
+
+   | Name | Type | Value |
+   |------|------|-------|
+   | `*` | A | `169.58.199.186` (Contabo) |
+
+   Cloud DNS (project that owns `poreiago.com`) → Add record once, **or** set
+   `GCP_PROJECT_ID` + `GCP_DNS_ZONE` + `GCP_SA_JSON` in repo Actions secrets /
+   `deploy/.env.prod` and run **Ensure platform wildcard DNS** / Deploy VPS
+   (`deploy/scripts/ensure-platform-wildcard-dns.sh`).
+
+   NPM also needs one platform proxy host: `*.poreiago.com` → `127.0.0.1:8003`
+   (+ wildcard SSL). See `deploy/scripts/ensure-npm-platform-wildcard.sh`.
+
+3. NPM proxy hosts (Forward to):
    | Domain | Forward |
    |--------|---------|
    | `api.poreiago.com` | `127.0.0.1:8004` |
    | `poreiago.com`, `www.poreiago.com` | `127.0.0.1:8003` |
+   | `*.poreiago.com` (all offices) | `127.0.0.1:8003` |
    | `www.achilliotravel.com`, `achilliotravel.com` | `127.0.0.1:8003` |
 
-3. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
+4. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
    Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει, ανανεώνει το `dist/`
    **και** εγκαθιστά το `deploy/nginx/frontend.conf` ώστε το `/api` να πηγαίνει στο api-blue
    (χωρίς αυτό το Contabo έδινε 405 στο login).
 
-4. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
+5. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
 
 ### Achillio Travel backoffice δεν ανοίγει
 
@@ -143,6 +160,12 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
    Έτσι το Google ενώνει apex + www σε ένα URL και σταματάει παλιούς τίτλους (π.χ. PoreiaGo).
 2. Ή Proxy Host για το apex με SSL Let’s Encrypt (το nginx κάνει 301 → www όταν
    περνάει `Host` / `X-Forwarded-Host`).
+
+Στα Proxy Hosts (poreiago + achillio) κράτα **`X-Forwarded-Host` = `$host`** (NPM
+Advanced → custom nginx). Το frontend διαλέγει shell από Host/XFH:
+`index.html` = PoreiaGo, `index.achillio.html` = Achillio Travel. Αν λείπει το
+XFH, το Contabo σερβίρει το default PoreiaGo και το Google δεν πρέπει να βλέπει
+Achillio meta στο `poreiago.com/grafeia`.
 
 Στο Postgres το `tenants.custom_domain` πρέπει να είναι `achilliotravel.com` **μόνο**
 στο γραφείο Achillio Travel (`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh`

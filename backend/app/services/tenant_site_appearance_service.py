@@ -108,6 +108,9 @@ _BRAND_LOGO_PATCH_KEYS = frozenset(
         "logo_shadow",
         "logo_show_name",
         "hero_image_focal",
+        "hero_overlay_opacity",
+        "hero_image_fit",
+        "hero_height_vh",
     }
 )
 
@@ -138,6 +141,9 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
+    "hero_overlay_opacity": 100,
+    "hero_image_fit": "cover",
+    "hero_height_vh": 88,
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
     "hero_title_accent": "Άνεση, ασφάλεια & θέση εξασφαλισμένη.",
@@ -155,6 +161,10 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "footer_hours": "",
+    "footer_tagline": "",
+    "footer_facebook_url": "",
+    "footer_instagram_url": "",
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
@@ -242,6 +252,31 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "intl_section_subtitle": (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     ),
+    # My Wallet «Αρχική» — empty → client falls back to hero / brand
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
 }
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
@@ -456,7 +491,10 @@ class TenantSiteAppearanceService:
 
         # One-shot heal: persist scrubbed Achillio leftovers so admin sidebar
         # and public hosts stop reloading poison from Postgres.
-        from app.services.tenant_modules import is_poreiago_platform_office
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
 
         if is_poreiago_platform_office(tenant):
             persist = _platform_appearance_needs_persist(
@@ -469,6 +507,19 @@ class TenantSiteAppearanceService:
                 settings["site_appearance"] = base
                 tenant.settings_json = json.dumps(settings, ensure_ascii=False)
                 await self._session.flush()
+
+        # Achillio Travel: soft-fill public contact when empty so storefront
+        # «Επικοινωνία» is never blank. Do not flush here — update_appearance
+        # ends with get_appearance and an extra flush breaks brand-save retries.
+        if is_achillio_travel_office(tenant):
+            if not str(merged.get("footer_contact_email") or "").strip():
+                merged["footer_contact_email"] = "info@achilliotravel.com"
+            if not str(merged.get("footer_hours") or "").strip():
+                merged["footer_hours"] = "Δευτέρα – Παρασκευή, 09:00 – 18:00"
+            if not str(merged.get("footer_tagline") or "").strip():
+                merged["footer_tagline"] = (
+                    "Εκδρομές με λεωφορείο στην Ελλάδα — κράτηση θέσης online."
+                )
 
         merged["storage_source"] = "postgres"
         merged["tenant_slug"] = tenant.slug
@@ -589,6 +640,25 @@ class TenantSiteAppearanceService:
             updated["logo_shadow"] = bool(updated["logo_shadow"])
         if "logo_show_name" in updated:
             updated["logo_show_name"] = bool(updated["logo_show_name"])
+        try:
+            if "hero_overlay_opacity" in updated:
+                updated["hero_overlay_opacity"] = max(
+                    0, min(100, int(updated["hero_overlay_opacity"]))
+                )
+        except (TypeError, ValueError):
+            updated["hero_overlay_opacity"] = 100
+        try:
+            if "hero_height_vh" in updated:
+                updated["hero_height_vh"] = max(50, min(100, int(updated["hero_height_vh"])))
+        except (TypeError, ValueError):
+            updated["hero_height_vh"] = 88
+        if "hero_image_fit" in updated:
+            fit = str(updated.get("hero_image_fit") or "cover").strip().lower()
+            updated["hero_image_fit"] = "contain" if fit == "contain" else "cover"
+        if "hero_image_focal" in updated:
+            focal = str(updated.get("hero_image_focal") or "center").strip().lower()
+            allowed_focal = {"center", "top", "bottom", "left", "right"}
+            updated["hero_image_focal"] = focal if focal in allowed_focal else "center"
         # Persist only appearance keys — drop enrichment helpers.
         updated.pop("display_name", None)
         updated.pop("storage_source", None)
@@ -619,6 +689,10 @@ class TenantSiteAppearanceService:
                 "rent_logo_shadow",
                 "rent_logo_show_name",
                 "rent_header_compact",
+                "hero_image_focal",
+                "hero_overlay_opacity",
+                "hero_image_fit",
+                "hero_height_vh",
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]

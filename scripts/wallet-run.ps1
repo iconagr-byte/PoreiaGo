@@ -1,13 +1,27 @@
-# PoreiaGo Wallet - build + install on running emulator
-# Usage:
+﻿# PoreiaGo native app (canonical) - build + install on emulator/USB device
+# Package: com.poreiago.wallet - ONE install, role-routed after login:
+#   driver JWT      -> /driver (CommandCenter)
+#   bus customer    -> /wallet (My Wallet)
+#   rent customer   -> /rent/wallet (Rent menu)
+#
+# Usage (from repo root; ALWAYS pull main first if this file is stale):
+#   cd C:\Users\User\poreiago
+#   git fetch origin main; git checkout main; git pull origin main
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+# Optional:
+#   -Branch main          (default; do NOT use old feature branches)
+#   -WaitMinutes 8        (adb "device" wait timeout; default 5 - offline is NOT ready)
+#   -StartEmulator        (auto-start first AVD if empty/offline; relaunches if stuck offline)
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Default main so splash + Google fixes are never wiped by an old feature branch.
-  [string]$Branch = "main"
+  # Always default to main (v1.0.11+). Old hardcode cursor/wallet-splash-apple-5ffb
+  # produced stale APKs (v1.0.9) missing recent Wallet UI fixes (tabs / multi-ticket).
+  [string]$Branch = "main",
+  [double]$WaitMinutes = 5,
+  [switch]$StartEmulator
 )
 
 $ErrorActionPreference = "Stop"
@@ -125,6 +139,23 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
+if ($Branch -ne "main") {
+  Write-Host ("WARNING: -Branch is '" + $Branch + "' (not main).") -ForegroundColor Yellow
+  Write-Host "You will get an OLD Wallet build. Prefer: -Branch main (default)." -ForegroundColor Yellow
+  if ($Branch -match 'wallet-splash-apple') {
+    Write-Host "cursor/wallet-splash-apple-5ffb is obsolete (v1.0.9). Use main (v1.0.11+)." -ForegroundColor Red
+  }
+}
+
+# PowerShell loads this file into memory once. If git reset updates wallet-run.ps1
+# on disk mid-run, launch/install fixes never apply until the NEXT process.
+# Re-exec once after reset when the script bytes change.
+$selfPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+$hashBefore = ""
+if ($selfPath -and (Test-Path -LiteralPath $selfPath)) {
+  $hashBefore = (Get-FileHash -LiteralPath $selfPath -Algorithm SHA256).Hash
+}
+
 Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
 git fetch origin $Branch
 if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
@@ -134,6 +165,31 @@ git reset --hard ("origin/" + $Branch)
 if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branch) }
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
+Write-Host ("OK: building from origin/" + $Branch) -ForegroundColor Green
+
+if (
+  $env:POREIAGO_WALLET_RUN_REEXEC -ne "1" -and
+  $selfPath -and
+  (Test-Path -LiteralPath $selfPath)
+) {
+  $hashAfter = (Get-FileHash -LiteralPath $selfPath -Algorithm SHA256).Hash
+  if ($hashBefore -and $hashAfter -and ($hashBefore -ne $hashAfter)) {
+    Write-Host "==> wallet-run.ps1 updated from git - restarting with fresh script" -ForegroundColor Yellow
+    $env:POREIAGO_WALLET_RUN_REEXEC = "1"
+    $argList = @(
+      "-ExecutionPolicy", "Bypass",
+      "-File", $selfPath,
+      "-Branch", $Branch,
+      "-WaitMinutes", "$WaitMinutes"
+    )
+    if ($Sdk) { $argList += @("-Sdk", $Sdk) }
+    if ($JavaHome) { $argList += @("-JavaHome", $JavaHome) }
+    if ($StartEmulator) { $argList += "-StartEmulator" }
+    & powershell.exe @argList
+    exit $LASTEXITCODE
+  }
+}
+$env:POREIAGO_WALLET_RUN_REEXEC = $null
 
 $staleDirs = @(
   (Join-Path $repo "dist"),
@@ -262,7 +318,7 @@ function Test-ApkHasMainActivity([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.9)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.11)" -ForegroundColor Green
 
 if (-not (Test-ApkHasMainActivity $apk)) {
   throw "APK built without com.poreiago.wallet.MainActivity in classes.dex - check android/app/src/main/java"
@@ -317,37 +373,303 @@ if ($debugSha) {
 }
 
 & $adb start-server
-Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
-$deadline = (Get-Date).AddMinutes(3)
-$online = $null
-while ((Get-Date) -lt $deadline) {
-  & $adb devices | Out-Host
-  $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
-  if ($online) { break }
-  Start-Sleep -Seconds 3
-}
-if (-not $online) {
-  throw ("Emulator not online. Open Medium Phone, wait for home screen, then rerun OR: adb install -r `"$apk`"")
+$emu = Join-Path $Sdk "emulator\emulator.exe"
+
+# Only "device" is ready. "offline" / "unauthorized" are NOT ready.
+function Get-OnlineAdbDevice {
+  return @(
+    & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
+  )
 }
 
-Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
-# adb writes "Failed" to stderr when the package is already gone; with
-# ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
-# Uninstall already removes app data — do not pm clear after uninstall.
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
-& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
-& $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
-& $adb uninstall com.poreiago.wallet 2>$null | Out-Null
-$ErrorActionPreference = $prevEap
-# Fresh install for user 0 — avoids Error type 3 on API 36/37 when a stale
-# Studio deploy left a package with no launcher activities.
-& $adb install -r -t --user 0 $apk
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "install --user 0 failed - retry plain install -r" -ForegroundColor Yellow
-  & $adb install -r $apk
+function Get-AdbDeviceRows {
+  return @(
+    & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\S" }
+  )
 }
-if ($LASTEXITCODE -ne 0) { throw "install failed" }
+
+function Test-AdbHasOffline {
+  $rows = Get-AdbDeviceRows
+  foreach ($r in $rows) {
+    if ($r -match "\toffline$" -or $r -match "\tunauthorized$") { return $true }
+  }
+  return $false
+}
+
+function Restart-AdbServer {
+  Write-Host "==> adb kill-server / start-server (clears stuck offline)" -ForegroundColor DarkYellow
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb kill-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  & $adb start-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  $ErrorActionPreference = $prevEap
+}
+
+function Stop-EmulatorProcesses {
+  Write-Host "==> killing stuck emulator / qemu processes..." -ForegroundColor DarkYellow
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  Get-Process -Name "emulator","qemu-system-x86_64","qemu-system-aarch64","crashpad_handler" -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 3
+  $ErrorActionPreference = $prevEap
+}
+
+function Start-FirstAvd([string]$reason) {
+  if (-not (Test-Path -LiteralPath $emu)) {
+    Write-Host "emulator.exe missing - start AVD from Device Manager." -ForegroundColor Yellow
+    return $false
+  }
+  $avds = @(& $emu -list-avds 2>$null | Where-Object { $_.Trim() -ne "" })
+  if (-not $avds -or $avds.Count -eq 0) {
+    Write-Host "No AVDs found. Create Medium Phone in Device Manager." -ForegroundColor Yellow
+    return $false
+  }
+  Write-Host ("==> " + $reason + ": launching AVD " + $avds[0]) -ForegroundColor Cyan
+  Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
+  return $true
+}
+
+function Wait-ForBootCompleted([int]$minutes = 2) {
+  Write-Host "==> waiting for sys.boot_completed=1 ..." -ForegroundColor Cyan
+  $deadline = (Get-Date).AddMinutes($minutes)
+  while ((Get-Date) -lt $deadline) {
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $boot = (& $adb shell getprop sys.boot_completed 2>$null | Out-String).Trim()
+    $ErrorActionPreference = $prevEap
+    if ($boot -eq "1") {
+      Write-Host "OK: boot_completed=1" -ForegroundColor Green
+      return $true
+    }
+    Start-Sleep -Seconds 3
+  }
+  Write-Host "WARN: boot_completed not set yet - install may still work" -ForegroundColor Yellow
+  return $false
+}
+
+# boot_completed=1 can race ahead of PackageManager on API 35/36 AVDs.
+# adb install then fails with: cmd: Can't find service: package
+function Test-PackageServiceReady {
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $out = (& $adb shell cmd package list packages 2>&1 | Out-String)
+  $ErrorActionPreference = $prevEap
+  if ($LASTEXITCODE -ne 0) { return $false }
+  if ($out -match "Can't find service:\s*package") { return $false }
+  if ($out -match "(?m)^package:") { return $true }
+  # Empty but successful listpackages is rare; treat as not ready.
+  return $false
+}
+
+function Wait-ForPackageService([int]$minutes = 3) {
+  Write-Host "==> waiting for PackageManager (cmd package) ..." -ForegroundColor Cyan
+  $started = Get-Date
+  $deadline = $started.AddMinutes($minutes)
+  $nudgeAdb = $false
+  while ((Get-Date) -lt $deadline) {
+    if (Test-PackageServiceReady) {
+      Write-Host "OK: package service ready" -ForegroundColor Green
+      return $true
+    }
+    # One adb bounce mid-wait - often unsticks a half-booted emulator.
+    if (-not $nudgeAdb -and ((Get-Date) - $started).TotalSeconds -ge [Math]::Max(20, ($minutes * 30))) {
+      Restart-AdbServer
+      $nudgeAdb = $true
+    }
+    Start-Sleep -Seconds 3
+  }
+  Write-Host "WARN: package service still missing - install may fail" -ForegroundColor Yellow
+  return $false
+}
+
+function Install-WalletApk([string]$apkPath) {
+  Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+  & $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
+  & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
+  $ErrorActionPreference = $prevEap
+
+  $attempts = @(
+    @{ Args = @("install", "-r", "-t", "--user", "0", $apkPath); Label = "install --user 0" },
+    @{ Args = @("install", "-r", "-t", $apkPath); Label = "install -r" }
+  )
+
+  foreach ($attempt in $attempts) {
+    Write-Host ("==> " + $attempt.Label) -ForegroundColor DarkGray
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $log = & $adb @($attempt.Args) 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
+    if ($log.Trim()) { Write-Host $log.Trim() }
+    if ($code -eq 0) { return $true }
+
+    if ($log -match "Can't find service:\s*package") {
+      Write-Host "PackageManager not up yet - waiting + adb restart..." -ForegroundColor Yellow
+      Restart-AdbServer
+      [void](Wait-ForBootCompleted 2)
+      [void](Wait-ForPackageService 3)
+    }
+  }
+
+  # Last chance after cold adb + package wait
+  Write-Host "==> final install -r after package wait" -ForegroundColor Yellow
+  [void](Wait-ForPackageService 2)
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb install -r -t $apkPath 2>&1 | Out-Host
+  $ok = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = $prevEap
+  return $ok
+}
+
+function Show-PackageServiceHelp([string]$apkPath) {
+  Write-Host ""
+  Write-Host "=== INSTALL FAILED: Can't find service: package ===" -ForegroundColor Red
+  Write-Host "EN: Emulator booted but PackageManager is not ready (half-booted AVD)." -ForegroundColor Yellow
+  Write-Host "EL: To emulator anoixe, alla to PackageManager den einai etoimo." -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host ("APK ready: " + $apkPath) -ForegroundColor Green
+  Write-Host "Recover:" -ForegroundColor Cyan
+  Write-Host "  1) Close the emulator window" -ForegroundColor Yellow
+  Write-Host "  2) Device Manager -> Cold Boot Now (or Wipe Data)" -ForegroundColor Yellow
+  Write-Host "  3) Wait until you see the Android home screen" -ForegroundColor Yellow
+  Write-Host "  4) Then install without rebuilding:" -ForegroundColor Yellow
+  Write-Host "     powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
+  Write-Host "  Or:" -ForegroundColor Yellow
+  Write-Host ("     & `"$adb`" kill-server; & `"$adb`" start-server") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" wait-for-device") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" shell cmd package list packages | Select-Object -First 3") -ForegroundColor Cyan
+  Write-Host ("     & `"$adb`" install -r `"$apkPath`"") -ForegroundColor Cyan
+  Write-Host ""
+}
+
+function Show-InstallTimeoutHelp([string]$apkPath) {
+  Write-Host ""
+  Write-Host "=== TIMEOUT: no adb device in state 'device' ===" -ForegroundColor Red
+  Write-Host "EN: emulator-5554 offline is NOT ready. Wait for home screen, or recover below." -ForegroundColor Yellow
+  Write-Host "EL: to emulator-5554 offline DEN einai etoimo. Perimenete home screen, i kanete recover." -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host ("APK ready (build OK): " + $apkPath) -ForegroundColor Green
+  Write-Host "Exact install (after device is online):" -ForegroundColor Cyan
+  Write-Host ("  & `"$adb`" install -r `"$apkPath`"") -ForegroundColor Cyan
+  Write-Host ("  & `"$adb`" shell am start -n com.poreiago.wallet/com.poreiago.wallet.MainActivity") -ForegroundColor Cyan
+  Write-Host ""
+  Write-Host "If stuck OFFLINE (emulator-5554 offline for minutes):" -ForegroundColor Yellow
+  Write-Host "  1) Close emulator window" -ForegroundColor Yellow
+  Write-Host "  2) Device Manager -> Cold Boot Now (or Wipe Data if Cold Boot fails)" -ForegroundColor Yellow
+  Write-Host "  3) Wait for home screen, then:" -ForegroundColor Yellow
+  Write-Host "     powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
+  Write-Host "  Or adb recovery:" -ForegroundColor Yellow
+  Write-Host ("     & `"$adb`" kill-server; & `"$adb`" start-server; & `"$adb`" devices") -ForegroundColor Cyan
+  Write-Host ""
+}
+
+$online = Get-OnlineAdbDevice
+$hasOffline = Test-AdbHasOffline
+if ((-not $online -or $online.Count -eq 0) -or $hasOffline) {
+  Write-Host ""
+  if ($hasOffline) {
+    Write-Host "adb shows OFFLINE (not ready). Only state 'device' can install." -ForegroundColor Yellow
+    Write-Host "EL: to emulator einai offline - den einai etoimo gia install." -ForegroundColor Yellow
+    Restart-AdbServer
+  } else {
+    Write-Host "NO DEVICE: adb devices empty (or no 'device' row)." -ForegroundColor Yellow
+    Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
+    Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
+    Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
+  }
+  Write-Host ("APK ready at: " + $apk) -ForegroundColor DarkYellow
+  Write-Host ""
+
+  if ($StartEmulator -or $hasOffline) {
+    if ($hasOffline) {
+      Stop-EmulatorProcesses
+      Restart-AdbServer
+      [void](Start-FirstAvd "relaunch after offline")
+    } elseif ($StartEmulator) {
+      [void](Start-FirstAvd "-StartEmulator")
+    }
+  }
+}
+
+$waitMins = $WaitMinutes
+if ($waitMins -lt 0.5) { $waitMins = 0.5 }
+Write-Host ("==> waiting for adb state 'device' (up to " + $waitMins + " min)...") -ForegroundColor Cyan
+Write-Host "    (offline / unauthorized do NOT count as ready)" -ForegroundColor DarkGray
+$deadline = (Get-Date).AddMinutes($waitMins)
+$online = $null
+$emptyHintShown = $false
+$offlineHintShown = $false
+$adbRestartedOnce = $false
+$emuRelaunchedOnce = $false
+$lastWaitForDevice = (Get-Date).AddSeconds(-30)
+while ((Get-Date) -lt $deadline) {
+  $devs = & $adb devices
+  $devs | Out-Host
+  $online = Get-OnlineAdbDevice
+  if ($online -and $online.Count -gt 0) { break }
+
+  $stuckOffline = Test-AdbHasOffline
+  if ($stuckOffline) {
+    if (-not $offlineHintShown) {
+      Write-Host "Still OFFLINE - not ready. Will try adb restart / emulator relaunch..." -ForegroundColor DarkYellow
+      Write-Host "EL: akoma offline - den einai etoimo." -ForegroundColor DarkYellow
+      $offlineHintShown = $true
+    }
+    if (-not $adbRestartedOnce) {
+      Restart-AdbServer
+      $adbRestartedOnce = $true
+      continue
+    }
+    if (-not $emuRelaunchedOnce -and ($StartEmulator -or $stuckOffline)) {
+      Stop-EmulatorProcesses
+      Restart-AdbServer
+      [void](Start-FirstAvd "cold relaunch (was stuck offline)")
+      $emuRelaunchedOnce = $true
+      Start-Sleep -Seconds 5
+      continue
+    }
+  } elseif (-not $emptyHintShown) {
+    Write-Host "Still empty - leave this window open, start the emulator, wait for home screen..." -ForegroundColor DarkYellow
+    $emptyHintShown = $true
+  }
+
+  # Periodically nudge adb wait-for-device (short poll; do not hang forever).
+  if (((Get-Date) - $lastWaitForDevice).TotalSeconds -ge 20) {
+    Write-Host "==> adb wait-for-device (20s nudge)..." -ForegroundColor DarkGray
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $wJob = Start-Job -ScriptBlock {
+      param($adbPath)
+      & $adbPath wait-for-device
+    } -ArgumentList $adb
+    Wait-Job $wJob -Timeout 18 | Out-Null
+    if ($wJob.State -eq "Running") { Stop-Job $wJob -ErrorAction SilentlyContinue }
+    Remove-Job $wJob -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = $prevEap
+    $lastWaitForDevice = Get-Date
+  }
+
+  Start-Sleep -Seconds 3
+}
+if (-not $online -or $online.Count -eq 0) {
+  Show-InstallTimeoutHelp $apk
+  throw "No adb device online after build (offline is not ready). Start AVD / USB phone, then install (commands above)."
+}
+
+[void](Wait-ForBootCompleted 2)
+[void](Wait-ForPackageService 3)
+
+if (-not (Install-WalletApk $apk)) {
+  Show-PackageServiceHelp $apk
+  throw "install failed (PackageManager not ready - Cold Boot the AVD, then wallet-boot-and-install.ps1)"
+}
 
 $ErrorActionPreference = "Continue"
 & $adb shell pm enable com.poreiago.wallet/com.poreiago.wallet.MainActivity 2>$null | Out-Null
@@ -359,29 +681,92 @@ if (-not $bootHit) { throw "Native /wallet cold-start missing from android asset
 Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
 
 Write-Host "==> launch My Wallet" -ForegroundColor Cyan
-$ErrorActionPreference = "Continue"
-# Prefer launcher intent (lets PackageManager resolve MainActivity).
-& $adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p com.poreiago.wallet | Out-Host
-$launchOk = ($LASTEXITCODE -eq 0)
-if (-not $launchOk) {
-  & $adb shell am start -W -n com.poreiago.wallet/com.poreiago.wallet.MainActivity | Out-Host
-  $launchOk = ($LASTEXITCODE -eq 0)
-}
-if (-not $launchOk) {
-  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1 | Out-Host
-}
-$ErrorActionPreference = "Stop"
-Start-Sleep -Seconds 3
-$ErrorActionPreference = "Continue"
-$pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
-$ErrorActionPreference = "Stop"
-if (-not $pidLine) {
+# Fresh installs are FORCE_STOPPED. Package-only (-p) MAIN/LAUNCHER often fails on
+# OEM phones (Blackview etc.) with "unable to resolve Intent" even when MainActivity
+# exists. Always start by explicit component. Do NOT pipe to Out-Host before checking
+# exit code / Error text - piping made LASTEXITCODE look like success and skipped fallbacks.
+function Invoke-WalletAmStart([string[]]$amArgs) {
+  $prev = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
-  Write-Host "==> package activities (diagnose Error type 3):" -ForegroundColor Yellow
-  & $adb shell dumpsys package com.poreiago.wallet | Select-String -Pattern 'Activity|enabled|versionName|ActivityInfo' | Select-Object -First 40 | Out-Host
-  & $adb logcat -d -t 80 AndroidRuntime:E ActivityManager:E Capacitor:E chromium:E *:S | Out-Host
+  $out = & $adb shell @amArgs 2>&1 | Out-String
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+  if ($out.Trim()) { Write-Host $out.TrimEnd() }
+  $failed = ($code -ne 0) -or ($out -match '(?i)Error:|unable to resolve|does not exist|SecurityException|Activity class')
+  return -not $failed
+}
+
+function Get-WalletPid {
+  $ErrorActionPreference = "Continue"
+  $p = (& $adb shell pidof com.poreiago.wallet 2>$null | Out-String).Trim()
+  if (-not $p) {
+    $p = (& $adb shell "pidof -s com.poreiago.wallet" 2>$null | Out-String).Trim()
+  }
+  if (-not $p) {
+    $psLine = & $adb shell "ps -A 2>/dev/null | grep com.poreiago.wallet" 2>$null | Out-String
+    if ($psLine -match 'com\.poreiago\.wallet') { $p = "ps" }
+  }
   $ErrorActionPreference = "Stop"
-  throw "App crashed on open - paste logcat above. If Activity class does not exist: Device Manager -> Wipe Data on the AVD, Cold Boot, rerun wallet-open.ps1 -Rebuild. Do NOT press Studio Run."
+  return $p
+}
+
+# Clear FORCE_STOP so OEM resolvers accept the next start.
+$ErrorActionPreference = "Continue"
+& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+& $adb shell pm enable com.poreiago.wallet 2>$null | Out-Null
+$ErrorActionPreference = "Stop"
+
+$launchOk = $false
+# 1) Explicit FQCN (Blackview / FORCE_STOP safe). Never use package-only -p first.
+if (Invoke-WalletAmStart @(
+    "am", "start", "--user", "0", "-W",
+    "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
+  )) { $launchOk = $true }
+
+# 2) FQCN + MAIN/LAUNCHER.
+if (-not $launchOk) {
+  Write-Host "am start FQCN failed - retry with MAIN/LAUNCHER ..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "am", "start", "--user", "0", "-W",
+      "-n", "com.poreiago.wallet/com.poreiago.wallet.MainActivity",
+      "-a", "android.intent.action.MAIN",
+      "-c", "android.intent.category.LAUNCHER"
+    )) { $launchOk = $true }
+}
+
+# 3) Short component form some OEMs prefer.
+if (-not $launchOk) {
+  Write-Host "am start FQCN failed - trying /.MainActivity ..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "am", "start", "--user", "0", "-W",
+      "-n", "com.poreiago.wallet/.MainActivity"
+    )) { $launchOk = $true }
+}
+
+# 4) Monkey launcher (last resort for stubborn FORCE_STOP).
+if (-not $launchOk) {
+  Write-Host "am start failed - trying launcher monkey..." -ForegroundColor Yellow
+  if (Invoke-WalletAmStart @(
+      "monkey", "-p", "com.poreiago.wallet", "-c", "android.intent.category.LAUNCHER", "1"
+    )) { $launchOk = $true }
+}
+
+Start-Sleep -Seconds 3
+$pidLine = Get-WalletPid
+if (-not $pidLine) {
+  Write-Host ""
+  Write-Host "INSTALL OK - auto-launch failed on this OEM (FORCE_STOP)." -ForegroundColor Yellow
+  Write-Host "Open PoreiaGo from the phone app drawer, OR run:" -ForegroundColor Yellow
+  Write-Host ("  & `"$adb`" shell am start --user 0 -n com.poreiago.wallet/com.poreiago.wallet.MainActivity") -ForegroundColor Cyan
+  Write-Host "APK is already on the device - no rebuild needed." -ForegroundColor Green
+  Write-Host ""
+  Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
+  $shaScript = Join-Path $repo "scripts\wallet-google-sha1.ps1"
+  if (Test-Path -LiteralPath $shaScript) {
+    & powershell -ExecutionPolicy Bypass -File $shaScript
+  }
+  Write-Host "DONE - Wallet installed (launch manually on phone)." -ForegroundColor Green
+  exit 0
 }
 Write-Host ""
 Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
@@ -391,4 +776,7 @@ if (Test-Path -LiteralPath $shaScript) {
 } else {
   Write-Host "Run: keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android"
 }
-Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In. Do NOT press Studio Run.") -ForegroundColor Green
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In.") -ForegroundColor Green
+Write-Host "Do NOT press Studio Run (cache fight / Unknown error). For Logcat only:" -ForegroundColor Yellow
+Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1" -ForegroundColor Cyan
+Write-Host "  then File -> Open -> android\  (not repo root)" -ForegroundColor Cyan

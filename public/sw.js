@@ -51,16 +51,16 @@ self.addEventListener('push', (event) => {
       });
       for (const client of clientsList) {
         try {
-          client.postMessage({
-            type: 'ADMIN_PUSH_RECEIVED',
-            payload: {
-              title: payload.title,
-              body: payload.body,
-              tag: payload.tag || options.tag,
-              url: options.data?.url || payload.url,
-              data: options.data || {},
-            },
-          });
+          const pushPayload = {
+            title: payload.title,
+            body: payload.body,
+            tag: payload.tag || options.tag,
+            url: options.data?.url || payload.url,
+            data: options.data || {},
+          };
+          // Admin inbox + Wallet customer bell both listen for these.
+          client.postMessage({ type: 'ADMIN_PUSH_RECEIVED', payload: pushPayload });
+          client.postMessage({ type: 'CUSTOMER_PUSH_RECEIVED', payload: pushPayload });
         } catch {
           /* ignore */
         }

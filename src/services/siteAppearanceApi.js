@@ -16,10 +16,11 @@ function appearanceStorageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
-function finalizeAppearance(data = {}) {
+function finalizeAppearance(data = {}, opts = {}) {
   const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
   // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
-  return scrubAchillioBrandForPlatformHost(merged);
+  // Native Wallet passes skipScrub so sealed-office branding is never wiped on localhost.
+  return scrubAchillioBrandForPlatformHost(merged, opts);
 }
 
 export const DEFAULT_SITE_APPEARANCE = {
@@ -33,6 +34,9 @@ export const DEFAULT_SITE_APPEARANCE = {
   logo_show_name: true,
   hero_image_url: '',
   hero_image_focal: 'center',
+  hero_overlay_opacity: 100,
+  hero_image_fit: 'cover',
+  hero_height_vh: 88,
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
   hero_title_accent: 'Άνεση, ασφάλεια & θέση εξασφαλισμένη.',
@@ -48,6 +52,10 @@ export const DEFAULT_SITE_APPEARANCE = {
   footer_contact_email: '',
   footer_contact_phone: '',
   footer_address: '',
+  footer_hours: '',
+  footer_tagline: '',
+  footer_facebook_url: '',
+  footer_instagram_url: '',
   rent_office_name: '',
   rent_logo_url: '',
   rent_logo_show_name: true,
@@ -102,6 +110,31 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_slider_options: {},
   rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
+  /** My Wallet «Αρχική» — empty → fall back to hero / brand in resolveWalletHomeFeed */
+  wallet_home_hook: '',
+  wallet_home_headline: '',
+  wallet_home_body: '',
+  wallet_home_image_url: '',
+  wallet_home_services: [
+    {
+      icon: 'confirmation_number',
+      title: 'Online κράτηση',
+      body: 'Κλείστε θέση σε λίγα βήματα από το κινητό.',
+    },
+    {
+      icon: 'qr_code_2',
+      title: 'Ψηφιακό εισιτήριο',
+      body: 'Το εισιτήριό σας πάντα στο Wallet.',
+    },
+    {
+      icon: 'support_agent',
+      title: 'Υποστήριξη γραφείου',
+      body: 'Είμαστε δίπλα σας πριν και κατά το ταξίδι.',
+    },
+  ],
+  wallet_home_news: [],
+  wallet_home_show_trips: true,
+  wallet_home_trips_title: 'Επερχόμενες εκδρομές',
   updated_at: null,
 };
 
@@ -198,14 +231,15 @@ export async function fetchSiteAppearance(
     const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = finalizeAppearance(data);
+      // Sealed tenant_id = real office (native Capacitor) — never scrub logo/name.
+      const merged = finalizeAppearance(data, { skipScrub: Boolean(tenantId) });
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || finalizeAppearance({});
+  return loadCached() || finalizeAppearance({}, { skipScrub: Boolean(tenantId) });
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */

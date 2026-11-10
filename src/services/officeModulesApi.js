@@ -6,6 +6,7 @@ import {
   officeModeFromModules,
   resolveDesignPageForModules,
 } from '../lib/admin/officeDesignPages.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { isAchillioTravelHost, isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 
@@ -123,9 +124,24 @@ function isPoreiagoPlatformModules(modules) {
  * - Office with rent_enabled → yes
  * - PoreiaGo platform office (incl. seed slug achillio) → yes
  */
+function _isNativeShell(opts = {}) {
+  if (typeof opts.native === 'boolean') return opts.native;
+  try {
+    return Boolean(isNativeApp());
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Public storefront /rent — only when the office has Rent enabled.
- * PoreiaGo marketing host (poreiago.com) always keeps Rent as product demo.
+ * Public storefront /rent + Wallet «Ενοικιάσεις» — only with an active Rent contract.
+ *
+ * Policy (agreed):
+ * - Achillio Travel → never (bus-only), even if rent_enabled drifts
+ * - Other offices → only when rent_enabled
+ * - PoreiaGo marketing web (poreiago.com) → product demo (Rent on)
+ * - Native Capacitor uses hostname localhost — must NOT treat that as marketing
+ *   demo when the sealed office has no Rent contract (Achillio bug).
  */
 export function shouldShowRentStorefront(modules, opts = {}) {
   const hostname =
@@ -133,10 +149,18 @@ export function shouldShowRentStorefront(modules, opts = {}) {
     (typeof window !== 'undefined' ? window.location.hostname : '');
   // Achillio Travel domain is bus-only even if modules API drifts.
   if (isAchillioTravelHost(hostname)) return false;
-  // PoreiaGo marketing keeps Rent as product demo.
-  if (isPlatformMarketingHost(hostname)) return true;
-  // Achillio Travel is bus-only — never expose Rent on wallet / storefront.
+  // Sealed Achillio office (native wallet /tenant_id) — bus-only.
   if (modules?.office_kind === 'achillio_travel') return false;
+
+  const native = _isNativeShell(opts);
+  if (native) {
+    // Capacitor serves from localhost — ignore marketing-host shortcut.
+    if (modules?.office_kind === 'poreiago_platform') return true;
+    return Boolean(modules?.rent_enabled);
+  }
+
+  // PoreiaGo marketing web keeps Rent as product demo.
+  if (isPlatformMarketingHost(hostname)) return true;
   return Boolean(modules?.rent_enabled);
 }
 

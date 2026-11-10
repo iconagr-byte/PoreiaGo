@@ -1,9 +1,9 @@
-﻿# PoreiaGo Wallet - Windows helper (packaged My Wallet only)
-# Usage (PowerShell) - ONE line at a time:
+﻿# PoreiaGo - light Windows helper (sync + assembleDebug). Prefer wallet-run.ps1.
+# Usage:
 #   cd C:\Users\User\poreiago
-#   git fetch origin
-#   git reset --hard origin/cursor/wallet-android-capacitor-5ffb
+#   git fetch origin main; git checkout main; git pull origin main
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-android-fix.ps1
+# Studio Unknown error: see docs/ANDROID-WALLET.md or wallet-studio-prep.ps1
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

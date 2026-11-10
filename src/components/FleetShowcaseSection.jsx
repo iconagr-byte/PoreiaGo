@@ -1,5 +1,6 @@
 import { amenityIcon } from '../services/fleetPublicApi.js';
 import { fleetCategoryLabel, fleetCategoryMeta } from '../lib/fleet/fleetVehicleCategories.js';
+import { PreviewBuilderControl } from './storefront/preview/PreviewDesignMode.jsx';
 
 export default function FleetShowcaseSection({
   vehicles,
@@ -15,9 +16,19 @@ export default function FleetShowcaseSection({
       className={`py-24 px-margin-desktop max-w-container-max mx-auto bg-surface-container-lowest border-y border-black/[0.04] ${sectionClassName}`.trim()}
     >
       <div className="text-center mb-16 max-w-2xl mx-auto">
-        <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
-          Ο Στόλος Μας
-        </span>
+        {/* One Builder for the whole fleet card template — beside Ο Στόλος Μας, not per vehicle. */}
+        <div className="sf-preview-trips-section-head mb-3">
+          <span className="text-primary font-semibold tracking-wider uppercase text-sm">
+            Ο Στόλος Μας
+          </span>
+          <PreviewBuilderControl
+            sectionId="general"
+            label="Στόλος"
+            variant="inline"
+            instanceId="fleet-section-title"
+            className="sf-preview-trips-section-head__builder"
+          />
+        </div>
         <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight mb-4">
           Premium λεωφορεία & παροχές
         </h2>
@@ -39,9 +50,10 @@ export default function FleetShowcaseSection({
             const categoryLabel =
               bus.category_label || fleetCategoryLabel(bus.category);
             const categoryIcon = fleetCategoryMeta(bus.category)?.icon || 'directions_bus';
+            const cardKey = String(bus.id ?? bus.name ?? categoryLabel);
             return (
-              <div key={bus.id} className="h-full">
-                <article className="relative group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
+              <div key={cardKey} className="h-full">
+                <article className="group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
                   <div className="relative h-52 w-full overflow-hidden shrink-0">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
                     <img
@@ -81,7 +93,7 @@ export default function FleetShowcaseSection({
                       <ul className="flex flex-wrap gap-2 content-start">
                         {(bus.amenities || []).map((item) => (
                           <li
-                            key={`${bus.id}-${item}`}
+                            key={`${cardKey}-${item}`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/[0.06] text-xs font-medium text-on-surface shadow-sm"
                           >
                             <span className="material-symbols-outlined text-[16px] text-primary">
