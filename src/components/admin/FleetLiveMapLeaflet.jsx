@@ -30,6 +30,7 @@ import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
+import FleetMapFocusVehicle from './FleetMapFocusVehicle.jsx';
 import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
@@ -94,15 +95,18 @@ const busIcon = (vehicle) => {
   return icon;
 };
 
-function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
+function LeafletAnimatedMarkers({ vehicles, selectedId = null, onSelectVehicle, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
 
   return display.map((v) => (
     <Marker
       key={v.id}
       position={[v.lat, v.lng]}
-      icon={busIcon(v)}
+      icon={busIcon(v, selectedId === v.id)}
       eventHandlers={{
+        click: () => {
+          onSelectVehicle?.(v);
+        },
         dblclick: (e) => {
           e.originalEvent?.preventDefault?.();
           e.originalEvent?.stopPropagation?.();
@@ -247,6 +251,10 @@ export default function FleetLiveMapLeaflet({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
+  focusVehicle = null,
+  focusNonce = 0,
+  selectedId = null,
+  onSelectVehicle,
   onVehicleHistory,
   onClearSos = null,
 }) {
@@ -281,12 +289,18 @@ export default function FleetLiveMapLeaflet({
       <ZoomControl position="bottomright" />
       <GreecePlacesLeafletLayer visible={showPlaces} />
       <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
+      <FleetMapFocusVehicle vehicle={focusVehicle} focusNonce={focusNonce} zoom={14} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
-      <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
+      <LeafletAnimatedMarkers
+        vehicles={vehicles}
+        selectedId={selectedId}
+        onSelectVehicle={onSelectVehicle}
+        onVehicleHistory={onVehicleHistory}
+      />
     </MapContainer>
   );
 }
