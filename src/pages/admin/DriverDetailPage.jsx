@@ -5,12 +5,13 @@ import { mockFleet } from '../../data/mockData.js';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
 import {
-  fetchDriverHistory,
   fetchFleetDriver,
+  peekCachedFleetDriver,
   updateFleetDriver,
   uploadDriverPhoto,
 } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import PasswordField from '../../components/PasswordField.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
@@ -130,11 +131,12 @@ function InfoTile({ icon, label, value, sub, highlight }) {
 export default function DriverDetailPage() {
   const { driverId } = useParams();
   const navigate = useNavigate();
-  const [driver, setDriver] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialCached = peekCachedFleetDriver(driverId);
+  const [driver, setDriver] = useState(initialCached);
+  const [loading, setLoading] = useState(!initialCached);
   const [appPassword, setAppPassword] = useState('');
   const [appPasswordConfirm, setAppPasswordConfirm] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoUrl, setPhotoUrl] = useState(initialCached?.photo_url || '');
   const [savingAccount, setSavingAccount] = useState(false);
   const [history, setHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -154,19 +156,27 @@ export default function DriverDetailPage() {
       return;
     }
     let cancelled = false;
-    (async () => {
+    const cached = peekCachedFleetDriver(driverId);
+    if (cached) {
+      setDriver(cached);
+      setPhotoUrl(cached.photo_url || '');
+      setLoading(false);
+    } else {
       setLoading(true);
-      setHistoryLoading(true);
-      const [d, h] = await Promise.all([
-        fetchFleetDriver(driverId),
-        fetchDriverHistory(driverId).catch(() => null),
-      ]);
-      if (!cancelled) {
-        setDriver(d);
-        setPhotoUrl(d?.photo_url || '');
-        setHistory(h);
-        setLoading(false);
-        setHistoryLoading(false);
+    }
+    (async () => {
+      try {
+        const d = await fetchFleetDriver(driverId);
+        if (!cancelled) {
+          setDriver(d);
+          setPhotoUrl(d?.photo_url || '');
+        }
+      } catch (err) {
+        if (!cancelled && !cached) {
+          toast.error(err?.message || 'Αποτυχία φόρτωσης προφίλ');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -254,9 +264,9 @@ export default function DriverDetailPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading && !driver) {
     return (
-      <AdminLayout activeTab="settings" title={header}>
+      <AdminLayout activeTab="settings" title={header} hideSidebar>
         <p className="text-on-surface-variant">Φόρτωση προφίλ…</p>
       </AdminLayout>
     );
@@ -264,7 +274,7 @@ export default function DriverDetailPage() {
 
   if (!driver) {
     return (
-      <AdminLayout activeTab="settings" title={header}>
+      <AdminLayout activeTab="settings" title={header} hideSidebar>
         <div className="max-w-lg mx-auto text-center py-16 bg-white rounded-[32px] border shadow-sm">
           <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">person_off</span>
           <p className="text-on-surface-variant mb-4">Δεν βρέθηκε ο οδηγός.</p>
@@ -288,7 +298,7 @@ export default function DriverDetailPage() {
     summary.display_total_km ?? summary.gps_total_km ?? driver.total_km ?? 0;
 
   return (
-    <AdminLayout activeTab="settings" title={header}>
+    <AdminLayout activeTab="settings" title={header} hideSidebar>
       <div className="max-w-5xl mx-auto pb-16 space-y-6">
         <div className="bg-surface-container-lowest rounded-[32px] border border-black/[0.05] shadow-sm p-6 md:p-8">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8">
@@ -297,6 +307,8 @@ export default function DriverDetailPage() {
                 <img
                   src={resolveSiteAssetUrl(driver.photo_url)}
                   alt=""
+                  decoding="async"
+                  fetchPriority="low"
                   className="w-24 h-24 rounded-3xl object-cover shadow-inner border border-primary/10"
                 />
               ) : (
@@ -394,12 +406,6 @@ export default function DriverDetailPage() {
             icon="calendar_today"
             label="Έναρξη απασχόλησης"
             value={formatDate(driver.hiring_date)}
-          />
-          <InfoTile
-            icon="payments"
-            label="Αμοιβή"
-            value={`€${driver.salary_per_km}/km`}
-            sub={`€${driver.salary_per_trip} ανά εκδρομή`}
           />
           <InfoTile
             icon="id_card"

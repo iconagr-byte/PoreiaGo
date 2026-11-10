@@ -61,7 +61,9 @@ def main() -> int:
         pass
 
     if ENV_FILE.exists():
+        # Inline PEM so the API container works even when /app/data was not synced yet.
         _set_env_kv("WEB_PUSH_VAPID_PUBLIC_KEY", public_key)
+        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY", private_pem.replace("\n", "\\n"))
         _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "/app/data/vapid_private.pem")
         _set_env_kv("WEB_PUSH_VAPID_SUBJECT", SUBJECT)
 
