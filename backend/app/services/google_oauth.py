@@ -22,17 +22,53 @@ def is_placeholder_google_client_id(client_id: str) -> bool:
     return False
 
 
+# Wallet / website Web client (same GCP project as Android OAuth).
+_POREIAGO_WALLET_WEB_CLIENT_ID = (
+    "967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com"
+)
+# Legacy Achillio Travel Web client — browsers may still mint tokens with this
+# aud after the PoreiaGo migration (FedCM / GIS cache). Accept both.
+_LEGACY_ACHILLIO_WEB_CLIENT_ID = (
+    "838114974488-8q36brogbldig001k9n88qrnciqle1j1.apps.googleusercontent.com"
+)
+
+_BUILTIN_WEB_CLIENT_IDS = (
+    _POREIAGO_WALLET_WEB_CLIENT_ID,
+    _LEGACY_ACHILLIO_WEB_CLIENT_ID,
+)
+
+
 def google_client_id() -> str:
     raw = (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
     if is_placeholder_google_client_id(raw):
-        return ""
-    return raw
+        # Prefer PoreiaGo Web client when env is empty / placeholder.
+        return _POREIAGO_WALLET_WEB_CLIENT_ID
+    # First id if comma-separated
+    return raw.split(",")[0].strip()
+
+
+def google_client_ids() -> list[str]:
+    """Accepted ID-token audiences (env + PoreiaGo + legacy Achillio Web)."""
+    ids: list[str] = []
+    raw = (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
+    if raw:
+        for part in raw.split(","):
+            cid = part.strip()
+            if cid and not is_placeholder_google_client_id(cid) and cid not in ids:
+                ids.append(cid)
+    for builtin in _BUILTIN_WEB_CLIENT_IDS:
+        if (
+            builtin not in ids
+            and not is_placeholder_google_client_id(builtin)
+        ):
+            ids.append(builtin)
+    return ids
 
 
 async def verify_google_id_token(id_token: str) -> dict:
     """Validate token with Google tokeninfo and return claims."""
-    client_id = google_client_id()
-    if not client_id:
+    accepted = google_client_ids()
+    if not accepted:
         raise HTTPException(
             status_code=503,
             detail="Google OAuth not configured (set GOOGLE_CLIENT_ID)",
@@ -49,7 +85,8 @@ async def verify_google_id_token(id_token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid Google token")
 
     data = response.json()
-    if data.get("aud") != client_id:
+    aud = str(data.get("aud") or "").strip()
+    if aud not in accepted:
         raise HTTPException(status_code=401, detail="Google token audience mismatch")
 
     email_verified = str(data.get("email_verified", "")).lower()

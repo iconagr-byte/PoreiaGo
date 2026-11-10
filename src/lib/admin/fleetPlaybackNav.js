@@ -42,6 +42,8 @@ export function buildFleetPlaybackSearchParams({
   tripId,
   driverId,
   driverName,
+  vehicleId,
+  vehicleCode,
   date = 'today',
   auto = true,
 }) {
@@ -51,19 +53,25 @@ export function buildFleetPlaybackSearchParams({
   if (tripId != null && tripId !== '') params.set('trip_id', String(tripId));
   if (driverId) params.set('driver_id', String(driverId));
   if (driverName) params.set('driver_name', String(driverName));
+  if (vehicleId) params.set('vehicle_id', String(vehicleId));
+  if (vehicleCode) params.set('vehicle_code', String(vehicleCode));
   if (date) params.set('date', date);
   if (auto) params.set('auto', '1');
   return params;
 }
 
-/** Μεταβαίνει στο BackOffice playback για σημερινή διαδρομή οδηγού. */
+/** Μεταβαίνει στο BackOffice playback για σημερινή διαδρομή (bus ή rent). */
 export function navigateToDriverTodayPlayback(navigate, vehicle, { replace = false } = {}) {
   const tripId = vehicle?.trip_id ?? vehicle?.tripId;
-  if (!tripId) return false;
+  const vehicleId = vehicle?.vehicle_id ?? vehicle?.id ?? vehicle?.vehicleId;
+  const vehicleCode = vehicle?.bus_plate ?? vehicle?.vehicle_code ?? vehicle?.plate;
+  if (!tripId && !vehicleId && !vehicleCode) return false;
   const params = buildFleetPlaybackSearchParams({
-    tripId,
+    tripId: tripId || undefined,
     driverId: vehicle?.driver_id ?? vehicle?.driverId,
     driverName: vehicle?.driver_name ?? vehicle?.driverName,
+    vehicleId: vehicleId || undefined,
+    vehicleCode: vehicleCode || undefined,
     date: 'today',
   });
   navigate(`/admin?${params.toString()}`, { replace });
@@ -86,6 +94,8 @@ export function parsePlaybackFilters(searchParams) {
     tripId: searchParams.get('trip_id') || '',
     driverId: searchParams.get('driver_id') || '',
     driverName: searchParams.get('driver_name') || '',
+    vehicleId: searchParams.get('vehicle_id') || '',
+    vehicleCode: searchParams.get('vehicle_code') || '',
     dateKey,
     from,
     to,

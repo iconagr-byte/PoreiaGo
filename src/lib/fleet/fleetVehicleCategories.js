@@ -38,7 +38,19 @@ const LABEL_BY_ID = Object.fromEntries(
 /** @param {string | null | undefined} categoryId */
 export function fleetCategoryLabel(categoryId) {
   if (!categoryId) return '—';
-  return LABEL_BY_ID[categoryId] || String(categoryId);
+  if (LABEL_BY_ID[categoryId]) return LABEL_BY_ID[categoryId];
+  const lower = String(categoryId).trim().toLowerCase();
+  if (lower.includes('van') || lower.includes('minibus')) return LABEL_BY_ID.Van;
+  if (lower.includes('express') || lower.includes('premium')) {
+    return LABEL_BY_ID['Premium Express'];
+  }
+  if (lower.includes('luxury') || lower.includes('coach')) {
+    return LABEL_BY_ID['Luxury Coach'];
+  }
+  if (lower.includes('standard') || lower.includes('classic')) {
+    return LABEL_BY_ID.Standard;
+  }
+  return String(categoryId);
 }
 
 export function fleetCategoryMeta(categoryId) {

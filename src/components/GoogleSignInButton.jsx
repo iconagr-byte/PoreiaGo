@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
-function GoogleLogo() {
+function GoogleLogo({ className = '' }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+    <svg className={className} width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
       <path
         fill="#EA4335"
         d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.98 13.72 17.98 9.5 24 9.5z"
@@ -29,6 +31,24 @@ function googleButtonLabel(text) {
   if (text === 'signup_with') return 'Εγγραφή με Google';
   if (text === 'continue_with') return 'Συνέχεια με Google';
   return 'Σύνδεση με Google';
+}
+
+/** Shared Apple-style shell — matches wallet / rent login forms. */
+function StyledGoogleShell({ label, disabled = false }) {
+  return (
+    <div
+      className={`flex w-full items-center justify-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all ${
+        disabled
+          ? 'opacity-60'
+          : 'group-hover:border-black/[0.14] group-hover:bg-[#fbfbfd] group-hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+      }`}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f5f5f7] ring-1 ring-black/[0.04]">
+        <GoogleLogo />
+      </span>
+      <span className="text-[15px] font-semibold tracking-tight text-[#1d1d1f]">{label}</span>
+    </div>
+  );
 }
 
 function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_with' }) {
@@ -62,25 +82,26 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 shadow-sm transition-colors disabled:opacity-50"
+        className="group w-full disabled:cursor-not-allowed"
       >
-        <GoogleLogo />
-        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <StyledGoogleShell label={label} disabled={disabled} />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <GoogleLogo />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f7]">
+                <GoogleLogo />
+              </span>
               <div>
-                <h2 className="font-bold text-gray-900">Google Sign-In</h2>
-                <p className="text-xs text-gray-500">Demo λειτουργία — τοπική δοκιμή</p>
+                <h2 className="font-bold text-[#1d1d1f]">Google Sign-In</h2>
+                <p className="text-xs text-[#6e6e73]">Demo λειτουργία — τοπική δοκιμή</p>
               </div>
             </div>
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label htmlFor="google-demo-email" className="text-sm font-medium text-gray-700">
+                <label htmlFor="google-demo-email" className="text-sm font-medium text-[#1d1d1f]">
                   Gmail / email πελάτη
                 </label>
                 <input
@@ -88,7 +109,7 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/30 outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="name@gmail.com"
                   autoFocus
                   required
@@ -98,13 +119,13 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 py-3 rounded-full border border-gray-200 text-gray-600 font-bold text-sm"
+                  className="flex-1 rounded-full border border-black/[0.08] py-3 text-sm font-bold text-[#6e6e73]"
                 >
                   Ακύρωση
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-full bg-primary-container text-white font-bold text-sm"
+                  className="flex-1 rounded-full bg-[#1d1d1f] py-3 text-sm font-bold text-white"
                 >
                   Συνέχεια
                 </button>
@@ -118,20 +139,225 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
 }
 
 function GoogleUnavailable({ disabled, text = 'signin_with' }) {
-  const base = googleButtonLabel(text);
+  const label = googleButtonLabel(text);
   return (
-    <button
-      type="button"
-      disabled
+    <div
+      className="w-full cursor-not-allowed"
       title="Ορίστε GOOGLE_CLIENT_ID στο deploy/.env.prod — βλ. deploy/GOOGLE-SIGNIN.md"
-      className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed disabled:opacity-70"
       aria-disabled="true"
     >
-      <GoogleLogo />
-      <span className="text-sm font-semibold">
-        {disabled ? `${base}…` : `${base} (μη διαθέσιμη)`}
-      </span>
-    </button>
+      <StyledGoogleShell
+        label={disabled ? `${label}…` : `${label} (μη διαθέσιμη)`}
+        disabled
+      />
+    </div>
+  );
+}
+
+/**
+ * Custom shell + real click target.
+ *
+ * The previous opacity-0 GIS iframe overlay often swallowed / ignored taps on
+ * iOS Safari and FedCM browsers. We keep the Apple-style shell, trigger GIS
+ * One Tap / FedCM from a real button click, and fall back to a visible Google
+ * button modal when the prompt is blocked.
+ */
+function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
+  const { clientId } = useGoogleAuthConfig();
+  const native = isNativeApp();
+  // FedCM / One Tap is unreliable inside Capacitor WebViews — use GIS button modal on tap.
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const label = googleButtonLabel(text);
+  const callbackRef = useRef({ onSuccess, onError });
+  callbackRef.current = { onSuccess, onError };
+  const useFedcm = !native;
+
+  const handleCredential = useCallback((credential) => {
+    setBusy(false);
+    setFallbackOpen(false);
+    if (!credential) {
+      callbackRef.current.onError?.('Δεν ελήφθη διαπιστευτήριο Google');
+      return;
+    }
+    callbackRef.current.onSuccess?.(credential);
+  }, []);
+
+  useEffect(() => {
+    const g = typeof window !== 'undefined' ? window.google?.accounts?.id : null;
+    if (!g || !clientId || native) return undefined;
+    try {
+      g.initialize({
+        client_id: clientId,
+        callback: (response) => handleCredential(response?.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        context: text === 'signup_with' ? 'signup' : 'signin',
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: useFedcm,
+      });
+    } catch {
+      /* GIS not ready yet — click handler will retry */
+    }
+    return undefined;
+  }, [clientId, handleCredential, text, native, useFedcm]);
+
+  const openFallback = () => {
+    setBusy(false);
+    setFallbackOpen(true);
+  };
+
+  const onClick = () => {
+    if (disabled || busy) return;
+    // Android/iOS: Credential Manager — never GIS inside WebView (origin_mismatch / disallowed_useragent).
+    if (native) {
+      setBusy(true);
+      void (async () => {
+        try {
+          const idToken = await nativeGoogleIdToken(clientId);
+          handleCredential(idToken);
+        } catch (err) {
+          setBusy(false);
+          const msg = String(err?.message || err || '');
+          if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
+            return;
+          }
+          // Never navigate out of the Capacitor app (bridge opened Chrome white page).
+          if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
+            onError?.(
+              'Google Console: λάθος SHA-1 ή package στο Android OAuth client (ή ακόμα διαδίδεται). Τρέξε wallet-google-sha1.ps1, σύγκρινε με το Console, βάλε Test user αν είναι Testing, περίμενε έως μερικές ώρες, ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/not implemented|SocialLogin/i.test(msg)) {
+            onError?.(
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-go.ps1 (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
+          if (/CANNOT use scopes|modifying the main activity/i.test(msg)) {
+            onError?.(
+              'Χρειάζεται νέο Wallet build (χωρίς custom Google scopes). Τρέξε wallet-go.ps1 και ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
+          }
+          if (/audience mismatch/i.test(msg)) {
+            onError?.(
+              'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (ή Actions → Set Google Client ID) και ξαναδοκίμασε σε ~2 λεπτά.',
+            );
+            return;
+          }
+          if (/No credentials available|NoCredential/i.test(msg)) {
+            onError?.(
+              'Δεν υπάρχει Google λογαριασμός στο emulator. Settings → Passwords & accounts → Add account → Google, μετά ξανά Σύνδεση με Google.',
+            );
+            return;
+          }
+          onError?.(
+            msg
+              ? `Google: ${msg}`
+              : 'Η σύνδεση με Google απέτυχε. Μείνε μέσα στο app Wallet (όχι Chrome) και δοκίμασε ξανά.',
+          );
+        }
+      })();
+      return;
+    }
+    const g = window.google?.accounts?.id;
+    if (!g || !clientId) {
+      onError?.('Google Sign-In δεν φόρτωσε. Ανανεώστε τη σελίδα.');
+      return;
+    }
+    setBusy(true);
+    try {
+      g.initialize({
+        client_id: clientId,
+        callback: (response) => handleCredential(response?.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        context: text === 'signup_with' ? 'signup' : 'signin',
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: useFedcm,
+      });
+      g.prompt((notification) => {
+        // isDismissedMoment also fires after a successful credential — do not
+        // treat that as failure (would open a duplicate fallback modal).
+        const blocked =
+          Boolean(notification?.isNotDisplayed?.()) ||
+          Boolean(notification?.isSkippedMoment?.());
+        if (blocked) openFallback();
+        else setBusy(false);
+      });
+    } catch {
+      openFallback();
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled || busy}
+        onClick={onClick}
+        className="group w-full disabled:cursor-not-allowed"
+        aria-label={label}
+      >
+        <StyledGoogleShell label={busy ? `${label}…` : label} disabled={disabled || busy} />
+      </button>
+
+      {fallbackOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Σύνδεση με Google"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f7]">
+                <GoogleLogo />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-[#1d1d1f]">Σύνδεση με Google</h2>
+                <p className="text-xs text-[#6e6e73]">Επιλέξτε τον λογαριασμό σας για συνέχεια</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFallbackOpen(false);
+                  setBusy(false);
+                }}
+                className="rounded-full p-2 text-[#6e6e73] hover:bg-black/[0.04]"
+                aria-label="Κλείσιμο"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-3 py-2">
+              <GoogleLogin
+                onSuccess={(response) => {
+                  if (!response.credential) {
+                    onError?.('Δεν ελήφθη διαπιστευτήριο Google');
+                    return;
+                  }
+                  handleCredential(response.credential);
+                }}
+                onError={() => {
+                  setBusy(false);
+                  onError?.('Η σύνδεση με Google απέτυχε. Δοκιμάστε ξανά.');
+                }}
+                theme="outline"
+                size="large"
+                text={text}
+                shape="pill"
+                locale="el"
+                width="320"
+                useOneTap={false}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -154,7 +380,6 @@ export default function GoogleSignInButton({
   }
 
   if (!enabled) {
-    // Local demo only — production must use a real OAuth Web Client ID.
     if (import.meta.env.DEV) {
       return (
         <DemoGoogleSignIn
@@ -169,24 +394,11 @@ export default function GoogleSignInButton({
   }
 
   return (
-    <div className={`flex justify-center w-full ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
-      <GoogleLogin
-        onSuccess={(response) => {
-          if (!response.credential) {
-            onError?.('Δεν ελήφθη διαπιστευτήριο Google');
-            return;
-          }
-          onSuccess(response.credential);
-        }}
-        onError={() => onError?.('Η σύνδεση με Google απέτυχε')}
-        theme="outline"
-        size="large"
-        text={buttonText}
-        shape="pill"
-        locale="el"
-        width="360"
-        useOneTap={false}
-      />
-    </div>
+    <LiveGoogleSignIn
+      onSuccess={onSuccess}
+      onError={onError}
+      disabled={disabled}
+      text={buttonText}
+    />
   );
 }

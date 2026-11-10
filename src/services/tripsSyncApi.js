@@ -26,6 +26,9 @@ function tripToPayload(trip) {
     featured: Boolean(trip.featured),
     description: trip.description || '',
     image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : [],
     hook: trip.hook || '',
     durationLabel: trip.durationLabel || '',
     badge: trip.badge || '',
@@ -110,21 +113,66 @@ export async function fetchOfficeTripCatalog() {
   return Array.isArray(data) ? data : [];
 }
 
-/** Hydrate local trip list from durable server catalog (+ Postgres titles). */
+/** Hydrate local trip list from durable server catalog (+ Postgres titles).
+ * Also merges public /api/site/trips so storefront-seeded office trips
+ * (e.g. Achillio 91001–91003) always appear in Διαχείριση Εκδρομών.
+ */
 export async function hydrateTripsFromServer() {
   const { mergeServerTripsIntoStore } = await import('../lib/trips/tripStore.js');
-  const rows = await fetchOfficeTripCatalog();
-  return mergeServerTripsIntoStore(rows);
+  let rows = [];
+  let catalogOk = false;
+  try {
+    rows = await fetchOfficeTripCatalog();
+    catalogOk = Array.isArray(rows);
+  } catch (err) {
+    console.warn('[trips-sync] admin catalog fetch failed', err);
+    rows = [];
+  }
+
+  try {
+    const { fetchPublicOfficeTrips } = await import('./officeTripsApi.js');
+    const pub = await fetchPublicOfficeTrips();
+    if (Array.isArray(pub) && pub.length) {
+      const byId = new Map();
+      for (const row of rows || []) {
+        const id = Number(row?.id);
+        if (Number.isFinite(id) && id > 0) byId.set(id, row);
+      }
+      for (const row of pub) {
+        const id = Number(row?.id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        const prev = byId.get(id) || {};
+        byId.set(id, {
+          ...prev,
+          ...row,
+          officeSeed: Boolean(row.officeSeed || row.office_seed || prev.officeSeed),
+          catalogSource:
+            row.catalogSource ||
+            row.catalog_source ||
+            prev.catalogSource ||
+            (Number.isFinite(id) && id >= 91001 && id <= 91099 ? 'office_seed' : ''),
+        });
+      }
+      rows = [...byId.values()];
+    }
+  } catch (err) {
+    console.warn('[trips-sync] public catalog merge failed', err);
+  }
+
+  // Only prune when the durable office catalog loaded — never wipe on network failure.
+  return mergeServerTripsIntoStore(rows, { pruneMissing: catalogOk });
 }
 
 export async function syncAllLocalTrips() {
   const { loadTrips, mergeServerTripsIntoStore } = await import(
     '../lib/trips/tripStore.js'
   );
-  // Never replace the public catalog with a partial local list.
+  // Reconcile first so deleted-elsewhere ghosts are not pushed back to the catalog.
   try {
     const remote = await fetchOfficeTripCatalog();
-    if (remote.length) mergeServerTripsIntoStore(remote);
+    if (Array.isArray(remote)) {
+      mergeServerTripsIntoStore(remote, { pruneMissing: true });
+    }
   } catch (err) {
     console.warn('[trips-sync] pre-sync hydrate failed', err);
   }

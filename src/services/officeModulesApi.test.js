@@ -10,6 +10,11 @@ vi.mock('../lib/saasJwt.js', () => ({
 
 vi.mock('../lib/platform/tenantHost.js', () => ({
   isPlatformMarketingHost: vi.fn(() => false),
+  isAchillioTravelHost: vi.fn((hostname = '') => {
+    const host = String(hostname || '').toLowerCase().split(':')[0];
+    const apex = host.replace(/^www\./, '');
+    return apex === 'achilliotravel.com' || host.endsWith('.achilliotravel.com');
+  }),
 }));
 
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
@@ -163,5 +168,56 @@ describe('shouldShowRentStorefront', () => {
         office_kind: 'achillio_travel',
       }),
     ).toBe(false);
+  });
+
+  it('hides Rent on achilliotravel.com hostname even if rent_enabled is set', () => {
+    expect(
+      shouldShowRentStorefront(
+        { rent_enabled: true, office_kind: 'customer' },
+        { hostname: 'www.achilliotravel.com' },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native Achillio even when hostname is localhost (marketing)', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'achillio_travel',
+          tenant_slug: 'admin-achillio-gr',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native customer office without rent contract despite localhost', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'customer',
+          tenant_slug: 'sunny-buses',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(false);
+  });
+
+  it('shows Rent on native only when rent_enabled for sealed office', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: true,
+          office_kind: 'customer',
+          tenant_slug: 'rent-office',
+        },
+        { hostname: 'localhost', native: true },
+      ),
+    ).toBe(true);
   });
 });

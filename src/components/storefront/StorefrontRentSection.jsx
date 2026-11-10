@@ -8,6 +8,7 @@ import {
   rentFleetCardWrapperClass,
   rentFleetGridClass,
 } from '../../lib/homepage/homepageTemplates.js';
+import { PreviewBuilderControl } from './preview/PreviewDesignMode.jsx';
 
 function RentVehicleCard({ vehicle, templateId, featured = false }) {
   const v = vehicle;
@@ -235,7 +236,8 @@ export default function StorefrontRentSection({
   loading = false,
   rentOnly = false,
   brandName = '',
-  showServices = true,
+  // Platform capability copy stays on www landing — not office storefronts.
+  showServices = false,
   siteAppearance = {},
 }) {
   const title = rentOnly ? 'Ενοικιάσεις οχημάτων' : 'Ενοικίαση αυτοκινήτου';
@@ -256,7 +258,17 @@ export default function StorefrontRentSection({
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
             <div className="max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700 mb-3">Rent</p>
-              <h2 className="font-headline-lg font-bold text-on-surface mb-3">{title}</h2>
+              {/* One Builder for the whole rent fleet card template — not per vehicle. */}
+              <div className="sf-preview-trips-section-head justify-start mb-3">
+                <h2 className="font-headline-lg font-bold text-on-surface">{title}</h2>
+                <PreviewBuilderControl
+                  sectionId="general"
+                  label="Rent"
+                  variant="inline"
+                  instanceId="rent-section-title"
+                  className="sf-preview-trips-section-head__builder"
+                />
+              </div>
               <p className="font-body-lg text-on-surface-variant leading-relaxed">{subtitle}</p>
               <p className="mt-3 text-sm font-semibold text-on-surface-variant">
                 {cars} επιβατικά · {vans} van
@@ -279,8 +291,9 @@ export default function StorefrontRentSection({
             <ul className={gridClass}>
               {preview.map((raw, index) => {
                 const v = enrichRentVehicle(raw);
+                const cardKey = String(v.id || v.name || index);
                 return (
-                  <li key={v.id || v.name || index} className={rentFleetCardWrapperClass(layoutId, index)}>
+                  <li key={cardKey} className={rentFleetCardWrapperClass(layoutId, index)}>
                     <RentVehicleCard
                       vehicle={v}
                       templateId={cardId}

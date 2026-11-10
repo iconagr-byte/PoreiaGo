@@ -4,8 +4,9 @@
 # Fixes:
 #   1) Ensure tenant admin-achillio-gr owns custom_domain=achilliotravel.com
 #   2) Clear poisoned achilliotravel.com from PoreiaGo platform seed (slug=achillio)
-#   3) Refresh frontend nginx.conf so /api + /ws proxy to api-blue (fixes 405/SPA HTML)
-#   4) Optional admin upsert via ACHILLIO_ADMIN_EMAIL + ACHILLIO_ADMIN_PASSWORD
+#   3) Seed PoreiaGo-style starter excursions (Μετέωρα / Αθήνα / Ιωάννινα) into Achillio catalog
+#   4) Refresh frontend nginx.conf so /api + /ws proxy to api-blue (fixes 405/SPA HTML)
+#   5) Optional admin upsert via ACHILLIO_ADMIN_EMAIL + ACHILLIO_ADMIN_PASSWORD
 #
 # Usage (on the VPS):
 #   cd /opt/poreiago
@@ -65,6 +66,9 @@ echo "==> Sync ensure modules from host git into API container"
 for rel in \
   app/services/tenant_modules.py \
   travel_platform/settings/office_host_guard.py \
+  travel_platform/operations/achillio_seed_trips.py \
+  travel_platform/operations/tenant_trip_catalog_store.py \
+  api/site_appearance_router.py \
   app/api/auth.py \
   app/services/auth_service.py
 do
@@ -116,16 +120,41 @@ else
   docker network connect aerostride-prod_edge "$API_CID" 2>/dev/null || true
 
   if [[ -f "$NGINX_CONF" ]]; then
-    echo "==> Installing frontend.conf (same-origin /api → api-blue)"
-    # Compose mounts deploy/nginx/frontend.conf → default.conf:ro — docker cp
-    # then fails with "device or resource busy". Host file is already the source;
-    # only docker cp into non-mounted frontends (e.g. legacy poreiago-frontend).
-    if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$FE_CID" \
-      | grep -qx '/etc/nginx/conf.d/default.conf'; then
-      echo "  conf is bind-mounted from host — skip docker cp, reload only"
+    echo "==> Installing frontend.conf (same-origin /api → api-blue + Achillio shell)"
+    # Compose mounts conf:ro — docker cp then fails with "device or resource busy".
+    # Sync OUR repo conf onto the host mount source (may be a stale aerostride path).
+    conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$FE_CID" 2>/dev/null || true)"
+    if [[ -n "$conf_src" ]]; then
+      if ! cmp -s "$NGINX_CONF" "$conf_src" 2>/dev/null; then
+        echo "  syncing frontend.conf → $conf_src"
+        cp "$NGINX_CONF" "$conf_src" \
+          || echo "WARN: could not write mount source $conf_src"
+      else
+        echo "  conf mount source already matches repo"
+      fi
+      SHARED="$DEPLOY_DIR/nginx/frontend-shared.inc"
+      APEX_MAP="$DEPLOY_DIR/nginx/apex-www-redirect.map"
+      if [[ -f "$SHARED" ]]; then
+        docker cp "$SHARED" "$FE_CID:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
+          || echo "WARN: could not docker cp frontend-shared.inc"
+      fi
+      if [[ -f "$APEX_MAP" ]]; then
+        conf_dir="$(dirname "$conf_src")"
+        cp "$APEX_MAP" "$conf_dir/apex-www-redirect.map" 2>/dev/null || true
+        docker cp "$APEX_MAP" "$FE_CID:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null \
+          || echo "WARN: could not docker cp apex-www-redirect.map"
+      fi
     else
       if ! docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"; then
         echo "WARN: docker cp failed (busy/ro mount?) — will still try nginx reload"
+      fi
+      SHARED="$DEPLOY_DIR/nginx/frontend-shared.inc"
+      APEX_MAP="$DEPLOY_DIR/nginx/apex-www-redirect.map"
+      if [[ -f "$SHARED" ]]; then
+        docker cp "$SHARED" "$FE_CID:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
+      fi
+      if [[ -f "$APEX_MAP" ]]; then
+        docker cp "$APEX_MAP" "$FE_CID:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null || true
       fi
     fi
     if docker exec "$FE_CID" nginx -t; then
@@ -138,11 +167,38 @@ else
     echo "WARN: missing $NGINX_CONF"
   fi
 
+  # Rebuild SPA when node is available so Back Office stripDemo keeps
+  # Achillio office-seed trips (91001–91003) instead of purging by title.
+  if command -v npm >/dev/null 2>&1 && [[ -f "$REPO_ROOT/package.json" ]]; then
+    echo "==> npm run build (office-seed stripDemo + hydrate)"
+    (
+      cd "$REPO_ROOT"
+      if [[ ! -d node_modules ]]; then
+        npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+      fi
+      npm run build
+    ) || echo "WARN: npm build failed — will copy existing dist/ if present"
+  fi
+
   # Refresh static SPA if dist exists (does not replace nginx.conf).
   if [[ -d "$REPO_ROOT/dist" ]]; then
     echo "==> Refreshing dist/ into frontend html root"
+    # Ensure Achillio shell exists even if vite plugin was skipped.
+    if [[ -f "$REPO_ROOT/dist/index.html" ]] && [[ ! -f "$REPO_ROOT/dist/index.achillio.html" ]]; then
+      echo "  generating missing index.achillio.html"
+      python3 - "$REPO_ROOT/dist/index.html" "$REPO_ROOT/dist/index.achillio.html" <<'PY' || true
+import sys
+src, dst = sys.argv[1:3]
+old = "PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
+new = "Achillio Travel"
+html = open(src, encoding="utf-8").read().replace(old, new)
+html = html.replace('name="application-name" content="PoreiaGo"',
+                    f'name="application-name" content="{new}"')
+open(dst, "w", encoding="utf-8").write(html)
+PY
+    fi
     docker cp "$REPO_ROOT/dist/." "$FE_CID:/usr/share/nginx/html/" 2>/dev/null \
-      || echo "WARN: dist copy failed"
+      || echo "WARN: dist copy failed (bind-mount may already expose dist/)"
   fi
 fi
 

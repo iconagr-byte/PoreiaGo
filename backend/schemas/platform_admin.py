@@ -58,6 +58,10 @@ class PlatformUserResponse(BaseModel):
     is_active: bool
     last_login_at: datetime | None = None
     created_at: datetime
+    # Present when listing across offices (superadmin all_offices=1).
+    tenant_id: str | None = None
+    tenant_name: str | None = None
+    tenant_slug: str | None = None
 
 
 class PlatformUserCreate(BaseModel):
@@ -74,12 +78,61 @@ class PlatformUserUpdate(BaseModel):
     password: str | None = Field(None, min_length=6, max_length=128)
 
 
+class AdminPasswordResetSendByUser(BaseModel):
+    """Optional note — reserved for future audit UI."""
+
+    note: str | None = Field(None, max_length=200)
+
+
+class AdminPasswordResetSendByEmail(BaseModel):
+    email: EmailStr
+    tenant_id: str | None = Field(
+        None,
+        description="Optional tenant UUID when the same email exists in multiple offices",
+    )
+
+
+class AdminPasswordResetRequestPublic(BaseModel):
+    """Public forgot-password from /admin/login (no session)."""
+
+    email: EmailStr
+    # Browser office host (API Host is often api.*) — scopes reset to that tenant.
+    host: str | None = Field(None, max_length=255)
+
+
+class AdminPasswordResetConfirm(BaseModel):
+    token: str = Field(..., min_length=20, max_length=2048)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class AdminPasswordResetSendResponse(BaseModel):
+    ok: bool = True
+    message: str
+    email: str | None = None
+    user_id: str | None = None
+    tenant_id: str | None = None
+    # Only returned to superadmin when SMTP fails (manual handoff). Never for tenant_admin.
+    reset_url: str | None = None
+
+
 class BackupInfoResponse(BaseModel):
     id: str
     filename: str
     size_bytes: int
     created_at: datetime
     includes: list[str]
+    scope: str = "platform"
+    tenant_id: str | None = None
+    tenant_label: str | None = None
+    kind: str = "json"
+    restorable: bool = True
+    db_mode: str | None = None
+
+
+class BackupCreateRequest(BaseModel):
+    scope: Literal["platform", "office", "database"] = "platform"
+    tenant_id: str | None = None
+    client_extras: dict | None = None
 
 
 class BackupCreateResponse(BaseModel):
@@ -93,6 +146,11 @@ class BackupRestoreResponse(BaseModel):
     restored_users: int = 0
     restored_settings: bool = False
     restored_drivers: int = 0
+    restored_customers: int = 0
+    restored_trips: int = 0
+    scope: str | None = None
+    tenant_id: str | None = None
+    admin_ui: dict | None = None
 
 
 class FleetDriverResponse(BaseModel):

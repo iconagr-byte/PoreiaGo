@@ -16,10 +16,11 @@ function appearanceStorageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
-function finalizeAppearance(data = {}) {
+function finalizeAppearance(data = {}, opts = {}) {
   const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
   // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
-  return scrubAchillioBrandForPlatformHost(merged);
+  // Native Wallet passes skipScrub so sealed-office branding is never wiped on localhost.
+  return scrubAchillioBrandForPlatformHost(merged, opts);
 }
 
 export const DEFAULT_SITE_APPEARANCE = {
@@ -33,6 +34,9 @@ export const DEFAULT_SITE_APPEARANCE = {
   logo_show_name: true,
   hero_image_url: '',
   hero_image_focal: 'center',
+  hero_overlay_opacity: 100,
+  hero_image_fit: 'cover',
+  hero_height_vh: 88,
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
   hero_title_accent: 'Άνεση, ασφάλεια & θέση εξασφαλισμένη.',
@@ -48,12 +52,34 @@ export const DEFAULT_SITE_APPEARANCE = {
   footer_contact_email: '',
   footer_contact_phone: '',
   footer_address: '',
+  footer_hours: '',
+  footer_tagline: '',
+  footer_facebook_url: '',
+  footer_instagram_url: '',
   rent_office_name: '',
+  rent_logo_url: '',
+  rent_logo_show_name: true,
+  rent_logo_height_px: 40,
+  rent_logo_max_width_px: 160,
+  rent_logo_radius_px: 0,
+  rent_logo_padding_px: 0,
+  rent_logo_bg_mode: 'none',
+  rent_logo_shadow: false,
+  rent_header_compact: false,
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
-  rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
+  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+  rent_guest_hero_title_accent: '— στόλος γραφείου · κράτηση σε λεπτά',
   rent_guest_hero_copy: '',
+  rent_guest_hero_benefits: [
+    'Δωρεάν ακύρωση στις περισσότερες κρατήσεις',
+    'Πολλαπλά σημεία παραλαβής',
+    'Υποστήριξη γραφείου & οδική βοήθεια',
+  ],
+  rent_search_show_dropoff_toggle: true,
+  rent_search_show_promo: true,
+  rent_search_submit_label: 'Αναζήτηση',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
   rent_coverage_options: [],
@@ -84,6 +110,31 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_slider_options: {},
   rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
+  /** My Wallet «Αρχική» — empty → fall back to hero / brand in resolveWalletHomeFeed */
+  wallet_home_hook: '',
+  wallet_home_headline: '',
+  wallet_home_body: '',
+  wallet_home_image_url: '',
+  wallet_home_services: [
+    {
+      icon: 'confirmation_number',
+      title: 'Online κράτηση',
+      body: 'Κλείστε θέση σε λίγα βήματα από το κινητό.',
+    },
+    {
+      icon: 'qr_code_2',
+      title: 'Ψηφιακό εισιτήριο',
+      body: 'Το εισιτήριό σας πάντα στο Wallet.',
+    },
+    {
+      icon: 'support_agent',
+      title: 'Υποστήριξη γραφείου',
+      body: 'Είμαστε δίπλα σας πριν και κατά το ταξίδι.',
+    },
+  ],
+  wallet_home_news: [],
+  wallet_home_show_trips: true,
+  wallet_home_trips_title: 'Επερχόμενες εκδρομές',
   updated_at: null,
 };
 
@@ -140,20 +191,55 @@ export function resolveSiteAssetUrl(url) {
   return url;
 }
 
-export async function fetchSiteAppearance(host = typeof window !== 'undefined' ? window.location.hostname : '') {
+/**
+ * Public site appearance.
+ * @param {string|{ host?: string, tenantId?: string }} [hostOrOpts]
+ *   Native Wallet passes sealed `tenantId` because Host is localhost.
+ */
+export async function fetchSiteAppearance(
+  hostOrOpts = typeof window !== 'undefined' ? window.location.hostname : '',
+) {
+  let host =
+    typeof hostOrOpts === 'string'
+      ? hostOrOpts
+      : String(hostOrOpts?.host || (typeof window !== 'undefined' ? window.location.hostname : ''));
+  let tenantId =
+    typeof hostOrOpts === 'object' && hostOrOpts
+      ? String(hostOrOpts.tenantId || '').trim()
+      : '';
+
+  // Capacitor / platform host: use sealed wallet office for logo + name.
+  if (!tenantId) {
+    try {
+      const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+      const { isNativeApp } = await import('../lib/capacitor/isNativeApp.js');
+      const { isPlatformMarketingHost } = await import('../lib/platform/tenantHost.js');
+      const sealed = getWalletTenantId();
+      if (sealed && (isNativeApp() || isPlatformMarketingHost(host))) {
+        tenantId = sealed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
-    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
-    const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
+    const qs = new URLSearchParams();
+    if (tenantId) qs.set('tenant_id', tenantId);
+    else if (host) qs.set('host', host);
+    const q = qs.toString() ? `?${qs}` : '';
+    const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = finalizeAppearance(data);
+      // Sealed tenant_id = real office (native Capacitor) — never scrub logo/name.
+      const merged = finalizeAppearance(data, { skipScrub: Boolean(tenantId) });
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || finalizeAppearance({});
+  return loadCached() || finalizeAppearance({}, { skipScrub: Boolean(tenantId) });
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */
@@ -266,7 +352,12 @@ export async function uploadSiteAsset(kind, file) {
     if (!res.ok) await parseError(res);
     const data = await res.json();
     if (data.appearance || data.url) {
-      const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+      const key =
+        kind === 'logo'
+          ? 'logo_url'
+          : kind === 'rent_logo'
+            ? 'rent_logo_url'
+            : 'hero_image_url';
       const merged = finalizeAppearance({
         ...(data.appearance || {}),
         [key]: data.url || data.appearance?.[key] || '',

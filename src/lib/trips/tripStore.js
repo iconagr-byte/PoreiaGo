@@ -17,6 +17,17 @@ import { stripDemoTrips } from '../admin/demoCatalog.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
+// Prevent in-flight hydrate from resurrecting a trip that was just deleted.
+const recentlyDeletedTripIds = new Set();
+const DELETE_TOMBSTONE_MS = 60_000;
+
+function rememberDeletedTripId(id) {
+  const n = Number(id);
+  if (!Number.isFinite(n)) return;
+  recentlyDeletedTripIds.add(n);
+  setTimeout(() => recentlyDeletedTripIds.delete(n), DELETE_TOMBSTONE_MS);
+}
+
 function storageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
@@ -123,14 +134,25 @@ export function upsertTrip(trip) {
   return withLog;
 }
 
-export function deleteTrip(tripId) {
+export async function deleteTrip(tripId) {
   const id = Number(tripId);
-  const trips = loadTrips().filter((t) => t.id !== id);
+  rememberDeletedTripId(id);
+  const trips = loadTrips().filter((t) => Number(t.id) !== id);
   saveTrips(trips);
-  // Rebuild public catalog without the deleted trip.
-  import('../../services/tripsSyncApi.js')
-    .then(({ syncTripsToPostgres }) => syncTripsToPostgres(trips, { replaceCatalog: true, pruneMissing: true }))
-    .catch(() => {});
+  // Rebuild public catalog + prune durable Postgres / catalog copies.
+  try {
+    const { syncTripsToPostgres } = await import('../../services/tripsSyncApi.js');
+    await syncTripsToPostgres(trips, { replaceCatalog: true, pruneMissing: true });
+  } catch (err) {
+    console.warn('[tripStore] delete sync failed', err);
+  }
+  try {
+    const { notifyTripsChanged } = await import('../ticketing/bookingSyncEvents.js');
+    notifyTripsChanged({ reason: 'delete', tripId: id });
+  } catch {
+    /* ignore */
+  }
+  return trips;
 }
 
 export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
@@ -155,6 +177,7 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     /** Extra coaches beyond the primary driver/vehicle pair. */
     additionalFleet: [],
     image: '',
+    images: [],
     hook: '',
     durationLabel: 'Ημερήσια',
     badge: '',
@@ -183,6 +206,14 @@ export function tripToFormData(trip) {
   if (!trip) return createEmptyTripForm();
   return normalizeHybridTripFields({
     ...trip,
+    image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : Array.isArray(trip.gallery)
+        ? trip.gallery.map((u) => String(u || '').trim()).filter(Boolean)
+        : Array.isArray(trip.gallery_urls)
+          ? trip.gallery_urls.map((u) => String(u || '').trim()).filter(Boolean)
+          : [],
     departureTime: trip.departureTime ? trip.departureTime.substring(0, 16) : '',
     arrivalTime: trip.arrivalTime ? trip.arrivalTime.substring(0, 16) : '',
     stops: trip.stops ? [...trip.stops] : [],
@@ -229,6 +260,9 @@ export function formDataToTrip(formData, existingId = null) {
     badge: String(formData.badge || '').trim(),
     meetingPoint: String(formData.meetingPoint || '').trim(),
     highlights,
+    images: Array.isArray(formData.images)
+      ? formData.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : [],
     currency: formData.currency || 'EUR',
     targetMarginPct: Number(formData.targetMarginPct) || 25,
     connectionThresholdMin: Number(formData.connectionThresholdMin) || 90,
@@ -289,6 +323,13 @@ export function catalogTripToLocal(row) {
     totalSeats: row.totalSeats ?? row.total_seats ?? row.capacity ?? 30,
     description: row.description || '',
     image: row.image || row.image_url || '',
+    images: Array.isArray(row.images)
+      ? row.images
+      : Array.isArray(row.gallery)
+        ? row.gallery
+        : Array.isArray(row.gallery_urls)
+          ? row.gallery_urls
+          : [],
     hook: row.hook || '',
     durationLabel: row.durationLabel || row.duration_label || '',
     badge: row.badge || '',
@@ -300,25 +341,40 @@ export function catalogTripToLocal(row) {
     market: row.market || null,
     vehicleType: row.vehicleType || row.vehicle_type || '',
     currency: row.currency || 'EUR',
+    officeSeed:
+      Boolean(row.officeSeed || row.office_seed) ||
+      (Number.isFinite(id) && id >= 91001 && id <= 91099),
+    catalogSource:
+      row.catalogSource ||
+      row.catalog_source ||
+      (Number.isFinite(id) && id >= 91001 && id <= 91099 ? 'office_seed' : ''),
   });
 }
 
 /**
  * Merge server catalog trips into localStorage without dropping richer local rows.
  * Local wins on field conflicts; server fills missing ids (recovery after cache wipe).
- * @returns {{ trips: object[], added: number, total: number }}
+ *
+ * When `pruneMissing` is true (authenticated office hydrate), drop local trips
+ * that are no longer on the server so a delete on another device/PC vanishes here
+ * without a hard refresh.
+ *
+ * @returns {{ trips: object[], added: number, removed: number, total: number }}
  */
-export function mergeServerTripsIntoStore(serverTrips) {
+export function mergeServerTripsIntoStore(serverTrips, { pruneMissing = false } = {}) {
   const local = loadTrips();
   const byId = new Map();
   for (const t of local) {
     if (t?.id != null) byId.set(Number(t.id), t);
   }
+  const serverIds = new Set();
   let added = 0;
   for (const raw of serverTrips || []) {
     const mapped = catalogTripToLocal(raw);
     if (!mapped) continue;
     const id = Number(mapped.id);
+    if (recentlyDeletedTripIds.has(id)) continue;
+    serverIds.add(id);
     if (!byId.has(id)) {
       byId.set(id, mapped);
       added += 1;
@@ -332,7 +388,17 @@ export function mergeServerTripsIntoStore(serverTrips) {
       byId.set(id, normalizeTrip(merged));
     }
   }
+  let removed = 0;
+  if (pruneMissing && isAuthenticatedOfficeSession()) {
+    // Empty server catalog is still authoritative (office deleted every trip).
+    for (const id of [...byId.keys()]) {
+      if (!serverIds.has(id)) {
+        byId.delete(id);
+        removed += 1;
+      }
+    }
+  }
   const trips = stripDemoTrips([...byId.values()].sort((a, b) => Number(a.id) - Number(b.id)));
   saveTrips(trips);
-  return { trips, added, total: trips.length };
+  return { trips, added, removed, total: trips.length };
 }

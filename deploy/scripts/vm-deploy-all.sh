@@ -100,31 +100,187 @@ refresh_external_frontend_dist() {
 }
 
 # Contabo poreiago-frontend often only serves static files — POST /api → 405.
-# Install repo frontend.conf so /api + /ws + /health proxy to api-blue.
+# Install repo frontend.conf so /api + /ws + /health proxy to api-blue,
+# default index.html stays PoreiaGo, and Achillio Host/XFH → index.achillio.html.
 repair_external_frontend_nginx() {
   local cid="$1"
   local conf="$DEPLOY_DIR/nginx/frontend.conf"
+  local shared="$DEPLOY_DIR/nginx/frontend-shared.inc"
+  local apex_map="$DEPLOY_DIR/nginx/apex-www-redirect.map"
   [[ -n "$cid" && -f "$conf" ]] || return 0
-  echo "==> Repair external frontend nginx (/api → api-blue)"
+  echo "==> Repair external frontend nginx (/api → api-blue + custom-domain apex→www)"
   docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
-  # Compose bind-mounts frontend.conf:ro — docker cp hits "device or resource busy".
-  if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$cid" \
-    | grep -qx '/etc/nginx/conf.d/default.conf'; then
-    echo "  conf bind-mounted from host — reload only"
-  elif ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
-    echo "  WARN: could not copy frontend.conf into container — reload anyway"
+
+  local conf_src=""
+  conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$cid" 2>/dev/null || true)"
+  if [[ -n "$conf_src" && -d "$(dirname "$conf_src")" ]]; then
+    echo "  force-sync frontend.conf → $conf_src"
+    cp "$conf" "$conf_src" || echo "  WARN: could not write $conf_src"
+    conf_dir="$(dirname "$conf_src")"
+    if [[ -f "$shared" ]]; then
+      cp "$shared" "$conf_dir/frontend-shared.inc" 2>/dev/null || true
+      echo "  docker cp frontend-shared.inc → container conf.d"
+      docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
+        || echo "  WARN: could not docker cp frontend-shared.inc"
+    fi
+    if [[ -f "$apex_map" ]]; then
+      cp "$apex_map" "$conf_dir/apex-www-redirect.map" 2>/dev/null || true
+      docker cp "$apex_map" "$cid:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null \
+        || echo "  WARN: could not docker cp apex-www-redirect.map"
+    fi
+  else
+    if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
+      echo "  WARN: could not copy frontend.conf into container — reload anyway"
+    fi
+    [[ -f "$shared" ]] && docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
+    [[ -f "$apex_map" ]] && docker cp "$apex_map" "$cid:/etc/nginx/conf.d/apex-www-redirect.map" 2>/dev/null || true
   fi
+
   if docker exec "$cid" nginx -t 2>/dev/null; then
     docker exec "$cid" nginx -s reload 2>/dev/null || true
     echo "  nginx reloaded with same-origin /api proxy"
   else
-    echo "  WARN: nginx -t failed after conf copy — check container image"
+    echo "  WARN: nginx -t failed after conf sync — check container image"
+    docker exec "$cid" nginx -t 2>&1 | sed 's/^/  /' || true
   fi
+
+  # Ensure frontend can resolve api-blue (homepage seo-shell proxy).
+  docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
+  local api_cid=""
+  api_cid="$(docker ps --filter "name=api-blue" --format '{{.ID}}' | head -1 || true)"
+  if [[ -n "$api_cid" ]]; then
+    local api_net=""
+    api_net="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$api_cid" 2>/dev/null | head -1 || true)"
+    if [[ -n "$api_net" ]]; then
+      docker network connect "$api_net" "$cid" 2>/dev/null || true
+    fi
+  fi
+
+  # If api-blue DNS fails from this frontend, point seo upstream at host-published API :8004.
+  if ! docker exec "$cid" wget -qO- --timeout=4 http://api-blue:8000/health 2>/dev/null | grep -q '"status"'; then
+    echo "  api-blue DNS unreachable from frontend — using host gateway :${NPM_API_PORT:-8004}"
+    local gw="172.17.0.1"
+    gw="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || echo 172.17.0.1)"
+    docker exec "$cid" sh -c \
+      "sed -i 's/api-blue:8000/${gw}:${NPM_API_PORT:-8004}/g' /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/frontend-shared.inc 2>/dev/null || true"
+    docker exec "$cid" nginx -t 2>/dev/null && docker exec "$cid" nginx -s reload 2>/dev/null || true
+  fi
+
+  # Prove default shell (no Host) is PoreiaGo — Contabo often ignores server_name
+  # and previously leaked Achillio Travel meta onto poreiago.com SERP.
+  local default_title=""
+  local local_title=""
+  if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
+    default_title="$(docker exec "$cid" curl -sS --max-time 5 http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+    local_title="$(docker exec "$cid" curl -sS --max-time 5 \
+      -H 'Host: www.achilliotravel.com' -H 'X-Forwarded-Host: www.achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  else
+    default_title="$(docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+    local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
+      --header='Host: www.achilliotravel.com' \
+      --header='X-Forwarded-Host: www.achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  fi
+  echo "  localhost default <title> → ${default_title:-<empty>}"
+  echo "  localhost Host=www.achilliotravel.com <title> → ${local_title:-<empty>}"
+  local pg_title=""
+  if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
+    pg_title="$(docker exec "$cid" curl -sS --max-time 5 \
+      -H 'Host: www.poreiago.com' -H 'X-Forwarded-Host: www.poreiago.com' \
+      http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  fi
+  echo "  localhost Host+XFH=poreiago.com <title> → ${pg_title:-<empty>}"
+  if echo "$default_title" | grep -qi 'achillio'; then
+    echo "  ERROR: default shell still Achillio Travel — poreiago.com SERP will leak"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html /usr/share/nginx/html/index.achillio.html 2>/dev/null | head -6' \
+      2>/dev/null | sed 's/^/  /' || true
+  elif ! echo "$default_title" | grep -qi 'poreiago'; then
+    echo "  WARN: default index.html is not PoreiaGo — check ensure_achillio_spa_shell"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html | head -3' \
+      2>/dev/null | sed 's/^/  /' || true
+  fi
+  if ! echo "$local_title" | grep -qi 'achillio'; then
+    echo "  WARN: Achillio Host/XFH did not select Achillio shell — check index.achillio.html + maps"
+  fi
+
   if docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/health 2>/dev/null | grep -q '"status"'; then
     echo "  frontend /health → api-blue OK"
   else
     echo "  WARN: frontend /health still not JSON — api-blue may be off the edge network"
   fi
+}
+
+# Googlebot reads static <title>. Contabo often serves index.html for every
+# Proxy Host, so the shared default MUST be PoreiaGo:
+# - index.html + index.poreiago.html = PoreiaGo marketing (default SERP-safe)
+# - index.achillio.html = Achillio Travel (Host/XFH / seo-shell only)
+ensure_achillio_spa_shell() {
+  local index="$REPO_ROOT/dist/index.html"
+  local achillio="$REPO_ROOT/dist/index.achillio.html"
+  local poreiago_out="$REPO_ROOT/dist/index.poreiago.html"
+  local title="Achillio Travel — Εκδρομές με λεωφορείο"
+  local poreiago="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
+  [[ -f "$index" ]] || { echo "  ERROR: missing $index"; return 1; }
+
+  if grep -q "<title>${poreiago}</title>" "$index" \
+    && [[ -f "$achillio" ]] && grep -q "<title>${title}</title>" "$achillio" \
+    && [[ -f "$poreiago_out" ]]; then
+    echo "  dist shells ready (index.html=PoreiaGo, index.achillio.html=Achillio)"
+    return 0
+  fi
+
+  echo "  writing PoreiaGo default index + Achillio host shell"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$index" "$achillio" "$poreiago_out" "$poreiago" "$title" <<'PY'
+import sys
+src, ach_path, por_path, old, new = sys.argv[1:6]
+html = open(src, encoding="utf-8").read()
+# If a previous deploy left Achillio in index.html, restore PoreiaGo first.
+if f"<title>{new}</title>" in html and f"<title>{old}</title>" not in html:
+    html = html.replace(new, old).replace(
+        'name="application-name" content="Achillio Travel"',
+        'name="application-name" content="PoreiaGo"',
+    ).replace(
+        'property="og:site_name" content="Achillio Travel"',
+        'property="og:site_name" content="PoreiaGo"',
+    )
+    open(src, "w", encoding="utf-8").write(html)
+open(por_path, "w", encoding="utf-8").write(html)
+ach = html.replace(old, new).replace(
+    'name="application-name" content="PoreiaGo"',
+    'name="application-name" content="Achillio Travel"',
+).replace(
+    'property="og:site_name" content="PoreiaGo"',
+    'property="og:site_name" content="Achillio Travel"',
+)
+if f"<title>{new}</title>" not in ach:
+    raise SystemExit("failed to rewrite Achillio document title")
+open(ach_path, "w", encoding="utf-8").write(ach)
+# Never overwrite src (index.html) with Achillio.
+PY
+  else
+    # Restore PoreiaGo default if a prior build left Achillio in index.html.
+    if grep -q "<title>${title}</title>" "$index" && ! grep -q "<title>${poreiago}</title>" "$index"; then
+      sed -i "s/${title}/${poreiago}/g" "$index"
+      sed -i 's/name="application-name" content="Achillio Travel"/name="application-name" content="PoreiaGo"/g' "$index"
+      sed -i 's/property="og:site_name" content="Achillio Travel"/property="og:site_name" content="PoreiaGo"/g' "$index"
+    fi
+    cp "$index" "$poreiago_out"
+    cp "$index" "$achillio"
+    sed -i "s/${poreiago}/${title}/g" "$achillio"
+    sed -i 's/name="application-name" content="PoreiaGo"/name="application-name" content="Achillio Travel"/g' "$achillio"
+    sed -i 's/property="og:site_name" content="PoreiaGo"/property="og:site_name" content="Achillio Travel"/g' "$achillio"
+  fi
+  grep -q "<title>${poreiago}</title>" "$index" \
+    || { echo "  ERROR: index.html must keep PoreiaGo title"; return 1; }
+  grep -q "<title>${title}</title>" "$achillio" \
+    || { echo "  ERROR: index.achillio.html Achillio title rewrite failed"; return 1; }
 }
 
 configure_compose_for_edge() {
@@ -221,6 +377,9 @@ VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
 VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID_VAL" \
 npm run build
 
+echo "==> Ensure SPA shells (PoreiaGo default + Achillio host shell)"
+ensure_achillio_spa_shell
+
 echo "==> API Docker image"
 docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
 
@@ -284,9 +443,13 @@ fi
 # Sync host VAPID keys into the durable api_data volume (env often pointed here without a copy).
 if [[ -n "$API_CID" && -f "$DEPLOY_DIR/.vapid_private.pem" && -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
   echo "==> Syncing Web Push VAPID keys into api-blue:/app/data"
+  # Remove ghost directories that block writing PEM files.
+  docker exec "$API_CID" sh -c 'rm -rf /app/data/vapid_private.pem /app/data/vapid_public.key' 2>/dev/null || true
   docker cp "$DEPLOY_DIR/.vapid_private.pem" "$API_CID:/app/data/vapid_private.pem" || true
   docker cp "$DEPLOY_DIR/.vapid_public.key" "$API_CID:/app/data/vapid_public.key" || true
   docker exec "$API_CID" chmod 600 /app/data/vapid_private.pem 2>/dev/null || true
+  echo "==> Restarting api-blue so Web Push picks up VAPID keys"
+  docker restart "$API_CID" >/dev/null || true
 fi
 # Fiscal MARK pipeline — worker + beat (stuck recovery / auto-retry).
 echo "==> Starting Celery worker + beat"
@@ -445,6 +608,50 @@ async def main():
 asyncio.run(main())
 PY
 
+echo "==> Ensure Achillio ops driver (axdafnis) for native Wallet login"
+$COMPOSE exec -T api-blue python - <<'PY' \
+  || echo "WARNING: Achillio ops driver ensure failed"
+import asyncio
+from travel_platform.settings.drivers_store import (
+    authenticate_driver,
+    repair_achillio_ops_drivers,
+)
+
+async def main():
+    result = await repair_achillio_ops_drivers()
+    print(result)
+    tid = result.get("achillio_tenant_id")
+    if tid:
+        # Smoke: password from profile must authenticate against Achillio tenant.
+        ok = authenticate_driver(
+            "axdafnis@gmail.com",
+            "Mpouri@1234",
+            tenant_id=tid,
+            allow_demo_legacy=True,
+        )
+        print("axdafnis_auth_ok", bool(ok), "tenant", tid[:8] if tid else None)
+
+asyncio.run(main())
+PY
+
+echo "==> Ensure Dodopoulos office /admin/login (axilleas0)"
+$COMPOSE exec -T api-blue python - <<'PY' \
+  || echo "WARNING: office admin bootstrap failed (API lifespan will retry)"
+import asyncio
+from travel_platform.settings.office_admin_bootstrap import repair_office_admin_bootstraps
+
+async def main():
+    print(await repair_office_admin_bootstraps())
+
+asyncio.run(main())
+PY
+
+echo "==> Platform wildcard DNS (*.poreiago.com → Contabo) — customers never set DNS"
+bash "$DEPLOY_DIR/scripts/ensure-platform-wildcard-dns.sh" || true
+if [[ "$EDGE_PROXY" == "npm" ]]; then
+  bash "$DEPLOY_DIR/scripts/ensure-npm-platform-wildcard.sh" || true
+fi
+
 echo "==> Custom domain / edge check"
 if [[ "$EDGE_PROXY" == "npm" ]]; then
   echo "  NPM owns TLS — check proxy hosts in NPM UI (api→:${NPM_API_PORT}, www+achillio→:${NPM_APP_PORT})"
@@ -481,6 +688,96 @@ for host in www.poreiago.com www.achilliotravel.com; do
   echo | openssl s_client -connect "${host}:443" -servername "${host}" 2>/dev/null \
     | openssl x509 -noout -subject -issuer 2>/dev/null | sed "s/^/  /" || true
 done
+
+echo "==> Achillio apex → www (single SERP URL)"
+ACH_APEX_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -A 'Googlebot' --max-time 15 \
+  -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+  "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null || echo "fail")
+ACH_APEX_LOC=$(curl -sS -I -A 'Googlebot' --max-time 15 \
+  -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+  "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="location:"{print $2; exit}')
+echo "  localhost Host=achilliotravel.com → ${ACH_APEX_CODE} ${ACH_APEX_LOC}"
+if echo "$ACH_APEX_CODE" | grep -qE '301|302'; then
+  if echo "$ACH_APEX_LOC" | grep -qi 'www.achilliotravel.com'; then
+    echo "  OK: apex redirects to www"
+  else
+    echo "  WARN: apex redirect Location is not www ($ACH_APEX_LOC)"
+  fi
+else
+  echo "  WARN: apex did not 301 via Host header — retry inside frontend container"
+  if [[ -n "${FE_CID:-}" ]]; then
+    IN_CODE=$(docker exec "$FE_CID" curl -sS -o /dev/null -w "%{http_code}" --max-time 5 \
+      -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null || echo fail)
+    IN_LOC=$(docker exec "$FE_CID" curl -sS -I --max-time 5 \
+      -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="location:"{print $2; exit}')
+    echo "  in-container Host=achilliotravel.com → ${IN_CODE} ${IN_LOC}"
+    if echo "$IN_CODE" | grep -qE '301|302' && echo "$IN_LOC" | grep -qi 'www.achilliotravel.com'; then
+      echo "  OK: in-container apex→www (NPM edge may still need Redirection Host for public 301)"
+    else
+      echo "  WARN: nginx apex map still not 301 — check frontend.conf bind-mount + reload"
+    fi
+  fi
+  echo "  TIP: NPM → Redirection Hosts: achilliotravel.com → https://www.achilliotravel.com (301)"
+fi
+
+echo "==> Achillio SERP title (static HTML — Googlebot)"
+ACH_HDR=$(mktemp)
+ACH_HTML=$(curl -sS -A 'Googlebot' -D "$ACH_HDR" --max-time 15 "https://www.achilliotravel.com/" || true)
+ACH_TITLE=$(printf '%s' "$ACH_HTML" | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+ACH_DESC=$(printf '%s' "$ACH_HTML" | tr '\n' ' ' | sed -n 's/.*name="description" content="\([^"]*\)".*/\1/p' || true)
+echo "  www.achilliotravel.com <title> → ${ACH_TITLE:-<empty>}"
+echo "  www.achilliotravel.com description → ${ACH_DESC:0:80}"
+if grep -qi 'X-Office-SEO' "$ACH_HDR" 2>/dev/null; then
+  echo "  OK: seo-shell header X-Office-SEO present"
+else
+  echo "  WARN: X-Office-SEO missing — homepage may still be static index"
+fi
+rm -f "$ACH_HDR"
+if echo "$ACH_TITLE" | grep -qi 'achillio'; then
+  echo "  OK: Achillio Travel static title"
+elif echo "$ACH_TITLE" | grep -qi 'poreiago'; then
+  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check seo-shell / index.achillio.html + Host/XFH"
+  exit 1
+else
+  echo "  ERROR: unexpected Achillio title (${ACH_TITLE:-empty})"
+  exit 1
+fi
+if echo "$ACH_DESC" | grep -qi 'poreiago'; then
+  echo "  ERROR: Achillio meta description still mentions PoreiaGo"
+  exit 1
+fi
+if echo "$ACH_HTML" | grep -qi 'application/ld+json'; then
+  echo "  OK: JSON-LD present"
+fi
+
+echo "==> PoreiaGo SERP title (static HTML — Googlebot)"
+PG_TITLE=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.poreiago.com/" \
+  | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+PG_GRAFEIA=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.poreiago.com/grafeia" \
+  | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+echo "  www.poreiago.com <title> → ${PG_TITLE:-<empty>}"
+echo "  www.poreiago.com/grafeia <title> → ${PG_GRAFEIA:-<empty>}"
+if echo "$PG_TITLE" | grep -qi 'achillio'; then
+  echo "  ERROR: poreiago.com still serves Achillio Travel in <title> (SERP parent leak)"
+  exit 1
+fi
+if echo "$PG_GRAFEIA" | grep -qi 'achillio'; then
+  echo "  ERROR: /grafeia still serves Achillio Travel — Google indexes it as Achillio parent"
+  exit 1
+fi
+if echo "$PG_TITLE" | grep -qi 'poreiago'; then
+  echo "  OK: PoreiaGo marketing static title"
+else
+  echo "  WARN: poreiago.com title is not PoreiaGo (Host/XFH routing may be missing)"
+  # Probe with explicit forwarded host via localhost frontend if available.
+  if curl -sS --max-time 5 -H 'Host: www.poreiago.com' -H 'X-Forwarded-Host: www.poreiago.com' \
+      "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null \
+      | tr '\n' ' ' | grep -qi 'PoreiaGo'; then
+    echo "  OK: localhost + X-Forwarded-Host serves PoreiaGo (NPM Host rewrite issue)"
+  fi
+fi
 
 echo ""
 echo "=============================================="

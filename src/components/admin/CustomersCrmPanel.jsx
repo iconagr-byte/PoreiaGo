@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { deleteCustomer } from '../../lib/customers/customerStore.js';
+import { deleteCustomerFromServer } from '../../lib/customers/customerStore.js';
 import { isPaid, isConfirmed } from '../../lib/bookingDisplay.js';
 import CustomerBookingCard from './CustomerBookingCard.jsx';
 import AddCustomerModal from './AddCustomerModal.jsx';
@@ -547,11 +547,11 @@ export default function CustomersCrmPanel({
     setEditCustomer(null);
   };
 
-  const handleDelete = (customer) => {
+  const handleDelete = async (customer) => {
     if (!customer?.id && !customer?.email) return;
     const label = customer.name || customer.email || 'πελάτη';
     if (!window.confirm(`Διαγραφή πελάτη «${label}»;`)) return;
-    const ok = deleteCustomer(customer.id || customer.email, serviceScope);
+    const ok = await deleteCustomerFromServer(customer.id || customer.email, serviceScope);
     if (!ok) {
       toast.error('Δεν βρέθηκε ο πελάτης');
       return;
@@ -951,6 +951,7 @@ export default function CustomersCrmPanel({
       <AddCustomerModal
         open={Boolean(editCustomer)}
         customer={editCustomer}
+        serviceScope={serviceScope}
         onClose={() => setEditCustomer(null)}
         onCreated={handleSaved}
       />

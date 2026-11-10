@@ -28,6 +28,14 @@ export function normalizeTrip(trip) {
     ...trip,
     market,
     ...(market === MARKET_INTERNATIONAL ? { category: 'international' } : {}),
+    image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : Array.isArray(trip.gallery)
+        ? trip.gallery.map((u) => String(u || '').trim()).filter(Boolean)
+        : Array.isArray(trip.gallery_urls)
+          ? trip.gallery_urls.map((u) => String(u || '').trim()).filter(Boolean)
+          : [],
     currency: trip.currency || 'EUR',
     targetMarginPct: trip.targetMarginPct ?? 25,
     connectionThresholdMin: trip.connectionThresholdMin ?? 90,

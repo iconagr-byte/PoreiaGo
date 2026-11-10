@@ -2,6 +2,10 @@
  * Θέματα αρχικής = ΔΙΑΤΑΞΗ (header × hero × trips × cards × footer).
  * Τα χρώματα είναι προτεινόμενα και εφαρμόζονται χωριστά (Γενικά → Brand colors),
  * εκτός αν ζητηθεί ρητά includeColors στο themeToAppearancePatch.
+ *
+ * HOMEPAGE_THEMES remains the layout catalog for resolving saved theme ids.
+ * Page Design picker shows only SELECTABLE_HOMEPAGE_THEME_IDS (empty until
+ * demo websites are copied in) — see getSelectableHomepageThemes().
  */
 
 export const THEME_CATEGORIES = [
@@ -220,19 +224,17 @@ export const HOMEPAGE_THEMES = [
     id: 'europa_corridor',
     name: 'Europa Corridor',
     nameEl: 'Europa Corridor',
-    description: 'Διεθνή δρομολόγια: editorial stack + abroad horizontal κάρτες.',
+    description: 'Διεθνή δρομολόγια με κοινή κάρτα εκδρομής για Ελλάδα και εξωτερικό.',
     mood: 'Διεθνές · express',
     badge: 'EU',
     category: 'corporate',
-    tags: ['Abroad cards', 'Floating', 'Cross-border'],
-    layoutLabel: 'Abroad · Editorial',
+    tags: ['Shared cards', 'Floating', 'Cross-border'],
+    layoutLabel: 'Grid · Shared card',
     palette: { primary: '#2563eb', secondary: '#1e40af', hero: '#1e3a8a', surface: '#eff6ff' },
     header_template: 'floating_pill',
     hero_template: 'fullscreen_overlay',
     trips_layout_template: 'grid_two_large',
     trip_card_template: 'premium',
-    intl_trips_layout_template: 'editorial_stack',
-    intl_trip_card_template: 'abroad_horizontal',
     footer_template: 'compact_inline',
     show_fleet_section: true,
     show_why_us_section: true,
@@ -420,6 +422,19 @@ export const HOMEPAGE_THEMES = [
 
 export const DEFAULT_HOMEPAGE_THEME_ID = 'aegean_classic';
 
+/**
+ * Themes shown in the Page Design picker.
+ * Empty until demo websites are copied in — keep HOMEPAGE_THEMES for
+ * resolving saved theme ids + layout apply (getHomepageThemeById).
+ */
+export const SELECTABLE_HOMEPAGE_THEME_IDS = [];
+
+export function getSelectableHomepageThemes() {
+  return SELECTABLE_HOMEPAGE_THEME_IDS.map((id) => getHomepageThemeById(id)).filter(
+    (t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i,
+  );
+}
+
 export function getHomepageThemeById(id) {
   return HOMEPAGE_THEMES.find((t) => t.id === id) || HOMEPAGE_THEMES[0];
 }
@@ -436,10 +451,11 @@ export function themeToAppearancePatch(theme, { includeColors = false } = {}) {
     hero_template: t.hero_template,
     trips_layout_template: t.trips_layout_template,
     trip_card_template: t.trip_card_template,
+    // One card for Greece + abroad — keep legacy intl_* keys aligned.
+    intl_trips_layout_template: t.trips_layout_template,
+    intl_trip_card_template: t.trip_card_template,
     footer_template: t.footer_template,
   };
-  if (t.intl_trips_layout_template) patch.intl_trips_layout_template = t.intl_trips_layout_template;
-  if (t.intl_trip_card_template) patch.intl_trip_card_template = t.intl_trip_card_template;
   if (includeColors && t.palette) {
     patch.accent_color = t.palette.primary;
     patch.secondary_color = t.palette.secondary;
