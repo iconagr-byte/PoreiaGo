@@ -5,6 +5,7 @@ import {
   createCustomerRentalBooking,
   fetchCustomerRentalAvailability,
   fetchMyRentalBookings,
+  uploadCustomerRentalIdDoc,
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
@@ -46,6 +47,36 @@ const EMPTY = {
 
 const PREFS_KEY = 'rent_booking_prefs_v1';
 const FUNNEL_KEY = 'rent_funnel_events_v1';
+const ID_DOCS_KEY = 'rent_id_docs_v1';
+const MIN_DRIVER_AGE = 21;
+
+const EMPTY_ID = {
+  id_document_url: '',
+  driving_license_url: '',
+  date_of_birth: '',
+  license_number: '',
+  license_expires_at: '',
+};
+
+function loadSavedIdDocs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ID_DOCS_KEY) || '{}');
+    return { ...EMPTY_ID, ...raw };
+  } catch {
+    return { ...EMPTY_ID };
+  }
+}
+
+function ageFromDob(dob) {
+  if (!dob) return null;
+  const d = new Date(`${dob}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+  return age;
+}
 
 function trackFunnel(step, meta = {}) {
   try {
@@ -312,12 +343,69 @@ export default function RentalCatalogPanel({
     }
   };
 
+  const uploadIdDoc = async (kind, file) => {
+    if (!file) return;
+    setUploadingKind(kind);
+    try {
+      const data = await uploadCustomerRentalIdDoc(file, kind);
+      setIdDocs((prev) => ({
+        ...prev,
+        ...(kind === 'id_card'
+          ? { id_document_url: data.url }
+          : { driving_license_url: data.url }),
+      }));
+      trackFunnel('id_doc_uploaded', { kind });
+      toast.success(kind === 'id_card' ? 'Ταυτότητα ανέβηκε' : 'Δίπλωμα ανέβηκε');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadingKind('');
+    }
+  };
+
+  const validateIdentity = () => {
+    if (form.driver_mode !== 'SELF_DRIVE') return true;
+    if (!idDocs.id_document_url) {
+      toast.error('Ανεβάστε φωτογραφία ταυτότητας ή διαβατηρίου');
+      return false;
+    }
+    if (!idDocs.driving_license_url) {
+      toast.error('Ανεβάστε φωτογραφία διπλώματος');
+      return false;
+    }
+    if (!idDocs.date_of_birth) {
+      toast.error('Συμπληρώστε ημερομηνία γέννησης');
+      return false;
+    }
+    const age = ageFromDob(idDocs.date_of_birth);
+    if (age == null || age < MIN_DRIVER_AGE) {
+      toast.error(`Ελάχιστη ηλικία οδηγού: ${MIN_DRIVER_AGE} ετών`);
+      return false;
+    }
+    if (!idDocs.license_number.trim()) {
+      toast.error('Συμπληρώστε αριθμό διπλώματος');
+      return false;
+    }
+    if (!idDocs.license_expires_at) {
+      toast.error('Συμπληρώστε λήξη διπλώματος');
+      return false;
+    }
+    const expiry = new Date(`${idDocs.license_expires_at}T23:59:59`);
+    const end = new Date(form.end_time);
+    if (Number.isFinite(expiry.getTime()) && Number.isFinite(end.getTime()) && expiry < end) {
+      toast.error('Το δίπλωμα λήγει πριν το τέλος της ενοικίασης');
+      return false;
+    }
+    return true;
+  };
+
   const book = async () => {
     if (!selectedId) {
       toast.error('Επιλέξτε όχημα');
       return;
     }
     if (!validateDates()) return;
+    if (!validateIdentity()) return;
     const extras = [];
     if (form.extra_insurance) extras.push('extra_insurance');
     if (form.child_seat) extras.push('child_seat');
@@ -597,6 +685,101 @@ export default function RentalCatalogPanel({
               <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
             ) : null}
           </div>
+          {form.driver_mode === 'SELF_DRIVE' ? (
+            <div className="rent-id-panel">
+              <h3>Ταυτότητα & δίπλωμα</h3>
+              <p className="wallet-field-hint">
+                Απαιτείται για self-drive · ελάχιστη ηλικία {MIN_DRIVER_AGE}. Τα έγγραφα ελέγχονται από το γραφείο.
+              </p>
+              <div className="rent-id-uploads">
+                <label className={`rent-id-upload${idDocs.id_document_url ? ' is-done' : ''}`}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    badge
+                  </span>
+                  <span>
+                    <strong>Ταυτότητα / Διαβατήριο</strong>
+                    <small>{idDocs.id_document_url ? 'Ανέβηκε' : 'Φωτογραφία ή κάμερα'}</small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={Boolean(uploadingKind)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      uploadIdDoc('id_card', file);
+                    }}
+                  />
+                </label>
+                <label className={`rent-id-upload${idDocs.driving_license_url ? ' is-done' : ''}`}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    credit_card
+                  </span>
+                  <span>
+                    <strong>Δίπλωμα οδήγησης</strong>
+                    <small>{idDocs.driving_license_url ? 'Ανέβηκε' : 'Φωτογραφία ή κάμερα'}</small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={Boolean(uploadingKind)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      uploadIdDoc('driving_license', file);
+                    }}
+                  />
+                </label>
+              </div>
+              {uploadingKind ? <p className="wallet-field-hint">Ανέβασμα…</p> : null}
+              {(idDocs.id_document_url || idDocs.driving_license_url) && (
+                <div className="rent-id-previews">
+                  {idDocs.id_document_url ? (
+                    <img src={idDocs.id_document_url} alt="Ταυτότητα" />
+                  ) : null}
+                  {idDocs.driving_license_url ? (
+                    <img src={idDocs.driving_license_url} alt="Δίπλωμα" />
+                  ) : null}
+                </div>
+              )}
+              <div className="rent-id-fields">
+                <div className="wallet-field">
+                  <label htmlFor="rent-dob">Ημερομηνία γέννησης *</label>
+                  <input
+                    id="rent-dob"
+                    type="date"
+                    className="wallet-input"
+                    value={idDocs.date_of_birth}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, date_of_birth: e.target.value }))}
+                  />
+                </div>
+                <div className="wallet-field">
+                  <label htmlFor="rent-lic-no">Αριθμός διπλώματος *</label>
+                  <input
+                    id="rent-lic-no"
+                    className="wallet-input"
+                    value={idDocs.license_number}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, license_number: e.target.value }))}
+                    placeholder="π.χ. ΑΒ123456"
+                  />
+                </div>
+                <div className="wallet-field">
+                  <label htmlFor="rent-lic-exp">Λήξη διπλώματος *</label>
+                  <input
+                    id="rent-lic-exp"
+                    type="date"
+                    className="wallet-input"
+                    value={idDocs.license_expires_at}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, license_expires_at: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="wallet-field-hint">Με οδηγό — δεν απαιτείται δίπλωμα πελάτη.</p>
+          )}
           <button type="submit" className="wallet-btn wallet-btn-primary wallet-btn-block" disabled={busy}>
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>

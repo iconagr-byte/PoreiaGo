@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
+_DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+_RENTAL_ID_DIR = _DATA_ROOT / "uploads" / "rental_id"
+_MAX_DOC_BYTES = 4 * 1024 * 1024
+_ID_KINDS = frozenset({"id_card", "driving_license"})
+
 
 async def _tenant_id(request: Request, account: dict | None = None) -> str:
     """Office scope for Wallet rentals — JWT seal + Host; never spoof via Origin."""

@@ -16,6 +16,7 @@ import {
   fetchRentalSummary,
   fetchRentalVehicles,
   updateRentalBookingStatus,
+  updateRentalIdVerification,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
