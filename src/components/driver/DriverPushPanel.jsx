@@ -198,13 +198,13 @@ export default function DriverPushPanel() {
       {enabled === null ? (
         <p className="text-xs text-[var(--driver-muted)] px-1 py-2">Έλεγχος ειδοποιήσεων…</p>
       ) : !enabled && !native ? (
-        <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-600/30 rounded-xl px-3 py-2">
+        <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 leading-relaxed">
           {loadError || 'Οι ειδοποιήσεις δεν είναι διαθέσιμες ακόμα — δοκιμάστε ξανά σε λίγο.'}
         </p>
       ) : (
         <>
           {native && !enabled ? (
-            <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-600/30 rounded-xl px-3 py-2">
+            <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 leading-relaxed">
               {loadError ||
                 'Μπορείτε να εγγράψετε τη συσκευή· η αποστολή ξεκινά όταν οριστούν τα Firebase credentials στον server.'}
             </p>
@@ -215,7 +215,7 @@ export default function DriverPushPanel() {
                 type="button"
                 disabled={busy}
                 onClick={onTest}
-                className="driver-btn-primary w-full py-3 text-sm"
+                className="driver-btn-primary w-full py-3.5 text-sm"
               >
                 {busy ? '…' : 'Δοκιμή push'}
               </button>
@@ -223,7 +223,7 @@ export default function DriverPushPanel() {
                 type="button"
                 disabled={busy}
                 onClick={onUnsubscribe}
-                className="w-full py-3 rounded-xl border border-white/15 text-sm font-bold text-[var(--driver-muted)]"
+                className="w-full py-3.5 rounded-xl border border-[var(--driver-border)] bg-slate-50 text-sm font-bold text-[var(--driver-muted)]"
               >
                 Απενεργοποίηση push
               </button>
@@ -233,7 +233,7 @@ export default function DriverPushPanel() {
               type="button"
               disabled={busy}
               onClick={onSubscribe}
-              className="driver-btn-primary w-full py-3 text-sm"
+              className="driver-btn-primary w-full py-3.5 text-sm"
             >
               {busy ? '…' : 'Ενεργοποίηση push'}
             </button>
