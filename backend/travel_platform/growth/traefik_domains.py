@@ -131,8 +131,8 @@ def render_custom_domains_yaml(
         rule = " || ".join(f"Host(`{h}`)" for h in hosts)
         lines.extend(
             [
-                f"    {rid}:",
-                f"      rule: {rule}",
+                f"    {www_rid}:",
+                f"      rule: Host(`{www_host}`)",
                 "      entryPoints:",
                 "        - websecure",
                 "      service: tenant-custom-frontend",
@@ -156,6 +156,27 @@ def render_custom_domains_yaml(
             logger.info("Traefik custom domain includes apex: %s", domain)
         else:
             logger.info("Traefik custom domain www-only (apex DNS not on platform): %s", domain)
+
+        use_apex = should_include_apex(domain) if include_apex is None else include_apex
+        if use_apex:
+            apex_rid = _router_id("apex-" + domain)
+            lines.extend(
+                [
+                    f"    {apex_rid}:",
+                    f"      rule: Host(`{domain}`)",
+                    "      entryPoints:",
+                    "        - websecure",
+                    "      service: tenant-custom-frontend",
+                    "      priority: 40",
+                    "      tls:",
+                    "        certResolver: letsencrypt",
+                    "        domains:",
+                    f'          - main: "{domain}"',
+                    "      middlewares:",
+                    "        - security-headers@file",
+                    "",
+                ]
+            )
 
     lines.extend(
         [

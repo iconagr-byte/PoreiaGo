@@ -8,11 +8,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import {
-  clearPreferRentLookup,
-  hasPreferRentLookup,
-  referrerLooksLikeRent,
-} from '../lib/rental/preferRentLookup.js';
+import { hasPreferRentLookup, referrerLooksLikeRent } from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchOfficeModules, shouldShowRentStorefront } from '../services/officeModulesApi.js';
 import '../styles/booking-lookup.css';
@@ -356,7 +352,7 @@ export default function BookingLookupPage() {
 
           <div className="booking-lookup-footer-links">
             <Link to="/login" className="booking-lookup-wallet">
-              Σύνδεση στο My Wallet
+              Σύνδεση στο My Wallet (λεωφορεία)
             </Link>
             {tel ? (
               <a href={tel} className="booking-lookup-phone">

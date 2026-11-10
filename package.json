@@ -33,6 +33,8 @@
     "@capacitor/status-bar": "^8.0.4",
     "@capgo/capacitor-social-login": "^8.5.18",
     "@react-oauth/google": "^0.13.5",
+    "@stripe/react-stripe-js": "^6.8.0",
+    "@stripe/stripe-js": "^9.12.0",
     "@yudiel/react-qr-scanner": "^2.6.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.17.0",

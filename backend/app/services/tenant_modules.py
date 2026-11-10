@@ -50,7 +50,12 @@ def parse_tenant_settings(raw: str | None) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None = None) -> dict[str, Any]:
+def initial_settings_for_plan(
+    plan: TenantPlan | str,
+    *,
+    office_name: str | None = None,
+    rent_addon: bool = False,
+) -> dict[str, Any]:
     """Seed settings_json when provisioning a new office."""
     plan_value = plan.value if isinstance(plan, TenantPlan) else str(plan or "starter")
     settings: dict[str, Any] = {"theme": {"primary": "#005d90"}}

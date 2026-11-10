@@ -76,8 +76,8 @@ export const RENT_STANDALONE_PLAN = {
     'Desk Ενοικιάσεις στο Control Panel',
     'Email πρότυπα Ενοικιάσεων + Newsletter',
   ],
-  ctaLoggedIn: 'Εγγραφή',
-  ctaGuest: 'Εγγραφή',
+  ctaLoggedIn: 'Επιλογή συμβολαίου ενοικιάσεων',
+  ctaGuest: 'Εγγραφή μόνο για ενοικιάσεις',
   visible: true,
   highlighted: true,
 };
@@ -87,9 +87,9 @@ export const RENT_STANDALONE_PLAN = {
  */
 export const RENT_ADDON = {
   id: 'rent_addon',
-  badge: 'Add-on σε λεωφορεία',
-  name: 'Add-on Ενοικιάσεις',
-  tagline: 'Προσθήκη Rent πάνω στο συμβόλαιο λεωφορείων',
+  badge: 'Πρόσθετο σε λεωφορεία',
+  name: 'Πρόσθετο ενοικιάσεων',
+  tagline: 'Προσθήκη ενοικιάσεων πάνω στο συμβόλαιο λεωφορείων',
   kind: 'addon',
   monthlyEur: 79,
   features: [
@@ -99,8 +99,8 @@ export const RENT_ADDON = {
     'Email πρότυπα Ενοικιάσεων στο Πρότυπα',
     'Χωρίς αλλαγή του core συμβολαίου λεωφορείων',
   ],
-  ctaLoggedIn: 'Εγγραφή',
-  ctaGuest: 'Εγγραφή',
+  ctaLoggedIn: 'Ενεργοποίηση πρόσθετου στο συμβόλαιο',
+  ctaGuest: 'Θέλω λεωφορεία και ενοικιάσεις',
   servicesLinkLabel: 'Δες δημόσια σελίδα υπηρεσιών →',
   visible: true,
 };
@@ -280,6 +280,15 @@ export function selectableAgencyPlans(agencyCatalog = null, rentCatalog = null) 
   const rent = mergeRentPlanCatalog(rentCatalog).standalone;
   const rentOption = rent.visible === false ? [] : [rent];
   return [...buses, ...rentOption];
+}
+
+export function isRentOnlyPlan(planId) {
+  return planId === RENT_STANDALONE_PLAN.id;
+}
+
+/** Plans that can be selected at signup / contracts (excludes contact-sales-only). */
+export function selectableAgencyPlans() {
+  return [...AGENCY_PLANS.filter((p) => !p.contactSales), RENT_STANDALONE_PLAN];
 }
 
 export function isRentOnlyPlan(planId) {

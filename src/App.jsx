@@ -24,6 +24,7 @@ import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
 import RentalRemoteSignPage from './pages/RentalRemoteSignPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
+import RentalShareTrackPage from './pages/RentalShareTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
 import DriverCommandCenter from './pages/driver/DriverCommandCenter';
 import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
@@ -188,6 +189,7 @@ function App() {
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/wallet/login" element={<Navigate to="/login" replace />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -230,6 +232,7 @@ function App() {
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
+            <Route path="/track/rental/:bookingId" element={<RentalShareTrackPage />} />
           </Routes>
           </WalletNativeSplashGate>
         </MaintenanceGate>

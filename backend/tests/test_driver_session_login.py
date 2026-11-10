@@ -137,6 +137,8 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         from unittest.mock import AsyncMock
 
         platform = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        # Driver created without explicit tenant → DEMO home office.
+        home = self.store.DEMO_TENANT_ID
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=platform),

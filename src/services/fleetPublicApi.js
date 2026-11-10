@@ -1,5 +1,12 @@
 import { API_BASE } from '../config/api.js';
 
+function normalizePublicFleet(rows) {
+  return (rows || []).map((bus) => ({
+    ...bus,
+    image_url: resolvePublicFleetImage(bus.image_url || bus.public_image_url),
+  }));
+}
+
 export async function fetchPublicFleet() {
   try {
     const host = typeof window !== 'undefined' ? window.location.host : '';
