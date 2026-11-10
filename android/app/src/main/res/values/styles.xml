@@ -19,9 +19,12 @@
     </style>
 
 
+    <!-- Achillio Travel seal + wordmark (full-bleed splash.png per density). -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
-        <item name="android:windowBackground">@android:color/white</item>
-        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
