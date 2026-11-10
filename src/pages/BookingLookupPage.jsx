@@ -8,11 +8,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import {
-  clearPreferRentLookup,
-  hasPreferRentLookup,
-  referrerLooksLikeRent,
-} from '../lib/rental/preferRentLookup.js';
+import { hasPreferRentLookup, referrerLooksLikeRent } from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchOfficeModules, shouldShowRentStorefront } from '../services/officeModulesApi.js';
 import '../styles/booking-lookup.css';
