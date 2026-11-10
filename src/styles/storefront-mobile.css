@@ -1,0 +1,51 @@
+/* Office storefront — phone-first trip visibility (Achillio & all desks) */
+
+.sf-hero-fullscreen {
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  /* Keep hero shorter so «Εκδρομές» enter the second screen faster */
+  .sf-hero-fullscreen {
+    min-height: min(68vh, 560px) !important;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .sf-hero-fullscreen .sf-hero-copy {
+    padding-top: 5.5rem;
+    padding-bottom: 1.75rem;
+  }
+
+  .sf-trips-section {
+    scroll-margin-top: 5.5rem;
+    padding-top: 2.75rem !important;
+    padding-bottom: 2.75rem !important;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: clip;
+  }
+
+  .sf-trips-section .sf-trips-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sf-trips-section .sf-trips-card-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sf-trips-section h2 {
+    font-size: clamp(1.45rem, 6vw, 1.85rem) !important;
+    line-height: 1.2;
+  }
+}
+
+#search-results,
+#international-trips {
+  scroll-margin-top: 5.5rem;
+}

@@ -242,13 +242,13 @@ export default function StorefrontHero({
   // fullscreen_overlay (default)
   return (
     <section
-      className="relative w-full flex items-center justify-center px-margin-desktop overflow-hidden"
+      className="sf-hero-fullscreen relative w-full flex items-center justify-center px-4 sm:px-margin-desktop overflow-hidden"
       style={{ minHeight }}
     >
       <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
       <HeroOverlays strength={overlayStrength} variant="fullscreen" />
-      <div className="relative z-10 w-full max-w-container-max mx-auto py-28 lg:py-32 pt-36">
-        <div className="max-w-2xl">
+      <div className="sf-hero-copy relative z-10 w-full max-w-container-max mx-auto py-16 sm:py-28 lg:py-32 pt-28 sm:pt-36">
+        <div className="max-w-2xl min-w-0">
           {badge}
           {titleBlock}
           {searchForm}

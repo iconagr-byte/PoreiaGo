@@ -50,6 +50,7 @@ import {
   PreviewDesignModeProvider,
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
+import '../styles/storefront-mobile.css';
 
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
