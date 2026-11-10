@@ -38,7 +38,7 @@ export default function PasswordField({
   onChange,
   autoComplete = 'new-password',
   placeholder = '••••••••',
-  required = true,
+  required = false,
   minLength,
   className,
   inputClassName,
