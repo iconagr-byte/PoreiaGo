@@ -23,6 +23,7 @@ class TenantProvisioningServiceFacade:
         admin_email: str,
         admin_password_hash: str,
         subdomain_hint: str | None = None,
+        rent_addon: bool = False,
     ) -> Tenant:
         return await self._inner.provision_from_stripe(
             stripe_customer_id=stripe_customer_id,
@@ -32,6 +33,7 @@ class TenantProvisioningServiceFacade:
             admin_email=admin_email,
             admin_password_hash=admin_password_hash,
             subdomain_hint=subdomain_hint,
+            rent_addon=rent_addon,
         )
 
     async def activate_subscription(self, tenant_id, stripe_status: str) -> None:
