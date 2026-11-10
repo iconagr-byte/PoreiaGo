@@ -73,20 +73,25 @@ export default function PlatformMarketingHeader() {
         </nav>
 
         <div className="pm-header-actions">
-          <Link to="/admin/login" className="pm-header-login">
+          {/* Desktop-only — on phone these live in the drawer so the mark stays full-width */}
+          <Link to="/admin/login" className="pm-header-login pm-header-desktop-only">
             Σύνδεση
           </Link>
           <Link
             to="/wallet"
             className="pm-header-cta pm-header-cta--wallet"
             onClick={closeAll}
+            aria-label="My Wallet"
           >
             <span className="material-symbols-outlined" aria-hidden>
               account_balance_wallet
             </span>
-            My Wallet
+            <span className="pm-header-cta__label">My Wallet</span>
           </Link>
-          <Link to="/grafeia" className="pm-header-cta pm-header-cta--contracts">
+          <Link
+            to="/grafeia"
+            className="pm-header-cta pm-header-cta--contracts pm-header-desktop-only"
+          >
             Συμβόλαια
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward

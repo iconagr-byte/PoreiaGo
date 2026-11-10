@@ -45,40 +45,50 @@
 }
 
 @media (max-width: 900px) {
-  /* Phone/tablet top bar: full PoreiaGo mark + My Wallet (not Συμβόλαια) */
+  /* Phone/tablet: brand + compact Wallet + menu only (Συμβόλαια / Σύνδεση in drawer) */
   .pm-header-inner {
     height: auto;
-    min-height: 4.5rem;
-    padding: 0.65rem 1rem;
-    gap: 0.55rem;
+    min-height: 3.75rem;
+    padding: 0.55rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.55rem
+      max(0.75rem, env(safe-area-inset-left, 0px));
+    gap: 0.4rem;
+  }
+
+  .pm-header-desktop-only,
+  .pm-header-cta--contracts,
+  .pm-header-login {
+    display: none !important;
   }
 
   .pg-brand {
-    gap: 0.5rem;
+    gap: 0.4rem;
     min-width: 0;
     width: auto;
-    flex-shrink: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
   }
 
   .pg-brand-link {
-    flex: 0 1 auto;
-    max-width: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 6.5rem);
   }
 
   .pg-brand-copy {
-    overflow: visible;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .pg-brand-mark {
-    width: 2.35rem;
-    height: 2.35rem;
+    width: 2.15rem;
+    height: 2.15rem;
   }
 
   .pg-brand-name {
-    font-size: 1.28rem;
+    font-size: 1.2rem;
     white-space: nowrap;
-    overflow: visible;
-    text-overflow: clip;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .pg-brand-line {
@@ -86,46 +96,56 @@
   }
 
   .pm-header-actions {
-    gap: 0.4rem;
-    margin-left: auto;
-  }
-
-  .pm-header-cta--contracts {
-    display: none;
+    gap: 0.3rem;
+    margin-left: 0;
+    flex: 0 0 auto;
   }
 
   .pm-header-cta--wallet {
     display: inline-flex;
-    padding: 0.48rem 0.8rem;
-    font-size: 0.78rem;
+    align-items: center;
+    gap: 0.2rem;
+    min-height: 2.15rem;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.68rem;
+    line-height: 1;
     white-space: nowrap;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.2);
   }
 
   .pm-header-cta--wallet .material-symbols-outlined {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-variation-settings: 'FILL' 1, 'wght' 500;
   }
 
   .pm-header-menu-btn {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.15rem;
+    height: 2.15rem;
     flex-shrink: 0;
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 420px) {
   .pm-header-inner {
-    padding: 0.55rem 0.85rem;
-    gap: 0.4rem;
+    padding: 0.5rem 0.7rem;
+    gap: 0.35rem;
   }
 
   .pg-brand-name {
-    font-size: 1.18rem;
+    font-size: 1.12rem;
   }
 
+  /* Icon-only wallet chip — frees room for full PoreiaGo wordmark */
   .pm-header-cta--wallet {
-    padding: 0.42rem 0.65rem;
-    font-size: 0.72rem;
+    width: 2.15rem;
+    min-width: 2.15rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .pm-header-cta--wallet .pm-header-cta__label {
+    display: none;
   }
 }
 
@@ -447,8 +467,10 @@
   color: #fff;
 }
 
-@media (min-width: 640px) {
-  .pm-header-login {
+/* Login + Συμβόλαια only beside the mark on desktop (≥901px) */
+@media (min-width: 901px) {
+  .pm-header-login,
+  .pm-header-desktop-only {
     display: inline-flex;
   }
 }
@@ -489,7 +511,6 @@
   font-variation-settings: 'FILL' 1, 'wght' 500;
 }
 
-/* Desktop: show both; phone hides contracts via max-width 900 rule */
 @media (min-width: 901px) {
   .pm-header-cta--wallet {
     display: inline-flex;
@@ -497,6 +518,10 @@
 
   .pm-header-cta--contracts {
     display: inline-flex;
+  }
+
+  .pm-header-cta__label {
+    display: inline;
   }
 }
 
