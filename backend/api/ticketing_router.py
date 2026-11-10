@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from ticketing.config import settings
@@ -37,6 +37,9 @@ async def verify_driver(authorization: str | None = Header(default=None)) -> str
 @router.post("/api/tickets/sync")
 async def sync_ticket_from_checkout(body: TicketSyncRequest):
     """Register checkout booking for rotating QR + driver scan."""
+    special = {}
+    if body.passengers:
+        special["passengers"] = body.passengers
     booking = await upsert_ticket_booking(
         local_id=body.id,
         trip_id=body.trip_id,
@@ -47,6 +50,7 @@ async def sync_ticket_from_checkout(body: TicketSyncRequest):
         departure_at=body.departure_at,
         saas_booking_id=body.saas_booking_id,
         email=body.email,
+        special_requirements=special or None,
     )
     return {"ok": True, "booking_id": booking.get("id"), "ticket_ref": booking.get("ticket_ref")}
 
@@ -75,26 +79,42 @@ async def cancel_ticket(booking_id: str):
 
 
 @router.get("/api/tickets/{booking_id}/qr", response_model=RotatingQrResponse)
-async def get_rotating_qr(booking_id: str):
-    """Issue short-lived JWT for rotating QR display."""
+async def get_rotating_qr(booking_id: str, seat: str | None = None):
+    """Issue short-lived JWT for rotating QR display (optional per-seat)."""
     booking = await get_booking_by_id(booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     if "CANCELLED" in booking["payment_status"].upper():
         raise HTTPException(status_code=410, detail="Booking cancelled")
-    if "PAID" not in booking["payment_status"].upper():
+    from ticketing.scan_service import is_paid
+    from ticketing.seat_boarding import booking_seat_codes, normalize_seat
+
+    if not is_paid(booking["payment_status"]):
         raise HTTPException(status_code=402, detail="Booking not paid")
-    data = issue_rotating_jwt(booking["ticket_ref"], booking["trip_id"])
+    seat_code = normalize_seat(seat)
+    if seat_code:
+        seats = booking_seat_codes(booking)
+        if seats and seat_code not in seats:
+            raise HTTPException(status_code=400, detail=f"Seat {seat_code} not on booking")
+    data = issue_rotating_jwt(booking["ticket_ref"], booking["trip_id"], seat=seat_code or None)
     return RotatingQrResponse(**data)
 
 
 @router.post("/api/tickets/{booking_id}/email")
-async def email_ticket(booking_id: str, body: TicketEmailRequest):
+async def email_ticket(booking_id: str, body: TicketEmailRequest, request: Request):
     """Send ticket confirmation to the customer's declared email."""
     payload = body.model_dump()
     payload["booking_id"] = payload.get("booking_id") or booking_id
     if not payload.get("pnr"):
         payload["pnr"] = booking_id
+    # Prefer the public Host that the passenger used (custom domain / www).
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip().split(":")[0].lower()
+    if host and not payload.get("custom_domain") and not payload.get("public_base_url"):
+        payload["custom_domain"] = host
     try:
         return await send_ticket_confirmation_email(payload)
     except ValueError as exc:

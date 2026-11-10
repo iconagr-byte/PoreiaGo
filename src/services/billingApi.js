@@ -73,3 +73,11 @@ export async function createBillingPortal() {
     body: JSON.stringify({}),
   });
 }
+
+/** Enable Rent module as add-on on current bus plan (demo / settings flag). */
+export async function enableBillingRentAddon() {
+  return saasFetch('/api/v1/billing/enable-rent-addon', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}

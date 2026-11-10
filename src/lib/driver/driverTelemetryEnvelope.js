@@ -44,6 +44,12 @@ export function buildDriverTelemetryPayload(position, session, extras = {}) {
 
   const boarding = manifestToBoardingSnapshot(extras.manifest);
   const sensors = extras.sensors || null;
+  const tripTitle =
+    extras.tripTitle ||
+    extras.manifest?.trip_title ||
+    session?.tripTitle ||
+    session?.trip_title ||
+    null;
 
   const payload = {
     ...base,
@@ -51,6 +57,10 @@ export function buildDriverTelemetryPayload(position, session, extras = {}) {
     boarding,
     sensors,
   };
+
+  if (tripTitle) {
+    payload.trip_title = String(tripTitle).trim();
+  }
 
   if (sensors?.acceleration) {
     payload.accel_x = sensors.acceleration.x;

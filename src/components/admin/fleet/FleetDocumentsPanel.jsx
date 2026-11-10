@@ -78,9 +78,9 @@ export default function FleetDocumentsPanel() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-8">
+    <div className="space-y-5 pb-4">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Έγγραφα οχημάτων</h2>
+        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Έγγραφα οχημάτων</h2>
         <p className="text-sm text-gray-500 mt-1">Άδειες, ασφάλειες, ΚΤΕΟ και άλλα PDF/εικόνες.</p>
       </div>
 

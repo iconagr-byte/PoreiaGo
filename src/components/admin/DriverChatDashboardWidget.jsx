@@ -1,5 +1,5 @@
 /**
- * Compact chat preview for admin dashboard.
+ * Compact chat preview for admin dashboard — Apple-minimal panel.
  */
 import { useEffect, useState } from 'react';
 import { fetchDriverChatThreads, fetchDriverChatUnread } from '../../services/platformApi.js';
@@ -42,47 +42,38 @@ export default function DriverChatDashboardWidget({ onOpenInbox, onOpenLiveMap }
   }, []);
 
   return (
-    <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 overflow-hidden">
-      <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+    <section className="dash-apple-panel h-full">
+      <div className="dash-apple-panel__head">
         <div>
-          <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">forum</span>
+          <h3 className="dash-apple-panel__title">
             Chat οδηγών
             {unread > 0 ? (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+              <span className="ml-2 align-middle text-[11px] font-semibold text-[#c93400]">
                 {unread} νέα
               </span>
             ) : null}
           </h3>
-          <p className="text-sm text-on-surface-variant mt-0.5">
-            Συνομιλία με την εφαρμογή κινητού · εμφανίζεται και στον live χάρτη
-          </p>
+          <p className="dash-apple-panel__meta">Συνομιλία με την εφαρμογή κινητού</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           {typeof onOpenLiveMap === 'function' ? (
-            <button
-              type="button"
-              onClick={onOpenLiveMap}
-              className="text-sm font-bold px-3 py-1.5 rounded-full border border-black/[0.08] hover:bg-surface-container-low inline-flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">map</span>
+            <button type="button" onClick={onOpenLiveMap} className="dash-apple-link">
+              <span className="material-symbols-outlined">map</span>
               Χάρτης
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onOpenInbox}
-            className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-          >
+          <button type="button" onClick={onOpenInbox} className="dash-apple-link">
             Άνοιγμα
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
       </div>
       <ul className="divide-y divide-black/[0.04]">
         {threads.length === 0 ? (
-          <li className="px-5 py-8 text-sm text-on-surface-variant text-center">
-            Δεν υπάρχουν μηνύματα ακόμα. Ανοίξτε το chat για να γράψετε σε οδηγό.
+          <li className="dash-apple-empty">
+            <span className="material-symbols-outlined">chat_bubble</span>
+            <p className="dash-apple-empty__title">Χωρίς μηνύματα ακόμα</p>
+            <p className="dash-apple-empty__meta">Άνοιξε το chat για να γράψεις σε οδηγό.</p>
           </li>
         ) : (
           threads.map((t) => (
@@ -90,22 +81,26 @@ export default function DriverChatDashboardWidget({ onOpenInbox, onOpenLiveMap }
               <button
                 type="button"
                 onClick={onOpenInbox}
-                className="w-full text-left px-5 py-3.5 hover:bg-primary/[0.03] transition-colors flex items-start justify-between gap-3"
+                className="w-full text-left px-5 py-3.5 hover:bg-[rgba(0,113,227,0.035)] transition-colors flex items-start justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <div className="font-bold text-on-surface truncate">
+                  <div className="font-semibold text-[0.92rem] tracking-tight text-[#1d1d1f] truncate">
                     {t.driver_name || 'Οδηγός'}
                     {t.vehicle_plate ? (
-                      <span className="text-on-surface-variant font-mono text-xs ml-2">
+                      <span className="text-[#6e6e73] font-mono text-[11px] ml-2 font-medium">
                         {t.vehicle_plate}
                       </span>
                     ) : null}
                   </div>
-                  <div className="text-sm text-on-surface-variant truncate mt-0.5">{t.last_message}</div>
-                  <div className="text-[11px] text-on-surface-variant/70 mt-1">{formatWhen(t.last_at)}</div>
+                  <div className="text-[0.84rem] text-[#6e6e73] truncate mt-0.5 tracking-tight">
+                    {t.last_message}
+                  </div>
+                  <div className="text-[11px] text-[#86868b] mt-1 tracking-tight">
+                    {formatWhen(t.last_at)}
+                  </div>
                 </div>
                 {t.unread_office > 0 ? (
-                  <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                  <span className="shrink-0 text-[11px] font-semibold text-[#c93400] tabular-nums">
                     {t.unread_office}
                   </span>
                 ) : null}
@@ -114,6 +109,6 @@ export default function DriverChatDashboardWidget({ onOpenInbox, onOpenLiveMap }
           ))
         )}
       </ul>
-    </div>
+    </section>
   );
 }
