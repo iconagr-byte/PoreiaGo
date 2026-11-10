@@ -188,6 +188,7 @@ function App() {
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/wallet/login" element={<Navigate to="/login" replace />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

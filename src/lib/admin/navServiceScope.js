@@ -11,6 +11,7 @@ export const SHARED_NAV_IDS = new Set([
   'fleet_live_map',
   'email',
   'email_templates',
+  'customer_registrations',
 ]);
 
 /** Bus / trips-only left-nav ids (plus fleet-ops hub). */

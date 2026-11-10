@@ -420,6 +420,19 @@ async def _login_office_tenant(request: Request) -> str | None:
     return None
 
 
+async def _login_office_tenant(request: Request) -> str | None:
+    """Host / middleware office for this /driver login (None on bare platform host)."""
+    tid = getattr(request.state, "tenant_id", None)
+    if tid:
+        return str(tid)
+    try:
+        from api.request_tenant import public_tenant_id
+
+        return await public_tenant_id(request, allow_demo_fallback=False)
+    except Exception:
+        return None
+
+
 @router.post("/session/login", response_model=DriverSessionResponse)
 async def login_with_password(request: Request, body: DriverLoginBody):
     """
@@ -933,6 +946,20 @@ async def driver_shift_start(session_payload: dict = Depends(require_driver_sess
     )
     was_offline = on_driver_connected(session_payload, connection_id)
 
+    driver_id = str(session_payload.get("sub") or session_payload.get("driver_id") or "")
+    trip_id = session_payload.get("trip_id")
+    try:
+        from travel_platform.settings.driver_activity_store import record_shift_start
+
+        record_shift_start(
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            trip_id=int(trip_id) if trip_id is not None else None,
+            meta={"reason": "shift_start"},
+        )
+    except Exception:
+        pass
+
     notify_result: dict = {"skipped": True}
     try:
         notify_result = await notify_driver_shift(
@@ -1010,7 +1037,7 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         pass
 
     removed: list[str] = []
-    if tenant_id and driver_id:
+    if driver_id:
         try:
             removed = await get_live_fleet().remove_driver_vehicles(
                 tenant_id,
