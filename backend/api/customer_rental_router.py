@@ -1,4 +1,4 @@
-"""Customer PWA fleet rental — catalog, availability, instant booking."""
+"""Customer PWA fleet rental — catalog, availability, booking + payment."""
 
 from __future__ import annotations
 
@@ -84,6 +84,12 @@ async def _require_rent_module(request: Request, account: dict | None = None) ->
         ) from None
 
     return tid
+
+class CustomerBookingExtras(BaseModel):
+    extra_insurance: bool = False
+    child_seat: bool = False
+    gps_pack: bool = False
+
 
 class CustomerBookingBody(BaseModel):
     vehicle_id: str

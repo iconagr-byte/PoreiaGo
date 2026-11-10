@@ -494,6 +494,18 @@ def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str,
     except ValueError:
         return None
 
+PAYMENT_PLANS = ("full", "deposit")
+PAYMENT_METHODS = ("card", "paypal", "apple", "bank_transfer", "cash_office")
+PAYMENT_STATUSES = ("pending", "partial", "paid")
+DEFAULT_DEPOSIT_PERCENT = 30
+
+# Daily extras (EUR) — must match customer PWA labels.
+EXTRA_DAILY_RATES = {
+    "extra_insurance": 12.0,
+    "child_seat": 7.0,
+    "gps_pack": 5.0,
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -772,6 +784,95 @@ def _norm_place(value: str | None) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def _normalize_deposit_percent(value: Any) -> int:
+    try:
+        pct = int(value)
+    except (TypeError, ValueError):
+        pct = DEFAULT_DEPOSIT_PERCENT
+    return max(5, min(90, pct))
+
+
+def compute_extras_total(days: int, extras: dict[str, Any] | None = None) -> tuple[float, list[str]]:
+    """Return (extras_total, label list) for selected daily add-ons."""
+    days = max(1, int(days or 1))
+    selected = extras if isinstance(extras, dict) else {}
+    lines: list[str] = []
+    total = 0.0
+    labels = {
+        "extra_insurance": "Extra insurance",
+        "child_seat": "Child seat",
+        "gps_pack": "GPS pack",
+    }
+    for key, daily in EXTRA_DAILY_RATES.items():
+        if selected.get(key):
+            total += daily * days
+            lines.append(labels.get(key, key))
+    return round(total, 2), lines
+
+
+def compute_payment_split(
+    total_eur: float,
+    *,
+    payment_plan: str = "full",
+    payment_method: str = "card",
+    deposit_percent: int | None = None,
+) -> dict[str, Any]:
+    """Deposit/full split + payment status for a rental booking."""
+    plan = str(payment_plan or "full").strip().lower() or "full"
+    if plan not in PAYMENT_PLANS:
+        plan = "full"
+    method = str(payment_method or "card").strip().lower() or "card"
+    if method not in PAYMENT_METHODS:
+        method = "card"
+    pct = _normalize_deposit_percent(
+        deposit_percent if deposit_percent is not None else DEFAULT_DEPOSIT_PERCENT
+    )
+    total = round(float(total_eur or 0), 2)
+    if plan == "deposit":
+        due_now = round(total * (pct / 100.0), 2)
+        balance = round(total - due_now, 2)
+    else:
+        due_now = total
+        balance = 0.0
+
+    if method == "bank_transfer":
+        amount_paid = 0.0
+        payment_status = "pending"
+        if plan == "deposit":
+            payment_label = f"PENDING · Προκαταβολή {pct}% (Τράπεζα)"
+        else:
+            payment_label = "PENDING (Bank Transfer)"
+    elif method == "cash_office":
+        amount_paid = 0.0
+        payment_status = "pending"
+        payment_label = "PENDING (Cash at office)"
+    else:
+        amount_paid = due_now
+        if balance > 0:
+            payment_status = "partial"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"DEPOSIT {pct}% ({method_name})"
+        else:
+            payment_status = "paid"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"PAID ({method_name})"
+
+    return {
+        "payment_plan": plan,
+        "payment_method": method,
+        "deposit_percent": pct,
+        "amount_due_now": due_now,
+        "amount_paid": amount_paid,
+        "balance_due": balance,
+        "payment_status": payment_status,
+        "payment_label": payment_label,
+    }
+
+
 def quote_vehicle(
     vehicle: dict[str, Any],
     *,
@@ -780,8 +881,9 @@ def quote_vehicle(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute rental quote: base days + optional one-way + with-driver."""
+    """Compute rental quote: base days + optional one-way + with-driver + extras."""
     days = max(1, math.ceil((end - start).total_seconds() / 86400))
     rate = float(vehicle.get("daily_rate_eur") or 0)
     one_way_fee = float(vehicle.get("one_way_surcharge_eur") or 0)
@@ -793,12 +895,17 @@ def quote_vehicle(
     base_total = round(rate * days, 2)
     driver_surcharge = round(with_driver_daily * days, 2) if mode == "WITH_DRIVER" else 0.0
     one_way_surcharge = round(one_way_fee, 2) if is_one_way else 0.0
+    extras_total, extras_lines = compute_extras_total(days, extras)
     return {
         "suggested_days": days,
         "base_total": base_total,
         "driver_surcharge": driver_surcharge,
         "one_way_surcharge": one_way_surcharge,
-        "suggested_total": round(base_total + driver_surcharge + one_way_surcharge, 2),
+        "extras_total": extras_total,
+        "extras_lines": extras_lines,
+        "suggested_total": round(
+            base_total + driver_surcharge + one_way_surcharge + extras_total, 2
+        ),
         "is_one_way": is_one_way,
         "driver_mode": mode,
     }
@@ -896,6 +1003,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
 
         driver_mode = str(body.get("driver_mode") or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
+        extras = body.get("extras") if isinstance(body.get("extras"), dict) else {}
         quote = quote_vehicle(
             vehicle,
             start=start,
@@ -903,6 +1011,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             pickup_location=pickup,
             dropoff_location=dropoff,
             driver_mode=driver_mode,
+            extras=extras,
         )
         extras_quote = quote_extras(body.get("extras"), days=quote["suggested_days"])
         vehicle_total = float(quote["suggested_total"])
@@ -995,6 +1104,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
                 "base_total": quote["base_total"],
                 "driver_surcharge": quote["driver_surcharge"],
                 "one_way_surcharge": quote["one_way_surcharge"],
+                "extras_total": quote["extras_total"],
+                "extras_lines": quote["extras_lines"],
                 "is_one_way": quote["is_one_way"],
                 "vehicle_total": vehicle_total,
                 "extras_total": extras_total,
