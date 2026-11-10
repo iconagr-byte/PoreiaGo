@@ -235,48 +235,94 @@ export default function StorefrontHeader({
             aria-label="Μενού κινητού"
           >
             {tripsEnabled ? (
-              <a href="#search-results" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#search-results"
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  map
+                </span>
                 Εκδρομές
               </a>
             ) : null}
+            {tripsEnabled ? (
+              <Link
+                to="/my-booking"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  confirmation_number
+                </span>
+                Η κράτησή μου
+              </Link>
+            ) : null}
+            <Link
+              to="/contact"
+              onClick={closeMenu}
+              className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                mail
+              </span>
+              Επικοινωνία
+            </Link>
             {rentEnabled ? (
-              <Link to="/rent" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <Link
+                to="/rent"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_car
+                </span>
                 Rent
               </Link>
             ) : null}
             {rentEnabled ? (
-              <a href="#rent-services" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#rent-services"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  verified_user
+                </span>
                 Υπηρεσίες
               </a>
             ) : null}
             {showFleet ? (
-              <a href="#our-fleet" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+              <a
+                href="#our-fleet"
+                onClick={closeMenu}
+                className="rounded-2xl px-3.5 py-3.5 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                  directions_bus
+                </span>
                 Στόλος
               </a>
             ) : null}
-            <Link to="/contact" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
-              Επικοινωνία
-            </Link>
             {tel ? (
-              <a href={tel} onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5 inline-flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+              <a
+                href={tel}
+                onClick={closeMenu}
+                className={`rounded-2xl px-3.5 py-3.5 text-sm font-bold inline-flex items-center gap-2.5 ${
+                  isDark ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden>
                   call
                 </span>
                 {phone}
               </a>
             ) : null}
-            <div className="px-3 py-2">
+            <div className="px-1 pt-2 pb-1">
               <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
             </div>
-            {tripsEnabled ? (
-              <Link
-                to="/my-booking"
-                onClick={closeMenu}
-                className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
-              >
-                Η κράτησή μου
-              </Link>
-            ) : null}
           </nav>
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-/* Office storefront — phone-first trip visibility (Achillio & all desks) */
+/* Office storefront — phone-first trip visibility + touch UX (Achillio & all desks) */
 
 .sf-hero-fullscreen {
   box-sizing: border-box;
@@ -7,22 +7,92 @@
 @media (max-width: 768px) {
   /* Keep hero shorter so «Εκδρομές» enter the second screen faster */
   .sf-hero-fullscreen {
-    min-height: min(68vh, 560px) !important;
-    padding-left: max(1rem, env(safe-area-inset-left, 0px));
-    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    min-height: min(58vh, 520px) !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
   }
 
   .sf-hero-fullscreen .sf-hero-copy {
-    padding-top: 5.5rem;
-    padding-bottom: 1.75rem;
+    padding-top: 4.75rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .sf-hero-fullscreen h1 {
+    font-size: clamp(1.35rem, 5.6vw, 1.7rem) !important;
+    line-height: 1.25 !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .sf-hero-fullscreen .sf-hero-copy > div > p,
+  .sf-hero-fullscreen .sf-hero-copy p.text-base {
+    font-size: 0.92rem !important;
+    line-height: 1.45 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Search panel — stack for thumbs, larger taps */
+  .sf-hero-search {
+    margin-top: 0.35rem !important;
+    padding: 0.9rem !important;
+    border-radius: 1.25rem !important;
+    max-width: 100% !important;
+  }
+
+  .sf-hero-search .sf-hero-search__chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -0.15rem;
+    padding: 0.1rem 0.15rem 0.25rem;
+  }
+
+  .sf-hero-search .sf-hero-search__chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sf-hero-search .sf-hero-search__chips button {
+    flex: 0 0 auto;
+    min-height: 2.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Trip quick-picks duplicate the select — drop on phones */
+  .sf-hero-search .sf-hero-search__trip-picks {
+    display: none !important;
+  }
+
+  .sf-hero-search select,
+  .sf-hero-search input {
+    min-height: 3rem;
+    font-size: 16px !important; /* avoid iOS zoom */
+    border-radius: 1rem !important;
+  }
+
+  .sf-hero-search .sf-hero-search__actions {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: 0.55rem !important;
+    width: 100%;
+  }
+
+  .sf-hero-search .sf-hero-search__actions > * {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 3rem;
+    box-sizing: border-box;
   }
 
   .sf-trips-section {
-    scroll-margin-top: 5.5rem;
-    padding-top: 2.75rem !important;
-    padding-bottom: 2.75rem !important;
-    padding-left: max(1rem, env(safe-area-inset-left, 0px));
-    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    scroll-margin-top: 5rem;
+    padding-top: 2.25rem !important;
+    padding-bottom: 2.25rem !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
@@ -32,6 +102,7 @@
   .sf-trips-section .sf-trips-grid {
     width: 100%;
     min-width: 0;
+    gap: 1rem !important;
   }
 
   .sf-trips-section .sf-trips-card-wrap {
@@ -40,12 +111,73 @@
   }
 
   .sf-trips-section h2 {
-    font-size: clamp(1.45rem, 6vw, 1.85rem) !important;
+    font-size: clamp(1.35rem, 5.8vw, 1.75rem) !important;
     line-height: 1.2;
+  }
+
+  /* Premium trip cards — denser, thumb-friendly book CTA */
+  .sf-trips-section article {
+    border-radius: 1.35rem !important;
+  }
+
+  .sf-trips-section article > div.p-8,
+  .sf-trips-section article .p-8 {
+    padding: 1.1rem !important;
+  }
+
+  .sf-trips-section article button {
+    min-height: 2.75rem;
+  }
+
+  .sf-trips-section article button.rounded-full:not(.h-10) {
+    min-height: 3rem;
+    font-size: 0.92rem;
+  }
+
+  /* Why-us — less scroll tax */
+  .sf-why-us {
+    padding-top: 2.75rem !important;
+    padding-bottom: 2.75rem !important;
+  }
+
+  .sf-why-us .mb-16 {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .sf-why-us .gap-8 {
+    gap: 0.85rem !important;
+  }
+
+  .sf-why-us .sf-why-us-card {
+    padding: 1.15rem 1rem !important;
+    border-radius: 1.25rem !important;
+  }
+
+  .sf-why-us .sf-why-us-card .w-16 {
+    width: 3.25rem !important;
+    height: 3.25rem !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .sf-why-us .sf-why-us-card .material-symbols-outlined {
+    font-size: 26px !important;
+  }
+
+  /* Mobile menu — larger tap rows */
+  .sf-header-mobile-nav a,
+  .sf-header-mobile-nav button {
+    min-height: 3rem;
+    font-size: 0.95rem !important;
+  }
+
+  .sf-header-mobile-nav {
+    padding-top: 0.65rem !important;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+    gap: 0.2rem !important;
   }
 }
 
 #search-results,
 #international-trips {
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: 5rem;
 }
