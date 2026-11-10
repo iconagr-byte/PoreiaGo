@@ -25,6 +25,40 @@ _live = LiveFleetService()
 
 async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     update = _parse_payload(payload)
+    raw = update.raw or {}
+
+    # Bind active office excursion (plate/driver + time window) when GPS has no trip_id.
+    if update.trip_id is None:
+        try:
+            from travel_platform.telemetry.active_excursion_resolve import resolve_active_excursion
+
+            hit = resolve_active_excursion(
+                str(update.tenant_id),
+                vehicle_code=update.vehicle_code,
+                bus_plate=raw.get("bus_plate"),
+                driver_id=raw.get("driver_id"),
+            )
+            if hit:
+                raw = {
+                    **raw,
+                    "trip_title": hit["title"],
+                    "trip_id": hit["trip_id"],
+                }
+                update = TelemetryUpdate(
+                    vehicle_code=update.vehicle_code,
+                    tenant_id=update.tenant_id,
+                    trip_id=int(hit["trip_id"]),
+                    latitude=update.latitude,
+                    longitude=update.longitude,
+                    speed_kmh=update.speed_kmh,
+                    engine_on=update.engine_on,
+                    fuel_level_pct=update.fuel_level_pct,
+                    recorded_at=update.recorded_at,
+                    raw=raw,
+                )
+        except Exception:
+            logger.debug("active excursion resolve skipped", exc_info=True)
+
     vehicle_id = _live.upsert_vehicle_registry(
         update.tenant_id,
         update.vehicle_code,
@@ -32,15 +66,52 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     )
 
     meta = _live._vehicles.get(str(vehicle_id), {})
-    raw = update.raw or {}
     if raw.get("driver_name"):
         meta["driver_name"] = raw.get("driver_name")
     if raw.get("bus_plate") or raw.get("vehicle_code"):
         meta["bus_plate"] = raw.get("bus_plate") or raw.get("vehicle_code")
     if raw.get("heading_deg") is not None:
         meta["heading_deg"] = raw.get("heading_deg")
-    if raw.get("driver_id"):
+    if raw.get("altitude_m") is not None:
+        try:
+            meta["altitude_m"] = float(raw.get("altitude_m"))
+        except (TypeError, ValueError):
+            pass
+    if raw.get("satellites") is not None:
+        try:
+            meta["satellites"] = int(raw.get("satellites"))
+        except (TypeError, ValueError):
+            pass
+    if raw.get("source"):
+        meta["source"] = str(raw.get("source"))
+    if raw.get("imei"):
+        meta["imei"] = str(raw.get("imei"))
+    # Teltonika must not inherit phone driver_id (shift-end would wipe the pin).
+    source_l = str(raw.get("source") or meta.get("source") or "").strip().lower()
+    is_tracker = source_l.startswith("teltonika") or source_l in {
+        "tracker",
+        "test_ping",
+        "teltonika_test_ping",
+    }
+    if is_tracker:
+        if raw.get("driver_id"):
+            meta["driver_id"] = raw.get("driver_id")
+        else:
+            meta.pop("driver_id", None)
+    elif raw.get("driver_id"):
         meta["driver_id"] = raw.get("driver_id")
+    preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
+    if preferred_title:
+        meta["trip_title"] = str(preferred_title).strip()
+    elif update.trip_id is not None and not meta.get("trip_title"):
+        from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+        meta["trip_title"] = await resolve_trip_title(update.trip_id)
+    if update.trip_id is not None:
+        meta["trip_id"] = update.trip_id
+    # First emission clock for this live session (shown on map / history).
+    if not meta.get("tracking_started_at"):
+        meta["tracking_started_at"] = update.recorded_at.isoformat()
     if meta:
         _live._vehicles[str(vehicle_id)] = {**_live._vehicles.get(str(vehicle_id), {}), **meta}
 
@@ -76,14 +147,148 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     idle_sec = _idling.trip_idle_seconds(vehicle_id)
     _live.apply_update(vehicle_id, update, idle_seconds=idle_sec)
 
+    # Durable history + live trail for every GPS source (driver PWA + Teltonika).
+    try:
+        from travel_platform.telemetry.coordinate_buffer import BufferedCoordinate, push_coordinate
+
+        push_coordinate(
+            BufferedCoordinate(
+                tenant_id=str(update.tenant_id),
+                trip_id=update.trip_id,
+                driver_id=str(raw.get("driver_id")) if raw.get("driver_id") else None,
+                vehicle_id=str(vehicle_id),
+                lat=float(update.latitude),
+                lng=float(update.longitude),
+                speed_kmh=float(update.speed_kmh or 0),
+                heading_deg=raw.get("heading_deg")
+                if raw.get("heading_deg") is not None
+                else None,
+                recorded_at=update.recorded_at,
+                raw={
+                    **{k: v for k, v in raw.items() if k not in {"accel_x", "accel_y", "accel_z"}},
+                    "vehicle_id": str(vehicle_id),
+                    "tracking_started_at": meta.get("tracking_started_at"),
+                },
+            ),
+        )
+    except Exception:
+        logger.exception("history coordinate enqueue failed vehicle=%s", vehicle_id)
+
+    try:
+        from travel_platform.telemetry.live_fleet_trail_redis import append_trail_point
+
+        await append_trail_point(
+            str(update.tenant_id),
+            str(vehicle_id),
+            lat=float(update.latitude),
+            lng=float(update.longitude),
+            speed_kmh=float(update.speed_kmh or 0),
+            heading_deg=raw.get("heading_deg"),
+            recorded_at=update.recorded_at,
+            trip_id=update.trip_id,
+            driver_id=str(raw.get("driver_id")) if raw.get("driver_id") else None,
+        )
+    except Exception:
+        logger.exception("live trail append failed vehicle=%s", vehicle_id)
+
+    source = str(raw.get("source") or "").lower()
+    is_tracker_src = source.startswith("teltonika") or source in {"test_ping", "tracker"}
+
+    if is_tracker_src:
+        # Keep App heartbeat across Teltonika refreshes (multi-worker Redis).
+        try:
+            await _live.absorb_plate_app_signal(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika absorb app signal skipped", exc_info=True)
+        try:
+            await _live.purge_phone_siblings_for_plate(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika phone-sibling purge skipped", exc_info=True)
+
     try:
         from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+        from travel_platform.telemetry.tracker_priority import (
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
 
         meta = _live._vehicles.get(str(vehicle_id), {})
         if meta:
-            await save_live_vehicle(meta)
+            if is_tracker_src:
+                sources = resolve_live_gps_sources(
+                    meta,
+                    max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                    tenant_id=str(update.tenant_id),
+                )
+                # Trust resolve only — do not force teltonika when signal is stale.
+                meta["gps_sources"] = ["teltonika", "app"] if (
+                    "teltonika" in sources and "app" in sources
+                ) else sources
+                _live._vehicles[str(vehicle_id)] = meta
+            ok = await save_live_vehicle(meta)
+            if not ok:
+                logger.warning(
+                    "live fleet Redis save returned false tenant=%s vehicle=%s",
+                    update.tenant_id,
+                    vehicle_id,
+                )
     except Exception:
-        logger.debug("live fleet Redis save skipped", exc_info=True)
+        logger.warning("live fleet Redis save failed", exc_info=True)
+
+    # Driver PWA already publishes fleet_location from fleet_ingress. Tracker
+    # (Teltonika) path needs its own egress so the map badge updates live.
+    if is_tracker_src:
+        try:
+            from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
+            from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            meta = _live._vehicles.get(str(vehicle_id), {}) or {}
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                tenant_id=str(update.tenant_id),
+            )
+            egress = {
+                "type": "fleet_location",
+                "tenant_id": str(update.tenant_id),
+                "trip_id": update.trip_id or meta.get("trip_id"),
+                "trip_title": meta.get("trip_title"),
+                "driver_id": meta.get("driver_id") or raw.get("driver_id") or meta.get("app_driver_id"),
+                "driver_name": meta.get("driver_name") or raw.get("driver_name"),
+                "bus_plate": meta.get("bus_plate") or update.vehicle_code,
+                "vehicle_code": update.vehicle_code,
+                "vehicle_id": str(vehicle_id),
+                "lat": float(update.latitude),
+                "lng": float(update.longitude),
+                "speed": float(update.speed_kmh or 0),
+                "heading": raw.get("heading_deg") if raw.get("heading_deg") is not None else meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(update.engine_on),
+                "timestamp": update.recorded_at.isoformat(),
+                "source": raw.get("source") or meta.get("source") or "teltonika",
+                "imei": raw.get("imei") or meta.get("imei"),
+                "tracker_signal_at": meta.get("tracker_signal_at"),
+                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
+                "app_seen_at": meta.get("app_seen_at"),
+                "gps_sources": gps_sources,
+            }
+            await publish_fleet_location(str(update.tenant_id), egress)
+            await get_fleet_egress_hub().broadcast(str(update.tenant_id), egress)
+        except Exception:
+            logger.debug("teltonika fleet_location egress skipped", exc_info=True)
 
     return NormalizedTelemetry(
         update=update,

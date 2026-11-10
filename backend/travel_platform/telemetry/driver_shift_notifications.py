@@ -50,12 +50,14 @@ def _session_fields(session: dict, body: dict[str, Any] | None = None) -> dict[s
         or "—",
     )
     trip_id = body.get("trip_id") or session.get("trip_id")
+    reason = str(body.get("reason") or "").strip()
     return {
         "tenant_id": tenant_id,
         "driver_id": driver_id,
         "driver_name": driver_name,
         "bus_plate": bus_plate,
         "trip_id": trip_id,
+        "reason": reason or None,
         "connection_key": driver_connection_key(session),
     }
 
@@ -101,9 +103,11 @@ async def notify_driver_shift(
         return {"skipped": True, "reason": "no_tenant"}
 
     alert_type = "DRIVER_ONLINE" if event == "online" else "DRIVER_OFFLINE"
-    reason = str((body or {}).get("reason") or "")
+    reason = str(meta.get("reason") or (body or {}).get("reason") or "")
     if event == "online":
-        if reason == "shift_start":
+        if reason == "login":
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) συνδέθηκε"
+        elif reason == "shift_start":
             message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) ξεκίνησε τη βάρδια"
         else:
             message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) είναι online"
@@ -132,8 +136,10 @@ async def notify_driver_shift(
                 "trip_id": meta.get("trip_id"),
                 "driver_id": meta.get("driver_id"),
                 "message": message,
+                "reason": reason or None,
                 "created_at": alert.get("created_at"),
                 "severity": "info" if event == "online" else "warning",
+                "metadata": meta,
                 **{k: v for k, v in meta.items() if k not in {"tenant_id", "trip_id", "driver_id"}},
             },
         )
@@ -142,18 +148,30 @@ async def notify_driver_shift(
 
     push_result: dict[str, Any] = {"skipped": True, "reason": "push_disabled"}
     if cfg["notify_push"]:
-        push_result = await _send_driver_shift_push(event=event, meta=meta, message=message)
+        push_result = await _send_driver_shift_push(
+            event=event,
+            meta=meta,
+            message=message,
+            reason=reason,
+        )
 
     logger.info(
-        "driver_shift notify event=%s tenant=%s push=%s",
+        "driver_shift notify event=%s reason=%s tenant=%s push=%s",
         event,
+        reason or "-",
         tenant_id,
         push_result,
     )
     return {"alert_id": alert.get("id"), "push": push_result}
 
 
-async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: str) -> dict[str, Any]:
+async def _send_driver_shift_push(
+    *,
+    event: str,
+    meta: dict[str, Any],
+    message: str,
+    reason: str = "",
+) -> dict[str, Any]:
     from travel_platform.notifications.push_subscription_store import (
         list_all_subscriptions,
         list_subscriptions_for_email,
@@ -161,30 +179,41 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
     )
     from travel_platform.notifications.web_push_service import (
         ensure_web_push_keys,
+        push_configured,
         send_push_to_email,
         send_push_to_subscription,
-        web_push_configured,
     )
 
     ensure_web_push_keys()
-    if not web_push_configured():
-        return {"skipped": True, "reason": "vapid_not_configured"}
+    if not push_configured():
+        return {"skipped": True, "reason": "push_not_configured"}
 
-    title = "Έναρξη βάρδιας" if event == "online" else "Τέλος βάρδιας"
+    if event == "online":
+        if reason == "login":
+            title = "Σύνδεση οδηγού"
+        elif reason == "shift_start":
+            title = "Έναρξη βάρδιας"
+        else:
+            title = "Οδηγός online"
+    else:
+        title = "Τέλος βάρδιας" if reason == "shift_end" else "Οδηγός offline"
+    reason_key = (reason or "default").replace(" ", "_")[:40]
     payload = {
         "title": title,
         "body": message,
-        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}-{event}",
+        # Unique tag so shift_end is not collapsed with a prior generic offline alert.
+        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}-{event}-{reason_key}",
         "url": "/admin?tab=fleet_live_map",
         "data": {
             "type": "driver_shift",
             "event": event,
+            "reason": reason or None,
             "tenant_id": meta["tenant_id"],
             "trip_id": meta.get("trip_id"),
             "driver_id": meta.get("driver_id"),
             "tab": "fleet_live_map",
         },
-        "requireInteraction": event == "online",
+        "requireInteraction": True,
     }
 
     attempted = 0
@@ -208,16 +237,20 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
 
     admin_email = _admin_email()
     if admin_email:
-        for sub in list_subscriptions_for_email(admin_email):
+        # Prefer admin-audience devices for this email (ignore customer wallet subs).
+        for sub in list_subscriptions_for_email(admin_email, audience="admin"):
             await _try_sub(sub)
+        if sent == 0:
+            for sub in list_subscriptions_for_email(admin_email):
+                await _try_sub(sub)
         if sent == 0:
             email_result = await send_push_to_email(admin_email, payload)
             if email_result.get("sent"):
                 sent += int(email_result.get("sent") or 0)
             attempted += int(email_result.get("attempted") or 0)
 
-    # Last resort: any admin-audience device (covers tenant-id drift after login).
-    if attempted == 0:
+    # Last resort: any admin device (tenant-id drift / wiped-but-re-subscribed elsewhere).
+    if sent == 0:
         for sub in list_all_subscriptions(audience="admin"):
             await _try_sub(sub)
 

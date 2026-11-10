@@ -1,14 +1,117 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import fs from 'node:fs'
+import path from 'node:path'
 
 const API_TARGET = process.env.VITE_DEV_API_PROXY || 'http://127.0.0.1:8001'
+
+const ACHILLIO_DOC_TITLE = 'Achillio Travel — Εκδρομές με λεωφορείο'
+const POREIAGO_DOC_TITLE = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
+
+/**
+ * Googlebot reads static <title>. Contabo often drops Host and serves index.html
+ * for every Proxy Host, so the platform default MUST stay PoreiaGo:
+ * - index.html + index.poreiago.html = PoreiaGo marketing (default SERP-safe)
+ * - index.achillio.html = Achillio Travel (only via Host/XFH or seo-shell)
+ *
+ * Never write Achillio into dist/index.html — that made Google index
+ * "Achillio Travel" under poreiago.com/grafeia as the parent URL.
+ */
+function writeAchillioSpaShell() {
+  const indexPath = path.resolve('dist/index.html')
+  if (!fs.existsSync(indexPath)) return
+  const poreiagoHtml = fs.readFileSync(indexPath, 'utf8')
+  if (!poreiagoHtml.includes(`<title>${POREIAGO_DOC_TITLE}</title>`)) {
+    throw new Error('achillio-spa-shell: dist/index.html must keep PoreiaGo document title')
+  }
+  fs.writeFileSync(path.resolve('dist/index.poreiago.html'), poreiagoHtml)
+
+  const ACHILLIO_DESC =
+    'Achillio Travel — εκδρομές με λεωφορείο στην Ελλάδα. Κράτηση θέσης, εισιτήρια και My Wallet στο achilliotravel.com.'
+  const POREIAGO_DESC =
+    'PoreiaGo — πλατφόρμα κρατήσεων, στόλου και wallet για ταξιδιωτικά γραφεία.'
+  const ACHILLIO_LD = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'TravelAgency',
+    name: 'Achillio Travel',
+    url: 'https://www.achilliotravel.com/',
+    description: ACHILLIO_DESC,
+  })
+
+  let achillioHtml = poreiagoHtml.split(POREIAGO_DOC_TITLE).join(ACHILLIO_DOC_TITLE)
+  achillioHtml = achillioHtml.split(POREIAGO_DESC).join(ACHILLIO_DESC)
+  achillioHtml = achillioHtml.replace(
+    /name="application-name" content="PoreiaGo"/g,
+    'name="application-name" content="Achillio Travel"',
+  )
+  achillioHtml = achillioHtml.replace(
+    /property="og:site_name" content="PoreiaGo"/g,
+    'property="og:site_name" content="Achillio Travel"',
+  )
+  if (!achillioHtml.includes('rel="canonical"')) {
+    achillioHtml = achillioHtml.replace(
+      '</title>',
+      '</title>\n    <link rel="canonical" href="https://www.achilliotravel.com/" />',
+    )
+  }
+  if (!achillioHtml.includes('application/ld+json')) {
+    achillioHtml = achillioHtml.replace(
+      '</head>',
+      `    <script type="application/ld+json">${ACHILLIO_LD}</script>\n    <noscript><h1>Achillio Travel</h1><p>${ACHILLIO_DESC}</p></noscript>\n  </head>`,
+    )
+  }
+  if (!achillioHtml.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
+    throw new Error('achillio-spa-shell: failed to rewrite document title')
+  }
+  fs.writeFileSync(path.resolve('dist/index.achillio.html'), achillioHtml)
+  // Keep PoreiaGo as the shared default shell (do not overwrite index.html).
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'poreiago-native-app-flavor',
+      transformIndexHtml(html) {
+        // Canonical Capacitor install: app (unified role router).
+        // Legacy: driver (com.poreiago.driver only). wallet accepted as alias of app.
+        const flavor = String(process.env.VITE_NATIVE_APP || 'app')
+          .trim()
+          .toLowerCase()
+        const app =
+          flavor === 'driver' ? 'driver' : flavor === 'wallet' ? 'wallet' : 'app'
+        return html
+          .split('__POREIAGO_NATIVE_APP_PLACEHOLDER__')
+          .join(app)
+          .replace(
+            /window\.__POREIAGO_NATIVE_APP__\s*=\s*window\.__POREIAGO_NATIVE_APP__\s*\|\|\s*['"][^'"]*['"]/,
+            `window.__POREIAGO_NATIVE_APP__ = '${app}'`,
+          )
+      },
+    },
+    {
+      name: 'pwa-service-worker-allowed',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split('?')[0] || ''
+          if (url === '/rental-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/rent')
+          } else if (url === '/wallet-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/wallet')
+          }
+          next()
+        })
+      },
+    },
+    {
+      name: 'achillio-spa-shell',
+      closeBundle() {
+        writeAchillioSpaShell()
+      },
+    },
   ],
   server: {
     // Μόνο API endpoints — ΟΧΙ /admin/login ή /admin (React routes)
@@ -22,6 +125,8 @@ export default defineConfig({
       '/api/v1/telemetry': { target: API_TARGET, changeOrigin: true },
       '/api/admin/telemetry': { target: API_TARGET, changeOrigin: true },
       '/api/admin/platform': { target: API_TARGET, changeOrigin: true },
+      '/api/admin/push': { target: API_TARGET, changeOrigin: true },
+      '/api/admin/platform/fleet-rental': { target: API_TARGET, changeOrigin: true },
       '/api/passenger': { target: API_TARGET, changeOrigin: true },
       '/api/tickets': { target: API_TARGET, changeOrigin: true },
       '/api/abandoned': { target: API_TARGET, changeOrigin: true },
@@ -31,6 +136,7 @@ export default defineConfig({
       '/api/auth': { target: API_TARGET, changeOrigin: true },
       '/api/push': { target: API_TARGET, changeOrigin: true },
       '/api/customer': { target: API_TARGET, changeOrigin: true },
+      '/api/lost-items': { target: API_TARGET, changeOrigin: true },
       '/api/bookings': { target: API_TARGET, changeOrigin: true },
       '/api/campaigns': { target: API_TARGET, changeOrigin: true },
       '/api/email': { target: API_TARGET, changeOrigin: true },

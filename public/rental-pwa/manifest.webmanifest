@@ -1,0 +1,43 @@
+{
+  "name": "Ενοικίαση — PoreiaGo",
+  "short_name": "Ενοικίαση",
+  "description": "Κράτηση οχήματος, ημερολόγιο και χάρτης παραλαβής — PoreiaGo",
+  "lang": "el",
+  "dir": "ltr",
+  "id": "/rent",
+  "start_url": "/rent?source=pwa",
+  "scope": "/rent",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "orientation": "portrait",
+  "background_color": "#0b3d4a",
+  "theme_color": "#0b3d4a",
+  "icons": [
+    {
+      "src": "/icons/rental-pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/rental-pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/rental-pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/rental-pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["travel", "business"],
+  "prefer_related_applications": false
+}
