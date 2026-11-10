@@ -1,5 +1,11 @@
 /** Provider presets for autonomous personal-email connect (no hosting whitelist). */
 
+/**
+ * Achillio mailbox lives on Intechs srv23. DNS for mail.achilliotravel.com currently
+ * points at srv24 (wrong box) — AUTH fails there even when webmail on srv23 works.
+ */
+export const ACHILLIO_CPANEL_MAIL_HOST = 'srv23.intechs.gr';
+
 export const PROVIDERS = {
   gmail: {
     id: 'gmail',
@@ -87,14 +93,19 @@ export function detectProvider(email) {
       ...PROVIDERS.custom,
       id: 'achillio',
       label: 'Achillio Travel (cPanel)',
-      imap_host: 'mail.achilliotravel.com',
-      smtp_host: 'mail.achilliotravel.com',
+      imap_host: ACHILLIO_CPANEL_MAIL_HOST,
+      smtp_host: ACHILLIO_CPANEL_MAIL_HOST,
       imap_port: 993,
       imap_secure: true,
       smtp_port: 465,
       smtp_secure: false,
+      // Dovecot/cPanel hierarchy: Sent lives under INBOX, not bare "Sent".
+      imap_folder_sent: 'INBOX.Sent',
+      imap_folder_spam: 'INBOX.spam',
       help: [
+        `Host: ${ACHILLIO_CPANEL_MAIL_HOST} ή mail.achilliotravel.com (μετά τη διόρθωση DNS)`,
         'cPanel Secure SSL/TLS: IMAP 993 · SMTP 465',
+        'Φάκελοι: Απεσταλμένα = INBOX.Sent · Spam = INBOX.spam',
         'Username: info@achilliotravel.com · κωδικός webmail',
       ],
     };
@@ -104,6 +115,34 @@ export function detectProvider(email) {
     imap_host: `mail.${domain}`,
     smtp_host: `mail.${domain}`,
   };
+}
+
+/**
+ * Match backend normalize_mail_password — strip spaces only for app-password
+ * providers. Never strip spaces for cPanel / custom hosts.
+ */
+export function normalizeMailPasswordForClient(password, { host = '', email = '' } = {}) {
+  const raw = String(password || '');
+  if (!raw) return '';
+  const blob = `${host} ${email}`.toLowerCase();
+  const appPwdProvider = [
+    'gmail.com',
+    'googlemail.com',
+    'imap.gmail.com',
+    'smtp.gmail.com',
+    'yahoo.',
+    'ymail.com',
+    'imap.mail.yahoo.com',
+    'smtp.mail.yahoo.com',
+    'outlook.',
+    'hotmail.',
+    'live.com',
+    'office365.com',
+  ].some((x) => blob.includes(x));
+  if (appPwdProvider) {
+    return raw.replace(/\s+/g, '');
+  }
+  return raw.trim();
 }
 
 export function buildAccountFromWizard({
@@ -118,18 +157,19 @@ export function buildAccountFromWizard({
     mode === 'gmail_bridge'
       ? PROVIDERS.gmail
       : provider || detectProvider(addr);
+  const host = prov.imap_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : '');
 
   return {
     label: label || addr,
     email_address: mode === 'gmail_bridge' ? addr : addr,
     mail_username: mode === 'gmail_bridge' ? addr : addr,
-    mail_password: password || '',
-    imap_host: prov.imap_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : ''),
+    mail_password: normalizeMailPasswordForClient(password, { host, email: addr }),
+    imap_host: host,
     imap_port: prov.imap_port,
     imap_secure: prov.imap_secure,
     imap_mailbox: 'INBOX',
-    imap_folder_sent: 'Sent',
-    imap_folder_spam: 'Spam',
+    imap_folder_sent: prov.imap_folder_sent || 'Sent',
+    imap_folder_spam: prov.imap_folder_spam || 'Spam',
     smtp_host: prov.smtp_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : ''),
     smtp_port: prov.smtp_port,
     smtp_secure: prov.smtp_secure,

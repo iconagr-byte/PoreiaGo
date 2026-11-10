@@ -5,13 +5,14 @@ import {
   sanitizeFleetOpsSubTab,
 } from '../../../lib/admin/fleetOpsHub.js';
 import FleetKpisDashboard from '../FleetKpisDashboard.jsx';
-import DriverChatInbox from '../DriverChatInbox.jsx';
 import FleetRouteHistory from '../FleetRouteHistory.jsx';
 import FleetCalendarPanel from './FleetCalendarPanel.jsx';
 import FleetAvailabilityPanel from './FleetAvailabilityPanel.jsx';
 import FleetDocumentsPanel from './FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from './FleetExpensesPanel.jsx';
 import FleetDigestPanel from './FleetDigestPanel.jsx';
+import AdminMenuFade from '../AdminMenuFade.jsx';
+import AdminResizableRail from '../AdminResizableRail.jsx';
 
 const RAIL_ACTIVE = {
   violet: 'border-violet-300 bg-violet-50 shadow-sm',
@@ -59,6 +60,8 @@ export default function FleetOpsHub({
   onOpenLiveMap,
   onOpenFleet,
   onOpenPayments,
+  /** When true, hide the left rail (parent BusesHub already shows the menu). */
+  embedded = false,
 }) {
   const [tab, setTab] = useState(() => sanitizeFleetOpsSubTab(initialTab));
 
@@ -74,10 +77,76 @@ export default function FleetOpsHub({
     onSubTabChange?.(next);
   };
 
+  const header = (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
+          {active.label}
+        </h2>
+        <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{active.description}</p>
+      </div>
+      <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-sky-500/[0.08] border-sky-500/15">
+        <span className="material-symbols-outlined text-[20px] text-sky-700">{active.icon}</span>
+        <span className="text-sm font-bold text-sky-800">{active.label}</span>
+      </div>
+    </div>
+  );
+
+  const subtabChips = (
+    <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+      {FLEET_OPS_HUB_TABS.map((t) => {
+        const isActive = t.id === tab;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => selectTab(t.id)}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold border transition ${
+              isActive
+                ? CHIP_ACTIVE[t.accent] || CHIP_ACTIVE.sky
+                : 'bg-white text-on-surface-variant border-black/[0.08]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">{t.icon}</span>
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const body = (
+    <FleetOpsHubPanel
+      tab={tab || DEFAULT_FLEET_OPS_TAB}
+      chatFocusDriverId={chatFocusDriverId}
+      onOpenLiveMap={onOpenLiveMap}
+      onOpenFleet={onOpenFleet}
+      onOpenPayments={onOpenPayments}
+      onOpenCalendar={() => selectTab('fleet_calendar')}
+      onOpenDocuments={() => selectTab('fleet_documents')}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div className="fleet-ops-hub fleet-ops-hub--embedded w-full space-y-5">
+        {header}
+        {subtabChips}
+        <AdminMenuFade panelKey={tab || DEFAULT_FLEET_OPS_TAB}>{body}</AdminMenuFade>
+      </div>
+    );
+  }
+
   return (
-    <div className="fleet-ops-hub animate-in fade-in duration-300 w-full">
+    <div className="fleet-ops-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
+        <AdminResizableRail
+          storageKey="poreiago_fleet_ops_rail_w"
+          defaultWidth={256}
+          minWidth={200}
+          maxWidth={420}
+          expandLabel="Μενού στόλου"
+        >
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700/80">
@@ -154,34 +223,12 @@ export default function FleetOpsHub({
               })}
             </ul>
           </div>
-        </aside>
+        </AdminResizableRail>
 
-        <div className="min-w-0 flex-1 space-y-5 w-full">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                {active.label}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{active.description}</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-sky-500/[0.08] border-sky-500/15">
-              <span className="material-symbols-outlined text-[20px] text-sky-700">
-                {active.icon}
-              </span>
-              <span className="text-sm font-bold text-sky-800">{active.label}</span>
-            </div>
-          </div>
-
-          <FleetOpsHubPanel
-            tab={tab || DEFAULT_FLEET_OPS_TAB}
-            chatFocusDriverId={chatFocusDriverId}
-            onOpenLiveMap={onOpenLiveMap}
-            onOpenFleet={onOpenFleet}
-            onOpenPayments={onOpenPayments}
-            onOpenCalendar={() => selectTab('fleet_calendar')}
-            onOpenDocuments={() => selectTab('fleet_documents')}
-          />
-        </div>
+        <AdminMenuFade panelKey={tab || DEFAULT_FLEET_OPS_TAB} className="min-w-0 flex-1 space-y-5 w-full">
+          {header}
+          {body}
+        </AdminMenuFade>
       </div>
     </div>
   );
@@ -199,10 +246,6 @@ function FleetOpsHubPanel({
   switch (tab) {
     case 'fleet_kpis':
       return <FleetKpisDashboard />;
-    case 'driver_chat':
-      return (
-        <DriverChatInbox initialDriverId={chatFocusDriverId} onOpenLiveMap={onOpenLiveMap} />
-      );
     case 'fleet_route_playback':
       return <FleetRouteHistory />;
     case 'fleet_calendar':

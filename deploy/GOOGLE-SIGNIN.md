@@ -1,59 +1,116 @@
 # My Wallet — Google Sign-In
 
-Χωρίς `GOOGLE_CLIENT_ID` το κουμπί «Σύνδεση με Google» δεν δουλεύει live
-(το API απαντά `503 Google OAuth not configured`).
+## Website (browser) — already works
 
-## 1) Δημιούργησε OAuth Web Client
+Web OAuth client + Authorized JavaScript origins (`https://www.achilliotravel.com`, …).
 
-1. Άνοιξε [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-2. **Create credentials → OAuth client ID → Web application**
-3. **Authorized JavaScript origins** (όλα τα host που σερβίρουν το storefront):
+## Android emulator / Capacitor app
 
-   | Origin |
-   |--------|
-   | `https://www.poreiago.com` |
-   | `https://www.achilliotravel.com` |
-   | `https://achilliotravel.com` (αν χρησιμοποιείται apex) |
-   | `http://localhost:5173` (dev) |
+Google **blocks OAuth inside WebView** (origin_mismatch / disallowed_useragent).
+The Wallet app uses **native Credential Manager** (`@capgo/capacitor-social-login`), not the website GIS button.
 
-4. **Authorized redirect URIs** — για GIS button / One Tap συνήθως δεν χρειάζονται·
-   αν το Console ζητήσει κάτι, βάλε τα ίδια origins με `/`.
-5. Αντιγράψε το **Client ID** (`….apps.googleusercontent.com`).
+### One-time Google Cloud setup
 
-## 2) Βάλε το στο VPS
+You need **two** OAuth clients in the **same** Google Cloud project:
 
-Στο `/opt/poreiago/deploy/.env.prod`:
+| Type | Purpose |
+|------|---------|
+| **Web application** | Used as `webClientId` in the app (and website) |
+| **Android** | Proves the APK is allowed — package + SHA-1 |
 
-```bash
-GOOGLE_CLIENT_ID=1234567890-xxxx.apps.googleusercontent.com
-VITE_GOOGLE_CLIENT_ID=1234567890-xxxx.apps.googleusercontent.com
+**Project PoreiaGo (`967076454927`) — both clients must live here:**
+
+| Type | Client ID (prefix) |
+|------|--------------------|
+| **Web application** | `967076454927-c5goejio1jlqr2vki24j7g8133knnqlp…` ← `webClientId` in app |
+| **Android** | `967076454927-nlak72ikck4somgc723gb7ebrdt27gg0…` ← Console only (package + SHA-1) |
+
+Never put the Android client ID in the app. Client **secret** is not required for Sign-In with Google (ID token).
+
+1. On Windows, after a build (or anytime):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-google-sha1.ps1
 ```
 
-Μετά:
+2. Copy the printed **SHA-1**.
+3. [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+   → **Create credentials → OAuth client ID → Android**
+4. Package name: `com.poreiago.wallet`
+5. SHA-1: paste from the script
+6. **Create** → wait 5–10 minutes (sometimes longer)
+7. Rebuild / reopen Wallet → **Σύνδεση με Google** (native account picker)
 
-```bash
-cd /opt/poreiago && bash deploy/scripts/vm-deploy-all.sh
+Do **not** put the Android client ID in the app. Web client ID:
+`967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com`
+
+If the OAuth consent screen is in **Testing**, add your Gmail under **Audience → Test users** (required — Google blocks everyone else).
+
+### Rebuild (required after any Google/native change)
+
+```powershell
+cd C:\Users\User\poreiago; git fetch origin cursor/wallet-native-theme-isolate-5ffb; git reset --hard origin/cursor/wallet-native-theme-isolate-5ffb; powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-go.ps1
 ```
 
-Ή μόνο recreate API αν το frontend είναι ήδη νέο (runtime config):
+Look for these green lines before the app opens:
 
-```bash
-cd /opt/poreiago/deploy
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate --no-deps api-blue
+- `OK: SocialLogin in capacitor.settings.gradle`
+- `OK: SocialLoginPlugin inside APK`
+- `SHA-1 (gradle signingReport debug): …` ← copy this into Google Console
+
+Do **not** press Android Studio **Run** — it can install an older APK without the native plugin.
+
+Emulator must be a **Google Play** system image (Play Store icon). After first boot: open Play Store → Update.
+
+### Error `"SocialLogin" plugin is not implemented on android`
+
+The APK on the emulator was built **without** `@capgo/capacitor-social-login`. Fix: pull latest + `wallet-go.ps1`. Website Google Sign-In is unrelated.
+
+### Error `You CANNOT use scopes without modifying the main activity`
+
+Do **not** pass a `scopes` array to `SocialLogin.login` on Android unless `MainActivity` implements Capgo’s `ModifiedMainActivityForSocialLoginPlugin`. Wallet auth only needs the default ID token (email/profile/openid are built-in).
+
+### Error `[28444] Developer console is not set up correctly`
+
+Google Credential Manager rejected **package + signing SHA-1 + webClientId**.
+
+**Native Wallet** always uses the PoreiaGo Web client
+(`967076454927-c5goejio…`) even if `/api/auth/google/config` still returns an
+older project id — otherwise Android OAuth (project `967076…`) and `webClientId`
+diverge and Google returns 28444.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-google-sha1.ps1
 ```
 
-## 3) Εναλλακτικά: GitHub Actions secret
+Checklist:
 
-Repo → **Settings → Secrets → Actions** → `GOOGLE_CLIENT_ID` = το Client ID.
+1. `webClientId` in the app = **Web** OAuth client (never the Android client ID).
+2. Android OAuth client in the **same** GCP project: package `com.poreiago.wallet` + **exact** SHA-1 from the script (prefer APK signing cert).
+3. If SHA-1 changed (new machine / new debug.keystore), update or recreate the Android client.
+4. Consent screen **Testing** → add your Gmail under Test users.
+5. Propagation can take **minutes to a few hours** — then retry in the Wallet app.
 
-Το deploy workflow το γράφει αυτόματα στο `.env.prod` πριν το `vm-deploy-all.sh`.
+Filter Logcat: `GoogleProvider` → compare `signingSha1=` with Console.
 
-## 4) Έλεγχος
+## Web client origins (website only)
+
+| Origin |
+|--------|
+| `https://www.poreiago.com` |
+| `https://www.achilliotravel.com` |
+| `https://achilliotravel.com` |
+| `http://localhost:5173` (dev) |
+
+`https://localhost` is **not** required when using native Credential Manager.
+
+## VPS env
+
+```bash
+GOOGLE_CLIENT_ID=….apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=….apps.googleusercontent.com
+```
 
 ```bash
 curl -sS https://www.achilliotravel.com/api/auth/google/config
-# {"enabled":true,"client_id":"….apps.googleusercontent.com"}
 ```
-
-Στη σελίδα Login / My Wallet πρέπει να εμφανίζεται το επίσημο κουμπί Google
-(όχι «Demo λειτουργία»).

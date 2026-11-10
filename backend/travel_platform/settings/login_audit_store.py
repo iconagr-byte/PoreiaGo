@@ -214,7 +214,15 @@ def list_login_events(
         if needle:
             blob = " ".join(
                 str(row.get(k) or "")
-                for k in ("identity", "actor_name", "ip", "device", "detail", "actor_id")
+                for k in (
+                    "identity",
+                    "actor_name",
+                    "ip",
+                    "device",
+                    "detail",
+                    "actor_id",
+                    "tenant_id",
+                )
             ).lower()
             if needle not in blob:
                 continue

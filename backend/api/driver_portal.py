@@ -4,6 +4,7 @@ Driver portal API — username/password login + Master QR exchange + session-sco
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -13,6 +14,8 @@ import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from database import AsyncSessionLocal
 from ticketing.boarding_service import get_boarding_manifest
@@ -42,9 +45,19 @@ class DriverLoginBody(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class DriverForgotPasswordBody(BaseModel):
+    username: str = Field(..., min_length=2, description="Email / άδεια / πινακίδα")
+
+
+class DriverResetPasswordBody(BaseModel):
+    token: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=4)
+
+
 class DriverSessionResponse(BaseModel):
     access_token: str
-    trip_id: int
+    # None until office assigns / opens a trip (Master QR or live fleet).
+    trip_id: int | None = None
     tenant_id: str
     driver_id: str | None
     expires_at: int
@@ -150,7 +163,13 @@ def _profile_fields(driver_id: str | None) -> dict:
     }
 
 
-def _trip_context(trip_id: int) -> dict:
+def _trip_context(trip_id: int | None) -> dict:
+    if not trip_id:
+        return {
+            "trip_title": None,
+            "destination": None,
+            "meeting_point": None,
+        }
     from travel_platform.operations.trip_ops_store import get_trip_ops
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title_sync
 
@@ -163,22 +182,70 @@ def _trip_context(trip_id: int) -> dict:
     }
 
 
+async def _notify_admin_driver_login(session_like: dict) -> None:
+    """Office bell + push as soon as a driver authenticates (not only on shift start)."""
+    from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
+    from travel_platform.telemetry.driver_shift_tracker import on_driver_connected
+
+    # Reserve connection so the first GPS ping does not send a second "online".
+    connection_id = hash(
+        f"login:{session_like.get('sub') or session_like.get('driver_id')}:{session_like.get('trip_id')}",
+    )
+    try:
+        on_driver_connected(session_like, connection_id)
+    except Exception:
+        pass
+    try:
+        await notify_driver_shift(
+            "online",
+            session_like,
+            body={"reason": "login"},
+        )
+    except Exception:
+        logger.warning("driver login admin notify failed", exc_info=True)
+
+
+def _session_like_from_response(resp: DriverSessionResponse) -> dict:
+    plate = resp.vehicle_plate or resp.vehicle_code or "—"
+    return {
+        "tenant_id": str(resp.tenant_id or ""),
+        "sub": resp.driver_id,
+        "driver_id": resp.driver_id,
+        "trip_id": resp.trip_id,
+        "driver_name": resp.driver_name or "Οδηγός",
+        "vehicle_code": plate,
+        "bus_plate": plate,
+    }
+
+
 def _issue_driver_session(
     *,
     driver_id: str | None,
     tenant_id: str,
-    trip_id: int,
+    trip_id: int | None,
     expires_at: int | None = None,
+    trip_source: str | None = None,
 ) -> DriverSessionResponse:
     exp = expires_at or int(time.time()) + 24 * 3600
     tid = tenant_id or DEFAULT_TENANT
     profile = _profile_fields(driver_id)
-    vehicle_code = profile.get("vehicle_plate") or profile.get("vehicle_code") or f"BUS-{trip_id}"
+    bound_trip = int(trip_id) if trip_id else None
+    # master_qr | live_fleet | None — legacy JWTs without this are treated as unbound.
+    source = (trip_source or "").strip() if bound_trip else None
+    if bound_trip and source not in ("master_qr", "live_fleet"):
+        source = None
+        bound_trip = None
+    vehicle_code = (
+        profile.get("vehicle_plate")
+        or profile.get("vehicle_code")
+        or (f"BUS-{bound_trip}" if bound_trip else None)
+    )
     driver_jwt = jwt.encode(
         {
             "sub": driver_id or "master-qr-driver",
             "tenant_id": tid,
-            "trip_id": trip_id,
+            "trip_id": bound_trip,
+            "trip_source": source,
             "roles": ["driver"],
             "scope": "manifest:read driver:scan",
             "exp": exp,
@@ -190,23 +257,23 @@ def _issue_driver_session(
         _jwt_secret(),
         algorithm=JWT_ALGORITHM,
     )
-    ctx = _trip_context(trip_id)
+    ctx = _trip_context(bound_trip)
     return DriverSessionResponse(
         access_token=driver_jwt,
-        trip_id=trip_id,
+        trip_id=bound_trip,
         tenant_id=tid,
         driver_id=driver_id,
         expires_at=exp,
-        schedule=_build_daily_schedule(trip_id),
+        schedule=_build_daily_schedule(bound_trip) if bound_trip else [],
         **profile,
         **ctx,
     )
 
 
-def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None) -> int:
-    """Prefer live fleet assignment; otherwise default demo trip."""
+def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None) -> int | None:
+    """Live fleet assignment only — never invent demo trip #1."""
     if not driver_id:
-        return 1
+        return None
     try:
         live: LiveFleetService = get_live_fleet()
         tid = UUID(tenant_id or DEFAULT_TENANT)
@@ -216,7 +283,31 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
                 return int(v.trip_id)
     except Exception:
         pass
-    return 1
+    return None
+
+
+def _session_has_open_trip(session_payload: dict) -> int | None:
+    """
+    Trip id only when office opened it (Master QR) or live fleet still assigns it.
+    Blocks legacy password JWTs that baked in demo Εκδρομή #1.
+    """
+    trip_id = int(session_payload.get("trip_id") or 0) or None
+    if not trip_id:
+        return None
+    source = str(session_payload.get("trip_source") or "").strip()
+    if source == "master_qr":
+        return trip_id
+    driver_id = str(
+        session_payload.get("driver_id") or session_payload.get("sub") or ""
+    ).strip()
+    if driver_id in ("", "master-qr-driver"):
+        return None
+    tenant_id = str(session_payload.get("tenant_id") or "") or None
+    live_trip = _resolve_trip_for_driver(driver_id, tenant_id)
+    if live_trip and int(live_trip) == int(trip_id):
+        return trip_id
+    # live_fleet source but assignment gone / offline — no excursion UI.
+    return None
 
 
 _POREIAGO_OFFICE_CACHE: tuple[float, str | None] | None = None
@@ -421,11 +512,136 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         tenant_id=str(tenant_id) if tenant_id else None,
         detail=driver.license_plate or driver.vehicle_code,
     )
-    return _issue_driver_session(
+    resp = _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,
         trip_id=trip_id,
+        trip_source="live_fleet" if trip_id else None,
     )
+    try:
+        import asyncio
+
+        asyncio.create_task(_notify_admin_driver_login(_session_like_from_response(resp)))
+    except Exception:
+        pass
+    return resp
+
+
+def _request_public_base(request: Request) -> str:
+    """Prefer the office host the driver is on (Achillio / PoreiaGo)."""
+    try:
+        origin = (request.headers.get("origin") or "").strip().rstrip("/")
+        if origin.startswith("http"):
+            return origin
+    except Exception:
+        pass
+    try:
+        forwarded = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+        host = forwarded or (request.headers.get("host") or "").split(",")[0].strip()
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+        if host:
+            return f"{proto}://{host}".rstrip("/")
+    except Exception:
+        pass
+    return (
+        (os.getenv("PUBLIC_APP_URL") or "").strip()
+        or (os.getenv("VITE_APP_URL") or "").strip()
+        or "https://www.poreiago.com"
+    ).rstrip("/")
+
+
+@router.post("/session/forgot-password")
+async def forgot_driver_password(request: Request, body: DriverForgotPasswordBody):
+    """
+    Send password-reset email for fleet driver PWA.
+
+    Always returns a generic ok message (no account enumeration).
+    """
+    from travel_platform.settings.driver_password_reset import (
+        build_reset_url,
+        create_reset_token,
+        resolve_driver_for_reset,
+        send_driver_reset_email,
+    )
+
+    username = (body.username or "").strip()
+    office_tid = await _login_office_tenant(request)
+    allow_demo_legacy = False
+    if office_tid:
+        try:
+            from sqlalchemy import select
+
+            from app.core.database import AsyncSessionLocal
+            from app.models.tenant import Tenant
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(Tenant).where(Tenant.id == UUID(str(office_tid))).limit(1)
+                )
+                tenant = result.scalar_one_or_none()
+                allow_demo_legacy = bool(tenant and is_achillio_travel_office(tenant))
+        except Exception:
+            allow_demo_legacy = False
+
+    generic = {
+        "ok": True,
+        "message": "Αν υπάρχει λογαριασμός με αυτό το στοιχείο, στάλθηκε email επαναφοράς (ελέγξτε και τα spam).",
+    }
+    if not office_tid:
+        return generic
+
+    try:
+        driver = resolve_driver_for_reset(
+            username,
+            tenant_id=office_tid,
+            allow_demo_legacy=allow_demo_legacy,
+        )
+        if not driver:
+            return generic
+        token = create_reset_token(
+            driver_id=driver.id,
+            tenant_id=str(getattr(driver, "tenant_id", None) or office_tid),
+            password_hash=driver.password_hash,
+        )
+        reset_url = build_reset_url(token, base_url=_request_public_base(request))
+        await send_driver_reset_email(
+            to_email=driver.email,
+            driver_name=driver.name,
+            reset_url=reset_url,
+        )
+    except Exception:
+        logger.warning("driver forgot-password failed", exc_info=True)
+    return generic
+
+
+@router.post("/session/reset-password")
+async def reset_driver_password(request: Request, body: DriverResetPasswordBody):
+    """Confirm driver password reset from emailed link."""
+    from travel_platform.settings.driver_password_reset import (
+        allow_confirm_attempt,
+        apply_password_reset,
+    )
+
+    client = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_confirm_attempt(client):
+        raise HTTPException(status_code=429, detail="Πολλές προσπάθειες — δοκιμάστε σε λίγο")
+    try:
+        driver = apply_password_reset(token=body.token, new_password=body.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Αποτυχία επαναφοράς κωδικού") from exc
+    return {
+        "ok": True,
+        "message": "Ο κωδικός ενημερώθηκε — συνδεθείτε με τον νέο κωδικό",
+        "driver_id": driver.id,
+        "email": driver.email,
+    }
 
 
 @router.post("/session/master-qr", response_model=DriverSessionResponse)
@@ -476,12 +692,20 @@ async def exchange_master_qr(request: Request, body: MasterQrExchangeBody):
             tenant_id=str(tenant_id) if tenant_id else None,
             detail=f"trip:{trip_id}",
         )
-        return _issue_driver_session(
+        resp = _issue_driver_session(
             driver_id=driver_id,
             tenant_id=tenant_id,
             trip_id=trip_id,
+            trip_source="master_qr",
             expires_at=int(hybrid["expires_at"]) if hybrid.get("expires_at") else None,
         )
+        try:
+            import asyncio
+
+            asyncio.create_task(_notify_admin_driver_login(_session_like_from_response(resp)))
+        except Exception:
+            pass
+        return resp
 
     preview = preview_master_qr_payload(body.qr_raw)
     if not preview or preview.get("typ") != "master_qr":
@@ -512,7 +736,7 @@ async def driver_me(session_payload: dict = Depends(require_driver_session)):
         driver_id = session_payload.get("driver_id")
     profile = _profile_fields(driver_id if driver_id and driver_id != "master-qr-driver" else None)
     driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
-    trip_id = int(session_payload.get("trip_id") or 0) or None
+    trip_id = _session_has_open_trip(session_payload)
     ctx = _trip_context(trip_id) if trip_id else {}
     return DriverMeResponse(
         driver_id=driver_id if driver_id != "master-qr-driver" else None,
@@ -530,7 +754,7 @@ async def driver_trip(session_payload: dict = Depends(require_driver_session)):
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.trip_ops_store import get_trip_ops
 
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     if not trip_id:
         raise HTTPException(status_code=403, detail="No trip bound to session")
     tenant_id = str(session_payload.get("tenant_id") or "")
@@ -558,10 +782,10 @@ async def driver_trip(session_payload: dict = Depends(require_driver_session)):
 async def driver_manifest(
     session_payload: dict = Depends(require_driver_session),
 ):
-    """Boarding manifest only for trip_id embedded in session token."""
+    """Boarding manifest only for an office-opened / live-assigned trip."""
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
 
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     if not trip_id:
         raise HTTPException(status_code=403, detail="No trip bound to session")
     try:
@@ -576,19 +800,21 @@ async def driver_manifest(
 
 @router.get("/schedule")
 async def driver_schedule(session_payload: dict = Depends(require_driver_session)):
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     ctx = _trip_context(trip_id) if trip_id else {}
     return {
         "trip_id": trip_id,
         "trip_title": ctx.get("trip_title"),
         "destination": ctx.get("destination"),
         "meeting_point": ctx.get("meeting_point"),
-        "stops": _build_daily_schedule(trip_id),
+        "stops": _build_daily_schedule(trip_id) if trip_id else [],
     }
 
 
-def _build_daily_schedule(trip_id: int) -> list[dict]:
+def _build_daily_schedule(trip_id: int | None) -> list[dict]:
     """Real excursion timeline from synced trip ops (stops / hybrid / destination)."""
+    if not trip_id:
+        return []
     from travel_platform.operations.trip_ops_store import build_schedule_from_ops, get_trip_ops
 
     ops = get_trip_ops(trip_id)

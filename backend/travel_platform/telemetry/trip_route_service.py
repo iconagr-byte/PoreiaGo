@@ -219,6 +219,18 @@ def _row_to_point(row: Any) -> dict[str, Any]:
     else:
         recorded_at = str(recorded)
     heading = row.get("heading_deg") if hasattr(row, "get") else row["heading_deg"]
+    raw = row.get("raw_payload") if hasattr(row, "get") else None
+    if isinstance(raw, str):
+        try:
+            import json
+
+            raw = json.loads(raw)
+        except Exception:
+            raw = None
+    if not isinstance(raw, dict):
+        raw = {}
+    altitude = raw.get("altitude_m")
+    satellites = raw.get("satellites")
     return {
         "id": int(row["id"]),
         "trip_id": row.get("trip_id") if hasattr(row, "get") else row["trip_id"],
@@ -228,6 +240,156 @@ def _row_to_point(row: Any) -> dict[str, Any]:
         "lng": float(row["lng"]),
         "speed_kmh": float(row.get("speed_kmh") or 0),
         "heading_deg": float(heading) if heading is not None else None,
+        "altitude_m": float(altitude) if altitude is not None else None,
+        "satellites": int(satellites) if satellites is not None else None,
         "recorded_at": recorded_at,
-        "source": "postgis",
+        "source": str(raw.get("source") or "postgis"),
+        "imei": str(raw["imei"]) if raw.get("imei") else None,
+        "bus_plate": str(raw.get("bus_plate") or raw.get("vehicle_code") or "") or None,
     }
+
+
+async def fetch_vehicle_route(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    vehicle_id: str | None = None,
+    vehicle_code: str | None = None,
+    from_time: datetime | None = None,
+    to_time: datetime | None = None,
+    limit: int = 5000,
+) -> dict[str, Any]:
+    """Full GPS history for a vehicle (Teltonika / driver) without requiring trip_id."""
+    cap = min(max(1, limit), MAX_ROUTE_POINTS)
+    vid = str(vehicle_id or "").strip() or None
+    code = str(vehicle_code or "").strip().upper() or None
+    if not vid and not code:
+        return {
+            "trip_id": None,
+            "vehicle_id": None,
+            "vehicle_code": None,
+            "tenant_id": str(tenant_id),
+            "point_count": 0,
+            "from_time": None,
+            "to_time": None,
+            "tracking_started_at": None,
+            "points": [],
+            "error": "vehicle_required",
+        }
+
+    vehicle_uuid = vid if _is_uuid(vid) else None
+    params: dict[str, Any] = {
+        "tenant_id": str(tenant_id),
+        "vehicle_uuid": vehicle_uuid,
+        "vehicle_id": vid,
+        "vehicle_code": code,
+        "from_time": from_time,
+        "to_time": to_time,
+        "limit": cap,
+    }
+    sql = """
+        SELECT
+            id,
+            trip_id,
+            driver_id,
+            vehicle_id,
+            recorded_at,
+            speed_kmh,
+            heading_deg,
+            ST_Y(geom::geometry) AS lat,
+            ST_X(geom::geometry) AS lng,
+            raw_payload
+        FROM trip_coordinates
+        WHERE tenant_id = CAST(:tenant_id AS uuid)
+          AND (:from_time IS NULL OR recorded_at >= :from_time)
+          AND (:to_time IS NULL OR recorded_at <= :to_time)
+          AND (
+            (:vehicle_uuid IS NOT NULL AND vehicle_id = CAST(:vehicle_uuid AS uuid))
+            OR (:vehicle_id IS NOT NULL AND raw_payload->>'vehicle_id' = :vehicle_id)
+            OR (
+              :vehicle_code IS NOT NULL AND (
+                UPPER(COALESCE(raw_payload->>'bus_plate', '')) = :vehicle_code
+                OR UPPER(COALESCE(raw_payload->>'vehicle_code', '')) = :vehicle_code
+              )
+            )
+          )
+        ORDER BY recorded_at ASC
+        LIMIT :limit
+    """
+    points: list[dict[str, Any]] = []
+    db_error = None
+    try:
+        result = await session.execute(text(sql), params)
+        points = [_row_to_point(row) for row in result.mappings().all()]
+    except Exception as exc:
+        logger.warning("vehicle route query failed: %s", exc)
+        db_error = "database_unavailable"
+
+    # Merge live Redis trail for the active vehicle session.
+    try:
+        if vid:
+            from travel_platform.telemetry.live_fleet_trail_redis import load_trail
+
+            trail = await load_trail(str(tenant_id), vid, limit=cap)
+            existing = {
+                (p.get("recorded_at"), round(p["lat"], 6), round(p["lng"], 6)) for p in points
+            }
+            for idx, p in enumerate(trail or []):
+                recorded_at = str(p.get("t") or "")
+                try:
+                    lat, lng = float(p["lat"]), float(p["lng"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                key = (recorded_at, round(lat, 6), round(lng, 6))
+                if key in existing:
+                    continue
+                points.append(
+                    {
+                        "id": -(idx + 1),
+                        "trip_id": p.get("trip_id"),
+                        "driver_id": p.get("driver_id"),
+                        "vehicle_id": vid,
+                        "lat": lat,
+                        "lng": lng,
+                        "speed_kmh": float(p.get("s") or 0),
+                        "heading_deg": float(p["h"]) if p.get("h") is not None else None,
+                        "altitude_m": None,
+                        "satellites": None,
+                        "recorded_at": recorded_at or None,
+                        "source": "live_trail",
+                        "imei": None,
+                        "bus_plate": code,
+                    },
+                )
+                existing.add(key)
+            points.sort(key=lambda p: p.get("recorded_at") or "")
+            if len(points) > cap:
+                points = points[-cap:]
+    except Exception:
+        logger.debug("vehicle live trail merge skipped", exc_info=True)
+
+    started = points[0]["recorded_at"] if points else None
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+
+        live = get_live_fleet()
+        if vid:
+            meta = await live.vehicle_meta_async(tenant_id, vid) or {}
+            started = meta.get("tracking_started_at") or started
+    except Exception:
+        pass
+
+    payload: dict[str, Any] = {
+        "trip_id": points[-1].get("trip_id") if points else None,
+        "vehicle_id": vid,
+        "vehicle_code": code,
+        "tenant_id": str(tenant_id),
+        "point_count": len(points),
+        "from_time": points[0]["recorded_at"] if points else None,
+        "to_time": points[-1]["recorded_at"] if points else None,
+        "tracking_started_at": started,
+        "points": points,
+    }
+    if db_error and not points:
+        payload["error"] = db_error
+    return payload

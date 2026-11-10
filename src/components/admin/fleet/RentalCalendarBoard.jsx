@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { LEAFLET_BASEMAP } from '../../../lib/maps/appleMapTheme.js';
 import {
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,
   resolvePlaceSync,
+  RENT_MAP_GREECE_CENTER,
+  RENT_MAP_GREECE_ZOOM,
 } from '../../../lib/rental/geocodePlace.js';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
@@ -99,7 +102,13 @@ function pinIcon(color, selected) {
 function FitPins({ pins, focusId }) {
   const map = useMap();
   useEffect(() => {
-    if (!pins.length) return;
+    // Leaflet often boots at world zoom when the container sizes late — always
+    // re-assert Greece when there are no pins yet.
+    map.invalidateSize();
+    if (!pins.length) {
+      map.setView(RENT_MAP_GREECE_CENTER, RENT_MAP_GREECE_ZOOM, { animate: false });
+      return;
+    }
     const focus = focusId ? pins.find((p) => p.id === focusId) : null;
     if (focus) {
       map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 12), { duration: 0.55 });
@@ -629,14 +638,18 @@ export default function RentalCalendarBoard({
             </div>
           ) : null}
           <MapContainer
-            center={[38.5, 23.5]}
-            zoom={6}
+            center={RENT_MAP_GREECE_CENTER}
+            zoom={RENT_MAP_GREECE_ZOOM}
+            minZoom={5}
+            maxZoom={18}
             className="h-full w-full"
             scrollWheelZoom
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap &copy; CARTO"
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution={LEAFLET_BASEMAP.attribution}
+              url={LEAFLET_BASEMAP.url}
+            subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
             />
             <FitPins pins={mapPins} focusId={selectedBookingId ? `${selectedBookingId}-pickup` : null} />
             {routeLines.map((line) => (
