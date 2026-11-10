@@ -74,10 +74,11 @@ function BusMarker({ vehicle, onVehicleHistory }) {
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
       <button
         type="button"
-        className="relative cursor-pointer border-0 bg-transparent p-0"
+        className="fleet-apple-bus-pin border-0 bg-transparent p-0"
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
+        {/* Ring-only flow box so Mapbox center anchor = GPS (labels float above). */}
         <div className="fleet-apple-bus-pin">
           {gpsSources.length ? (
             <div

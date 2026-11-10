@@ -6,6 +6,7 @@ import json
 import math
 import os
 import threading
+import unicodedata
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -162,8 +163,7 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
     return {"lines": lines, "total": round(total, 2), "days": d}
 
 
-# Stable demo fleet (compact cars + vans) — seeded for empty demo offices.
-# Photos are Wikimedia Commons shots of the named models (not mismatched stock cars).
+# Demo fleet marker — used only to purge previously seeded showcase vehicles.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
 _DEMO_BOOKING_MARKER = "demo_rent_booking_v1"
 _WM = "https://upload.wikimedia.org/wikipedia/commons/"
@@ -285,73 +285,15 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
 )
 
 
-def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
-    """Refresh marketing copy + models on seeded demo vehicles (incl. plate remap)."""
-    by_suffix = {spec["id_suffix"]: spec for spec in _DEMO_VEHICLE_SPECS}
-    by_plate = {str(spec["plate_number"]).upper(): spec for spec in _DEMO_VEHICLE_SPECS}
-    updated = 0
-    now = _now()
-    for row in data.get("vehicles") or []:
-        if row.get("tenant_id") != tenant_id:
-            continue
-        if str(row.get("notes") or "") != _DEMO_FLEET_MARKER:
-            continue
-        vid = str(row.get("id") or "")
-        plate = str(row.get("plate_number") or "").strip().upper()
-        spec = by_plate.get(plate)
-        if not spec:
-            suffix = None
-            for key in by_suffix:
-                if vid.endswith(key) or key in vid:
-                    suffix = key
-                    break
-            if not suffix:
-                model = str(row.get("model") or "").strip().lower()
-                for key, candidate in by_suffix.items():
-                    if str(candidate.get("model") or "").strip().lower() == model:
-                        suffix = key
-                        break
-            spec = by_suffix.get(suffix) if suffix else None
-        if not spec:
-            continue
-        changed = False
-        for field, cast in (
-            ("model", str),
-            ("category", str),
-            ("seating_capacity", int),
-            ("daily_rate_eur", float),
-            ("one_way_surcharge_eur", float),
-            ("with_driver_daily_eur", float),
-            ("description", str),
-        ):
-            new_val = cast(spec.get(field))
-            old_val = row.get(field)
-            if field in ("daily_rate_eur", "one_way_surcharge_eur", "with_driver_daily_eur"):
-                try:
-                    if float(old_val or 0) != float(new_val):
-                        row[field] = float(new_val)
-                        changed = True
-                except (TypeError, ValueError):
-                    row[field] = float(new_val)
-                    changed = True
-            elif field == "seating_capacity":
-                if int(old_val or 0) != int(new_val):
-                    row[field] = int(new_val)
-                    changed = True
-            else:
-                if str(old_val or "").strip() != str(new_val or "").strip():
-                    row[field] = new_val
-                    changed = True
-        new_photo = str(spec.get("photo_url") or "").strip()
-        old_photo = str(row.get("photo_url") or "").strip()
-        if new_photo and old_photo != new_photo:
-            row["photo_url"] = new_photo
-            row["photo_urls"] = [new_photo]
-            changed = True
-        if changed:
-            row["updated_at"] = now
-            updated += 1
-    return updated
+def _is_demo_vehicle_row(row: dict[str, Any]) -> bool:
+    notes = str(row.get("notes") or "")
+    if notes == _DEMO_FLEET_MARKER:
+        return True
+    vid = str(row.get("id") or "")
+    if vid.startswith("demo-rent-"):
+        return True
+    plate = str(row.get("plate_number") or "").strip().upper()
+    return plate.startswith("DEMO-C") or plate.startswith("DEMO-V")
 
 
 def demo_rental_fleet_allowed() -> bool:
@@ -377,40 +319,36 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
-        existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
-        if existing:
-            if _refresh_demo_fleet_copy(data, tid):
-                _write(data)
-            return 0
-        now = _now()
-        added = 0
-        for spec in _DEMO_VEHICLE_SPECS:
-            photo = str(spec.get("photo_url") or "").strip() or None
-            row = {
-                "id": f"demo-rent-{tid[:8]}-{spec['id_suffix']}",
-                "tenant_id": tid,
-                "plate_number": spec["plate_number"],
-                "category": spec["category"],
-                "model": spec["model"],
-                "seating_capacity": int(spec["seating_capacity"]),
-                "current_status": "AVAILABLE",
-                "current_mileage": int(spec.get("current_mileage") or 0),
-                "daily_rate_eur": float(spec["daily_rate_eur"]),
-                "one_way_surcharge_eur": float(spec.get("one_way_surcharge_eur") or 0),
-                "with_driver_daily_eur": float(spec.get("with_driver_daily_eur") or 0),
-                "gps_device_id": None,
-                "photo_url": photo,
-                "photo_urls": [photo] if photo else [],
-                "description": spec.get("description"),
-                "notes": _DEMO_FLEET_MARKER,
-                "created_at": now,
-                "updated_at": now,
-            }
-            data["vehicles"].append(row)
-            added += 1
-        if added:
-            _write(data)
-        return added
+        vehicles = list(data.get("vehicles") or [])
+        demo_ids = {
+            str(v.get("id"))
+            for v in vehicles
+            if v.get("tenant_id") == tid and _is_demo_vehicle_row(v)
+        }
+        if not demo_ids:
+            return {"vehicles": 0, "bookings": 0}
+        data["vehicles"] = [
+            v
+            for v in vehicles
+            if not (v.get("tenant_id") == tid and str(v.get("id")) in demo_ids)
+        ]
+        bookings = list(data.get("bookings") or [])
+        kept_bookings = []
+        removed_bookings = 0
+        for b in bookings:
+            if b.get("tenant_id") == tid and str(b.get("vehicle_id") or "") in demo_ids:
+                removed_bookings += 1
+                continue
+            kept_bookings.append(b)
+        data["bookings"] = kept_bookings
+        _write(data)
+        return {"vehicles": len(demo_ids), "bookings": removed_bookings}
+
+
+def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
+    """Deprecated no-op — demo rent fleet is no longer seeded."""
+    purge_demo_rental_fleet(tenant_id)
+    return 0
 
 
 def _ensure_demo_sign_vehicle(tenant_id: str) -> dict[str, Any]:
@@ -493,6 +431,18 @@ def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str,
         return create_demo_sign_sample(tid)
     except ValueError:
         return None
+
+PAYMENT_PLANS = ("full", "deposit")
+PAYMENT_METHODS = ("card", "paypal", "apple", "bank_transfer", "cash_office")
+PAYMENT_STATUSES = ("pending", "partial", "paid")
+DEFAULT_DEPOSIT_PERCENT = 30
+
+# Daily extras (EUR) — must match customer PWA labels.
+EXTRA_DAILY_RATES = {
+    "extra_insurance": 12.0,
+    "child_seat": 7.0,
+    "gps_pack": 5.0,
+}
 
 
 def _now() -> str:
@@ -744,6 +694,62 @@ def list_bookings(
     return sorted(rows, key=lambda b: b.get("start_time") or "", reverse=True)
 
 
+def get_booking(tenant_id: str | None, booking_id: str) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    if not bid:
+        return None
+    with _LOCK:
+        for b in _read()["bookings"]:
+            if b.get("tenant_id") == tid and b.get("id") == bid:
+                return deepcopy(b)
+    return None
+
+
+def parse_rental_qr_code(raw: str | None) -> str:
+    """Extract booking id from `RENT:{uuid}` or bare UUID."""
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("Κενός κωδικός QR")
+    upper = value.upper()
+    if upper.startswith("RENT:"):
+        value = value.split(":", 1)[1].strip()
+    value = value.strip()
+    if not value:
+        raise ValueError("Μη έγκυρος κωδικός QR ενοικίασης")
+    return value
+
+
+def verify_rental_qr(tenant_id: str | None, raw_code: str) -> dict[str, Any]:
+    """Desk verify wallet pass QR — read-only, no status mutation."""
+    booking_id = parse_rental_qr_code(raw_code)
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    status = str(booking.get("rental_status") or "").upper()
+    eligible_checkin = status == "CONFIRMED"
+    eligible_checkout = status == "ACTIVE"
+    if status == "CANCELLED":
+        reason = "Η κράτηση έχει ακυρωθεί"
+    elif status == "COMPLETED":
+        reason = "Η ενοικίαση έχει ολοκληρωθεί"
+    elif eligible_checkin:
+        reason = "Έτοιμη για check-in"
+    elif eligible_checkout:
+        reason = "Έτοιμη για check-out / επιστροφή"
+    else:
+        reason = f"Κατάσταση: {status or '—'}"
+    return {
+        "ok": True,
+        "code": f"RENT:{booking_id}",
+        "booking_id": booking_id,
+        "booking": booking,
+        "eligible_checkin": eligible_checkin,
+        "eligible_checkout": eligible_checkout,
+        "reason": reason,
+    }
+
+
 def _vehicle_conflicts(
     data: dict[str, Any],
     *,
@@ -772,6 +778,95 @@ def _norm_place(value: str | None) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def _normalize_deposit_percent(value: Any) -> int:
+    try:
+        pct = int(value)
+    except (TypeError, ValueError):
+        pct = DEFAULT_DEPOSIT_PERCENT
+    return max(5, min(90, pct))
+
+
+def compute_extras_total(days: int, extras: dict[str, Any] | None = None) -> tuple[float, list[str]]:
+    """Return (extras_total, label list) for selected daily add-ons."""
+    days = max(1, int(days or 1))
+    selected = extras if isinstance(extras, dict) else {}
+    lines: list[str] = []
+    total = 0.0
+    labels = {
+        "extra_insurance": "Extra insurance",
+        "child_seat": "Child seat",
+        "gps_pack": "GPS pack",
+    }
+    for key, daily in EXTRA_DAILY_RATES.items():
+        if selected.get(key):
+            total += daily * days
+            lines.append(labels.get(key, key))
+    return round(total, 2), lines
+
+
+def compute_payment_split(
+    total_eur: float,
+    *,
+    payment_plan: str = "full",
+    payment_method: str = "card",
+    deposit_percent: int | None = None,
+) -> dict[str, Any]:
+    """Deposit/full split + payment status for a rental booking."""
+    plan = str(payment_plan or "full").strip().lower() or "full"
+    if plan not in PAYMENT_PLANS:
+        plan = "full"
+    method = str(payment_method or "card").strip().lower() or "card"
+    if method not in PAYMENT_METHODS:
+        method = "card"
+    pct = _normalize_deposit_percent(
+        deposit_percent if deposit_percent is not None else DEFAULT_DEPOSIT_PERCENT
+    )
+    total = round(float(total_eur or 0), 2)
+    if plan == "deposit":
+        due_now = round(total * (pct / 100.0), 2)
+        balance = round(total - due_now, 2)
+    else:
+        due_now = total
+        balance = 0.0
+
+    if method == "bank_transfer":
+        amount_paid = 0.0
+        payment_status = "pending"
+        if plan == "deposit":
+            payment_label = f"PENDING · Προκαταβολή {pct}% (Τράπεζα)"
+        else:
+            payment_label = "PENDING (Bank Transfer)"
+    elif method == "cash_office":
+        amount_paid = 0.0
+        payment_status = "pending"
+        payment_label = "PENDING (Cash at office)"
+    else:
+        amount_paid = due_now
+        if balance > 0:
+            payment_status = "partial"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"DEPOSIT {pct}% ({method_name})"
+        else:
+            payment_status = "paid"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"PAID ({method_name})"
+
+    return {
+        "payment_plan": plan,
+        "payment_method": method,
+        "deposit_percent": pct,
+        "amount_due_now": due_now,
+        "amount_paid": amount_paid,
+        "balance_due": balance,
+        "payment_status": payment_status,
+        "payment_label": payment_label,
+    }
+
+
 def quote_vehicle(
     vehicle: dict[str, Any],
     *,
@@ -780,8 +875,9 @@ def quote_vehicle(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute rental quote: base days + optional one-way + with-driver."""
+    """Compute rental quote: base days + optional one-way + with-driver + extras."""
     days = max(1, math.ceil((end - start).total_seconds() / 86400))
     rate = float(vehicle.get("daily_rate_eur") or 0)
     one_way_fee = float(vehicle.get("one_way_surcharge_eur") or 0)
@@ -793,12 +889,17 @@ def quote_vehicle(
     base_total = round(rate * days, 2)
     driver_surcharge = round(with_driver_daily * days, 2) if mode == "WITH_DRIVER" else 0.0
     one_way_surcharge = round(one_way_fee, 2) if is_one_way else 0.0
+    extras_total, extras_lines = compute_extras_total(days, extras)
     return {
         "suggested_days": days,
         "base_total": base_total,
         "driver_surcharge": driver_surcharge,
         "one_way_surcharge": one_way_surcharge,
-        "suggested_total": round(base_total + driver_surcharge + one_way_surcharge, 2),
+        "extras_total": extras_total,
+        "extras_lines": extras_lines,
+        "suggested_total": round(
+            base_total + driver_surcharge + one_way_surcharge + extras_total, 2
+        ),
         "is_one_way": is_one_way,
         "driver_mode": mode,
     }
@@ -862,6 +963,116 @@ def check_availability(
     return out
 
 
+def _normalize_surname(value: str | None) -> str:
+    raw = unicodedata.normalize("NFD", str(value or "").strip().lower())
+    return "".join(ch for ch in raw if unicodedata.category(ch) != "Mn").replace(" ", "")
+
+
+def _normalize_ref_code(value: str | None) -> str:
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if raw.startswith("RN-"):
+        return raw
+    if raw.startswith("RN"):
+        return f"RN-{raw[2:].lstrip('-')}"
+    return raw
+
+
+def _ensure_reference_code(row: dict[str, Any]) -> str:
+    existing = _normalize_ref_code(row.get("reference_code"))
+    if existing:
+        row["reference_code"] = existing
+        return existing
+    code = f"RN-{uuid4().hex[:8].upper()}"
+    row["reference_code"] = code
+    return code
+
+
+def _surname_matches(client_name: str | None, surname: str | None) -> bool:
+    full = _normalize_surname(client_name)
+    needle = _normalize_surname(surname)
+    if not full or not needle:
+        return False
+    if full == needle:
+        return True
+    # Match last token of "First Last" or whole string contains
+    parts = [p for p in str(client_name or "").strip().lower().split() if p]
+    if parts and _normalize_surname(parts[-1]) == needle:
+        return True
+    return needle in full
+
+
+def guest_lookup_booking(
+    tenant_id: str | None,
+    *,
+    surname: str,
+    reference_code: str,
+) -> dict[str, Any] | None:
+    """Public lookup by surname + RN- code (office-scoped)."""
+    tid = _normalize_tenant(tenant_id)
+    code = _normalize_ref_code(reference_code)
+    if not code or not str(surname or "").strip():
+        return None
+    with _LOCK:
+        data = _read()
+        dirty = False
+        hit = None
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid:
+                continue
+            before = row.get("reference_code")
+            ref = _ensure_reference_code(row)
+            if before != ref:
+                dirty = True
+            if ref != code:
+                continue
+            if not _surname_matches(row.get("client_name"), surname):
+                continue
+            hit = row
+            break
+        if dirty:
+            _write(data)
+        return deepcopy(hit) if hit else None
+
+
+def guest_online_checkin(
+    tenant_id: str | None,
+    *,
+    surname: str,
+    reference_code: str,
+) -> dict[str, Any]:
+    """Mark booking ready for pickup (online check-in) after surname+code verify."""
+    tid = _normalize_tenant(tenant_id)
+    code = _normalize_ref_code(reference_code)
+    if not code or not str(surname or "").strip():
+        raise ValueError("Συμπληρώστε επώνυμο και κωδικό κράτησης")
+    with _LOCK:
+        data = _read()
+        booking = None
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid:
+                continue
+            ref = _ensure_reference_code(row)
+            if ref != code:
+                continue
+            if not _surname_matches(row.get("client_name"), surname):
+                continue
+            booking = row
+            break
+        if not booking:
+            raise ValueError("Δεν βρέθηκε κράτηση με αυτά τα στοιχεία")
+        status = str(booking.get("rental_status") or "").upper()
+        if status == "CANCELLED":
+            raise ValueError("Η κράτηση έχει ακυρωθεί")
+        if status == "COMPLETED":
+            raise ValueError("Η ενοικίαση έχει ολοκληρωθεί")
+        now = _now()
+        booking["online_checkin_at"] = now
+        booking["online_checkin_ready"] = True
+        booking["updated_at"] = now
+        _write(data)
+        return deepcopy(booking)
+
+
 def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     vehicle_id = str(body.get("vehicle_id") or "").strip()
@@ -896,6 +1107,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
 
         driver_mode = str(body.get("driver_mode") or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
+        extras = body.get("extras") if isinstance(body.get("extras"), dict) else {}
         quote = quote_vehicle(
             vehicle,
             start=start,
@@ -903,6 +1115,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             pickup_location=pickup,
             dropoff_location=dropoff,
             driver_mode=driver_mode,
+            extras=extras,
         )
         extras_quote = quote_extras(body.get("extras"), days=quote["suggested_days"])
         vehicle_total = float(quote["suggested_total"])
@@ -985,6 +1198,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "client_email": (str(body.get("client_email") or "").strip().lower() or None),
             "client_phone": (str(body.get("client_phone") or "").strip() or None),
             "channel": channel,
+            "reference_code": f"RN-{uuid4().hex[:8].upper()}",
             "start_time": start.isoformat(),
             "end_time": end.isoformat(),
             "pickup_location": pickup,
@@ -995,6 +1209,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
                 "base_total": quote["base_total"],
                 "driver_surcharge": quote["driver_surcharge"],
                 "one_way_surcharge": quote["one_way_surcharge"],
+                "extras_total": quote["extras_total"],
+                "extras_lines": quote["extras_lines"],
                 "is_one_way": quote["is_one_way"],
                 "vehicle_total": vehicle_total,
                 "extras_total": extras_total,
@@ -1017,6 +1233,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "payment_status": payment_status,
             "provider_payment_id": provider_ref,
             "legal_doc_signatures": {},
+            "online_checkin_ready": False,
+            "online_checkin_at": None,
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),

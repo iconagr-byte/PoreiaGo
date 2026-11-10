@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from ticketing.password_utils import hash_password, verify_password
+from ticketing.password_utils import (
+    DRIVER_PBKDF2_ITERATIONS,
+    hash_password,
+    verify_password,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +97,7 @@ def _parse_datetime(value) -> datetime:
 def _driver_from_row(row: dict) -> FleetDriver:
     pwd_hash = row.get("password_hash")
     if not pwd_hash and row.get("password"):
-        pwd_hash = hash_password(str(row["password"]))
+        pwd_hash = _hash_driver_password(str(row["password"]))
     return FleetDriver(
         id=row.get("id") or str(uuid4()),
         name=row["name"],
@@ -112,7 +116,7 @@ def _driver_from_row(row: dict) -> FleetDriver:
         total_km=float(row.get("total_km", 0)),
         license_expires_at=_parse_date(row.get("license_expires_at")),
         avg_rating=row.get("avg_rating"),
-        password_hash=pwd_hash or hash_password(DEFAULT_DRIVER_PASSWORD),
+        password_hash=pwd_hash or _default_password_hash(),
         photo_url=(str(row["photo_url"]).strip() or None) if row.get("photo_url") else None,
         # Legacy rows without tenant_id belong to the demo office only.
         tenant_id=_normalize_tenant_id(row.get("tenant_id")),
@@ -607,9 +611,10 @@ _store_mtime: float | None = None
 
 def reset_drivers_cache() -> None:
     """Test helper — drop in-memory cache so next access reloads from disk."""
-    global _drivers, _store_mtime
+    global _drivers, _store_mtime, _CACHED_DEFAULT_PASSWORD_HASH
     _drivers = None
     _store_mtime = None
+    _CACHED_DEFAULT_PASSWORD_HASH = None
 
 
 def _ensure() -> dict[str, FleetDriver]:
@@ -825,7 +830,7 @@ def authenticate_driver(
     if not stored:
         if password != DEFAULT_DRIVER_PASSWORD:
             return None
-        driver.password_hash = hash_password(password)
+        driver.password_hash = _hash_driver_password(password)
         _persist()
         return driver
     if not verify_password(password, stored):
@@ -886,7 +891,7 @@ def create_driver(data: dict) -> FleetDriver:
         current_balance=0.0,
         safety_score=100,
         license_expires_at=_parse_date(data.get("license_expires_at")),
-        password_hash=hash_password(str(pwd)),
+        password_hash=_hash_driver_password(str(pwd)),
         photo_url=(str(data["photo_url"]).strip() or None) if data.get("photo_url") else None,
         tenant_id=tenant_id,
     )
@@ -955,7 +960,7 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         pwd = str(patch["password"])
         if len(pwd) < 4:
             raise ValueError("Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες")
-        d.password_hash = hash_password(pwd)
+        d.password_hash = _hash_driver_password(pwd)
     _persist()
     return d
 

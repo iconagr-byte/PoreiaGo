@@ -133,8 +133,8 @@ export default function FleetLiveMapWebSocket() {
     [mapVehicles],
   );
 
-  const transportLabel =
-    transport === 'poll' ? 'HTTP' : transport === 'ws' ? 'Live' : 'σύνδεση…';
+  const feedLabel =
+    transport === 'poll' ? 'HTTP poll' : transport === 'ws' ? 'WebSocket' : 'σύνδεση…';
 
   return (
     <div className="fleet-apple-shell space-y-4">
@@ -238,6 +238,11 @@ export default function FleetLiveMapWebSocket() {
               onClearSos={clearAlert}
             />
           )}
+          {!mapbox ? (
+            <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-slate-500 shadow-sm backdrop-blur">
+              Leaflet · ορίστε VITE_MAPBOX_TOKEN για Mapbox
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-4">

@@ -1,11 +1,13 @@
 import { API_BASE } from '../config/api.js';
-import { adminAuthHeaders } from './adminApi.js';
+import { adminAuthHeaders, adminBearerHeaders } from './adminApi.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
 const DEVICE_KEY =
   import.meta.env.VITE_TELEMETRY_DEVICE_KEY ||
   (import.meta.env.PROD ? '' : 'dev-gps-key');
 
+/** Admin live map HTTP poll cadence — matches driver GPS send interval (5s). */
+export const FLEET_LIVE_POLL_MS = 5000;
 export async function postTelemetryUpdate(payload) {
   const res = await fetch(`${API_BASE}/telemetry/update`, {
     method: 'POST',
@@ -23,12 +25,34 @@ export async function postTelemetryUpdate(payload) {
 }
 
 export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
-  const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
-    headers: authHeaders,
-  });
-  if (res.ok) {
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+  const run = async () => {
+    const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
+      headers: authHeaders,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+    // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
+    if (authHeaders?.Authorization) {
+      const err = await res.json().catch(() => ({}));
+      const error = new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
+    return getMockFleet();
+  };
+
+  try {
+    return await run();
+  } catch (err) {
+    // One quick retry on gateway blips during api-blue recreate.
+    const status = err?.status;
+    if (status === 502 || status === 503 || status === 504) {
+      await new Promise((r) => setTimeout(r, 600));
+      return run();
+    }
+    throw err;
   }
   // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
   if (authHeaders?.Authorization) {
@@ -107,13 +131,32 @@ export async function fetchFleetKpis({ days = 30, from, to } = {}, authHeaders =
   return data;
 }
 
-export async function fetchFleetEtas(authHeaders = adminAuthHeaders()) {
-  const res = await fetch(`${API_BASE}/api/admin/telemetry/etas`, { headers: authHeaders });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.detail || 'Αποτυχία φόρτωσης fleet ETA');
+export async function fetchFleetEtas(authHeaders = adminBearerHeaders()) {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/telemetry/etas`, {
+      headers: authHeaders,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data.detail;
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg || d).join(', ')
+            : 'Αποτυχία φόρτωσης fleet ETA';
+      throw new Error(message);
+    }
+    return data;
+  } catch (err) {
+    // Network / CORS / unreachable API — don't surface raw "Failed to fetch".
+    if (err?.message && /failed to fetch|networkerror|load failed/i.test(err.message)) {
+      const soft = new Error('Αδυναμία σύνδεσης με το API ETA');
+      soft.code = 'NETWORK';
+      throw soft;
+    }
+    throw err;
   }
-  return data;
 }
 
 /** Signed public passenger track link — POST /api/admin/telemetry/trips/{id}/track-link */

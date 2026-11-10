@@ -55,6 +55,7 @@ class TenantProvisioningService:
         admin_password_hash: str,
         subdomain_hint: str | None = None,
         trial_days: int = 14,
+        rent_addon: bool = False,
     ) -> Tenant:
         existing = await self._session.execute(
             select(Tenant).where(Tenant.stripe_customer_id == stripe_customer_id),
@@ -83,7 +84,7 @@ class TenantProvisioningService:
             stripe_customer_id=stripe_customer_id,
             isolation_strategy=isolation,
             settings_json=json.dumps(
-                initial_settings_for_plan(plan, office_name=legal_name),
+                initial_settings_for_plan(plan, office_name=legal_name, rent_addon=rent_addon),
                 ensure_ascii=False,
             ),
         )

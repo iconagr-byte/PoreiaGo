@@ -1,12 +1,31 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 UserRole = Literal["admin", "driver", "agent", "viewer"]
 
+
+def _empty_to_none(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+def _coerce_nonneg_float(value: Any, default: float) -> float:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return default
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return default
+    if n != n:  # NaN
+        return default
+    return max(0.0, n)
 
 class PlatformSettingsResponse(BaseModel):
     company_name: str = "PoreiaGo Travel"
@@ -191,6 +210,28 @@ class FleetDriverCreate(BaseModel):
     photo_url: str | None = None
     password: str = Field(..., min_length=4, max_length=128)
 
+    @field_validator("name", "license_no", "phone", "status", mode="before")
+    @classmethod
+    def _strip_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("hiring_date", "license_expires_at", "vehicle_code", "license_plate", "photo_url", mode="before")
+    @classmethod
+    def _blank_optional(cls, value: Any) -> Any:
+        return _empty_to_none(value)
+
+    @field_validator("salary_per_km", mode="before")
+    @classmethod
+    def _salary_km(cls, value: Any) -> float:
+        return _coerce_nonneg_float(value, 0.45)
+
+    @field_validator("salary_per_trip", mode="before")
+    @classmethod
+    def _salary_trip(cls, value: Any) -> float:
+        return _coerce_nonneg_float(value, 25.0)
+
 
 class FleetDriverUpdate(BaseModel):
     name: str | None = None
@@ -206,6 +247,24 @@ class FleetDriverUpdate(BaseModel):
     license_expires_at: date | None = None
     photo_url: str | None = None
     password: str | None = Field(None, min_length=4)
+
+    @field_validator("hiring_date", "license_expires_at", "vehicle_code", "license_plate", "photo_url", mode="before")
+    @classmethod
+    def _blank_optional(cls, value: Any) -> Any:
+        return _empty_to_none(value)
+
+    @field_validator("salary_per_km", "salary_per_trip", mode="before")
+    @classmethod
+    def _salary_optional(cls, value: Any) -> Any:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        try:
+            n = float(value)
+        except (TypeError, ValueError):
+            return None
+        if n != n:
+            return None
+        return max(0.0, n)
 
 class VehicleProfileResponse(BaseModel):
     id: str
@@ -259,7 +318,7 @@ class VehicleCreate(BaseModel):
     fuel_cost_total: float = Field(0, ge=0)
     insurance_cost_total: float = Field(0, ge=0)
     category: str = "Standard"
-    seat_count: int = Field(49, ge=8, le=80)
+    seat_count: int = Field(49, ge=2, le=80)
     amenities: list[str] = Field(default_factory=list)
     public_image_url: str = ""
     gallery_urls: list[str] = Field(default_factory=list)
@@ -285,7 +344,7 @@ class VehicleUpdate(BaseModel):
     fuel_cost_total: float | None = Field(None, ge=0)
     insurance_cost_total: float | None = Field(None, ge=0)
     category: str | None = None
-    seat_count: int | None = Field(None, ge=8, le=80)
+    seat_count: int | None = Field(None, ge=2, le=80)
     amenities: list[str] | None = None
     public_image_url: str | None = None
     gallery_urls: list[str] | None = None
@@ -485,6 +544,11 @@ class DriverShiftPushRequest(BaseModel):
     driver_id: str | None = None
     message: str | None = Field(default=None, max_length=240)
     trip_title: str | None = Field(default=None, max_length=120)
+    frontend_base: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Public driver app origin for magic-link auth_url",
+    )
 
 
 class DriverShiftPushResponse(BaseModel):
