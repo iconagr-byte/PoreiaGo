@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import { getSaasToken, saasAuthHeaders } from './saasApi.js';
+import { adminBearerHeaders, adminFetch } from './adminApi.js';
 
 async function rentalFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental${path}`, {
@@ -86,16 +87,22 @@ export async function fetchRentalLiveOverlays() {
 export async function uploadRentalInspectionPhoto(file) {
   const form = new FormData();
   form.append('file', file);
-  const token = getSaasToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental/inspections/photo-upload`, {
+  // Must use bearer-only headers — Content-Type: application/json breaks multipart.
+  const res = await adminFetch('/api/admin/platform/fleet-rental/inspections/photo-upload', {
     method: 'POST',
-    headers,
+    headers: adminBearerHeaders(),
     body: form,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.detail || 'Αποτυχία ανεβάσματος φωτογραφίας');
+    const detail = data?.detail;
+    const msg =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data?.message || 'Αποτυχία ανεβάσματος φωτογραφίας';
+    throw new Error(msg);
   }
   return data;
 }
@@ -118,6 +125,41 @@ export async function createRentalBooking(body) {
   return rentalFetch('/bookings', { method: 'POST', body: JSON.stringify(body) });
 }
 
+/**
+ * Open issued rental contract HTML in a new tab.
+ * Admin `/contracts/file/*` needs Bearer auth — plain <a target=_blank> shows blank/401.
+ */
+export async function openRentalContractFile(contractUrl) {
+  const raw = String(contractUrl || '').trim();
+  if (!raw) throw new Error('Δεν υπάρχει αρχείο σύμβασης');
+  const abs = raw.startsWith('http') ? raw : `${API_BASE}${raw}`;
+  const token = getSaasToken();
+  const res = await fetch(abs, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      typeof data?.detail === 'string' ? data.detail : `Αποτυχία ανοίγματος σύμβασης (${res.status})`,
+    );
+  }
+  const html = await res.text();
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const href = URL.createObjectURL(blob);
+  const win = window.open(href, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    URL.revokeObjectURL(href);
+    throw new Error('Το παράθυρο μπλοκαρίστηκε — επέτρεψε pop-ups');
+  }
+  window.setTimeout(() => URL.revokeObjectURL(href), 120_000);
+  return true;
+}
+
+/** One-click CONFIRMED sample booking for dual-mode signature demo. */
+export async function createRentalDemoSignSample() {
+  return rentalFetch('/bookings/demo-sign-sample', { method: 'POST', body: '{}' });
+}
+
 export async function updateRentalBookingStatus(id, rentalStatus) {
   return rentalFetch(`/bookings/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
@@ -125,20 +167,106 @@ export async function updateRentalBookingStatus(id, rentalStatus) {
   });
 }
 
-export async function verifyRentalQr(code) {
-  return rentalFetch('/verify-qr', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
+/** Attach signature to a legal paperwork document on a booking. */
+export async function saveRentalLegalDocSignature(bookingId, { docId, signatureUrl, signerName }) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/legal-docs`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      doc_id: docId,
+      signature_url: signatureUrl,
+      signer_name: signerName || undefined,
+    }),
   });
 }
 
-export async function fetchRentalBooking(id) {
-  return rentalFetch(`/bookings/${encodeURIComponent(id)}`);
+/** Tablet checkout — accept terms + signature → issue contract (ACTIVE). */
+export async function completeRentalCheckout(bookingId, body) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Generate 24h contactless signing link + SMS/email to client. */
+export async function createRentalSignLink(bookingId, publicBaseUrl) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/sign-link`, {
+    method: 'POST',
+    body: JSON.stringify({ public_base_url: publicBaseUrl || window.location.origin }),
+  });
+}
+
+/**
+ * Clear issued/wrong signature (even if ACTIVE) and optionally send a new remote link.
+ */
+export async function resetRentalSignature(
+  bookingId,
+  { sendLink = true, publicBaseUrl } = {},
+) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/reset-signature`, {
+    method: 'POST',
+    body: JSON.stringify({
+      send_link: Boolean(sendLink),
+      public_base_url: publicBaseUrl || window.location.origin,
+    }),
+  });
+}
+
+/** Poll agent tablet while waiting for remote client signature. */
+export async function fetchRentalCheckoutStatus(bookingId) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout-status`);
 }
 
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];
+}
+
+export async function fetchRentalAvailabilityBoard() {
+  const data = await rentalFetch('/availability-board');
+  return data.vehicles || [];
+}
+
+export async function fetchRentalDocuments(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const data = await rentalFetch(`/documents${q}`);
+  return data.documents || [];
+}
+
+export async function uploadRentalDocument(vehicleId, file, { kind = 'registration', expiresAt } = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  const params = new URLSearchParams({ kind });
+  if (expiresAt) params.set('expires_at', expiresAt);
+  const res = await adminFetch(
+    `/api/admin/platform/fleet-rental/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
+    { method: 'POST', headers: adminBearerHeaders(), body: form },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία ανεβάσματος εγγράφου');
+  }
+  return data;
+}
+
+export async function deleteRentalDocument(vehicleId, documentId) {
+  return rentalFetch(
+    `/vehicles/${encodeURIComponent(vehicleId)}/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+export async function fetchRentalExpenses(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const data = await rentalFetch(`/expenses${q}`);
+  return data.expenses || [];
+}
+
+export async function createRentalExpense(body) {
+  return rentalFetch('/expenses', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function deleteRentalExpense(expenseId) {
+  return rentalFetch(`/expenses/${encodeURIComponent(expenseId)}`, { method: 'DELETE' });
 }
 
 export async function fetchRentalInspections(bookingId) {
