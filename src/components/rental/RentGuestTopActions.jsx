@@ -177,6 +177,34 @@ export default function RentGuestTopActions({
             </button>
           ))}
 
+          <div
+            className="rent-top-menu-lang"
+            role="group"
+            aria-label={el ? 'Γλώσσα' : 'Language'}
+          >
+            <span className="rent-top-menu-lang-label">
+              {el ? 'Γλώσσα' : 'Language'}
+            </span>
+            <div className="rent-top-lang rent-top-lang--menu">
+              <button
+                type="button"
+                className={lang === 'el' ? 'is-active' : ''}
+                aria-pressed={lang === 'el'}
+                onClick={() => switchLang('el')}
+              >
+                ΕΛ
+              </button>
+              <button
+                type="button"
+                className={lang === 'en' ? 'is-active' : ''}
+                aria-pressed={lang === 'en'}
+                onClick={() => switchLang('en')}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+
           <div className="rent-top-menu-sep" role="separator" />
 
           <button
@@ -279,7 +307,11 @@ export default function RentGuestTopActions({
           ))}
         </nav>
 
-        <div className="rent-top-lang" role="group" aria-label={el ? 'Γλώσσα' : 'Language'}>
+        <div
+          className="rent-top-lang rent-top-lang--bar"
+          role="group"
+          aria-label={el ? 'Γλώσσα' : 'Language'}
+        >
           <button
             type="button"
             className={lang === 'el' ? 'is-active' : ''}
