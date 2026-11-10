@@ -1,22 +1,22 @@
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import PlatformBusesSession from '../components/marketing/PlatformBusesSession.jsx';
+import PlatformWalletSession from '../components/marketing/PlatformWalletSession.jsx';
 import PlatformMarketingHeader from '../components/marketing/PlatformMarketingHeader.jsx';
-import PlatformRentSession from '../components/marketing/PlatformRentSession.jsx';
 import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
   FeaturesSection,
   FinalCtaSection,
-  HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
 import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 import { Link } from 'react-router-dom';
+import '../styles/platform-landing-rest.css';
 
 export default function FrontPage() {
   return (
     <div
-      className="min-h-screen bg-slate-950 text-white"
+      className="pg-home-shell min-h-screen bg-slate-950 text-white"
       style={{
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -27,89 +27,45 @@ export default function FrontPage() {
       <main>
         <PlatformServiceHub />
         <PlatformBusesSession />
-        <PlatformRentSession />
+        <PlatformWalletSession />
         <PainPointsSection />
         <FeaturesSection />
-        <HowItWorksSection />
         <PricingTeaserSection />
         <FinalCtaSection />
       </main>
 
-      <footer className="border-t border-white/10 bg-slate-950 py-12">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between gap-8">
-          <div>
+      <footer className="pg-site-footer">
+        <div className="pg-site-footer-inner">
+          <div className="pg-site-footer-brand">
             <PlatformBrand variant="dark" asLink={false} />
-            <p className="text-sm text-white/45 mt-4 max-w-xs">
+            <p>
               Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, χρεώσεις.
             </p>
           </div>
-          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
-            <div className="flex flex-col gap-2 min-w-[8rem]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-300/80">
-                Λεωφορεία
-              </span>
-              <a href="#session-buses" className="hover:text-white">
-                Εκδρομές & λεωφορεία
-              </a>
-              <a href="#platform-trips" className="hover:text-white">
-                Εκδρομές
-              </a>
-              <a href="#our-fleet" className="hover:text-white">
-                Στόλος
-              </a>
-              <a href="#features" className="hover:text-white">
-                Λειτουργίες
-              </a>
+
+          <div className="pg-site-footer-cols">
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label pg-site-footer-label--buses">Λεωφορεία</span>
+              <a href="#session-buses">Εκδρομές & λεωφορεία</a>
+              <a href="#platform-trips">Εκδρομές</a>
+              <a href="#our-fleet">Στόλος</a>
+              <a href="#session-wallet">My Wallet</a>
+              <a href="#features">Λειτουργίες</a>
             </div>
-            <div className="flex flex-col gap-2 min-w-[8rem]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-teal-300/80">
-                Ενοικιάσεις
-              </span>
-              <a href="#session-rent" className="hover:text-white">
-                Ενοικιάσεις οχημάτων
-              </a>
-              <Link to="/rent" className="hover:text-white">
-                Σελίδα Rent
-              </Link>
-              <Link to="/grafeia" className="hover:text-white">
-                Συμβόλαια Rent
-              </Link>
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label pg-site-footer-label--rent">Ενοικιάσεις</span>
+              <Link to="/rent">Ενοικιάσεις οχημάτων</Link>
+              <Link to="/rent">Σελίδα Rent</Link>
+              <Link to="/grafeia">Συμβόλαια Rent</Link>
             </div>
-            <div className="flex flex-col gap-2 min-w-[8rem]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                Πλατφόρμα
-              </span>
-              <a href="#pricing" className="hover:text-white">
-                Τιμές
-              </a>
-              <Link to="/my-booking" className="hover:text-white">
-                Ανάκτηση κράτησης
-              </Link>
-              <Link
-                to="/login"
-                state={{ from: '/wallet' }}
-                className="hover:text-white inline-flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]" aria-hidden>
-                  person
-                </span>
-                Λογαριασμός πελάτη
-              </Link>
-              {/* Discreet staff entry — not in the public header (customers see account login there). */}
-              <Link
-                to="/admin/login"
-                className="mt-1 text-white/35 hover:text-white/70 inline-flex items-center gap-1.5 text-xs"
-                title="Σύνδεση διαχείρισης γραφείου"
-              >
-                <span className="material-symbols-outlined text-[14px]" aria-hidden>
-                  badge
-                </span>
-                Διαχείριση γραφείου
-              </Link>
+            <div className="pg-site-footer-col">
+              <span className="pg-site-footer-label">Πλατφόρμα</span>
+              <a href="#pricing">Τιμές</a>
+              <Link to="/my-booking">Ανάκτηση κράτησης</Link>
             </div>
           </div>
         </div>
-        <p className="text-center text-xs text-white/30 mt-10">
+        <p className="pg-site-footer-copy">
           © {new Date().getFullYear()} {PLATFORM_NAME} — {PLATFORM_BRAND_LINE}
         </p>
       </footer>

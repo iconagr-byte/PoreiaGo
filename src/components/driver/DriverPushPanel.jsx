@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 import {
   fetchDriverPushConfig,
   fetchDriverPushStatus,
@@ -11,8 +12,9 @@ import {
   unsubscribeDriverPush,
 } from '../../services/driverPushNotificationApi.js';
 
-/** Ενεργοποίηση push — «Άνοιξε βάρδια» από το γραφείο. */
+/** Ενεργοποίηση push — «Άνοιξε βάρδια» από το γραφείο (Web Push ή native FCM). */
 export default function DriverPushPanel() {
+  const native = typeof window !== 'undefined' && isNativeApp();
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(null); // null = loading
   const [subscribed, setSubscribed] = useState(false);
@@ -22,38 +24,40 @@ export default function DriverPushPanel() {
   useEffect(() => {
     const ok = isDriverPushSupported();
     setSupported(ok);
-    if (!ok) return;
+    if (!ok) {
+      setEnabled(false);
+      return undefined;
+    }
 
     let cancelled = false;
     (async () => {
       try {
-        // /config auto-provisions VAPID and does not require a session.
         const [config, localSub] = await Promise.all([
           fetchDriverPushConfig(),
           isThisBrowserDriverPushSubscribed().catch(() => false),
         ]);
         if (cancelled) return;
-        setEnabled(Boolean(config.enabled && config.public_key));
+        const channelOk = native
+          ? Boolean(config.enabled || config.fcm)
+          : Boolean(config.enabled && config.public_key);
+        setEnabled(channelOk);
         setSubscribed(Boolean(localSub));
         try {
           const status = await fetchDriverPushStatus();
           if (cancelled) return;
           if (status.enabled != null) {
-            setEnabled(Boolean(status.enabled));
+            setEnabled(Boolean(status.enabled || (native && status.fcm)));
           }
-          // Prefer this browser — tenant-wide "subscribed" can lie across devices.
           if (!localSub && status.subscribed) {
             setSubscribed(false);
           }
         } catch {
-          // Session may be cold; still show enable if VAPID is ready.
+          /* Session may be cold; still show enable if keys/FCM ready. */
         }
 
-        // Auto-prompt once per session on Achillio / driver phone so push is not skipped.
         if (
           !cancelled &&
-          config.enabled &&
-          config.public_key &&
+          channelOk &&
           !localSub &&
           sessionStorage.getItem('driver_push_autoprompt_v1') !== '1'
         ) {
@@ -74,7 +78,7 @@ export default function DriverPushPanel() {
                         await subscribeDriverPush();
                         setSubscribed(true);
                         setEnabled(true);
-                        toast.success('Push ενεργό σε αυτή τη συσκευή');
+                        toast.success('Push ενεργό');
                       } catch (err) {
                         toast.error(err.message || 'Αποτυχία');
                       } finally {
@@ -88,7 +92,7 @@ export default function DriverPushPanel() {
               ),
               { duration: 14000, id: 'driver-push-prompt' },
             );
-          }, 900);
+          }, 1200);
         }
       } catch (err) {
         if (cancelled) return;
@@ -100,7 +104,7 @@ export default function DriverPushPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [native]);
 
   const onSubscribe = async () => {
     setBusy(true);
@@ -108,7 +112,11 @@ export default function DriverPushPanel() {
       await subscribeDriverPush();
       setSubscribed(true);
       setEnabled(true);
-      toast.success('Push ενεργό — θα λαμβάνετε κλήση βάρδιας από το γραφείο');
+      toast.success(
+        native
+          ? 'Native push ενεργό — θα λαμβάνετε κλήση βάρδιας στο κινητό'
+          : 'Push ενεργό — θα λαμβάνετε κλήση βάρδιας από το γραφείο',
+      );
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενεργοποίησης');
     } finally {
@@ -146,7 +154,7 @@ export default function DriverPushPanel() {
         const detail =
           Array.isArray(result.errors) && result.errors[0]
             ? String(result.errors[0]).slice(0, 100)
-            : 'ελέγξτε άδεια ειδοποιήσεων';
+            : 'ελέγξτε άδεια ειδοποιήσεων / FCM credentials';
         toast.error(`Δοκιμή απέτυχε — ${detail}`);
       }
     } catch (err) {
@@ -156,7 +164,21 @@ export default function DriverPushPanel() {
     }
   };
 
-  if (!supported) return null;
+  if (!supported) {
+    if (!native) return null;
+    return (
+      <div className="driver-card space-y-2">
+        <h3 className="font-bold text-base flex items-center gap-2">
+          <span className="material-symbols-outlined text-[var(--driver-yellow)]">notifications</span>
+          Ειδοποιήσεις βάρδιας
+        </h3>
+        <p className="text-xs text-[var(--driver-muted)] leading-relaxed">
+          Το plugin Push Notifications δεν είναι διαθέσιμο σε αυτό το build. Κάντε sync/rebuild του
+          APK με @capacitor/push-notifications.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="driver-card space-y-3">
@@ -167,44 +189,56 @@ export default function DriverPushPanel() {
             Ειδοποιήσεις βάρδιας
           </h3>
           <p className="text-xs text-[var(--driver-muted)] mt-1 leading-relaxed">
-            Ενεργοποιήστε push σε ΑΥΤΟ το κινητό. Το γραφείο θα σας στείλει «Άνοιξε βάρδια».
+            {native
+              ? 'Native FCM — ενεργοποιήστε push σε ΑΥΤΟ το κινητό για «Άνοιξε βάρδια» από το γραφείο.'
+              : 'Ενεργοποιήστε push σε ΑΥΤΟ το κινητό. Το γραφείο θα σας στείλει «Άνοιξε βάρδια».'}
           </p>
         </div>
       </div>
       {enabled === null ? (
         <p className="text-xs text-[var(--driver-muted)] px-1 py-2">Έλεγχος ειδοποιήσεων…</p>
-      ) : !enabled ? (
-        <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-600/30 rounded-xl px-3 py-2">
+      ) : !enabled && !native ? (
+        <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 leading-relaxed">
           {loadError || 'Οι ειδοποιήσεις δεν είναι διαθέσιμες ακόμα — δοκιμάστε ξανά σε λίγο.'}
         </p>
-      ) : subscribed ? (
-        <div className="grid gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onTest}
-            className="driver-btn-primary w-full py-3 text-sm"
-          >
-            {busy ? '…' : 'Δοκιμή push'}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onUnsubscribe}
-            className="w-full py-3 rounded-xl border border-white/15 text-sm font-bold text-[var(--driver-muted)]"
-          >
-            Απενεργοποίηση push
-          </button>
-        </div>
       ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onSubscribe}
-          className="driver-btn-primary w-full py-3 text-sm"
-        >
-          {busy ? '…' : 'Ενεργοποίηση push'}
-        </button>
+        <>
+          {native && !enabled ? (
+            <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 leading-relaxed">
+              {loadError ||
+                'Μπορείτε να εγγράψετε τη συσκευή· η αποστολή ξεκινά όταν οριστούν τα Firebase credentials στον server.'}
+            </p>
+          ) : null}
+          {subscribed ? (
+            <div className="grid gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onTest}
+                className="driver-btn-primary w-full py-3.5 text-sm"
+              >
+                {busy ? '…' : 'Δοκιμή push'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onUnsubscribe}
+                className="w-full py-3.5 rounded-xl border border-[var(--driver-border)] bg-slate-50 text-sm font-bold text-[var(--driver-muted)]"
+              >
+                Απενεργοποίηση push
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSubscribe}
+              className="driver-btn-primary w-full py-3.5 text-sm"
+            >
+              {busy ? '…' : 'Ενεργοποίηση push'}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import {
   shouldShowRentStorefront,
 } from '../../services/officeModulesApi.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
 /**
  * Blocks /rent surfaces on tenant storefronts without an active Rent contract/add-on.
@@ -57,7 +58,8 @@ export default function RentStorefrontGate({ children }) {
   }
 
   if (!state.allowed) {
-    return <Navigate to="/" replace />;
+    // Native unified app: never bounce to marketing `/` (role boot would re-enter /rent).
+    return <Navigate to={isNativeApp() ? '/wallet' : '/'} replace />;
   }
 
   return children;

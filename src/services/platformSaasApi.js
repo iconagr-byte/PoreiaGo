@@ -53,12 +53,22 @@ export async function validatePlatformDomain(domain) {
   return saasFetch(`/api/v1/platform/tls/validate-domain?${q}`);
 }
 
+/** Registry + live DNS (www CNAME / apex A) for any office custom domain. */
+export async function checkPlatformDomainDns(domain) {
+  const q = new URLSearchParams({ domain: String(domain || '').trim().toLowerCase() });
+  return saasFetch(`/api/v1/platform/tls/dns-check?${q}`);
+}
+
 export async function suspendPlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/suspend`, { method: 'POST' });
 }
 
 export async function reactivatePlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/reactivate`, { method: 'POST' });
+}
+
+export async function deletePlatformTenant(tenantId) {
+  return saasFetch(`/api/v1/platform/tenants/${tenantId}`, { method: 'DELETE' });
 }
 
 export async function impersonatePlatformTenant(tenantId) {
