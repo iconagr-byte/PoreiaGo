@@ -257,13 +257,12 @@ export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = ad
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     }
-    // Authenticated office must never see demo ROUTE_DEVIATION mocks —
-    // a 500 (e.g. NEW_BOOKING without vehicle_id) previously hid real bookings.
-    if (authHeaders?.Authorization) return [];
   } catch {
-    if (authHeaders?.Authorization) return [];
+    /* ignore — fall through */
   }
-  return getMockAlerts();
+  // Never inject demo ROUTE_DEVIATION («120m εκτός διαδρόμου») into real offices.
+  // That mock leaked into every γραφείο via a shared session inbox.
+  return [];
 }
 
 /** Office dismisses driver SOS — pin leaves the live map. */
