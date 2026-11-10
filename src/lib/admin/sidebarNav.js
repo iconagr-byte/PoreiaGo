@@ -229,6 +229,16 @@ export function loadNavLayout(isSuperAdmin) {
     isSuperAdmin ? 'aerostride_admin_nav_layout_v6_super' : 'aerostride_admin_nav_layout_v6',
   ];
 
+  const finish = (layout) => {
+    const cleaned = migrateNavLayout(layout, isSuperAdmin);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(cleaned));
+    } catch {
+      /* ignore quota */
+    }
+    return cleaned;
+  };
+
   try {
     for (const key of legacyKeys) {
       const raw = localStorage.getItem(key);
@@ -248,13 +258,30 @@ export function loadNavLayout(isSuperAdmin) {
       }
     }
 
-    const legacyRaw =
-      localStorage.getItem(isSuperAdmin ? `${NAV_ORDER_STORAGE_KEY}_super` : NAV_ORDER_STORAGE_KEY) ||
-      localStorage.getItem(NAV_ORDER_STORAGE_KEY);
-    if (legacyRaw) {
-      const flat = JSON.parse(legacyRaw);
-      if (Array.isArray(flat)) {
-        return migrateNavLayout(splitLegacyFlatOrder(flat, isSuperAdmin), isSuperAdmin);
+    // Migrate from v2 / flat order keys.
+    for (const key of [
+      isSuperAdmin ? 'aerostride_admin_nav_layout_v2_super' : 'aerostride_admin_nav_layout_v2',
+      'aerostride_admin_nav_layout_v2',
+      isSuperAdmin ? `${NAV_ORDER_STORAGE_KEY}_super` : NAV_ORDER_STORAGE_KEY,
+      NAV_ORDER_STORAGE_KEY,
+    ]) {
+      const legacyRaw = localStorage.getItem(key);
+      if (!legacyRaw) continue;
+      try {
+        const parsed = JSON.parse(legacyRaw);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.main)) {
+          return finish({
+            main: parsed.main || [],
+            fleet_ops: parsed.fleet_ops || [],
+            platform: parsed.platform || [],
+            settings: parsed.settings || [],
+          });
+        }
+        if (Array.isArray(parsed)) {
+          return finish(splitLegacyFlatOrder(parsed, isSuperAdmin));
+        }
+      } catch {
+        /* try next key */
       }
     }
   } catch {
@@ -428,7 +455,7 @@ export const ADMIN_NAV_ITEMS = {
   fleet_route_playback: {
     id: 'fleet_route_playback',
     label: 'Ιστορικό Διαδρομής',
-    icon: 'route',
+    icon: 'history',
     filled: true,
     type: 'tab',
     tab: 'fleet_route_playback',
