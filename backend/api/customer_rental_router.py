@@ -328,6 +328,41 @@ async def rental_availability(
     )
 
 
+class GuestCheckinBody(BaseModel):
+    surname: str = Field(min_length=2, max_length=120)
+    reference_code: str = Field(min_length=4, max_length=40)
+
+
+@router.post("/public/lookup")
+async def guest_rental_lookup(body: GuestCheckinBody, request: Request):
+    """Guest online check-in lookup — surname + RN- code, office tenant from Host."""
+    row = store.guest_lookup_booking(
+        await _tenant_id(request),
+        surname=body.surname,
+        reference_code=body.reference_code,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση με αυτά τα στοιχεία")
+    return {"booking": _guest_booking_view(row)}
+
+
+@router.post("/public/check-in")
+async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
+    """Confirm online check-in for a rental booking (desk sees ready flag)."""
+    try:
+        row = store.guest_online_checkin(
+            await _tenant_id(request),
+            surname=body.surname,
+            reference_code=body.reference_code,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "booking": _guest_booking_view(row)}
+
+
 @router.get("/bookings")
 async def my_rental_bookings(
     request: Request,
