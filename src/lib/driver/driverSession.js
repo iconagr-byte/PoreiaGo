@@ -1,20 +1,38 @@
 /**
  * Driver Command Center session — bound to trip/day via password / Master QR.
  *
- * Auth is intentionally NOT sticky across app launches: localStorage leftovers
- * are ignored/cleared so reopening /driver always shows the login gate unless
- * this visit just authenticated (sessionStorage fresh marker).
+ * Web / PWA: auth is NOT sticky across launches (sessionStorage + fresh marker).
+ * Native Capacitor (unified PoreiaGo app + legacy driver package): JWT persists
+ * in localStorage so a valid session opens the command center on cold start.
  */
+
+import { shouldPersistNativeDriverSession } from '../capacitor/isNativeApp.js';
+import { rememberNativeRoleHome, NATIVE_ROLE_DRIVER } from '../capacitor/nativeRoleHome.js';
 
 const STORAGE_KEY = 'driver_command_session';
 const FRESH_AUTH_KEY = 'driver_auth_fresh';
+const OFFICE_SEAL_KEY = 'driver_native_office_seal';
+
+function persistNativeDriver() {
+  return shouldPersistNativeDriverSession();
+}
 
 function readSessionRaw() {
   try {
-    return sessionStorage.getItem(STORAGE_KEY);
+    const fromSession = sessionStorage.getItem(STORAGE_KEY);
+    if (fromSession) return fromSession;
   } catch {
-    return null;
+    /* ignore */
   }
+  // Native: restore sealed JWT across process death.
+  if (persistNativeDriver()) {
+    try {
+      return localStorage.getItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 function writeSessionRaw(value) {
@@ -22,6 +40,13 @@ function writeSessionRaw(value) {
     sessionStorage.setItem(STORAGE_KEY, value);
   } catch {
     /* private mode / quota */
+  }
+  if (persistNativeDriver()) {
+    try {
+      localStorage.setItem(STORAGE_KEY, value);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -33,6 +58,43 @@ function removeSessionRaw() {
   }
   try {
     localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Persist office host + tenant so Achillio drivers stay on Achillio APIs. */
+export function sealDriverOffice({ tenantId, apiHost } = {}) {
+  if (!persistNativeDriver()) return;
+  try {
+    const host =
+      String(apiHost || '').trim().replace(/\/$/, '') ||
+      String(import.meta.env.VITE_NATIVE_API_BASE || '').trim().replace(/\/$/, '') ||
+      'https://www.achilliotravel.com';
+    const seal = {
+      tenantId: tenantId || null,
+      apiHost: host,
+      sealedAt: Date.now(),
+    };
+    localStorage.setItem(OFFICE_SEAL_KEY, JSON.stringify(seal));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getDriverOfficeSeal() {
+  try {
+    const raw = localStorage.getItem(OFFICE_SEAL_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function clearDriverOfficeSeal() {
+  try {
+    localStorage.removeItem(OFFICE_SEAL_KEY);
   } catch {
     /* ignore */
   }
@@ -86,17 +148,27 @@ export function getDriverSession() {
 
 export function saveDriverSession(session) {
   writeSessionRaw(JSON.stringify(session));
-  // Never keep a sticky copy — reopen must ask for credentials again.
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
+  if (!persistNativeDriver()) {
+    // Web: never keep a sticky copy — reopen must ask for credentials again.
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  } else {
+    if (session?.tenantId) {
+      sealDriverOffice({ tenantId: session.tenantId });
+    }
+    rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
   }
   try {
     localStorage.setItem('userRole', 'driver');
     localStorage.setItem('driverApiKey', 'dev-driver-key');
-    if (session.tripId != null) {
+    if (session.tripId != null && Number(session.tripId) > 0) {
       sessionStorage.setItem('driverActiveTripId', String(session.tripId));
+      localStorage.removeItem('driverActiveTripId');
+    } else {
+      sessionStorage.removeItem('driverActiveTripId');
       localStorage.removeItem('driverActiveTripId');
     }
   } catch {
@@ -118,6 +190,7 @@ export function clearDriverSession() {
   } catch {
     /* ignore */
   }
+  // Keep office seal on logout so the next login still hits the same office host.
 }
 
 export function isSessionValid() {
@@ -125,12 +198,38 @@ export function isSessionValid() {
 }
 
 /**
- * Cold-open gate: allow through only right after login/QR in this visit.
- * Otherwise wipe any residual session and force the login screen.
+ * Cold-open gate.
+ * - Native (unified or legacy driver package): valid persisted JWT → command center.
+ * - Web/PWA: only right after login/QR in this visit (fresh marker).
+ *
+ * Peek the fresh marker — do not consume here. React StrictMode double-invokes
+ * useState initializers; consuming once then clearing the session on the second
+ * call bounced drivers straight back to /login after a successful sign-in.
  */
 export function resolveDriverAuthOnLaunch() {
+  if (persistNativeDriver()) {
+    // Drop legacy web sticky leftovers that are not our sealed JWT shape.
+    try {
+      localStorage.removeItem('driverActiveTripId');
+    } catch {
+      /* ignore */
+    }
+    if (isSessionValid()) {
+      markDriverAuthFresh();
+      rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
+      return true;
+    }
+    clearDriverSession();
+    return false;
+  }
   purgeStickyDriverSession();
-  if (consumeDriverAuthFresh() && isSessionValid()) {
+  let fresh = false;
+  try {
+    fresh = sessionStorage.getItem(FRESH_AUTH_KEY) === '1';
+  } catch {
+    fresh = false;
+  }
+  if (fresh && isSessionValid()) {
     return true;
   }
   clearDriverSession();
@@ -146,12 +245,44 @@ export function driverSessionHeaders() {
 
 export function getActiveTripId() {
   const s = getDriverSession();
-  if (s?.tripId != null) return s.tripId;
+  if (s?.tripId != null && Number(s.tripId) > 0) return Number(s.tripId);
   try {
     const fromSession = Number(sessionStorage.getItem('driverActiveTripId'));
-    if (fromSession) return fromSession;
+    if (fromSession > 0) return fromSession;
   } catch {
     /* ignore */
   }
-  return 1;
+  // Never invent demo trip #1 — office must assign / open an excursion.
+  return null;
+}
+
+/** Drop trip binding (keep auth) when office has not opened an excursion. */
+export function clearDriverTripBinding() {
+  const s = getDriverSession();
+  if (!s) return null;
+  const next = {
+    ...s,
+    tripId: null,
+    tripTitle: null,
+    destination: null,
+    meetingPoint: null,
+    schedule: [],
+  };
+  try {
+    writeSessionRaw(JSON.stringify(next));
+    sessionStorage.removeItem('driverActiveTripId');
+    localStorage.removeItem('driverActiveTripId');
+    // Drop offline demo manifests that painted Εκδρομή #1 + κάτοψη.
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('driver_manifest_'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent('driver-trip-cleared'));
+  return next;
+}
+
+export function hasOpenDriverTrip(session = getDriverSession()) {
+  return Boolean(session?.tripId != null && Number(session.tripId) > 0);
 }

@@ -17,7 +17,12 @@ import {
   resolveUpsellCoverage,
   selectedExtrasLabels,
 } from '../../lib/rental/rentBookingExtras.js';
-import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import {
+  navigateToRentDateSearch,
+  readRentBookingPrefs,
+  rentTripSearchReady,
+  writeRentBookingPrefs,
+} from '../../lib/rental/rentBookingSearch.js';
 import { readRentNotifySettings } from '../../lib/rental/rentNotify.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
@@ -188,9 +193,10 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
       navigate('/rent#rent-guest-fleet');
       return;
     }
-    if (!prefs.start_time || !prefs.end_time || !prefs.pickup_location) {
-      toast.error('Συμπλήρωσε παραλαβή και ημερομηνίες.');
-      navigate('/rent#rent-guest-search');
+    if (!rentTripSearchReady(prefs)) {
+      navigateToRentDateSearch(navigate, {
+        message: 'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.',
+      });
       return;
     }
 
@@ -211,7 +217,14 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
         <RentBookingStepper activeId="details" />
       </header>
 
-      <RentBookingTripSummary prefs={prefs} onEdit={() => navigate('/rent#rent-guest-search')} />
+      <RentBookingTripSummary
+        prefs={prefs}
+        onEdit={() =>
+          navigateToRentDateSearch(navigate, {
+            message: 'Μπορείς να αλλάξεις ημερομηνίες παραλαβής και επιστροφής εδώ.',
+          })
+        }
+      />
 
       {!vehicle ? (
         <div className="rent-wiz-empty">

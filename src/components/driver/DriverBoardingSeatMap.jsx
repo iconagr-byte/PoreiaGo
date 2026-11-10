@@ -89,12 +89,9 @@ export default function DriverBoardingSeatMap({ manifest, vehicleType, className
   const selected = map.seats.find((s) => s.number === selectedId) || null;
   const aisleAfterIndex = map.layout.cols.indexOf(map.layout.aisleAfter);
 
-  if (!manifest) {
-    return (
-      <div className={`driver-bus-map ${className}`}>
-        <p className="driver-bus-map-empty">Φόρτωση κάτοψης…</p>
-      </div>
-    );
+  if (!manifest?.trip_id) {
+    // No open excursion — do not render bus floor plan at all.
+    return null;
   }
 
   return (

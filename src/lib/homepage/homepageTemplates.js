@@ -120,6 +120,14 @@ export const TRIPS_LAYOUT_TEMPLATES = [
     tags: ['Premium', 'Creative'],
   },
   {
+    id: 'destination_bento',
+    label: 'Destination bento',
+    description:
+      'Gallery προορισμών 3+2 — πλήρης φωτογραφία, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'photo_library',
+    tags: ['Premium', 'Gallery', 'Λεωφορείο'],
+  },
+  {
     id: 'grid_four',
     label: 'Πλέγμα 4 στήλες',
     description: 'Πυκνό gallery σε μεγάλες οθόνες — ιδανικό για πλούσιο κατάλογο.',
@@ -207,11 +215,27 @@ export const TRIP_CARD_TEMPLATES = [
     tags: ['Συμπαγές'],
   },
   {
+    id: 'abroad_horizontal',
+    label: 'Abroad Horizontal',
+    description:
+      'Οριζόντια κάρτα εκδρομής εξωτερικού — προορισμός, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'public',
+    tags: ['Εξωτερικό', 'Horizontal', 'Λεωφορείο'],
+  },
+  {
     id: 'image_overlay',
     label: 'Image Overlay',
     description: 'Όλα πάνω στην εικόνα — cinematic look.',
     icon: 'layers',
     tags: ['Cinematic', 'Premium'],
+  },
+  {
+    id: 'destination_poster',
+    label: 'Destination Poster',
+    description:
+      'Full-bleed προορισμός: τίτλος + ημερομηνίες αριστερά, «Standard / VIP · €» δεξιά — για εκδρομές λεωφορείου.',
+    icon: 'wallpaper',
+    tags: ['Gallery', 'Λεωφορείο', 'Premium'],
   },
   {
     id: 'minimal_clean',
@@ -268,10 +292,10 @@ export const RENT_FLEET_LAYOUT_TEMPLATES = [
   },
   {
     id: 'rent_scroll',
-    label: 'Οριζόντιο scroll',
-    description: 'Swipe καρουζέλ — γρήγορη περιήγηση στόλου στο κινητό.',
-    icon: 'swipe',
-    tags: ['Mobile'],
+    label: 'Πλέγμα wrap',
+    description: 'Ίδιο με 3στήλο πλέγμα — χωρίς οριζόντιο scroll.',
+    icon: 'grid_view',
+    tags: ['Grid'],
   },
   {
     id: 'rent_list',
@@ -380,6 +404,17 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
+  rent_theme_id: 'aegean_coast',
+  rent_hero_style: 'coastal',
+  rent_hero_layout: 'strip',
+  rent_hero_image_url: '/images/rent-hero-coastal-v2.jpg',
+  rent_header_style: 'glass',
+  rent_accent_color: '#0a7a6c',
+  rent_secondary_color: '#0b3d4a',
+  rent_surface_color: '#f0fdfa',
+  /** Kept in sync with trips_* — one card style for Greece + abroad. */
+  intl_trips_layout_template: 'grid_three',
+  intl_trip_card_template: 'premium',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
   trips_section_subtitle:
@@ -387,14 +422,16 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα.',
+    'Διεθνείς εκδρομές με λεωφορείο — ίδια εμφάνιση κάρτας με τις εγχώριες.',
 };
 
 export function getTemplateById(list, id) {
   return list.find((t) => t.id === id) || list[0];
 }
 
-export function tripsGridClass(layoutId, tripCount = 0) {
+export function tripsGridClass(layoutId, tripCount = 0, cardTemplateId = '') {
+  const abroad = cardTemplateId === 'abroad_horizontal';
+
   // One trip (typical new office) — keep the card narrow/centered, not full-bleed.
   if (tripCount === 1) {
     switch (layoutId) {
@@ -404,7 +441,9 @@ export function tripsGridClass(layoutId, tripCount = 0) {
         return 'flex justify-center gap-6';
       case 'alternating_rows':
       case 'editorial_stack':
-        return 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
+        return abroad
+          ? 'flex flex-col gap-8 max-w-3xl sm:max-w-4xl mx-auto w-full'
+          : 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
       default:
         return 'grid grid-cols-1 max-w-[300px] sm:max-w-[340px] md:max-w-[380px] mx-auto gap-6 w-full';
     }
@@ -429,10 +468,15 @@ export function tripsGridClass(layoutId, tripCount = 0) {
       return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 items-stretch';
     case 'bento_showcase':
       return 'grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5 items-stretch';
+    case 'destination_bento':
+      // 3 tall cards on top, 2 wider on bottom — airline-gallery look for coaches.
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 items-stretch';
     case 'grid_four':
       return 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6';
     case 'editorial_stack':
-      return 'flex flex-col gap-10 max-w-3xl mx-auto w-full';
+      return abroad
+        ? 'flex flex-col gap-6 md:gap-8 max-w-5xl mx-auto w-full'
+        : 'flex flex-col gap-5 md:gap-6 max-w-3xl mx-auto w-full';
     case 'horizontal_scroll':
       return 'flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin';
     case 'alternating_rows':
@@ -447,12 +491,17 @@ export function tripsGridClass(layoutId, tripCount = 0) {
   }
 }
 
-export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0) {
+export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0, cardTemplateId = '') {
   if (layoutId === 'horizontal_scroll') {
+    const abroad = cardTemplateId === 'abroad_horizontal';
     if (tripCount === 1) {
-      return 'w-full max-w-[320px] sm:max-w-[360px] h-full';
+      return abroad
+        ? 'w-full max-w-[420px] sm:max-w-[460px] h-full'
+        : 'w-full max-w-[320px] sm:max-w-[360px] h-full';
     }
-    return 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
+    return abroad
+      ? 'snap-start shrink-0 w-[min(92vw,420px)] h-full'
+      : 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
   }
   if (layoutId === 'masonry_two') {
     return 'break-inside-avoid mb-6';
@@ -465,6 +514,11 @@ export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0) {
     if (index === 1) return 'h-full md:col-span-2';
     return 'h-full md:col-span-2';
   }
+  if (layoutId === 'destination_bento') {
+    // Top row: indices 0–2 → 2 cols each. Bottom: 3–4 → 3 cols each (wider).
+    if (index <= 2) return 'h-full lg:col-span-2 min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]';
+    return 'h-full sm:col-span-2 lg:col-span-3 min-h-[200px] sm:min-h-[240px] lg:min-h-[260px]';
+  }
   // Equal-height cards in CSS grids (items stretch; children fill).
   return 'h-full';
 }
@@ -476,7 +530,7 @@ export function rentFleetGridClass(layoutId) {
     case 'rent_featured':
       return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_scroll':
-      return 'flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory list-none p-0 m-0';
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_list':
       return 'flex flex-col gap-3 max-w-3xl list-none p-0 m-0';
     case 'rent_grid_three':
@@ -486,9 +540,6 @@ export function rentFleetGridClass(layoutId) {
 }
 
 export function rentFleetCardWrapperClass(layoutId, index = 0) {
-  if (layoutId === 'rent_scroll') {
-    return 'snap-start shrink-0 w-[min(86vw,300px)]';
-  }
   if (layoutId === 'rent_featured' && index === 0) {
     return 'md:col-span-2';
   }

@@ -135,12 +135,15 @@ class TenantBrandingService:
         ):
             display_name = "PoreiaGo"
 
-        checkout_default = (
-            f"https://www.{base_domain}"
-            if is_poreiago_platform_office(tenant)
-            else f"https://{subdomain_fqdn}"
+        from travel_platform.settings.checkout_base import (
+            is_localhost_checkout_url,
+            resolve_tenant_checkout_base,
         )
+
+        checkout_default = resolve_tenant_checkout_base(tenant, base_domain=base_domain)
         checkout = str(branding.get("checkout_base_url") or "").strip() or checkout_default
+        if is_localhost_checkout_url(checkout):
+            checkout = checkout_default
         if checkout and _is_achillio_travel_host(checkout) and is_poreiago_platform_office(tenant):
             checkout = checkout_default
 
@@ -190,6 +193,13 @@ class TenantBrandingService:
             normalized = normalize_custom_domain(custom_domain)
             if normalized and not _DOMAIN_RE.match(normalized):
                 raise ValueError("Invalid custom domain format (example: travel.agency.gr)")
+            if normalized:
+                from travel_platform.growth.domain_security import is_valid_public_domain
+
+                if not is_valid_public_domain(normalized):
+                    raise ValueError(
+                        "Αυτό το domain δεν επιτρέπεται (δεσμευμένο για την πλατφόρμα PoreiaGo)"
+                    )
             # Seal: only Achillio Travel may own achilliotravel.com.
             if normalized and _is_achillio_travel_host(normalized) and not is_achillio_travel_office(
                 tenant
@@ -240,11 +250,11 @@ class TenantBrandingService:
         await self._session.flush()
         await self._sync_file_branding(tenant.slug, tenant, branding, theme)
         try:
-            from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+            from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 
-            await sync_traefik_custom_domains_from_db(self._session)
+            await sync_edge_custom_domains_from_db(self._session)
         except Exception:
-            logger.debug("Traefik custom-domain sync skipped", exc_info=True)
+            logger.debug("Edge custom-domain sync skipped", exc_info=True)
         await self._audit.record(
             tenant_id=tenant_id,
             actor_id=None,
@@ -292,7 +302,7 @@ class TenantBrandingService:
                 "logo_url": row.logo_url or "",
                 "css_injection_url": row.css_injection_url or "",
                 "css_injection_inline": row.css_injection_inline or "",
-                "checkout_base_url": row.checkout_base_url or f"http://localhost:5173",
+                "checkout_base_url": row.checkout_base_url or f"https://www.{base_domain}",
                 "dns_instructions": self._dns_instructions(
                     custom_domain or None,
                     f"{subdomain}.{base_domain}",
@@ -312,7 +322,7 @@ class TenantBrandingService:
                 "logo_url": "",
                 "css_injection_url": "",
                 "css_injection_inline": "",
-                "checkout_base_url": "http://localhost:5173",
+                "checkout_base_url": f"https://www.{base_domain}",
                 "dns_instructions": self._dns_instructions(None, f"{subdomain}.{base_domain}"),
             }
 
@@ -344,18 +354,20 @@ class TenantBrandingService:
     ) -> dict[str, Any]:
         ingress = self._olympus.get("ingress_cname", "ingress.olympus-saas.com")
         base_domain = self._olympus["base_domain"]
-        ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "34.141.98.145").strip()
+        ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "169.58.199.186").strip()
+        cname_target = "www.poreiago.com" if custom_domain else ingress
         notes = [
             f"Το subdomain {subdomain_fqdn} λειτουργεί αυτόματα (wildcard SSL).",
-            "Για δικό σας domain: CNAME το www → www.poreiago.com (ή στον ingress).",
+            f"Για δικό σας domain (όπως Achillio): CNAME το www → {cname_target}.",
             f"Για ασφαλές HTTPS χωρίς www: A record στο apex (@) → {ingress_ip}.",
             "Αν το apex δείχνει ακόμα στο παλιό hosting, ο browser εμφανίζει «Μη ασφαλής σύνδεση».",
-            "Μετά την αποθήκευση, το Traefik εκδίδει Let's Encrypt όταν το DNS δείχνει στο VPS.",
+            "Μετά την αποθήκευση: έλεγχος DNS στο panel + αυτόματο edge sync (NPM/Traefik) + apex→www.",
         ]
         if not custom_domain:
             return {
                 "cname_host": custom_domain or "your-domain.example",
                 "cname_target": ingress,
+                "apex_host": None,
                 "apex_a_record": ingress_ip,
                 "subdomain_cname_host": subdomain_fqdn.split(".")[0],
                 "subdomain_cname_target": base_domain,

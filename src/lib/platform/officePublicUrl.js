@@ -284,11 +284,11 @@ export function getOfficeRentUrl(branding = {}, options = {}) {
   return `${origin}/rent`;
 }
 
-/** Rent My Wallet — green product, separate from bus /wallet. */
+/** Rent passes live in unified My Wallet (?tab=rentals). Legacy /rent/wallet redirects. */
 export function getOfficeRentWalletUrl(branding = {}, options = {}) {
   const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
-  if (!origin) return '/rent/wallet';
-  return `${origin}/rent/wallet`;
+  if (!origin) return '/wallet?tab=rentals';
+  return `${origin}/wallet?tab=rentals`;
 }
 
 /** Rent Wallet login — green auth page. */
@@ -301,4 +301,21 @@ export function getOfficeRentLoginUrl(branding = {}, options = {}) {
 export function getOfficeStorefrontUrl(branding = {}, options = {}) {
   const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
   return origin || '/';
+}
+
+/** Driver PWA entry — password login / QR scan on office host. */
+export function getOfficeDriverAppUrl(branding = {}, options = {}) {
+  const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
+  if (!origin) return '/driver';
+  return `${origin}/driver`;
+}
+
+/**
+ * Open Viber share sheet with prefilled text (user picks contact).
+ * Keep text short — Viber trims around 200 characters.
+ */
+export function buildViberForwardHref(text) {
+  const body = String(text || '').trim();
+  if (!body) return '';
+  return `viber://forward?text=${encodeURIComponent(body.slice(0, 200))}`;
 }

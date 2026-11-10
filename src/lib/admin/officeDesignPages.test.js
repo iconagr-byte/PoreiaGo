@@ -17,7 +17,7 @@ console.assert(officeModeFromModules(rentOnly) === 'rent_only', 'rent mode');
 console.assert(officeModeFromModules(both) === 'both', 'both mode');
 
 console.assert(
-  designPagesForModules(tripsOnly).map((p) => p.id).join(',') === 'home',
+  designPagesForModules(tripsOnly).map((p) => p.id).join(',') === 'home,wallet',
   'trips pages',
 );
 console.assert(
@@ -25,13 +25,16 @@ console.assert(
   'rent pages',
 );
 console.assert(
-  designPagesForModules(both).map((p) => p.id).join(',') === 'home,rent',
+  designPagesForModules(both).map((p) => p.id).join(',') === 'home,wallet,rent',
   'both pages',
 );
 
 console.assert(resolveDesignPageForModules('rent', tripsOnly) === 'home', 'clamp rent→home');
+console.assert(resolveDesignPageForModules('wallet', rentOnly) === 'rent', 'clamp wallet→rent');
 console.assert(resolveDesignPageForModules('home', rentOnly) === 'rent', 'clamp home→rent');
 console.assert(resolveDesignPageForModules('rent', both) === 'rent', 'both keeps rent');
+console.assert(resolveDesignPageForModules('wallet', both) === 'wallet', 'both keeps wallet');
+console.assert(resolveDesignPageForModules('wallet', tripsOnly) === 'wallet', 'trips keeps wallet');
 console.assert(contractDesignLabel('both').includes('Λεωφορεία'), 'label both');
 
 console.log('officeDesignPages: OK');

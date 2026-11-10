@@ -6,7 +6,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas import LoginRequest, MfaEnrollResponse, MfaVerifyRequest, RefreshTokenRequest, TokenResponse
+from app.api.schemas import (
+    GoogleAdminLoginRequest,
+    LoginRequest,
+    MfaEnrollResponse,
+    MfaVerifyRequest,
+    RefreshTokenRequest,
+    TokenResponse,
+)
 from app.core.auth_deps import get_current_user_id, get_tenant_db
 from app.core.database import AsyncSessionLocal
 from app.core.config import get_settings
@@ -123,33 +130,112 @@ async def dev_login(request: Request, body: LoginRequest):
     )
 
 
+def _browser_office_host(request: Request) -> str:
+    """
+    When the SPA calls the shared API (api.poreiago.com), Host is the API — not the
+    office page. Prefer X-Office-Host / Origin / Referer so office subdomain login
+    (e.g. acme.poreiago.com) and Achillio Travel still force the correct JWT.
+    """
+    from middleware.domain_tenant import _request_host
+    from travel_platform.settings.office_host_guard import host_is_shared_api
+
+    explicit = (request.headers.get("x-office-host") or "").strip().lower().split(":")[0]
+    if explicit and "." in explicit and not host_is_shared_api(explicit):
+        return explicit
+
+    host = _request_host(request)
+    if not host_is_shared_api(host):
+        return host
+    for header in ("origin", "referer"):
+        raw = (request.headers.get(header) or "").strip()
+        if not raw:
+            continue
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+            cand = (parsed.hostname or "").strip().lower()
+        except Exception:
+            cand = ""
+        if cand:
+            return cand
+    return host
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(request: Request, body: LoginRequest):
     """Login with email + password. Tenant is resolved automatically (optional tenant_slug)."""
     from travel_platform.settings.login_audit_store import record_login_from_request
 
     email = (body.email or "").strip().lower()
+    # Host affinity:
+    # - Achillio Travel URL → Achillio office JWT only
+    # - poreiago.com → PoreiaGo platform JWT (never Achillio Travel session)
+    # Same email/password can open both desks; tenant_id always follows Host.
+    # Shared API host (api.*) uses Origin/Referer so Contabo builds with
+    # VITE_API_BASE=https://api.poreiago.com still open the correct office.
+    forced_tenant_id = body.tenant_id
+    mirror_missing_user = False
+    try:
+        from uuid import UUID as _UUID
+
+        from middleware.domain_tenant import _is_platform_host
+        from travel_platform.settings.office_host_guard import (
+            host_looks_like_achillio_travel,
+            login_host_forced_tenant_id,
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        host = _browser_office_host(request)
+        platform = _is_platform_host(host)
+        # On achilliotravel.com never honour company code ``achillio`` (PoreiaGo
+        # platform seed / superadmin) — always force the Achillio Travel office.
+        slug_in = (body.tenant_slug or "").strip().lower()
+        if host_looks_like_achillio_travel(host) and forced_tenant_id is None:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
+            if forced is not None:
+                forced_tenant_id = forced
+                mirror_missing_user = True
+        elif forced_tenant_id is None and not slug_in:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
+            if forced is not None:
+                forced_tenant_id = forced
+                # Same operator may only have a PoreiaGo membership — copy onto Achillio.
+                mirror_missing_user = True
+            elif platform:
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    forced_tenant_id = _UUID(str(platform_tid))
+                    mirror_missing_user = True
+    except Exception:
+        mirror_missing_user = False
+
     async with AsyncSessionLocal() as db:
         try:
             token, refresh, user, tenant = await AuthService(db).login(
                 email=body.email,
                 password=body.password,
-                tenant_id=body.tenant_id,
+                tenant_id=forced_tenant_id,
                 tenant_slug=body.tenant_slug,
                 mfa_code=body.mfa_code,
+                mirror_missing_user=mirror_missing_user,
             )
             await db.commit()
         except ValueError as exc:
             await db.rollback()
+            raw = str(exc).strip() or "Λάθος email ή κωδικός"
+            # Keep Greek UX for generic auth failures from AuthService.
+            if raw.lower() in {"invalid credentials", "unauthorized"}:
+                raw = "Λάθος email ή κωδικός"
             record_login_from_request(
                 request,
                 actor_type="admin",
                 identity=email,
                 success=False,
                 method="password",
-                detail=str(exc),
+                detail=raw,
             )
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=raw) from exc
         role_values = [r for r in (user.roles or []) if r in {e.value for e in UserRole}]
         record_login_from_request(
             request,
@@ -161,6 +247,97 @@ async def login(request: Request, body: LoginRequest):
             method="password",
             tenant_id=str(tenant.id),
             detail=tenant.slug,
+        )
+        return _token_response(
+            access_token=token,
+            refresh_token=refresh,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            roles=role_values,
+        )
+
+
+@router.post("/google", response_model=TokenResponse)
+async def google_login(request: Request, body: GoogleAdminLoginRequest):
+    """Admin Back Office — Google Sign-In for existing office users."""
+    from app.services.google_oauth import verify_google_id_token
+    from travel_platform.settings.login_audit_store import record_login_from_request
+
+    try:
+        claims = await verify_google_id_token(body.id_token)
+    except HTTPException as exc:
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity="google",
+            success=False,
+            method="google",
+            detail=str(exc.detail),
+        )
+        raise
+
+    email = str(claims.get("email", "")).strip().lower()
+    forced_tenant_id = body.tenant_id
+    try:
+        from uuid import UUID as _UUID
+
+        from middleware.domain_tenant import _is_platform_host
+        from travel_platform.settings.office_host_guard import (
+            host_looks_like_achillio_travel,
+            login_host_forced_tenant_id,
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        host = _browser_office_host(request)
+        platform = _is_platform_host(host)
+        slug_in = (body.tenant_slug or "").strip().lower()
+        if host_looks_like_achillio_travel(host) and forced_tenant_id is None:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
+            if forced is not None:
+                forced_tenant_id = forced
+        elif forced_tenant_id is None and not slug_in:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
+            if forced is not None:
+                forced_tenant_id = forced
+            elif platform:
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    forced_tenant_id = _UUID(str(platform_tid))
+    except Exception:
+        pass
+
+    async with AsyncSessionLocal() as db:
+        try:
+            token, refresh, user, tenant = await AuthService(db).login_with_google(
+                email=email,
+                tenant_id=forced_tenant_id,
+                tenant_slug=body.tenant_slug,
+                google_name=claims.get("name"),
+            )
+            await db.commit()
+        except ValueError as exc:
+            await db.rollback()
+            record_login_from_request(
+                request,
+                actor_type="admin",
+                identity=email,
+                success=False,
+                method="google",
+                detail=str(exc),
+            )
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+        role_values = [r for r in (user.roles or []) if r in {e.value for e in UserRole}]
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity=getattr(user, "email", None) or email,
+            success=True,
+            actor_id=str(user.id),
+            actor_name=getattr(user, "full_name", None) or claims.get("name"),
+            method="google",
+            tenant_id=str(tenant.id),
+            detail=f"{tenant.slug} · google",
         )
         return _token_response(
             access_token=token,
