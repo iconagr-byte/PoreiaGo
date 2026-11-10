@@ -17,6 +17,7 @@ import {
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
+import BookingLookupEntryLink from '../components/BookingLookupEntryLink.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 import '../styles/customer-auth.css';
@@ -412,16 +413,8 @@ export default function RegisterPage() {
             </Link>
           </p>
         ) : (
-          <p className="text-xs text-center mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-            <span className="text-[#d2d2d7]" aria-hidden>
-              ·
-            </span>
-            <Link to="/rent/my-booking" className={linkClass}>
-              Εύρεση κράτησης ενοικίασης
-            </Link>
+          <p className="text-xs text-center mt-4">
+            <BookingLookupEntryLink preferRent={rentIntent} className={linkClass} />
           </p>
         )
       ) : null}

@@ -257,13 +257,12 @@ export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = ad
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     }
-    // Authenticated office must never see demo ROUTE_DEVIATION mocks —
-    // a 500 (e.g. NEW_BOOKING without vehicle_id) previously hid real bookings.
-    if (authHeaders?.Authorization) return [];
   } catch {
-    if (authHeaders?.Authorization) return [];
+    /* ignore — fall through */
   }
-  return getMockAlerts();
+  // Never inject demo ROUTE_DEVIATION («120m εκτός διαδρόμου») into real offices.
+  // That mock leaked into every γραφείο via a shared session inbox.
+  return [];
 }
 
 /** Office dismisses driver SOS — pin leaves the live map. */
@@ -407,22 +406,6 @@ export async function downloadTripRouteExport(
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
-}
-
-function getMockAlerts() {
-  const now = new Date().toISOString();
-  return [
-    {
-      id: 'mock-1',
-      alert_type: 'ROUTE_DEVIATION',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      vehicle_id: 'demo-vehicle-1',
-      trip_id: 1,
-      message: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
-      metadata: { distance_outside_m: 120, buffer_m: 75 },
-      created_at: now,
-    },
-  ];
 }
 
 function getMockFleet() {

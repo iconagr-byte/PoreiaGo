@@ -33,13 +33,15 @@ export default function TemplatePicker({
   onChange,
   columns = 3,
   accent = 'sky',
-  /** Denser layout for preview-chrome Builder dropdown. */
+  /** Denser layout for preview-chrome studio drawer. */
   compact = false,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Όλα');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [popularOnly, setPopularOnly] = useState(false);
+  /** Compact studio: hide search/chips until the user asks — less noise. */
+  const [toolsOpen, setToolsOpen] = useState(!compact);
 
   const { primary, rest } = useMemo(
     () => collectFilterChips(templates, compact),
@@ -101,8 +103,11 @@ export default function TemplatePicker({
               <span className="material-symbols-outlined">{selected.icon}</span>
             </span>
             <div className="min-w-0 flex-1">
-              <p className="pdw-picker__selected-kicker">Επιλεγμένο</p>
+              <p className="pdw-picker__selected-kicker">Ενεργό πρότυπο</p>
               <p className="pdw-picker__selected-label">{selected.label}</p>
+              {compact && selected.description ? (
+                <p className="pdw-picker__selected-desc">{selected.description}</p>
+              ) : null}
             </div>
           </div>
           <span className="pdw-picker__selected-count" title="Εμφανίζονται / σύνολο">
@@ -111,81 +116,106 @@ export default function TemplatePicker({
         </div>
       ) : null}
 
-      <div className={`pdw-picker__toolbar${compact ? ' is-compact' : ''}`}>
-        <label className="pdw-picker__search">
-          <span className="material-symbols-outlined pdw-picker__search-icon" aria-hidden>
-            search
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Αναζήτηση προτύπου…"
-            className="pdw-picker__search-input"
-          />
-          {query ? (
-            <button
-              type="button"
-              className="pdw-picker__search-clear"
-              onClick={() => setQuery('')}
-              aria-label="Καθαρισμός αναζήτησης"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          ) : null}
-        </label>
-        {hasActiveFilters ? (
-          <button type="button" onClick={clearFilters} className="pdw-picker__clear">
-            Καθαρισμός
-          </button>
-        ) : null}
-      </div>
-
-      <div className={`pdw-picker__filters${compact ? ' is-compact' : ''}`}>
-        {compact ? (
+      {compact ? (
+        <div className="pdw-picker__tools-row">
           <button
             type="button"
-            className={`pdw-picker__popular${popularOnly ? ' is-active' : ''}`}
-            aria-pressed={popularOnly}
-            onClick={() => setPopularOnly((v) => !v)}
-            title="Πρότυπα με Premium / Featured"
+            className={`pdw-picker__tools-toggle${toolsOpen || hasActiveFilters ? ' is-open' : ''}`}
+            aria-expanded={toolsOpen}
+            onClick={() => setToolsOpen((v) => !v)}
           >
             <span className="material-symbols-outlined" aria-hidden>
-              star
+              tune
             </span>
-            Δημοφιλή
+            {hasActiveFilters ? 'Φίλτρα ενεργά' : 'Αναζήτηση & φίλτρα'}
           </button>
-        ) : null}
-        <div className="pdw-picker__chips" role="group" aria-label="Φίλτρα προτύπων">
-          {chips.map((chip) => {
-            const active = filter === chip;
-            return (
-              <button
-                key={chip}
-                type="button"
-                onClick={() => setFilter(chip)}
-                className={`pdw-picker__chip${active ? ' is-active' : ''}`}
-                data-accent={accentTone}
-              >
-                {chip}
-              </button>
-            );
-          })}
-          {hasMore ? (
-            <button
-              type="button"
-              onClick={() => setShowMoreFilters((v) => !v)}
-              className={`pdw-picker__chip is-more${showMoreFilters ? ' is-open' : ''}`}
-            >
-              {showMoreFilters
-                ? 'Λιγότερα'
-                : compact
-                  ? `+${hiddenCount || rest.length}`
-                  : `+${rest.length} ακόμα`}
+          {hasActiveFilters ? (
+            <button type="button" onClick={clearFilters} className="pdw-picker__clear">
+              Καθαρισμός
             </button>
           ) : null}
         </div>
-      </div>
+      ) : null}
+
+      {toolsOpen || !compact ? (
+        <>
+          <div className={`pdw-picker__toolbar${compact ? ' is-compact' : ''}`}>
+            <label className="pdw-picker__search">
+              <span className="material-symbols-outlined pdw-picker__search-icon" aria-hidden>
+                search
+              </span>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Αναζήτηση προτύπου…"
+                className="pdw-picker__search-input"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  className="pdw-picker__search-clear"
+                  onClick={() => setQuery('')}
+                  aria-label="Καθαρισμός αναζήτησης"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              ) : null}
+            </label>
+            {!compact && hasActiveFilters ? (
+              <button type="button" onClick={clearFilters} className="pdw-picker__clear">
+                Καθαρισμός
+              </button>
+            ) : null}
+          </div>
+
+          <div className={`pdw-picker__filters${compact ? ' is-compact' : ''}`}>
+            {compact ? (
+              <button
+                type="button"
+                className={`pdw-picker__popular${popularOnly ? ' is-active' : ''}`}
+                aria-pressed={popularOnly}
+                onClick={() => setPopularOnly((v) => !v)}
+                title="Πρότυπα με Premium / Featured"
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  star
+                </span>
+                Δημοφιλή
+              </button>
+            ) : null}
+            <div className="pdw-picker__chips" role="group" aria-label="Φίλτρα προτύπων">
+              {chips.map((chip) => {
+                const active = filter === chip;
+                return (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setFilter(chip)}
+                    className={`pdw-picker__chip${active ? ' is-active' : ''}`}
+                    data-accent={accentTone}
+                  >
+                    {chip}
+                  </button>
+                );
+              })}
+              {hasMore ? (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreFilters((v) => !v)}
+                  className={`pdw-picker__chip is-more${showMoreFilters ? ' is-open' : ''}`}
+                >
+                  {showMoreFilters
+                    ? 'Λιγότερα'
+                    : compact
+                      ? `+${hiddenCount || rest.length}`
+                      : `+${rest.length} ακόμα`}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {filtered.length === 0 ? (
         <p className="pdw-picker__empty">

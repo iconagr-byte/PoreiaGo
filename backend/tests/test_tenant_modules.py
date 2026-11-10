@@ -55,6 +55,9 @@ def test_initial_settings_for_rent_plan():
     assert seed["site_appearance"]["rent_office_name"] == "Achillio Travel"
     assert seed["site_appearance"]["footer_brand_name"] == "Achillio Travel"
     assert "Το όχημά σας" in seed["site_appearance"]["rent_hero_title"]
+    assert seed["site_appearance"]["hero_image_url"] == "/images/rent-hero-coastal-v2.jpg"
+    assert seed["site_appearance"]["rent_hero_image_url"] == "/images/rent-hero-coastal-v2.jpg"
+    assert "hero-bus-achillio" not in seed["site_appearance"]["hero_image_url"]
 
 
 def test_resolve_provision_service_modes():

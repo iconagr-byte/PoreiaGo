@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { saasDevLogin, saasGoogleLogin, saasLogin } from '../services/saasApi.js';
 import '../styles/platform-admin-login.css';
 
@@ -29,11 +30,12 @@ function postLoginNavigate(navigate, location, data) {
   return data;
 }
 
-/** Σύνδεση διαχειριστή — Stripe-inspired portal · email + κωδικός ή Google. */
+/** Σύνδεση διαχειριστή — office host: minimal fields only · platform host: marketing portal. */
 export default function AdminLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
+  const officeMinimal = isTenantStorefrontHost();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -130,22 +132,35 @@ export default function AdminLoginPage() {
   const busy = loading || googleLoading;
 
   return (
-    <div className="pg-login">
+    <div className={`pg-login${officeMinimal ? ' pg-login--office-minimal' : ''}`}>
       <div className="pg-login-main">
-        <div className="pg-login-top">
-          <PlatformBrand variant="light" />
-          <Link to="/" className="pg-login-back">
-            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
-              arrow_back
-            </span>
-            Αρχική
-          </Link>
-        </div>
+        {officeMinimal ? (
+          <div className="pg-login-top pg-login-top--minimal">
+            <Link to="/" className="pg-login-back">
+              <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+                arrow_back
+              </span>
+              Πίσω
+            </Link>
+          </div>
+        ) : (
+          <div className="pg-login-top">
+            <PlatformBrand variant="light" />
+            <Link to="/" className="pg-login-back">
+              <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+                arrow_back
+              </span>
+              Αρχική
+            </Link>
+          </div>
+        )}
 
         <div className="pg-login-center">
           <div className="pg-login-card">
-            <h1>Σύνδεση στο γραφείο σας</h1>
-            <p>Email και κωδικός — ή Google. Χωρίς τεχνικά IDs.</p>
+            <h1>{officeMinimal ? 'Σύνδεση' : 'Σύνδεση στο γραφείο σας'}</h1>
+            {officeMinimal ? null : (
+              <p>Email και κωδικός — ή Google. Χωρίς τεχνικά IDs.</p>
+            )}
 
             {error ? <p className="pg-login-error">{error}</p> : null}
 
@@ -189,10 +204,11 @@ export default function AdminLoginPage() {
                 </div>
               </div>
 
-              {(showAgency || import.meta.env.DEV) && (
+              {(showAgency || (!officeMinimal && import.meta.env.DEV)) && (
                 <div className="pg-login-field">
                   <label htmlFor="tenant_slug">
-                    Κωδικός εταιρείας <span style={{ color: '#94a3b8', fontWeight: 500 }}>(μόνο αν ζητηθεί)</span>
+                    Κωδικός εταιρείας{' '}
+                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>(μόνο αν ζητηθεί)</span>
                   </label>
                   <input
                     id="tenant_slug"
@@ -203,13 +219,15 @@ export default function AdminLoginPage() {
                     onChange={(e) => setTenantSlug(e.target.value)}
                     placeholder="π.χ. admin-achillio-gr"
                   />
-                  <p className="pg-login-hint">
-                    Συνήθως δεν χρειάζεται — μόνο αν το email ανήκει σε πολλές εταιρείες.
-                  </p>
+                  {!officeMinimal ? (
+                    <p className="pg-login-hint">
+                      Συνήθως δεν χρειάζεται — μόνο αν το email ανήκει σε πολλές εταιρείες.
+                    </p>
+                  ) : null}
                 </div>
               )}
 
-              {!showAgency ? (
+              {!officeMinimal && !showAgency ? (
                 <button type="button" className="pg-login-agency-toggle" onClick={() => setShowAgency(true)}>
                   Έχω κωδικό εταιρείας (σπάνια)
                 </button>
@@ -219,6 +237,12 @@ export default function AdminLoginPage() {
                 {loading ? 'Σύνδεση…' : 'Είσοδος'}
               </button>
             </form>
+
+            <div className="pg-login-forgot-wrap">
+              <Link to="/admin/forgot-password" className="pg-login-forgot">
+                Ξέχασα τον κωδικό μου
+              </Link>
+            </div>
 
             {googleEnabled ? (
               <>
@@ -241,29 +265,33 @@ export default function AdminLoginPage() {
               </>
             ) : null}
 
-            <div className="pg-login-foot">
-              Νέο γραφείο;{' '}
-              <Link to="/grafeia">Δείτε συμβόλαια</Link>
-              <br />
-              Είστε πελάτης;{' '}
-              <Link to="/login">My Wallet σύνδεση</Link>
-            </div>
+            {officeMinimal ? null : (
+              <div className="pg-login-foot">
+                Νέο γραφείο;{' '}
+                <Link to="/grafeia">Δείτε συμβόλαια</Link>
+                <br />
+                Είστε πελάτης;{' '}
+                <Link to="/login">My Wallet σύνδεση</Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <aside className="pg-login-aside" aria-hidden>
-        <div className="pg-login-wave" />
-        <div className="pg-login-wave pg-login-wave--soft" />
-        <div className="pg-login-orbit" />
-        <div className="pg-login-orbit pg-login-orbit--slow" />
+      {officeMinimal ? null : (
+        <aside className="pg-login-aside" aria-hidden>
+          <div className="pg-login-wave" />
+          <div className="pg-login-wave pg-login-wave--soft" />
+          <div className="pg-login-orbit" />
+          <div className="pg-login-orbit pg-login-orbit--slow" />
 
-        <div className="pg-login-aside-copy">
-          <p className="pg-login-aside-kicker">PoreiaGo</p>
-          <strong>Ένα σύστημα. Δικό σας brand.</strong>
-          <span>Κρατήσεις, στόλος, GPS και ενοικιάσεις — από τον πίνακα του γραφείου σας.</span>
-        </div>
-      </aside>
+          <div className="pg-login-aside-copy">
+            <p className="pg-login-aside-kicker">PoreiaGo</p>
+            <strong>Ένα σύστημα. Δικό σας brand.</strong>
+            <span>Κρατήσεις, στόλος, GPS και ενοικιάσεις — από τον πίνακα του γραφείου σας.</span>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

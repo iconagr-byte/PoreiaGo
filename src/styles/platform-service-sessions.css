@@ -15,9 +15,9 @@
 .pg-session--buses {
   position: relative;
   overflow: hidden;
-  /* White so sky accents pop and the gray trip preview below stays distinct. */
-  background: #ffffff;
-  color: var(--pg-session-ink);
+  /* Match Apple contracts stage fill so the page reads as one surface. */
+  background: #f5f5f7;
+  color: #1d1d1f;
 }
 
 .pg-buses-atmosphere {
@@ -30,20 +30,11 @@
 .pg-buses-atmosphere-glow {
   position: absolute;
   inset: 0;
-  /* Soft depth only — no blue wash competing with the next section. */
-  background: radial-gradient(ellipse 55% 40% at 50% 0%, rgba(15, 23, 42, 0.035), transparent 62%);
+  background: radial-gradient(ellipse 50% 36% at 50% 0%, rgba(0, 0, 0, 0.03), transparent 65%);
 }
 
 .pg-buses-atmosphere-grid {
-  position: absolute;
-  inset: 0;
-  opacity: 0.45;
-  background-image:
-    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, black 0%, transparent 68%);
-  -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 68%);
+  display: none;
 }
 
 .pg-session--rent {
@@ -76,7 +67,7 @@
 }
 
 .pg-session--buses .pg-session-kicker {
-  color: var(--pg-session-sky);
+  color: #0071e3;
 }
 
 .pg-session--rent .pg-session-kicker {
@@ -92,7 +83,9 @@
 }
 
 .pg-session--buses .pg-session-hook {
-  color: #0f172a;
+  color: #1d1d1f;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .pg-session--rent .pg-session-hook {
@@ -107,7 +100,7 @@
 }
 
 .pg-session--buses .pg-session-support {
-  color: var(--pg-session-muted);
+  color: #86868b;
 }
 
 .pg-session--rent .pg-session-support {
@@ -134,7 +127,7 @@
 }
 
 .pg-session--buses .pg-session-points li {
-  color: #334155;
+  color: #424245;
 }
 
 .pg-session--rent .pg-session-points li {
@@ -146,7 +139,7 @@
 }
 
 .pg-session--buses .pg-session-points .material-symbols-outlined {
-  color: var(--pg-session-sky);
+  color: #0071e3;
 }
 
 /* Buses journey — sell / board / run (no card chrome) */
@@ -163,10 +156,7 @@
 
 .pg-buses-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #0284c7 0%, #0ea5e9 55%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #0071e3;
 }
 
 .pg-session--buses .pg-session-support {
@@ -181,7 +171,7 @@
   padding: 1.75rem 0 0.25rem;
   text-align: left;
   max-width: 58rem;
-  border-top: 1px solid rgba(14, 165, 233, 0.14);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 @media (min-width: 860px) {
@@ -194,7 +184,7 @@
   .pg-buses-journey-col + .pg-buses-journey-col {
     padding-left: 1.6rem;
     margin-left: 0.35rem;
-    border-left: 1px solid rgba(14, 165, 233, 0.14);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -212,12 +202,12 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #0284c7;
+  color: #0071e3;
 }
 
 .pg-buses-journey-label span {
   font-variant-numeric: tabular-nums;
-  color: rgba(2, 132, 199, 0.45);
+  color: rgba(0, 113, 227, 0.45);
 }
 
 .pg-buses-journey-col ul {
@@ -243,9 +233,9 @@
   height: 2.4rem;
   border-radius: 0.85rem;
   font-size: 1.2rem !important;
-  color: #0284c7;
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px solid rgba(14, 165, 233, 0.16);
+  color: #0071e3;
+  background: rgba(0, 113, 227, 0.08);
+  border: 1px solid rgba(0, 113, 227, 0.14);
 }
 
 .pg-buses-journey-col strong {
@@ -848,15 +838,16 @@
 }
 
 .pg-wallet-pass-qr {
+  display: block;
   width: 5.25rem;
   height: 5.25rem;
   margin: 0 auto;
+  padding: 0.35rem;
+  box-sizing: border-box;
   border-radius: 0.75rem;
-  background:
-    linear-gradient(90deg, #0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    linear-gradient(#0f172a 25%, transparent 25%) 0 0 / 0.7rem 0.7rem,
-    #f8fafc;
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.12);
+  shape-rendering: crispEdges;
 }
 
 .pg-wallet-rise {
@@ -873,11 +864,12 @@
   width: 100%;
   opacity: 1;
   scroll-margin-top: 5.75rem;
+  /* Match Rent showcase hero wash */
   background:
-    radial-gradient(ellipse 65% 50% at 90% 15%, rgba(45, 212, 191, 0.18), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 5% 85%, rgba(13, 148, 136, 0.14), transparent 55%),
-    linear-gradient(165deg, #042f2e 0%, #0b3d4a 45%, #062a30 100%);
-  color: #f8fafc;
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(13, 148, 136, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 12% 80%, rgba(14, 165, 233, 0.1), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: #0a2540;
 }
 
 /* Guest /rent: sit between fleet and landing bands, edge-to-edge inside the app. */
@@ -896,14 +888,14 @@
 .pg-rent-contracts-atmosphere-glow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 42%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 48%);
 }
 
 .pg-rent-contracts-orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(42px);
-  opacity: 0.5;
+  filter: blur(48px);
+  opacity: 0.55;
   animation: pgWalletOrb 11s ease-in-out infinite alternate;
 }
 
@@ -912,7 +904,7 @@
   height: 16rem;
   top: -3rem;
   right: 10%;
-  background: rgba(45, 212, 191, 0.4);
+  background: rgba(13, 148, 136, 0.16);
 }
 
 .pg-rent-contracts-orb--b {
@@ -920,7 +912,7 @@
   height: 13rem;
   bottom: 8%;
   left: 6%;
-  background: rgba(20, 184, 166, 0.28);
+  background: rgba(14, 165, 233, 0.12);
   animation-delay: -3.5s;
 }
 
@@ -951,18 +943,18 @@
 }
 
 .pg-session--rent-contracts .pg-session-kicker {
-  color: #5eead4;
+  color: #0d9488;
 }
 
 .pg-session--rent-contracts .pg-session-hook {
-  color: #fff;
+  color: #0a2540;
   font-size: clamp(1.85rem, 4.2vw, 2.85rem);
   max-width: 16ch;
 }
 
 .pg-rent-contracts-hook-accent {
   font-style: normal;
-  background: linear-gradient(105deg, #99f6e4 0%, #5eead4 45%, #ccfbf1 100%);
+  background: linear-gradient(100deg, #0f766e 0%, #0ea5e9 55%, #0891b2 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -971,7 +963,7 @@
 .pg-session--rent-contracts .pg-session-support {
   margin: 0 0 1.6rem;
   max-width: 34rem;
-  color: rgba(204, 251, 241, 0.78);
+  color: #425466;
 }
 
 .pg-rent-contracts-points {
@@ -997,9 +989,9 @@
   height: 2.45rem;
   border-radius: 0.9rem;
   font-size: 1.2rem !important;
-  color: #5eead4;
-  background: rgba(45, 212, 191, 0.12);
-  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.18);
 }
 
 .pg-rent-contracts-points strong {
@@ -1007,7 +999,7 @@
   font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: #0a2540;
   line-height: 1.25;
 }
 
@@ -1017,16 +1009,17 @@
   font-size: 0.86rem;
   font-weight: 500;
   line-height: 1.45;
-  color: rgba(167, 243, 208, 0.78);
+  color: #64748b;
 }
 
 .pg-session-cta--rent-contracts {
-  background: #fff;
-  color: #042f2e;
+  background: #0f766e;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.28);
 }
 
 .pg-session-cta--rent-contracts:hover {
-  background: #ccfbf1;
+  background: #0d9488;
 }
 
 .pg-rent-contracts-visual {
@@ -1043,8 +1036,9 @@
   color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 28px 50px rgba(2, 44, 34, 0.38);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(15, 23, 42, 0.1),
+    0 2px 8px rgba(15, 23, 42, 0.04);
   animation: pgRentContractsDocFloat 6s ease-in-out infinite;
 }
 

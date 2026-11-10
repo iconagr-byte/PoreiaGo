@@ -1,4 +1,4 @@
-# One-shot: pull latest, install Wallet APK (rebuild only if needed).
+﻿# One-shot: pull latest, install Wallet APK (rebuild only if needed).
 # Paste this from ANY folder:
 #   powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-go.ps1
 # ASCII-only (no BOM) for Windows PowerShell 5.1.
@@ -27,8 +27,8 @@ if (-not (Test-Path -LiteralPath $open)) {
   throw ("Missing " + $open)
 }
 
-# Always full rebuild after pull — JS/native Google fixes must land in assets.
+# Always full rebuild after pull - JS/native Google fixes must land in assets.
 Write-Host "==> full rebuild + install (Google Sign-In fix)" -ForegroundColor Cyan
 & powershell -ExecutionPolicy Bypass -File $open -Rebuild
 if ($LASTEXITCODE -ne 0) { throw "wallet-open failed" }
-Write-Host "DONE - try Σύνδεση με Google inside My Wallet (not Chrome)." -ForegroundColor Green
+Write-Host "DONE - try Syndesi me Google inside My Wallet (not Chrome)." -ForegroundColor Green

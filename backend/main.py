@@ -10,6 +10,7 @@ from api.abandoned_public import router as abandoned_public_router
 from api.branding_public import router as branding_public_router
 from api.admin_bookings_router import router as admin_bookings_router
 from api.site_appearance_router import router as site_appearance_router
+from api.site_contact_router import router as site_contact_router
 from api.customer_auth import router as customer_auth_router
 from api.customer_bookings import router as customer_bookings_router
 from middleware.domain_tenant import DomainTenantMiddleware
@@ -311,6 +312,19 @@ async def lifespan(app: FastAPI):
             "Achillio ops driver ensure skipped: %s", exc
         )
     try:
+        from travel_platform.settings.office_admin_bootstrap import (
+            repair_office_admin_bootstraps,
+        )
+
+        repaired_admins = await repair_office_admin_bootstraps()
+        __import__("logging").getLogger("poreiago.startup").info(
+            "Office admin bootstrap: %s", repaired_admins
+        )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Office admin bootstrap skipped: %s", exc
+        )
+    try:
         from app.core.database import AsyncSessionLocal
         from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
 
@@ -449,6 +463,7 @@ app.include_router(abandoned_public_router)
 app.include_router(branding_public_router)
 app.include_router(admin_bookings_router)
 app.include_router(site_appearance_router)
+app.include_router(site_contact_router)
 app.include_router(customer_auth_router)
 app.include_router(customer_bookings_router)
 try:

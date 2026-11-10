@@ -43,6 +43,7 @@ import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
+import StorefrontMobileDock from '../components/storefront/StorefrontMobileDock.jsx';
 import StorefrontRentSection from '../components/storefront/StorefrontRentSection.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
 import {
@@ -50,15 +51,8 @@ import {
   PreviewDesignModeProvider,
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
-
-const RENT_ONLY_HERO = {
-  hero_badge: 'Ενοικιάσεις οχημάτων',
-  hero_title: 'Νοίκιασε όχημα,',
-  hero_title_accent: 'online σε λίγα λεπτά.',
-  hero_subtitle:
-    'Διάλεξε από τον στόλο ενοικίασης, κλείσε ημερομηνίες και παρέλαβε — χωρίς εκδρομές λεωφορείου σε αυτή τη σελίδα.',
-  hero_search_label: 'Ενοικίαση',
-};
+import '../styles/storefront-mobile.css';
+import '../styles/storefront-sections.css';
 
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
@@ -94,6 +88,7 @@ export default function StorefrontDemoPage() {
   const [fleetShowcase, setFleetShowcase] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [modules, setModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [modulesReady, setModulesReady] = useState(false);
   const [rentalVehicles, setRentalVehicles] = useState([]);
   const [rentalLoading, setRentalLoading] = useState(false);
 
@@ -131,21 +126,6 @@ export default function StorefrontDemoPage() {
     (showDomestic ? filteredDomestic.length : 0) +
     (showInternational ? filteredInternational.length : 0);
 
-  const heroAppearance = useMemo(() => {
-    if (!rentOnly) return siteAppearance;
-    const brand =
-      siteAppearance.footer_brand_name ||
-      siteAppearance.display_name ||
-      '';
-    return {
-      ...siteAppearance,
-      ...RENT_ONLY_HERO,
-      hero_subtitle: brand
-        ? `Κλείσε online από τον στόλο του ${brand} — ημερομηνίες, παραλαβή και επιστροφή σε λίγα βήματα.`
-        : RENT_ONLY_HERO.hero_subtitle,
-    };
-  }, [rentOnly, siteAppearance]);
-
   useEffect(() => {
     // Marketing host redirects away — do not load office storefront data there.
     if (!allowStorefront) return undefined;
@@ -171,7 +151,9 @@ export default function StorefrontDemoPage() {
     };
 
     const loadCommon = () => {
-      fetchOfficeModules().then(setModules);
+      fetchOfficeModules()
+        .then(setModules)
+        .finally(() => setModulesReady(true));
       fetchPlatformSettings().then(setPricingSettings);
     };
 
@@ -262,37 +244,10 @@ export default function StorefrontDemoPage() {
     '--sf-surface': siteAppearance.surface_color || '#f8fafc',
   };
 
-  const rentHeroCta = (
-    <div className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-xl">
-      <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-        {heroAppearance.hero_search_label || 'Ενοικίαση'}
-      </p>
-      <p className="text-sm text-white/85 leading-relaxed">
-        Διαθέσιμος στόλος για ημερήσια ή πολυήμερη ενοικίαση. Συνέχισε στην εφαρμογή Rent για ημερομηνίες και κράτηση.
-      </p>
-      <div className="flex flex-wrap gap-3 pt-1">
-        <Link
-          to="/rent"
-          className="bg-teal-600 text-white px-8 py-3.5 rounded-full font-label-md font-bold hover:bg-teal-500 transition-all inline-flex items-center justify-center gap-2"
-        >
-          Δες στόλο ενοικίασης
-          <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-        </Link>
-        <a
-          href="#rent"
-          className="px-8 py-3.5 rounded-full font-label-md font-bold bg-white text-slate-900 hover:bg-white/90 transition-all inline-flex items-center gap-2"
-        >
-          Περισσότερα
-          <span className="material-symbols-outlined text-[20px]">expand_more</span>
-        </a>
-      </div>
-    </div>
-  );
-
   const searchForm = (
     <form
       onSubmit={handleSearch}
-      className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
+      className="sf-hero-search mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
     >
       <div className="sf-preview-trip-program-head">
         <p className="text-xs font-bold uppercase tracking-wider text-white/70 min-w-0">
@@ -306,7 +261,7 @@ export default function StorefrontDemoPage() {
           instanceId="trips-header"
         />
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="sf-hero-search__chips flex flex-wrap gap-2">
         {[
           { id: MARKET_FILTER_ALL, label: 'Όλες' },
           { id: MARKET_FILTER_DOMESTIC, label: 'Ελλάδα' },
@@ -328,7 +283,7 @@ export default function StorefrontDemoPage() {
       </div>
 
       {pickerTrips.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="sf-hero-search__trip-picks flex flex-wrap gap-2">
           {pickerTrips.slice(0, 4).map((trip) => {
             const active = String(searchFilters.tripId) === String(trip.id);
             return (
@@ -404,7 +359,7 @@ export default function StorefrontDemoPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 pt-1">
+      <div className="sf-hero-search__actions flex flex-wrap gap-3 pt-1">
         <button
           type="submit"
           className="bg-primary text-white px-8 py-3.5 rounded-full font-label-md font-bold hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
@@ -442,6 +397,14 @@ export default function StorefrontDemoPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Rent-only offices land on /rent (sea hero + search + full fleet) — no bus photo gate.
+  if (!modulesReady) {
+    return <div className="min-h-screen bg-slate-950" aria-busy="true" />;
+  }
+  if (rentOnly) {
+    return <Navigate to="/rent" replace />;
+  }
+
   const brandName =
     siteAppearance.footer_brand_name || siteAppearance.display_name || '';
   const showBusFleet = tripsEnabled && siteAppearance.show_fleet_section !== false;
@@ -460,9 +423,9 @@ export default function StorefrontDemoPage() {
       <main>
         <PreviewEditableSection sectionId="hero" label="Hero">
           <StorefrontHero
-            siteAppearance={heroAppearance}
+            siteAppearance={siteAppearance}
             templateId={siteAppearance.hero_template || 'fullscreen_overlay'}
-            searchForm={rentOnly ? rentHeroCta : searchForm}
+            searchForm={searchForm}
           />
         </PreviewEditableSection>
 
@@ -524,8 +487,8 @@ export default function StorefrontDemoPage() {
         />
 
         {siteAppearance.show_why_us_section !== false && (
-        <section className="py-24 bg-surface-bright border-y border-black/[0.05]">
-          <div className="max-w-container-max mx-auto px-margin-desktop">
+        <section className="sf-why-us py-24 border-y border-sky-200/60">
+          <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
             <div className="text-center max-w-2xl mx-auto mb-16">
               {/* One Builder for the whole why-us card template — not per card. */}
               <div className="sf-preview-trips-section-head mb-6">
@@ -579,7 +542,7 @@ export default function StorefrontDemoPage() {
               ].map((card) => (
                 <div
                   key={card.id}
-                  className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
+                  className="sf-why-us-card p-8 rounded-3xl flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
                 >
                   <div
                     className={`w-16 h-16 rounded-full ${card.iconWrap} flex items-center justify-center mb-6`}
@@ -601,21 +564,34 @@ export default function StorefrontDemoPage() {
         <StorefrontFooter
           siteAppearance={siteAppearance}
           templateId={siteAppearance.footer_template || 'classic_columns'}
+          tripsEnabled={tripsEnabled}
+          rentEnabled={rentEnabled}
         />
       </PreviewEditableSection>
 
+      {!previewOn ? (
+        <StorefrontMobileDock
+          tripsEnabled={tripsEnabled}
+          rentEnabled={rentEnabled}
+          phone={siteAppearance.footer_contact_phone}
+        />
+      ) : null}
+
       {previewOn ? (
-        <div className="sf-preview-dock" aria-label="Builder ενότητες σελίδας">
+        <div className="sf-preview-dock" aria-label="Studio — γρήγορες ενότητες">
+          <p className="sf-preview-dock__label">Studio</p>
           <PreviewBuilderControl
             sectionId="general"
             label="Γενικά"
-            variant="inline"
+            variant="dock"
+            buttonLabel="Γενικά"
             instanceId="dock-general"
           />
           <PreviewBuilderControl
             sectionId="slider"
             label="Slider"
-            variant="inline"
+            variant="dock"
+            buttonLabel="Slider"
             instanceId="dock-slider"
           />
         </div>

@@ -463,7 +463,22 @@ export default function BackOffice() {
       busy = true;
       try {
         const merged = await loadMergedBookings();
-        if (!cancelled) setBookings(merged);
+        if (cancelled) return;
+        setBookings(merged);
+        // Wallet/app delete: close open detail if the row is gone from Postgres.
+        setSelectedBooking((prev) => {
+          if (!prev) return null;
+          const aliases = [prev.id, prev.saasBookingId, prev.pnr, prev.ticketRef]
+            .filter(Boolean)
+            .map(String);
+          const still = merged.find((b) => {
+            const keys = [b.id, b.saasBookingId, b.pnr, b.ticketRef]
+              .filter(Boolean)
+              .map(String);
+            return aliases.some((a) => keys.includes(a));
+          });
+          return still || null;
+        });
       } catch {
         /* keep last good list */
       } finally {
@@ -1906,7 +1921,34 @@ export default function BackOffice() {
     };
 
     if (selectedBooking) {
-      const currentSelectedBooking = bookings.find(b => b.id === selectedBooking.id) || selectedBooking;
+      const currentSelectedBooking = bookings.find(
+        (b) =>
+          b.id === selectedBooking.id ||
+          (selectedBooking.saasBookingId &&
+            b.saasBookingId === selectedBooking.saasBookingId) ||
+          (selectedBooking.pnr && b.pnr === selectedBooking.pnr),
+      );
+      // Never fall back to a stale selectedBooking — wallet deletes left the
+      // detail pane open with a deleted ticket (BK-F15C6C28 still on screen).
+      if (!currentSelectedBooking) {
+        return (
+          <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in duration-300">
+            <div className="rounded-2xl border border-black/[0.06] bg-white p-8 text-center shadow-sm">
+              <p className="text-lg font-bold text-slate-900">Η κράτηση διαγράφηκε</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Δεν υπάρχει πλέον στη λίστα του γραφείου (διαγραφή από Wallet ή άλλη συσκευή).
+              </p>
+              <button
+                type="button"
+                className="mt-5 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-bold text-white"
+                onClick={() => setSelectedBooking(null)}
+              >
+                Πίσω στις κρατήσεις
+              </button>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">

@@ -1,5 +1,94 @@
 /* PoreiaGo office login — Stripe-inspired portal entrance (Aegean accents) */
 
+/* Login also mounts PlatformBrand — keep wordmark styles local. */
+.pg-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  line-height: 1;
+}
+
+.pg-brand-mark {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+}
+
+.pg-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.pg-brand-name {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+}
+
+.pg-brand-go {
+  font-weight: 800;
+}
+
+.pg-brand-line {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-brand--light {
+  color: #0ea5e9;
+}
+
+.pg-brand--light .pg-brand-name {
+  color: #1e293b;
+}
+
+.pg-brand--light .pg-brand-go {
+  color: #0ea5e9;
+}
+
+.pg-brand--light .pg-brand-line {
+  color: #64748b;
+}
+
+.pg-brand--dark {
+  color: #38bdf8;
+}
+
+.pg-brand--dark .pg-brand-name {
+  color: #f8fafc;
+}
+
+.pg-brand--dark .pg-brand-go {
+  color: #38bdf8;
+}
+
+.pg-brand--dark .pg-brand-line {
+  color: rgba(248, 250, 252, 0.55);
+}
+
+@media (min-width: 768px) {
+  .pg-brand-mark {
+    width: 3.15rem;
+    height: 3.15rem;
+  }
+
+  .pg-brand-name {
+    font-size: 1.75rem;
+  }
+
+  .pg-brand-line {
+    font-size: 0.78rem;
+  }
+}
+
 .pg-login {
   --pg-login-ink: #0a2540;
   --pg-login-muted: #425466;
@@ -662,4 +751,88 @@
   .pg-login-aside-copy {
     animation: none !important;
   }
+}
+
+/* Tenant office /admin/login — credentials only, no PoreiaGo chrome. */
+.pg-login--office-minimal {
+  grid-template-columns: 1fr;
+  background: #f5f5f7;
+}
+
+.pg-login--office-minimal .pg-login-main {
+  padding: 1rem 1rem 2rem;
+}
+
+.pg-login--office-minimal .pg-login-top--minimal {
+  justify-content: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.pg-login--office-minimal .pg-login-card {
+  max-width: 22rem;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+.pg-login--office-minimal .pg-login-card h1 {
+  margin-bottom: 1.25rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.pg-login--office-minimal .pg-login-field label {
+  color: #6e6e73;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pg-login--office-minimal .pg-login-field input {
+  border-radius: 0.65rem;
+  border-color: rgba(0, 0, 0, 0.12);
+  background: #fff;
+}
+
+.pg-login--office-minimal .pg-login-submit {
+  margin-top: 0.35rem;
+  border-radius: 0.65rem;
+  background: #1d1d1f;
+}
+
+.pg-login--office-minimal .pg-login-submit:hover:not(:disabled) {
+  background: #000;
+}
+
+.pg-login--office-minimal .pg-login-divider {
+  color: #86868b;
+}
+
+@media (min-width: 960px) {
+  .pg-login--office-minimal {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pg-login-forgot-wrap {
+  margin-top: 0.85rem;
+  text-align: center;
+}
+
+.pg-login-forgot {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6e6e73;
+  text-decoration: none;
+}
+
+.pg-login-forgot:hover {
+  color: #1d1d1f;
+  text-decoration: underline;
+}
+
+.pg-login--office-minimal .pg-login-forgot {
+  color: #86868b;
 }

@@ -10,6 +10,7 @@ import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import AdminForgotPasswordPage from './pages/AdminForgotPasswordPage';
 import AdminResetPasswordPage from './pages/AdminResetPasswordPage';
 import SeatSelection from './pages/SeatSelection';
 import TripExtrasPage from './pages/TripExtrasPage';
@@ -44,6 +45,7 @@ import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
 import CheckoutPage from './pages/CheckoutPage';
 import BookingLookupPage from './pages/BookingLookupPage';
+import OfficeContactPage from './pages/OfficeContactPage.jsx';
 import CheckoutResumePage from './pages/CheckoutResumePage';
 import TicketPrintPage from './pages/TicketPrintPage.jsx';
 import FiscalReceiptPrintPage from './pages/FiscalReceiptPrintPage.jsx';
@@ -189,7 +191,9 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/my-booking" element={<BookingLookupPage />} />
+            <Route path="/contact" element={<OfficeContactPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
             <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />

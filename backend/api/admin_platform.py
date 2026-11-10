@@ -89,6 +89,7 @@ from schemas.platform_admin import (
     PlatformUserUpdate,
     AdminPasswordResetSendByUser,
     AdminPasswordResetSendByEmail,
+    AdminPasswordResetRequestPublic,
     AdminPasswordResetConfirm,
     AdminPasswordResetSendResponse,
     VehicleCreate,
@@ -590,6 +591,7 @@ async def _send_reset_for_db_user(
     user,
     *,
     include_reset_url: bool = False,
+    public_base: str | None = None,
 ) -> AdminPasswordResetSendResponse:
     from travel_platform.settings.admin_password_reset import (
         build_reset_url,
@@ -602,7 +604,7 @@ async def _send_reset_for_db_user(
         tenant_id=str(user.tenant_id),
         password_hash=user.password_hash,
     )
-    reset_url = build_reset_url(token)
+    reset_url = build_reset_url(token, public_base=public_base)
     try:
         await send_admin_reset_email(
             to_email=user.email,
@@ -841,6 +843,91 @@ async def send_password_reset_by_email(
         return result
 
 
+@router.post(
+    "/password-reset/request",
+    response_model=AdminPasswordResetSendResponse,
+)
+async def request_admin_password_reset_public(
+    request: Request,
+    body: AdminPasswordResetRequestPublic,
+):
+    """
+    Public forgot-password from office /admin/login.
+
+    Always returns a generic success message (no email enumeration).
+    Scopes to the tenant resolved from Host when on an office subdomain.
+    """
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import (
+        allow_request_attempt,
+        find_users_by_email,
+    )
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_request_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
+    generic = AdminPasswordResetSendResponse(
+        ok=True,
+        message="Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε οδηγίες επαναφοράς (έλεγχος και spam).",
+        email=None,
+        user_id=None,
+        tenant_id=None,
+    )
+
+    email = str(body.email).strip().lower()
+    if not email:
+        return generic
+
+    # Prefer explicit office host from the SPA (API Host is often api.*).
+    host = (
+        str(body.host or "").split(":")[0].strip().lower()
+        or (request.headers.get("origin") or "").replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].strip().lower()
+        or (request.headers.get("host") or "").split(":")[0].strip().lower()
+    )
+    public_base = None
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[
+        0
+    ].strip()
+    if host and host not in ("api.poreiago.com", "localhost", "127.0.0.1"):
+        public_base = f"{proto}://{host}"
+
+    tenant_id = None
+    try:
+        from olympus.tenant.domain_resolver import DomainResolver
+
+        async with AsyncSessionLocal() as db:
+            resolved = await DomainResolver(db).resolve(host)
+            if resolved and resolved.tenant_id:
+                tenant_id = resolved.tenant_id
+    except Exception as exc:
+        logger.warning("password-reset/request host resolve failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            users = await find_users_by_email(db, email)
+            active = [u for u in users if u.is_active]
+            if tenant_id is not None:
+                active = [u for u in active if u.tenant_id == tenant_id]
+            if len(active) != 1:
+                return generic
+            await _send_reset_for_db_user(
+                active[0],
+                include_reset_url=False,
+                public_base=public_base,
+            )
+    except Exception as exc:
+        logger.warning("password-reset/request failed for %s: %s", email, exc)
+    return generic
+
+
 @router.post("/password-reset/confirm")
 async def confirm_admin_password_reset(request: Request, body: AdminPasswordResetConfirm):
     """Public: set a new backoffice password with a signed reset token."""
@@ -1060,13 +1147,84 @@ async def get_login_audits(
     success: bool | None = Query(default=None),
     q: str | None = Query(default=None, max_length=120),
 ):
-    """Login history: χρόνος, IP, συσκευή — admin / customer / driver."""
+    """Login history: χρόνος, IP, συσκευή, γραφείο — admin / customer / driver."""
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
     from travel_platform.settings.login_audit_store import actor_type_label, list_login_events
 
-    rows = list_login_events(limit=limit, actor_type=actor_type, success=success, q=q)
+    # Fetch without q first so we can match office labels after DB enrich.
+    fetch_cap = 500 if (q and str(q).strip()) else limit
+    rows = list_login_events(
+        limit=fetch_cap,
+        actor_type=actor_type,
+        success=success,
+        q=None,
+    )
+
+    tenant_ids: set[UUID] = set()
     for row in rows:
+        raw = str(row.get("tenant_id") or "").strip()
+        if not raw:
+            continue
+        try:
+            tenant_ids.add(UUID(raw))
+        except ValueError:
+            continue
+
+    labels: dict[str, dict[str, str | None]] = {}
+    if tenant_ids:
+        try:
+            async with AsyncSessionLocal() as db:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[str(t.id)] = {
+                        "tenant_name": getattr(t, "legal_name", None),
+                        "tenant_slug": getattr(t, "slug", None),
+                    }
+        except Exception:
+            logger.debug("login-audits tenant label enrich failed", exc_info=True)
+
+    needle = " ".join(str(q or "").lower().split()).strip()
+    out: list[dict] = []
+    for row in rows:
+        tid = str(row.get("tenant_id") or "").strip() or None
+        meta = labels.get(tid or "") if tid else None
+        name = (meta or {}).get("tenant_name") if meta else None
+        slug = (meta or {}).get("tenant_slug") if meta else None
+        if name and slug and str(slug) not in str(name):
+            office_label = f"{name} · {slug}"
+        else:
+            office_label = name or slug or (f"Γραφείο {tid[:8]}…" if tid else "Χωρίς γραφείο")
         row["actor_type_label"] = actor_type_label(row.get("actor_type"))
-    return {"items": rows, "total": len(rows)}
+        row["tenant_name"] = name
+        row["tenant_slug"] = slug
+        row["office_label"] = office_label
+        if needle:
+            blob = " ".join(
+                str(x or "")
+                for x in (
+                    office_label,
+                    name,
+                    slug,
+                    tid,
+                    row.get("identity"),
+                    row.get("actor_name"),
+                    row.get("ip"),
+                    row.get("device"),
+                    row.get("detail"),
+                    row.get("actor_id"),
+                )
+            ).lower()
+            if needle not in blob:
+                continue
+        out.append(row)
+        if len(out) >= limit:
+            break
+    return {"items": out, "total": len(out)}
 
 
 @router.get("/drivers", response_model=list[FleetDriverResponse])

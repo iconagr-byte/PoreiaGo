@@ -1,4 +1,4 @@
-# PoreiaGo — clear "Medium Phone is already running as process NNNN"
+﻿# PoreiaGo - clear "Medium Phone is already running as process NNNN"
 # when Android Studio Device Manager shows Play but Run fails with that toast.
 # ASCII-only (no BOM) for Windows PowerShell 5.1.
 #

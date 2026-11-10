@@ -230,6 +230,9 @@ export default function PageDesignBuilderPanel({
   onSelectThemes,
   saving = false,
   onSaveSlider,
+  onClose,
+  /** Studio drawer chrome already shows title — use quieter in-panel header. */
+  studio = false,
 }) {
   const [tripsTab, setTripsTab] = useState('layout');
   const [heroTab, setHeroTab] = useState('photo');
@@ -238,17 +241,31 @@ export default function PageDesignBuilderPanel({
   const theme = getHomepageThemeById(form.homepage_theme_id);
 
   return (
-    <div className="pdw-builder__panel">
-      <header className="pdw-builder__head">
-        <span className="pdw-builder__head-icon" aria-hidden>
-          <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
-        </span>
-        <div className="pdw-builder__head-copy min-w-0 flex-1">
-          <p className="pdw-builder__kicker">Builder</p>
-          <h3 className="pdw-builder__title">{meta.title}</h3>
+    <div className={`pdw-builder__panel${studio ? ' is-studio' : ''}`}>
+      {!studio ? (
+        <header className="pdw-builder__head">
+          <span className="pdw-builder__head-icon" aria-hidden>
+            <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
+          </span>
+          <div className="pdw-builder__head-copy min-w-0 flex-1">
+            <p className="pdw-builder__kicker">Studio</p>
+            <h3 className="pdw-builder__title">{meta.title}</h3>
+            <p className="pdw-builder__blurb">{meta.blurb}</p>
+          </div>
+          {onClose ? (
+            <button type="button" className="pdw-builder__link shrink-0" onClick={onClose}>
+              Κλείσιμο
+            </button>
+          ) : null}
+        </header>
+      ) : (
+        <div className="pdw-builder__studio-intro">
+          <span className="pdw-builder__head-icon" aria-hidden>
+            <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
+          </span>
           <p className="pdw-builder__blurb">{meta.blurb}</p>
         </div>
-      </header>
+      )}
 
       <div className="pdw-builder__body">
         {section === 'general' ? (
@@ -558,6 +575,45 @@ export default function PageDesignBuilderPanel({
                     onChange={(e) => setForm((p) => ({ ...p, footer_address: e.target.value }))}
                   />
                 </label>
+                <label className="pdw-builder__field">
+                  <span className="pdw-builder__field-label">Ωράριο</span>
+                  <input
+                    className="pdw-builder__input"
+                    placeholder="Δευ–Παρ 09:00–18:00"
+                    value={form.footer_hours || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, footer_hours: e.target.value }))}
+                  />
+                </label>
+                <label className="pdw-builder__field">
+                  <span className="pdw-builder__field-label">Tagline footer</span>
+                  <input
+                    className="pdw-builder__input"
+                    value={form.footer_tagline || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, footer_tagline: e.target.value }))}
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Facebook URL</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_facebook_url || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_facebook_url: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Instagram URL</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_instagram_url || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_instagram_url: e.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
               </div>
             )}
           </div>

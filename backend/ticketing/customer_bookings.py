@@ -107,6 +107,77 @@ async def get_booking(booking_id: str, tenant_id: str | None = None) -> dict | N
     return booking
 
 
+def _booking_alias_set(booking: dict, row_id: str | None = None) -> set[str]:
+    out: set[str] = set()
+    for raw in (
+        booking.get("id"),
+        booking.get("saasBookingId"),
+        booking.get("pnr"),
+        booking.get("ticketRef"),
+        booking.get("reference_code"),
+        row_id,
+    ):
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        out.add(text)
+        out.add(text.upper())
+        out.add(text.lower())
+    return out
+
+
+async def find_booking_by_aliases(
+    aliases: list[str],
+    *,
+    email: str | None = None,
+    tenant_id: str | None = None,
+) -> dict | None:
+    """
+    Resolve a wallet cache row by id / saasBookingId / PNR.
+
+    SQLite primary key is the local B-… id while clients often DELETE with the
+    Postgres UUID (saasBookingId). Primary-key lookup alone misses those rows.
+    """
+    keys = [str(a).strip() for a in (aliases or []) if str(a or "").strip()]
+    if not keys:
+        return None
+    # Fast path — exact primary key.
+    tid = _normalize_tenant(tenant_id)
+    for key in keys:
+        hit = await get_booking(key, tenant_id=tid)
+        if hit:
+            if email and str(hit.get("email") or "").strip().lower() != email.strip().lower():
+                continue
+            return hit
+
+    email_key = str(email or "").strip().lower() or None
+    db = get_db()
+    if tid and email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ? AND tenant_id = ?",
+            (email_key, tid),
+        )
+    elif email_key:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ?",
+            (email_key,),
+        )
+    elif tid:
+        cur = await db.execute(
+            "SELECT * FROM customer_bookings WHERE tenant_id = ?",
+            (tid,),
+        )
+    else:
+        return None
+    rows = await cur.fetchall()
+    alias_set = {k for k in keys} | {k.upper() for k in keys} | {k.lower() for k in keys}
+    for row in rows:
+        booking = _row_to_booking(row)
+        if _booking_alias_set(booking, str(row["id"] or "")) & alias_set:
+            return booking
+    return None
+
+
 async def upsert_booking(
     booking: dict,
     *,

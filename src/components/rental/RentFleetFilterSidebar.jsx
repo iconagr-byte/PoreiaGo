@@ -11,6 +11,7 @@ import {
   rentFleetFiltersActive,
   toggleRentFilterValue,
 } from '../../lib/rental/rentFleetFilters.js';
+import { useRentMobile } from '../../lib/rental/rentDevice.js';
 
 function FilterCheck({ id, label, count, checked, onChange }) {
   return (
@@ -35,12 +36,15 @@ export default function RentFleetFilterSidebar({
   filters = EMPTY_RENT_FLEET_FILTERS,
   onChange,
 } = {}) {
+  const isMobile = useRentMobile();
   const [extrasOpen, setExtrasOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const facets = useMemo(
     () => countRentFleetFilterFacets(vehicles, filters),
     [vehicles, filters],
   );
   const active = rentFleetFiltersActive(filters);
+  const bodyOpen = !isMobile || mobileOpen;
 
   const patch = (key, nextList) => {
     if (typeof onChange !== 'function') return;
@@ -53,10 +57,33 @@ export default function RentFleetFilterSidebar({
   const hiddenExtras = Math.max(0, RENT_FILTER_EXTRAS.length - RENT_FILTER_EXTRAS_VISIBLE);
 
   return (
-    <aside className="rent-side-filters" aria-label="Φίλτρα στόλου">
+    <aside
+      className={`rent-side-filters${isMobile ? ' rent-side-filters--mobile' : ''}${
+        bodyOpen ? ' is-open' : ''
+      }`}
+      aria-label="Φίλτρα στόλου"
+    >
       <div className="rent-side-filters-card">
         <header className="rent-side-filters-head">
-          <h3>Φίλτρα</h3>
+          {isMobile ? (
+            <button
+              type="button"
+              className="rent-side-filters-toggle"
+              aria-expanded={bodyOpen}
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                tune
+              </span>
+              <h3>Φίλτρα</h3>
+              {active ? <span className="rent-side-filters-badge">ενεργά</span> : null}
+              <span className="material-symbols-outlined rent-side-filters-chevron" aria-hidden>
+                {bodyOpen ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+          ) : (
+            <h3>Φίλτρα</h3>
+          )}
           {active ? (
             <button
               type="button"
@@ -68,6 +95,7 @@ export default function RentFleetFilterSidebar({
           ) : null}
         </header>
 
+        {bodyOpen ? <div className="rent-side-filters-body">
         <section className="rent-side-filters-section">
           <h4>Τοποθεσία</h4>
           <div className="rent-side-filters-list">
@@ -179,6 +207,7 @@ export default function RentFleetFilterSidebar({
             ))}
           </div>
         </section>
+        </div> : null}
       </div>
     </aside>
   );

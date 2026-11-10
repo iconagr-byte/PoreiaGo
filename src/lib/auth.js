@@ -1,4 +1,8 @@
 import { upsertCustomer } from './customers/customerStore.js';
+import {
+  rememberQuickLoginOnLogout,
+  syncQuickLoginVaultIfEnabled,
+} from './wallet/walletDeviceSecurity.js';
 import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
 
 export const ROLES = {
@@ -75,6 +79,22 @@ export function loginAsCustomer(email, profile = {}, accessToken = null) {
     authProvider: profile.provider || 'email',
     id: cid,
   });
+
+  // Keep Quick Login vault fresh when PIN unlock is enabled on this device.
+  try {
+    const token = accessToken || profile.access_token || getCustomerToken();
+    syncQuickLoginVaultIfEnabled(email, {
+      accessToken: token,
+      name: profile.name,
+      picture: profile.picture,
+      provider: profile.provider || 'email',
+      phone: profile.phone,
+      customerId: cid,
+      tenantId: tid,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getCustomerName() {
@@ -98,6 +118,7 @@ export function getAuthProvider() {
 }
 
 export function logoutCustomer() {
+  const email = localStorage.getItem('userEmail');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userEmail');
   localStorage.removeItem('userName');
@@ -107,4 +128,10 @@ export function logoutCustomer() {
   localStorage.removeItem(CUSTOMER_ID_KEY);
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
   clearWalletTenantId();
+  // Leave device PIN vault so the next visit can unlock with Quick Login.
+  try {
+    rememberQuickLoginOnLogout(email);
+  } catch {
+    /* ignore */
+  }
 }

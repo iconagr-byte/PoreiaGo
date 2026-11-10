@@ -566,8 +566,13 @@ html.driver-route #root {
 }
 
 .driver-main {
-  padding-top: 0.625rem;
-  padding-bottom: 1rem;
+  padding-top: 0.75rem;
+  padding-bottom: 1.15rem;
+}
+
+.driver-app.is-phone .driver-main {
+  padding-top: 0.65rem;
+  padding-bottom: 1.25rem;
 }
 
 .driver-main--chat {
@@ -613,12 +618,12 @@ html.driver-route #root {
   /* home · chat · gps · scan · sos · summary */
   grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: end;
-  gap: 0.1rem;
+  gap: 0.05rem;
   width: 100%;
   max-width: var(--driver-max-w);
   margin: 0 auto;
-  padding: 0.35rem max(0.35rem, env(safe-area-inset-left, 0px))
-    0.45rem max(0.35rem, env(safe-area-inset-right, 0px));
+  padding: 0.4rem max(0.3rem, env(safe-area-inset-left, 0px))
+    0.5rem max(0.3rem, env(safe-area-inset-right, 0px));
 }
 
 .driver-nav button {
@@ -784,16 +789,39 @@ html.driver-route #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: max(1.5rem, env(safe-area-inset-top, 0px)) var(--driver-pad-x)
-    max(1.5rem, env(safe-area-inset-bottom, 0px));
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) var(--driver-pad-x)
+    max(1.25rem, env(safe-area-inset-bottom, 0px));
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   color: var(--driver-text);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   background:
     radial-gradient(ellipse 70% 50% at 50% 0%, rgba(29, 78, 216, 0.1), transparent 60%),
     radial-gradient(ellipse 50% 40% at 0% 100%, rgba(234, 179, 8, 0.08), transparent 55%),
     linear-gradient(180deg, #ffffff, #f8fafc 55%, #f1f5f9);
+}
+
+@media (max-height: 720px) {
+  .driver-gate {
+    justify-content: flex-start;
+    padding-top: max(0.85rem, env(safe-area-inset-top, 0px));
+  }
+
+  .driver-gate-brand {
+    margin-bottom: 1rem;
+  }
+
+  .driver-gate-brand .inline-flex {
+    width: 3.25rem;
+    height: 3.25rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .driver-gate-brand h1 {
+    font-size: 1.35rem;
+  }
 }
 
 .driver-gate-glow {
@@ -897,16 +925,18 @@ html.driver-route #root {
 
 .driver-gate-input {
   width: 100%;
-  min-height: 3rem;
-  border-radius: 0.9rem;
+  min-height: 3.15rem;
+  border-radius: 0.95rem;
   border: 1px solid var(--driver-border);
   background: #f8fafc;
-  padding: 0.75rem 0.9rem;
-  font-size: 1rem;
+  padding: 0.8rem 0.95rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: var(--driver-text);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .driver-gate-input--with-eye {
@@ -1152,6 +1182,152 @@ html.driver-route #root {
   }
   50% {
     box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.08);
+  }
+}
+
+/* Home — wallet-style greeting + quick actions */
+.driver-home {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding-top: 0.35rem;
+  animation: driver-home-in 0.38s ease-out both;
+}
+
+@keyframes driver-home-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.driver-home-hero {
+  padding: 0.15rem 0.15rem 0.1rem;
+}
+
+.driver-home-hello {
+  margin: 0;
+  font-size: clamp(1.35rem, 5.5vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #0f172a;
+}
+
+.driver-home-hello-name {
+  color: var(--driver-accent);
+}
+
+.driver-home-hello-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--driver-muted);
+}
+
+.driver-quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.driver-quick-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-height: 5.75rem;
+  padding: 0.9rem 0.95rem 0.85rem;
+  text-align: left;
+  border-radius: 1.25rem;
+  border: 1px solid var(--driver-border);
+  background: var(--driver-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.05);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.driver-quick-tile:active {
+  transform: scale(0.975);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.driver-quick-tile--scan {
+  border-color: rgba(29, 78, 216, 0.22);
+  background: linear-gradient(160deg, #eff6ff 0%, #ffffff 70%);
+}
+
+.driver-quick-tile--chat {
+  border-color: rgba(234, 179, 8, 0.28);
+  background: linear-gradient(160deg, #fefce8 0%, #ffffff 72%);
+}
+
+.driver-quick-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 0.9rem;
+  background: var(--driver-accent-soft);
+  color: var(--driver-accent);
+}
+
+.driver-quick-tile--scan .driver-quick-icon {
+  background: linear-gradient(160deg, #3b82f6, #1d4ed8);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(29, 78, 216, 0.3);
+}
+
+.driver-quick-tile--chat .driver-quick-icon {
+  background: var(--driver-yellow-soft);
+  color: #a16207;
+}
+
+.driver-quick-icon .material-symbols-outlined {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.driver-quick-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.15;
+}
+
+.driver-quick-hint {
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--driver-muted);
+  line-height: 1.2;
+}
+
+@media (max-width: 359px) {
+  .driver-quick-tile {
+    min-height: 5.25rem;
+    padding: 0.8rem 0.75rem 0.75rem;
+  }
+
+  .driver-quick-label {
+    font-size: 0.875rem;
+  }
+
+  .driver-home-hello {
+    font-size: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .driver-home {
+    animation: none;
   }
 }
 

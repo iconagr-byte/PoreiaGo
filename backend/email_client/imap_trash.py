@@ -107,6 +107,58 @@ def _try_move(client: imaplib.IMAP4, msg_set: str, trash_box: str) -> bool:
     return True
 
 
+def imap_mark_message_seen(
+    cfg: dict[str, Any],
+    *,
+    message_id: str,
+    local_folder: str,
+    imap_uid: str | None = None,
+) -> dict[str, Any]:
+    """Set \\Seen on the IMAP message so the next sync keeps the unread dot off."""
+    if not cfg.get("host") or not cfg.get("user"):
+        return {"ok": False, "marked": False, "error": "IMAP host/username missing"}
+    if not (cfg.get("password") or "").strip():
+        return {"ok": False, "marked": False, "error": "Λείπει ο κωδικός email"}
+
+    mid = (message_id or "").strip()
+    if not mid or mid.endswith("@local") or mid.startswith("draft-"):
+        return {"ok": True, "marked": False, "error": None}
+
+    try:
+        client = connect_imap(cfg)
+    except Exception as exc:
+        return {"ok": False, "marked": False, "error": format_imap_connect_error(exc)}
+
+    try:
+        source = _source_imap_box(client, cfg, local_folder or FOLDER_INBOX)
+        if not source:
+            return {"ok": True, "marked": False, "error": None}
+
+        status, _ = client.select(source, readonly=False)
+        if status != "OK":
+            return {"ok": False, "marked": False, "error": f"Cannot select {source}"}
+
+        nums = _search_by_message_id(client, mid)
+        if not nums and imap_uid and str(imap_uid).isdigit():
+            nums = [str(imap_uid).encode("ascii")]
+        if not nums:
+            return {"ok": True, "marked": False, "error": None}
+
+        msg_set = b",".join(nums).decode("ascii")
+        typ, _ = client.store(msg_set, "+FLAGS", "(\\Seen)")
+        if typ != "OK":
+            return {"ok": False, "marked": False, "error": "IMAP STORE \\Seen failed"}
+        return {"ok": True, "marked": True, "error": None}
+    except Exception as exc:
+        logger.warning("IMAP mark seen failed: %s", exc)
+        return {"ok": False, "marked": False, "error": str(exc)}
+    finally:
+        try:
+            client.logout()
+        except Exception:
+            pass
+
+
 def imap_move_message_to_trash(
     cfg: dict[str, Any],
     *,

@@ -46,9 +46,6 @@ export default function BookingLookupPage() {
   const [fieldError, setFieldError] = useState({ email: '', reference: '' });
   const [helpOpen, setHelpOpen] = useState(false);
   const [phone, setPhone] = useState('');
-  const [rentGate, setRentGate] = useState(false);
-  const [rentAvailable, setRentAvailable] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
     // Rent deep-link / RB-… / session from /rent → never stay on bus ticket finder (if Rent enabled).
@@ -75,15 +72,15 @@ export default function BookingLookupPage() {
       /* ignore */
     }
 
-    setRentGate(false);
-
     fetchOfficeModules()
       .then((modules) => {
         if (cancelled) return;
         const rentOk = shouldShowRentStorefront(modules);
-        setRentAvailable(rentOk);
+        const rentOnly =
+          Boolean(modules?.rent_enabled) && modules?.trips_enabled === false;
 
-        if (preferRent && rentOk) {
+        // Office is rent-only, or session/ref clearly rent → rent lookup (no chooser).
+        if ((preferRent && rentOk) || (rentOnly && rentOk)) {
           const qs = searchParams.toString();
           const hasLookup = Boolean(
             searchParams.get('email') ||
@@ -92,7 +89,9 @@ export default function BookingLookupPage() {
               searchParams.get('code'),
           );
           const target =
-            hasLookup || qRef.startsWith('RB-') ? '/rent/my-booking' : '/wallet?tab=rentals';
+            hasLookup || qRef.startsWith('RB-') || rentOnly
+              ? '/rent/my-booking'
+              : '/wallet?tab=rentals';
           navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
           return;
         }
@@ -100,14 +99,11 @@ export default function BookingLookupPage() {
           clearPreferRentLookup();
         }
 
-        if (!forceBus && rentOk) setRentGate(true);
-
         setEmail((qEmail || saved).trim().toLowerCase());
         if (qRef) setReference(normalizeReference(qRef));
       })
       .catch(() => {
         if (cancelled) return;
-        setRentAvailable(false);
         setEmail((qEmail || saved).trim().toLowerCase());
         if (qRef) setReference(normalizeReference(qRef));
       });
@@ -234,177 +230,136 @@ export default function BookingLookupPage() {
             Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις το εισιτήριό σου.
           </p>
 
-          {rentGate ? (
-            <div className="booking-lookup-product-gate" role="group" aria-label="Τύπος κράτησης">
-              <p className="booking-lookup-product-gate-title">Τι ψάχνεις;</p>
-              <div className="booking-lookup-product-gate-actions">
-                <button
-                  type="button"
-                  className="booking-lookup-product-gate-bus"
-                  onClick={() => {
-                    clearPreferRentLookup();
-                    setRentGate(false);
+          <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
+            <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
+              <span>Email κράτησης</span>
+              <div className="booking-lookup-input-wrap">
+                <span className="material-symbols-outlined" aria-hidden>
+                  mail
+                </span>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldError.email) setFieldError((f) => ({ ...f, email: '' }));
                   }}
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    directions_bus
-                  </span>
-                  Εισιτήριο λεωφορείου
-                </button>
-                <a href="/wallet?tab=rentals" className="booking-lookup-product-gate-rent">
-                  <span className="material-symbols-outlined" aria-hidden>
-                    car_rental
-                  </span>
-                  Ενοικίαση · Rent Wallet
-                </a>
+                />
               </div>
-              <p className="booking-lookup-note" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
-                Από το μενού Rent πάτα πάντα το πράσινο Wallet — όχι αυτή τη μπλε φόρμα.
-              </p>
-            </div>
-          ) : (
-            <>
-              {rentAvailable ? (
-                <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
-                  Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-                  <Link to="/wallet?tab=rentals">My Wallet</Link>
-                  {' · '}
-                  <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
+              {fieldError.email ? <em>{fieldError.email}</em> : null}
+            </label>
+
+            <label
+              className={`booking-lookup-field ${fieldError.reference ? 'has-error' : ''}`}
+              htmlFor="reference"
+            >
+              <span>Κωδικός αναφοράς</span>
+              <div className="booking-lookup-input-wrap">
+                <span className="material-symbols-outlined" aria-hidden>
+                  tag
+                </span>
+                <input
+                  id="reference"
+                  name="reference"
+                  type="text"
+                  required
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="is-mono"
+                  placeholder="BK-XXXXXXXX"
+                  value={reference}
+                  onPaste={handlePasteReference}
+                  onChange={(e) => {
+                    setReference(e.target.value.toUpperCase());
+                    if (fieldError.reference) setFieldError((f) => ({ ...f, reference: '' }));
+                  }}
+                  onBlur={() => {
+                    if (reference.trim()) setReference(normalizeReference(reference));
+                  }}
+                />
+              </div>
+              {fieldError.reference ? (
+                <em>{fieldError.reference}</em>
+              ) : (
+                <small>Μπορείς να επικολλήσεις ολόκληρο το email επιβεβαίωσης</small>
+              )}
+            </label>
+
+            <button type="submit" disabled={!canSubmit} className="booking-lookup-submit">
+              {loading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin" aria-hidden>
+                    progress_activity
+                  </span>
+                  Αναζήτηση…
+                </>
+              ) : (
+                <>
+                  Εμφάνιση εισιτηρίου
+                  <span className="material-symbols-outlined" aria-hidden>
+                    arrow_forward
+                  </span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            className="booking-lookup-help-toggle"
+            aria-expanded={helpOpen}
+            onClick={() => setHelpOpen((o) => !o)}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              {helpOpen ? 'expand_less' : 'help'}
+            </span>
+            Πού βρίσκω τον κωδικό;
+          </button>
+
+          {helpOpen ? (
+            <div className="booking-lookup-help">
+              <ol>
+                <li>Άνοιξε το email επιβεβαίωσης κράτησης.</li>
+                <li>
+                  Ψάξε για κωδικό τύπου <strong>BK-…</strong> (ή PNR / αναφορά).
+                </li>
+                <li>Χρησιμοποίησε το ίδιο email με την κράτηση.</li>
+              </ol>
+              {tel ? (
+                <p>
+                  Χρειάζεσαι βοήθεια;{' '}
+                  <a href={tel} className="booking-lookup-phone">
+                    Κάλεσε {phone}
+                  </a>
                 </p>
               ) : null}
+            </div>
+          ) : null}
 
-              <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
-                <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
-                  <span>Email κράτησης</span>
-                  <div className="booking-lookup-input-wrap">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      mail
-                    </span>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      autoComplete="email"
-                      inputMode="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (fieldError.email) setFieldError((f) => ({ ...f, email: '' }));
-                      }}
-                    />
-                  </div>
-                  {fieldError.email ? <em>{fieldError.email}</em> : null}
-                </label>
+          <p className="booking-lookup-note">
+            Για λόγους απορρήτου χρειάζονται και τα δύο στοιχεία — δεν εμφανίζονται όλες οι κρατήσεις του
+            email.
+          </p>
 
-                <label
-                  className={`booking-lookup-field ${fieldError.reference ? 'has-error' : ''}`}
-                  htmlFor="reference"
-                >
-                  <span>Κωδικός αναφοράς</span>
-                  <div className="booking-lookup-input-wrap">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      tag
-                    </span>
-                    <input
-                      id="reference"
-                      name="reference"
-                      type="text"
-                      required
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="is-mono"
-                      placeholder="BK-XXXXXXXX"
-                      value={reference}
-                      onPaste={handlePasteReference}
-                      onChange={(e) => {
-                        setReference(e.target.value.toUpperCase());
-                        if (fieldError.reference) setFieldError((f) => ({ ...f, reference: '' }));
-                      }}
-                      onBlur={() => {
-                        if (reference.trim()) setReference(normalizeReference(reference));
-                      }}
-                    />
-                  </div>
-                  {fieldError.reference ? (
-                    <em>{fieldError.reference}</em>
-                  ) : (
-                    <small>Μπορείς να επικολλήσεις ολόκληρο το email επιβεβαίωσης</small>
-                  )}
-                </label>
-
-                <button type="submit" disabled={!canSubmit} className="booking-lookup-submit">
-                  {loading ? (
-                    <>
-                      <span className="material-symbols-outlined animate-spin" aria-hidden>
-                        progress_activity
-                      </span>
-                      Αναζήτηση…
-                    </>
-                  ) : (
-                    <>
-                      Εμφάνιση εισιτηρίου
-                      <span className="material-symbols-outlined" aria-hidden>
-                        arrow_forward
-                      </span>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              <button
-                type="button"
-                className="booking-lookup-help-toggle"
-                aria-expanded={helpOpen}
-                onClick={() => setHelpOpen((o) => !o)}
-              >
+          <div className="booking-lookup-footer-links">
+            <Link to="/login" className="booking-lookup-wallet">
+              Σύνδεση στο My Wallet
+            </Link>
+            {tel ? (
+              <a href={tel} className="booking-lookup-phone">
                 <span className="material-symbols-outlined" aria-hidden>
-                  {helpOpen ? 'expand_less' : 'help'}
+                  call
                 </span>
-                Πού βρίσκω τον κωδικό;
-              </button>
-
-              {helpOpen ? (
-                <div className="booking-lookup-help">
-                  <ol>
-                    <li>Άνοιξε το email επιβεβαίωσης κράτησης.</li>
-                    <li>
-                      Ψάξε για κωδικό τύπου <strong>BK-…</strong> (ή PNR / αναφορά).
-                    </li>
-                    <li>Χρησιμοποίησε το ίδιο email με την κράτηση.</li>
-                  </ol>
-                  {tel ? (
-                    <p>
-                      Χρειάζεσαι βοήθεια;{' '}
-                      <a href={tel} className="booking-lookup-phone">
-                        Κάλεσε {phone}
-                      </a>
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <p className="booking-lookup-note">
-                Για λόγους απορρήτου χρειάζονται και τα δύο στοιχεία — δεν εμφανίζονται όλες οι κρατήσεις του
-                email.
-              </p>
-
-              <div className="booking-lookup-footer-links">
-                <Link to="/login" className="booking-lookup-wallet">
-                  Σύνδεση στο My Wallet
-                </Link>
-                {tel ? (
-                  <a href={tel} className="booking-lookup-phone">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      call
-                    </span>
-                    {phone}
-                  </a>
-                ) : null}
-              </div>
-            </>
-          )}
+                {phone}
+              </a>
+            ) : null}
+          </div>
         </section>
       </main>
     </div>

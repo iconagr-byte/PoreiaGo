@@ -676,6 +676,24 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
+  max-width: min(15rem, 58vw);
+}
+
+.wallet-app--phone .wallet-topbar-brand {
+  max-width: min(14.5rem, 56vw);
+}
+
+.wallet-app--phone .wallet-topbar-brand img {
+  max-height: 36px;
+  height: 36px;
+  width: auto;
+  max-width: min(140px, 44vw);
+}
+
+.wallet-app--phone .wallet-topbar-brand img.office-brand-mark__logo--with-name {
+  max-height: 28px;
+  height: 28px;
+  max-width: min(72px, 28vw);
 }
 
 .wallet-more-trip-list {

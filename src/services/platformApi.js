@@ -314,6 +314,24 @@ export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
   return res.json();
 }
 
+/** Public: request admin password-reset email from /admin/login (no session). */
+export async function requestAdminPasswordReset({ email, host } = {}) {
+  const officeHost =
+    String(host || (typeof window !== 'undefined' ? window.location.hostname : '') || '')
+      .trim()
+      .toLowerCase();
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      email: String(email || '').trim().toLowerCase(),
+      ...(officeHost ? { host: officeHost } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 /** Public: confirm admin password reset with emailed token. */
 export async function confirmAdminPasswordReset({ token, newPassword }) {
   const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/confirm`, {

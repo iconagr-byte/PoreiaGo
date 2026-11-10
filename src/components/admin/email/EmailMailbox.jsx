@@ -93,12 +93,19 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [bulkBusy, setBulkBusy] = useState(false);
   const autoSyncedFor = useRef('');
   const syncInFlight = useRef(false);
+  // Survives IMAP poll / list reload races so a just-opened mail stays marked read.
+  const locallyReadIdsRef = useRef(new Set());
+  const selectedIdRef = useRef(null);
   const { width: listWidth, onPointerDown: onListResize } = useResizableRailWidth({
     storageKey: LIST_WIDTH_KEY,
     defaultWidth: 300,
     minWidth: 220,
     maxWidth: 560,
   });
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const loadFolders = useCallback(async () => {
     // No office mailbox → empty counts (never show another tenant's unread).
@@ -113,6 +120,37 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       mailboxToastError(err.message);
     }
   }, [emailSettingsId]);
+
+  const applyMessageList = useCallback((list) => {
+    const readIds = locallyReadIdsRef.current;
+    const merged = (list || []).map((m) =>
+      readIds.has(m.id) || m.is_read ? { ...m, is_read: true } : m,
+    );
+    setMessages((prev) => {
+      // Also keep any id that was already read in UI even if ref missed a beat.
+      const next = merged.map((m) => {
+        const was = prev.find((p) => p.id === m.id);
+        if (was?.is_read && !m.is_read) {
+          readIds.add(m.id);
+          return { ...m, is_read: true };
+        }
+        return m;
+      });
+      if (
+        prev.length === next.length &&
+        prev.every(
+          (m, i) =>
+            m.id === next[i]?.id &&
+            m.is_read === next[i]?.is_read &&
+            m.subject === next[i]?.subject,
+        )
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    return merged;
+  }, []);
 
   const loadMessages = useCallback(
     async ({ silent = false } = {}) => {
@@ -129,27 +167,14 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         const list = await fetchMailboxMessages(activeFolder, {
           accountId: emailSettingsId,
         });
-        setMessages((prev) => {
-          // Avoid re-render jitter when poll returns the same rows.
-          if (
-            prev.length === list.length &&
-            prev.every(
-              (m, i) =>
-                m.id === list[i]?.id &&
-                m.is_read === list[i]?.is_read &&
-                m.subject === list[i]?.subject,
-            )
-          ) {
-            return prev;
-          }
-          return list;
-        });
-        if (selectedId && !list.find((m) => m.id === selectedId)) {
+        const merged = applyMessageList(list);
+        const currentSelected = selectedIdRef.current;
+        if (currentSelected && !merged.find((m) => m.id === currentSelected)) {
           setSelectedId(null);
           setDetail(null);
           setCustomer(null);
         }
-        return list;
+        return merged;
       } catch (err) {
         if (!silent) mailboxToastError(err.message);
         return [];
@@ -157,7 +182,9 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         if (!silent) setLoading(false);
       }
     },
-    [activeFolder, selectedId, emailSettingsId],
+    // selectedId must NOT be a dep — changing selection used to re-fetch the list
+    // and race ahead of mark-as-read, bringing the blue unread dot back.
+    [activeFolder, emailSettingsId, applyMessageList],
   );
 
   useEffect(() => {
@@ -240,6 +267,11 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     [emailSettingsId, loadFolders, loadMessages],
   );
 
+  // Account switch: drop sticky reads from the previous mailbox.
+  useEffect(() => {
+    locallyReadIdsRef.current = new Set();
+  }, [emailSettingsId]);
+
   // First open of an account: pull IMAP so the inbox is not stuck empty.
   useEffect(() => {
     if (!emailSettingsId) return;
@@ -258,15 +290,34 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   }, [emailSettingsId, runSync]);
 
   const selectMessage = async (id) => {
+    const wasUnread = Boolean(messages.find((m) => m.id === id && !m.is_read));
     setSelectedId(id);
     setReplyOpen(false);
+    // Sticky local read: list reloads / IMAP poll must not revive this blue dot.
+    locallyReadIdsRef.current.add(id);
+    // Optimistic: clear the blue unread dot immediately.
+    if (wasUnread) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
+      setFolders((prev) =>
+        prev.map((f) =>
+          f.name === activeFolder && f.unread > 0
+            ? { ...f, unread: Math.max(0, (f.unread || 0) - 1) }
+            : f,
+        ),
+      );
+    }
     try {
       const msg = await fetchMailboxMessage(id);
       setDetail(msg);
+      locallyReadIdsRef.current.add(id);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
       const cust = await fetchMessageCustomer(id);
       setCustomer(cust);
       loadFolders();
-      loadMessages();
     } catch (err) {
       mailboxToastError(err.message);
     }
