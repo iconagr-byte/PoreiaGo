@@ -76,7 +76,17 @@ export default function PlatformMarketingHeader() {
           <Link to="/admin/login" className="pm-header-login">
             Σύνδεση
           </Link>
-          <Link to="/grafeia" className="pm-header-cta">
+          <Link
+            to="/wallet"
+            className="pm-header-cta pm-header-cta--wallet"
+            onClick={closeAll}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              account_balance_wallet
+            </span>
+            My Wallet
+          </Link>
+          <Link to="/grafeia" className="pm-header-cta pm-header-cta--contracts">
             Συμβόλαια
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
@@ -169,11 +179,18 @@ export default function PlatformMarketingHeader() {
               <Link to="/admin/login" className="pm-mobile-login" onClick={closeAll}>
                 Σύνδεση γραφείου
               </Link>
-              <Link to="/grafeia" className="pm-header-cta pm-mobile-cta" onClick={closeAll}>
-                Συμβόλαια
+              <Link
+                to="/wallet"
+                className="pm-header-cta pm-header-cta--wallet pm-mobile-cta"
+                onClick={closeAll}
+              >
                 <span className="material-symbols-outlined" aria-hidden>
-                  arrow_forward
+                  account_balance_wallet
                 </span>
+                My Wallet
+              </Link>
+              <Link to="/grafeia" className="pm-mobile-login" onClick={closeAll}>
+                Συμβόλαια
               </Link>
             </div>
           </nav>

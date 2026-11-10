@@ -40,78 +40,92 @@
   display: inline-flex;
   min-width: 0;
   flex: 1 1 auto;
-  max-width: min(100%, 22rem);
+  max-width: min(100%, 24rem);
   text-decoration: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  /* Phone/tablet top bar: full PoreiaGo mark + My Wallet (not Συμβόλαια) */
   .pm-header-inner {
     height: auto;
-    min-height: 4.65rem;
-    padding: 0.7rem 1.15rem;
-    gap: 0.7rem;
+    min-height: 4.5rem;
+    padding: 0.65rem 1rem;
+    gap: 0.55rem;
   }
 
   .pg-brand {
-    gap: 0.55rem;
+    gap: 0.5rem;
     min-width: 0;
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
   }
 
   .pg-brand-link {
-    max-width: min(100%, 14.5rem);
+    flex: 0 1 auto;
+    max-width: none;
+  }
+
+  .pg-brand-copy {
+    overflow: visible;
   }
 
   .pg-brand-mark {
-    width: 2.4rem;
-    height: 2.4rem;
+    width: 2.35rem;
+    height: 2.35rem;
   }
 
   .pg-brand-name {
-    font-size: 1.32rem;
+    font-size: 1.28rem;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .pg-brand-line {
-    display: block;
-    max-width: 100%;
-    font-size: 0.62rem;
+    display: none;
   }
 
   .pm-header-actions {
-    gap: 0.45rem;
-    margin-left: 0.15rem;
-    padding-right: 0.05rem;
+    gap: 0.4rem;
+    margin-left: auto;
   }
 
-  .pm-header-cta {
-    padding: 0.5rem 0.85rem;
-    font-size: 0.8rem;
+  .pm-header-cta--contracts {
+    display: none;
+  }
+
+  .pm-header-cta--wallet {
+    display: inline-flex;
+    padding: 0.48rem 0.8rem;
+    font-size: 0.78rem;
     white-space: nowrap;
   }
 
-  .pm-header-cta .material-symbols-outlined {
-    font-size: 16px;
+  .pm-header-cta--wallet .material-symbols-outlined {
+    font-size: 1.05rem;
+    font-variation-settings: 'FILL' 1, 'wght' 500;
   }
 
   .pm-header-menu-btn {
-    width: 2.55rem;
-    height: 2.55rem;
+    width: 2.5rem;
+    height: 2.5rem;
     flex-shrink: 0;
   }
 }
 
 @media (max-width: 380px) {
   .pm-header-inner {
-    padding: 0.65rem 0.95rem;
-    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    gap: 0.4rem;
   }
 
-  .pg-brand-link {
-    max-width: min(100%, 11.5rem);
+  .pg-brand-name {
+    font-size: 1.18rem;
   }
 
-  .pm-header-cta {
-    padding: 0.48rem 0.7rem;
+  .pm-header-cta--wallet {
+    padding: 0.42rem 0.65rem;
+    font-size: 0.72rem;
   }
 }
 
@@ -462,6 +476,30 @@
   font-size: 18px;
 }
 
+.pm-header-cta--wallet {
+  background: #0071e3;
+  box-shadow: 0 8px 20px rgba(0, 113, 227, 0.28);
+}
+
+.pm-header-cta--wallet:hover {
+  background: #0077ed;
+}
+
+.pm-header-cta--wallet .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 500;
+}
+
+/* Desktop: show both; phone hides contracts via max-width 900 rule */
+@media (min-width: 901px) {
+  .pm-header-cta--wallet {
+    display: inline-flex;
+  }
+
+  .pm-header-cta--contracts {
+    display: inline-flex;
+  }
+}
+
 .pm-header-menu-btn {
   display: inline-flex;
   align-items: center;
@@ -645,6 +683,15 @@
 
 .pm-header--light .pm-header-cta:hover {
   background: #133556;
+}
+
+.pm-header--light .pm-header-cta--wallet {
+  background: #0071e3;
+  box-shadow: 0 8px 20px rgba(0, 113, 227, 0.22);
+}
+
+.pm-header--light .pm-header-cta--wallet:hover {
+  background: #0077ed;
 }
 
 .pm-header--light .pm-header-menu-btn {
