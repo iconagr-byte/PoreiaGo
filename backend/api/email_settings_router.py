@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from api.request_tenant import admin_tenant_id
 from email_client.dynamic_mailer import test_account_connection
 from email_client.settings_store import (
     create_settings,
@@ -15,6 +16,31 @@ from email_client.settings_store import (
 )
 
 router = APIRouter(prefix="/api/email/settings", tags=["Email Settings"])
+
+
+def _owner_key(request: Request) -> str:
+    """Scope email accounts to the logged-in office (JWT tenant)."""
+    return f"tenant:{admin_tenant_id(request)}"
+
+
+async def _list_for_request(request: Request, *, active_only: bool = False):
+    return await list_settings(
+        owner_key=_owner_key(request),
+        active_only=active_only,
+        # Never pull / auto-adopt shared owner_key=default into another office.
+        include_legacy_default=False,
+    )
+
+
+async def _require_owned(settings_id: str, request: Request, *, with_password: bool = False):
+    owner = _owner_key(request)
+    row = await get_settings(settings_id, with_password=with_password)
+    if not row:
+        raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
+    if row.get("owner_key") == owner:
+        return row
+    # Do not auto-claim foreign/legacy rows on read — prevents email credential theft.
+    raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
 
 
 class EmailSettingsCreate(BaseModel):
@@ -94,39 +120,62 @@ class TestConnectionBody(BaseModel):
 
 @router.get("", response_model=list[EmailSettingsOut])
 async def list_email_settings(
-    owner_key: str = Query(default="default"),
+    request: Request,
     active_only: bool = False,
 ):
-    rows = await list_settings(owner_key=owner_key, active_only=active_only)
+    rows = await _list_for_request(request, active_only=active_only)
     return [EmailSettingsOut(**r) for r in rows]
 
 
 @router.post("", response_model=EmailSettingsOut, status_code=201)
-async def create_email_settings(body: EmailSettingsCreate):
+async def create_email_settings(body: EmailSettingsCreate, request: Request):
     if not body.mail_password:
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός email")
-    created = await create_settings(body.model_dump())
+    from email_client.dynamic_mailer import normalize_mail_password
+
+    payload = body.model_dump()
+    payload["mail_password"] = normalize_mail_password(
+        payload.get("mail_password"),
+        host=payload.get("imap_host") or payload.get("smtp_host") or "",
+        email=payload.get("email_address") or "",
+    )
+    payload["owner_key"] = _owner_key(request)
+    created = await create_settings(payload)
     return EmailSettingsOut(**created)
 
 
 @router.get("/{settings_id}", response_model=EmailSettingsOut)
-async def get_email_settings(settings_id: str):
-    row = await get_settings(settings_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
+async def get_email_settings(settings_id: str, request: Request):
+    row = await _require_owned(settings_id, request)
     return EmailSettingsOut(**row)
 
 
 @router.patch("/{settings_id}", response_model=EmailSettingsOut)
-async def patch_email_settings(settings_id: str, body: EmailSettingsUpdate):
-    updated = await update_settings(settings_id, body.model_dump(exclude_unset=True))
+async def patch_email_settings(settings_id: str, body: EmailSettingsUpdate, request: Request):
+    await _require_owned(settings_id, request)
+    from email_client.dynamic_mailer import normalize_mail_password
+
+    patch = body.model_dump(exclude_unset=True)
+    if patch.get("mail_password"):
+        existing = await get_settings(settings_id) or {}
+        patch["mail_password"] = normalize_mail_password(
+            patch["mail_password"],
+            host=patch.get("imap_host")
+            or existing.get("imap_host")
+            or patch.get("smtp_host")
+            or existing.get("smtp_host")
+            or "",
+            email=patch.get("email_address") or existing.get("email_address") or "",
+        )
+    updated = await update_settings(settings_id, patch)
     if not updated:
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
     return EmailSettingsOut(**updated)
 
 
 @router.delete("/{settings_id}", status_code=204)
-async def remove_email_settings(settings_id: str):
+async def remove_email_settings(settings_id: str, request: Request):
+    await _require_owned(settings_id, request)
     if not await delete_settings(settings_id):
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
 
@@ -143,8 +192,6 @@ async def test_connection(body: TestConnectionBody):
 
 
 @router.post("/{settings_id}/test-connection")
-async def test_saved_connection(settings_id: str):
-    account = await get_settings(settings_id, with_password=True)
-    if not account:
-        raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
+async def test_saved_connection(settings_id: str, request: Request):
+    account = await _require_owned(settings_id, request, with_password=True)
     return test_account_connection(account)
