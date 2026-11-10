@@ -15,6 +15,7 @@ import {
   fetchRentalLiveOverlays,
   fetchRentalSummary,
   fetchRentalVehicles,
+  issueRentalReceipt,
   updateRentalBookingStatus,
   updateRentalIdVerification,
   uploadRentalInspectionPhoto,

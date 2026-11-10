@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import threading
@@ -442,6 +443,7 @@ EXTRA_DAILY_RATES = {
     "extra_insurance": 12.0,
     "child_seat": 7.0,
     "gps_pack": 5.0,
+    "young_driver": 15.0,
 }
 
 
@@ -653,7 +655,15 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
         if not existing:
             data["vehicles"].append(row)
         _write(data)
-        return deepcopy(row)
+        saved = deepcopy(row)
+
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_vehicle_to_pg
+
+        sync_vehicle_to_pg(saved)
+    except Exception:
+        logger.debug("rental pg sync after upsert_vehicle skipped", exc_info=True)
+    return saved
 
 
 def delete_vehicle(tenant_id: str | None, vehicle_id: str) -> bool:
@@ -786,21 +796,57 @@ def _normalize_deposit_percent(value: Any) -> int:
     return max(5, min(90, pct))
 
 
+def looks_like_airport(pickup_location: str | None) -> bool:
+    raw = str(pickup_location or "").strip().lower()
+    if not raw:
+        return False
+    return any(tok in raw for tok in _AIRPORT_TOKENS)
+
+
+def validate_client_afm(value: Any) -> str | None:
+    """Optional AFM — empty ok; if present must be exactly 9 digits."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if not _AFM_RE.fullmatch(raw):
+        raise ValueError("Το ΑΦΜ πρέπει να έχει ακριβώς 9 ψηφία")
+    return raw
+
+
+def fleet_dispatch_ok(plate: str | None) -> tuple[bool, str | None]:
+    """KTEO/insurance compliance via fleet service. Unknown plate → allow."""
+    plate_norm = str(plate or "").strip()
+    if not plate_norm:
+        return True, None
+    try:
+        from travel_platform.fleet.service_service import service_service
+
+        result = service_service.check_dispatch_availability(plate_norm)
+    except Exception as exc:
+        logger.warning("fleet dispatch check failed plate=%s: %s", plate_norm, exc)
+        return True, None
+    if not isinstance(result, dict):
+        return True, None
+    if result.get("available") is False:
+        reason = str(result.get("reason") or "Το όχημα δεν είναι διαθέσιμο (συμμόρφωση στόλου)")
+        return False, reason
+    return True, None
+
+
 def compute_extras_total(days: int, extras: dict[str, Any] | None = None) -> tuple[float, list[str]]:
-    """Return (extras_total, label list) for selected daily add-ons."""
+    """Return (extras_total, label list) for daily + flat add-ons."""
     days = max(1, int(days or 1))
     selected = extras if isinstance(extras, dict) else {}
     lines: list[str] = []
     total = 0.0
-    labels = {
-        "extra_insurance": "Extra insurance",
-        "child_seat": "Child seat",
-        "gps_pack": "GPS pack",
-    }
     for key, daily in EXTRA_DAILY_RATES.items():
         if selected.get(key):
             total += daily * days
-            lines.append(labels.get(key, key))
+            lines.append(EXTRA_LABELS.get(key, key))
+    for key, flat in EXTRA_FLAT_RATES.items():
+        if selected.get(key):
+            total += flat
+            lines.append(EXTRA_LABELS.get(key, key))
     return round(total, 2), lines
 
 
@@ -889,7 +935,13 @@ def quote_vehicle(
     base_total = round(rate * days, 2)
     driver_surcharge = round(with_driver_daily * days, 2) if mode == "WITH_DRIVER" else 0.0
     one_way_surcharge = round(one_way_fee, 2) if is_one_way else 0.0
-    extras_total, extras_lines = compute_extras_total(days, extras)
+
+    selected = dict(extras) if isinstance(extras, dict) else {}
+    is_airport_pickup = bool(selected.get("airport_pickup")) or looks_like_airport(pickup_location)
+    if is_airport_pickup:
+        selected["airport_pickup"] = True
+
+    extras_total, extras_lines = compute_extras_total(days, selected)
     return {
         "suggested_days": days,
         "base_total": base_total,
@@ -901,7 +953,9 @@ def quote_vehicle(
             base_total + driver_surcharge + one_way_surcharge + extras_total, 2
         ),
         "is_one_way": is_one_way,
+        "is_airport_pickup": is_airport_pickup,
         "driver_mode": mode,
+        "extras_applied": selected,
     }
 
 
@@ -942,6 +996,9 @@ def check_availability(
                 end=end,
             )
             if conflicts:
+                continue
+            ok, _reason = fleet_dispatch_ok(v.get("plate_number"))
+            if not ok:
                 continue
             quote = quote_vehicle(
                 v,
@@ -1096,6 +1153,9 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             raise ValueError("Το όχημα δεν βρέθηκε")
         if str(vehicle.get("current_status") or "") == "MAINTENANCE":
             raise ValueError("Το όχημα είναι σε συντήρηση")
+        ok, reason = fleet_dispatch_ok(vehicle.get("plate_number"))
+        if not ok:
+            raise ValueError(reason or "Το όχημα δεν είναι διαθέσιμο (συμμόρφωση στόλου)")
         conflicts = _vehicle_conflicts(
             data,
             tenant_id=tid,
@@ -1108,6 +1168,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
 
         driver_mode = str(body.get("driver_mode") or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
         extras = body.get("extras") if isinstance(body.get("extras"), dict) else {}
+        client_afm = validate_client_afm(body.get("client_afm"))
         quote = quote_vehicle(
             vehicle,
             start=start,
@@ -1197,6 +1258,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "client_name": client_name,
             "client_email": (str(body.get("client_email") or "").strip().lower() or None),
             "client_phone": (str(body.get("client_phone") or "").strip() or None),
+            "client_afm": client_afm,
             "channel": channel,
             "reference_code": f"RN-{uuid4().hex[:8].upper()}",
             "start_time": start.isoformat(),
@@ -1245,7 +1307,222 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         vehicle["current_status"] = "RENTED"
         vehicle["updated_at"] = now
         _write(data)
-        return deepcopy(row)
+        created = deepcopy(row)
+
+    # Fire-and-forget side effects outside the lock.
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg, sync_vehicle_to_pg
+
+        sync_booking_to_pg(created)
+        sync_vehicle_to_pg(get_vehicle(tid, vehicle_id) or {})
+    except Exception:
+        logger.debug("rental pg sync after create_booking skipped", exc_info=True)
+
+    # Auto fiscal mark for instant card-like payments.
+    try:
+        method = str(created.get("payment_method") or "")
+        paid = float(created.get("amount_paid") or 0)
+        if method in ("card", "paypal", "apple") and paid > 0:
+            from travel_platform.rental.rental_fiscal import mark_rental_receipt
+
+            created = mark_rental_receipt(created, kind="local_receipt", amount=paid)
+    except Exception:
+        logger.debug("auto fiscal mark skipped", exc_info=True)
+
+    return created
+
+
+def _recompute_payment_after_total_change(booking: dict[str, Any], new_total: float) -> dict[str, Any]:
+    """Keep amount_paid; refresh balance / status for a new total."""
+    total = round(float(new_total or 0), 2)
+    paid = round(float(booking.get("amount_paid") or 0), 2)
+    balance = round(max(0.0, total - paid), 2)
+    method = str(booking.get("payment_method") or "card")
+    plan = str(booking.get("payment_plan") or "full")
+    pct = _normalize_deposit_percent(booking.get("deposit_percent"))
+    if paid <= 0:
+        status = "pending"
+        if method == "bank_transfer":
+            label = f"PENDING · Προκαταβολή {pct}% (Τράπεζα)" if plan == "deposit" else "PENDING (Bank Transfer)"
+        elif method == "cash_office":
+            label = "PENDING (Cash at office)"
+        else:
+            label = "PENDING"
+    elif balance > 0:
+        status = "partial"
+        method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(method, method)
+        label = f"DEPOSIT {pct}% ({method_name})" if plan == "deposit" else f"PARTIAL ({method_name})"
+    else:
+        status = "paid"
+        method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(method, method)
+        label = f"PAID ({method_name})"
+    return {
+        "total_cost": total,
+        "amount_paid": paid,
+        "balance_due": balance,
+        "payment_status": status,
+        "payment_label": label,
+        "amount_due_now": round(max(0.0, float(booking.get("amount_due_now") or 0)), 2)
+        if paid > 0
+        else (round(total * (pct / 100.0), 2) if plan == "deposit" else total),
+    }
+
+
+def modify_booking_for_customer(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str,
+    start_time: str,
+    end_time: str,
+    pickup: str | None = None,
+    dropoff: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Customer reschedule — CONFIRMED only, same free-cancel window, conflict-safe."""
+    tid = _normalize_tenant(tenant_id)
+    needle = str(email or "").strip().lower()
+    bid = str(booking_id or "").strip()
+    if not needle or not bid:
+        raise ValueError("Απαιτείται κράτηση και email")
+    start = _parse_dt(start_time)
+    end = _parse_dt(end_time)
+    if end <= start:
+        raise ValueError("Η λήξη πρέπει να είναι μετά την έναρξη")
+
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        owner = str(booking.get("client_email") or "").strip().lower()
+        if owner != needle:
+            raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+        status = str(booking.get("rental_status") or "").upper()
+        if status != "CONFIRMED":
+            raise ValueError("Μπορείτε να τροποποιήσετε μόνο επιβεβαιωμένες κρατήσεις")
+        if not free_cancel_eligible(booking, now=now):
+            raise ValueError(
+                f"Η αλλαγή ημερομηνιών ισχύει έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. "
+                "Επικοινωνήστε με το γραφείο."
+            )
+
+        vehicle = next(
+            (
+                v
+                for v in data["vehicles"]
+                if v.get("tenant_id") == tid and v.get("id") == booking.get("vehicle_id")
+            ),
+            None,
+        )
+        if not vehicle:
+            raise ValueError("Το όχημα δεν βρέθηκε")
+        ok, reason = fleet_dispatch_ok(vehicle.get("plate_number"))
+        if not ok:
+            raise ValueError(reason or "Το όχημα δεν είναι διαθέσιμο (συμμόρφωση στόλου)")
+
+        conflicts = _vehicle_conflicts(
+            data,
+            tenant_id=tid,
+            vehicle_id=vehicle["id"],
+            start=start,
+            end=end,
+            exclude_booking_id=bid,
+        )
+        if conflicts:
+            raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
+
+        new_pickup = str(pickup if pickup is not None else booking.get("pickup_location") or "").strip()
+        new_dropoff = str(
+            dropoff
+            if dropoff is not None
+            else (booking.get("dropoff_location") or booking.get("pickup_location") or "")
+        ).strip() or new_pickup
+        if not new_pickup:
+            raise ValueError("Απαιτείται σημείο παραλαβής")
+
+        extras = booking.get("extras") if isinstance(booking.get("extras"), dict) else {}
+        quote = quote_vehicle(
+            vehicle,
+            start=start,
+            end=end,
+            pickup_location=new_pickup,
+            dropoff_location=new_dropoff,
+            driver_mode=booking.get("driver_mode"),
+            extras=extras,
+        )
+        pay_fields = _recompute_payment_after_total_change(booking, quote["suggested_total"])
+        booking.update(
+            {
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "pickup_location": new_pickup,
+                "dropoff_location": new_dropoff,
+                "pricing": {
+                    "days": quote["suggested_days"],
+                    "base_total": quote["base_total"],
+                    "driver_surcharge": quote["driver_surcharge"],
+                    "one_way_surcharge": quote["one_way_surcharge"],
+                    "extras_total": quote["extras_total"],
+                    "extras_lines": quote["extras_lines"],
+                    "is_one_way": quote["is_one_way"],
+                    "is_airport_pickup": quote.get("is_airport_pickup"),
+                },
+                **pay_fields,
+                "updated_at": _now(),
+                "modified_at": _now(),
+            }
+        )
+        _write(data)
+        updated = deepcopy(booking)
+
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg
+
+        sync_booking_to_pg(updated)
+    except Exception:
+        logger.debug("rental pg sync after modify skipped", exc_info=True)
+    return updated
+
+
+def patch_booking_fields(
+    tenant_id: str | None,
+    booking_id: str,
+    fields: dict[str, Any],
+) -> dict[str, Any]:
+    """Patch arbitrary safe fields on a booking (payment_intent_id, fiscal, etc.)."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    allowed = {
+        "payment_intent_id",
+        "fiscal_status",
+        "fiscal_mark",
+        "fiscal_kind",
+        "fiscal_amount",
+        "fiscal_issued_at",
+        "amount_paid",
+        "balance_due",
+        "payment_status",
+        "payment_label",
+        "client_afm",
+    }
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        for key, value in (fields or {}).items():
+            if key in allowed:
+                booking[key] = value
+        booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
 
 
 def confirm_booking_payment(
@@ -2237,7 +2514,19 @@ def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, 
                 vehicle["current_status"] = "AVAILABLE"
                 vehicle["updated_at"] = now
         _write(data)
-        return deepcopy(row)
+        created = deepcopy(row)
+
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg, sync_inspection_to_pg
+
+        sync_inspection_to_pg(created)
+        if booking_id:
+            b = get_booking(tid, booking_id)
+            if b:
+                sync_booking_to_pg(b)
+    except Exception:
+        logger.debug("rental pg sync after create_inspection skipped", exc_info=True)
+    return created
 
 
 def list_inspections(tenant_id: str | None, *, booking_id: str | None = None) -> list[dict[str, Any]]:

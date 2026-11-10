@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
   createCustomerRentalBooking,
+  createCustomerRentalPaymentIntent,
   fetchCustomerRentalAvailability,
   fetchMyRentalBookings,
   uploadCustomerRentalIdDoc,
@@ -40,9 +41,12 @@ const EMPTY = {
   dropoff_location: 'Γραφείο',
   driver_mode: 'SELF_DRIVE',
   client_phone: '',
+  client_afm: '',
   extra_insurance: false,
   child_seat: false,
   gps_pack: false,
+  airport_pickup: false,
+  young_driver: false,
 };
 
 const PREFS_KEY = 'rent_booking_prefs_v1';
@@ -412,9 +416,10 @@ export default function RentalCatalogPanel({
     if (form.gps_pack) extras.push('gps_pack');
     setBusy(true);
     try {
-      if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
-        // Demo card capture — same pattern as ticket checkout (no live gateway yet).
-        await new Promise((r) => setTimeout(r, 900));
+      if (form.client_afm && !/^\d{9}$/.test(String(form.client_afm).trim())) {
+        toast.error('Το ΑΦΜ πρέπει να έχει 9 ψηφία');
+        setBusy(false);
+        return;
       }
       const created = await createCustomerRentalBooking({
         vehicle_id: selectedId,
@@ -426,12 +431,23 @@ export default function RentalCatalogPanel({
         client_phone: form.client_phone || null,
         extras,
       });
+      if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
+        try {
+          const pi = await createCustomerRentalPaymentIntent(created.id);
+          if (pi?.demo) {
+            await new Promise((r) => setTimeout(r, 900));
+          }
+        } catch {
+          await new Promise((r) => setTimeout(r, 900));
+        }
+      }
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({
         id: created?.client_id || undefined,
         name: getCustomerName() || '',
         email: getCustomerEmail() || '',
         phone: form.client_phone || '',
+        afm: form.client_afm?.trim() || '',
       });
       const payNote =
         created?.payment_status === 'pending'
@@ -482,7 +498,11 @@ export default function RentalCatalogPanel({
     }
   })();
   const extrasTotal =
-    (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
+    (form.extra_insurance ? 12 * nights : 0) +
+    (form.child_seat ? 7 * nights : 0) +
+    (form.gps_pack ? 5 * nights : 0) +
+    (form.young_driver ? 15 * nights : 0) +
+    (form.airport_pickup ? 25 : 0);
   const selectedTotal = Number(selected?.suggested_total || 0) + extrasTotal;
   const paySplit = computeDepositSplit(selectedTotal, depositPercent);
   const dueNow = amountDueAtCheckout(selectedTotal, paymentPlan, depositPercent);
@@ -666,6 +686,20 @@ export default function RentalCatalogPanel({
             />
           </div>
           <div className="wallet-field">
+            <label htmlFor="rent-afm">ΑΦΜ (προαιρετικό)</label>
+            <input
+              id="rent-afm"
+              className="wallet-input"
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="9 ψηφία"
+              value={form.client_afm}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, client_afm: e.target.value.replace(/\D/g, '').slice(0, 9) }))
+              }
+            />
+          </div>
+          <div className="wallet-field">
             <label>Extras</label>
             <div className="rent-extras">
               <label>
@@ -691,6 +725,22 @@ export default function RentalCatalogPanel({
                   onChange={(e) => setForm((f) => ({ ...f, gps_pack: e.target.checked }))}
                 />
                 GPS pack (+€5/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.airport_pickup}
+                  onChange={(e) => setForm((f) => ({ ...f, airport_pickup: e.target.checked }))}
+                />
+                Παραλαβή αεροδρόμιο (+€25)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.young_driver}
+                  onChange={(e) => setForm((f) => ({ ...f, young_driver: e.target.checked }))}
+                />
+                Νέος οδηγός κάτω των 25 (+€15/ημέρα)
               </label>
             </div>
             {extrasTotal > 0 ? (

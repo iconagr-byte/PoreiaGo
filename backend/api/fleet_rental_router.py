@@ -84,6 +84,7 @@ class BookingBody(BaseModel):
     client_name: str = Field(min_length=1, max_length=160)
     client_email: str | None = None
     client_phone: str | None = None
+    client_afm: str | None = None
     client_id: str | None = None
     channel: str = "DESK"
     start_time: str

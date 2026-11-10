@@ -94,6 +94,8 @@ class CustomerBookingExtras(BaseModel):
     extra_insurance: bool = False
     child_seat: bool = False
     gps_pack: bool = False
+    airport_pickup: bool = False
+    young_driver: bool = False
 
 
 class CustomerBookingBody(BaseModel):
@@ -104,6 +106,7 @@ class CustomerBookingBody(BaseModel):
     dropoff_location: str | None = None
     driver_mode: str = "SELF_DRIVE"
     client_phone: str | None = None
+    client_afm: str | None = None
     notes: str | None = None
     extras: list[str] = Field(default_factory=list)
     marketing_email: bool = False
@@ -143,6 +146,7 @@ def _public_booking(row: dict) -> dict:
         "reference_code": store._booking_reference_code(row),
         "vehicle_id": row.get("vehicle_id"),
         "client_id": row.get("client_id"),
+        "client_afm": row.get("client_afm"),
         "vehicle_plate": row.get("vehicle_plate"),
         "vehicle_model": row.get("vehicle_model"),
         "vehicle_category": row.get("vehicle_category"),
@@ -165,6 +169,7 @@ def _public_booking(row: dict) -> dict:
         "balance_due": row.get("balance_due"),
         "payment_status": row.get("payment_status"),
         "created_at": row.get("created_at"),
+        "modified_at": row.get("modified_at"),
     }
 
 
@@ -422,6 +427,7 @@ async def book_rental(
         "client_name": (account.get("name") or account["email"].split("@")[0]).strip(),
         "client_email": account["email"],
         "client_phone": body.client_phone or account.get("phone") or None,
+        "client_afm": body.client_afm,
         "client_id": account.get("customer_id"),
         "start_time": body.start_time,
         "end_time": body.end_time,
@@ -493,3 +499,111 @@ async def cancel_my_rental(
     except Exception:
         pass
     return _public_booking(row)
+
+
+@router.get("/bookings/{booking_id}/contract", response_class=HTMLResponse)
+async def rental_booking_contract(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    return HTMLResponse(content=_contract_html(row))
+
+
+@router.post("/bookings/{booking_id}/remind")
+async def remind_my_rental(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    try:
+        from travel_platform.notifications.rental_customer_push import maybe_remind_if_soon
+
+        result = await maybe_remind_if_soon(row, within_hours=48)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return result
+
+
+@router.post("/reminders/scan")
+async def scan_rental_reminders(
+    within_hours: float = Query(default=24, ge=1, le=168),
+    _: dict = Depends(get_current_customer),
+):
+    """Scan upcoming CONFIRMED rentals and push reminders (customer/internal)."""
+    from travel_platform.notifications.rental_customer_push import scan_and_notify_upcoming_rentals
+
+    return await scan_and_notify_upcoming_rentals(within_hours=within_hours)
+
+
+@router.post("/bookings/{booking_id}/payment-intent")
+async def rental_payment_intent(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    from travel_platform.rental.rental_stripe import create_rental_payment_intent
+
+    return create_rental_payment_intent(row, tenant_id=tid)
+
+
+@router.post("/bookings/{booking_id}/inspections")
+async def customer_create_inspection(
+    booking_id: str,
+    body: CustomerInspectionBody,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    itype = str(body.inspection_type or "").strip().upper()
+    if itype not in ("PICKUP_CHECK", "RETURN_CHECK"):
+        raise HTTPException(status_code=400, detail="Μη έγκυρος τύπος επιθεώρησης")
+    status = str(row.get("rental_status") or "").upper()
+    if itype == "PICKUP_CHECK" and status != "CONFIRMED":
+        raise HTTPException(status_code=400, detail="Check-in μόνο για επιβεβαιωμένες κρατήσεις")
+    if itype == "RETURN_CHECK" and status != "ACTIVE":
+        raise HTTPException(status_code=400, detail="Check-out μόνο για ενεργές κρατήσεις")
+    try:
+        insp = store.create_inspection(
+            tid,
+            {
+                "rental_booking_id": booking_id,
+                "inspection_type": itype,
+                "fuel_level": body.fuel_level,
+                "mileage": body.mileage,
+                "damage_notes": body.damage_notes,
+                "photo_urls": body.photo_urls,
+                "signature_url": body.signature_url,
+                "inspector_name": (account.get("name") or account["email"].split("@")[0]).strip(),
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return insp
