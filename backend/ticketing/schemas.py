@@ -29,6 +29,7 @@ class TicketSyncRequest(BaseModel):
     departure_at: str | None = None
     saas_booking_id: str | None = None
     email: str | None = None
+    passengers: list[dict[str, Any]] | None = None
 
 
 class RotatingQrResponse(BaseModel):
@@ -36,6 +37,7 @@ class RotatingQrResponse(BaseModel):
     expires_in: int
     step: int
     window_seconds: int
+    seat: str | None = None
 
 
 class OfflineScanItem(BaseModel):

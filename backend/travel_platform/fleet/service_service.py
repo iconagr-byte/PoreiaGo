@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -10,15 +12,32 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from travel_platform.settings.platform_store import get_platform_config
-from travel_platform.settings.drivers_store import list_drivers
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID, list_drivers
 
 ServiceStatus = Literal["OK", "Warning", "Urgent"]
 AlertSeverity = Literal["warning", "urgent"]
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "fleet_store.json"
-NOTIFICATION_LOG = DATA_DIR / "fleet_notifications.log"
-UPLOAD_DIR = DATA_DIR / "uploads"
+# Prefer persistent volume in production (docker mount /app/data).
+_PKG_DIR = Path(__file__).resolve().parent
+_DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or (_PKG_DIR.parents[1] / "data"))
+_LEGACY_STORE = _PKG_DIR / "fleet_store.json"
+STORE_FILE = Path(os.getenv("FLEET_VEHICLES_STORE") or (_DATA_DIR / "fleet_store.json"))
+NOTIFICATION_LOG = _DATA_DIR / "fleet_notifications.log"
+UPLOAD_DIR = _DATA_DIR / "fleet_uploads"
+# Keep package-relative alias for older imports/tests that patch DATA_DIR.
+DATA_DIR = _DATA_DIR
+
+
+def _ensure_store_path() -> None:
+    """Migrate legacy package-local store onto the durable data volume once."""
+    STORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    if STORE_FILE.exists() or not _LEGACY_STORE.is_file():
+        return
+    try:
+        shutil.copy2(_LEGACY_STORE, STORE_FILE)
+    except OSError:
+        pass
 
 DEFAULT_AMENITIES: dict[str, list[str]] = {
     "Luxury Coach": [
@@ -45,13 +64,8 @@ DEFAULT_AMENITIES: dict[str, list[str]] = {
     "Van": [
         "Κλιματισμός",
         "USB θύρες",
-        "Χώρος αποσκευών",
-    ],
-    "VIP Minibus": [
-        "Wi-Fi onboard",
-        "USB θύρες",
-        "Κλιματισμός",
-        "Ανακλινόμενα καθίσματα",
+        "Ευέλικτες θέσεις",
+        "Αποσκευές",
     ],
 }
 
@@ -60,8 +74,12 @@ DEFAULT_SEATS: dict[str, int] = {
     "Premium Express": 32,
     "Standard": 55,
     "Van": 9,
-    "VIP Minibus": 16,
 }
+
+
+def _normalize_tenant_id(value: str | None) -> str:
+    tid = str(value or "").strip()
+    return tid or DEMO_TENANT_ID
 
 
 def _default_amenities(category: str) -> list[str]:
@@ -70,6 +88,34 @@ def _default_amenities(category: str) -> list[str]:
 
 def _default_seats(category: str) -> int:
     return DEFAULT_SEATS.get(category, 49)
+
+
+# Stable English category ids → Greek labels (matches src/lib/fleet/fleetVehicleCategories.js).
+_CATEGORY_LABEL_EL: dict[str, str] = {
+    "Luxury Coach": "Πολυτελές λεωφορείο",
+    "Premium Express": "Εξπρές πολυτελείας",
+    "Standard": "Κλασικό λεωφορείο",
+    "Van": "Μικρό λεωφορείο / van",
+}
+
+
+def _category_label_el(category: str | None) -> str:
+    raw = str(category or "").strip()
+    if not raw:
+        return "—"
+    if raw in _CATEGORY_LABEL_EL:
+        return _CATEGORY_LABEL_EL[raw]
+    # Soft match for legacy / free-text values.
+    lower = raw.lower()
+    if "van" in lower or "minibus" in lower:
+        return _CATEGORY_LABEL_EL["Van"]
+    if "express" in lower or "premium" in lower:
+        return _CATEGORY_LABEL_EL["Premium Express"]
+    if "luxury" in lower or "coach" in lower:
+        return _CATEGORY_LABEL_EL["Luxury Coach"]
+    if "standard" in lower or "classic" in lower:
+        return _CATEGORY_LABEL_EL["Standard"]
+    return raw
 
 
 @dataclass
@@ -95,10 +141,27 @@ class Vehicle:
     seat_count: int = 49
     amenities: list[str] = field(default_factory=list)
     public_image_url: str = ""
+    gallery_urls: list[str] = field(default_factory=list)
     public_summary: str = ""
     show_on_website: bool = True
+    tenant_id: str = DEMO_TENANT_ID
+    documents: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass
+class FleetExpense:
+    id: str
+    vehicle_id: str
+    tenant_id: str
+    expense_date: date
+    category: str  # fuel | tolls | insurance | other
+    amount: float
+    liters: float | None = None
+    odometer: float | None = None
+    note: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -162,6 +225,8 @@ class ServiceService:
         self._vehicles: dict[str, Vehicle] = {}
         self._events: dict[str, MaintenanceEvent] = {}
         self._alerts: dict[str, FleetAlert] = {}
+        self._expenses: dict[str, FleetExpense] = {}
+        self._store_mtime: float | None = None
         self._load()
 
     def _seed(self) -> None:
@@ -178,6 +243,7 @@ class ServiceService:
                 "Luxury Coach": "Premium coach για μεγάλες αποστάσεις — άνεση VIP επιπέδου.",
                 "Premium Express": "Express στόλος για γρήγορες διαδρομές Ελλάδας & Ευρώπης.",
                 "Standard": "Αξιόπιστο coach για ομαδικές εκδρομές και σχολικές μεταφορές.",
+                "Van": "Van / minibus για transfers και μικρές ομάδες.",
             }.get(category, "")
             self._vehicles[vid] = Vehicle(
                 id=vid,
@@ -201,11 +267,42 @@ class ServiceService:
                 public_summary=summary,
                 public_image_url="/images/hero-bus-achillio.png",
                 show_on_website=True,
+                tenant_id=DEMO_TENANT_ID,
             )
 
+    def _clear_memory(self) -> None:
+        self._vehicles.clear()
+        self._events.clear()
+        self._alerts.clear()
+        self._expenses.clear()
+
+    def _disk_mtime(self) -> float | None:
+        try:
+            if STORE_FILE.exists():
+                return STORE_FILE.stat().st_mtime
+        except OSError:
+            return None
+        return None
+
+    def _ensure_fresh(self) -> None:
+        """
+        Reload when another worker / process wrote a newer fleet_store.json.
+
+        Public site builds a fresh ServiceService per request (always disk-fresh).
+        Admin uses the module singleton — without this, Contabo multi-worker
+        shows 0 vehicles in «Διαχείριση Στόλου» while /api/site/fleet is full.
+        """
+        disk_mtime = self._disk_mtime()
+        if disk_mtime is None:
+            return
+        if self._store_mtime is not None and disk_mtime > self._store_mtime:
+            self._load()
+
     def _load(self) -> None:
+        _ensure_store_path()
+        self._clear_memory()
         if not STORE_FILE.exists():
-            self._seed()
+            # Start empty — never inject demo coaches for new offices.
             self._persist()
             return
         raw = json.loads(STORE_FILE.read_text(encoding="utf-8"))
@@ -232,8 +329,16 @@ class ServiceService:
                 seat_count=int(r.get("seat_count") or _default_seats(str(r.get("category") or "Standard"))),
                 amenities=list(r.get("amenities") or _default_amenities(str(r.get("category") or "Standard"))),
                 public_image_url=str(r.get("public_image_url") or ""),
+                gallery_urls=[
+                    str(u).strip()
+                    for u in (r.get("gallery_urls") or [])
+                    if str(u).strip()
+                ],
                 public_summary=str(r.get("public_summary") or ""),
                 show_on_website=bool(r.get("show_on_website", True)),
+                # Legacy rows without tenant_id belong to the demo office only.
+                tenant_id=_normalize_tenant_id(r.get("tenant_id")),
+                documents=list(r.get("documents") or []),
                 created_at=_parse_datetime(r.get("created_at")),
                 updated_at=_parse_datetime(r.get("updated_at")),
             )
@@ -267,14 +372,39 @@ class ServiceService:
                 created_at=_parse_datetime(r.get("created_at")),
                 resolved=bool(r.get("resolved")),
             )
+        for r in raw.get("expenses", []):
+            self._expenses[r["id"]] = FleetExpense(
+                id=r["id"],
+                vehicle_id=r["vehicle_id"],
+                tenant_id=_normalize_tenant_id(r.get("tenant_id")),
+                expense_date=_parse_date(r.get("expense_date")) or date.today(),
+                category=str(r.get("category") or "other"),
+                amount=float(r.get("amount") or 0),
+                liters=float(r["liters"]) if r.get("liters") is not None else None,
+                odometer=float(r["odometer"]) if r.get("odometer") is not None else None,
+                note=str(r.get("note") or ""),
+                created_at=_parse_datetime(r.get("created_at")),
+            )
+        try:
+            self._store_mtime = STORE_FILE.stat().st_mtime
+        except OSError:
+            self._store_mtime = None
 
     def _persist(self) -> None:
+        _ensure_store_path()
         payload = {
             "vehicles": [_iso(asdict(v)) for v in self._vehicles.values()],
             "events": [_iso(asdict(e)) for e in self._events.values()],
             "alerts": [_iso(asdict(a)) for a in self._alerts.values()],
+            "expenses": [_iso(asdict(e)) for e in self._expenses.values()],
         }
-        STORE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp = STORE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(STORE_FILE)
+        try:
+            self._store_mtime = STORE_FILE.stat().st_mtime
+        except OSError:
+            self._store_mtime = None
 
     def _service_threshold(self, v: Vehicle) -> float:
         return float(v.next_service_threshold or (v.last_service_mileage + v.service_interval_km))
@@ -303,13 +433,33 @@ class ServiceService:
             "days_to_legal_deadline": days_to_kteo,
         }
 
-    def list_vehicles(self) -> list[dict[str, Any]]:
-        return sorted((self._vehicle_response(v) for v in self._vehicles.values()), key=lambda x: x["plate_number"])
+    def _vehicle_tenant_id(self, v: Vehicle) -> str:
+        return _normalize_tenant_id(getattr(v, "tenant_id", None))
 
-    def list_public_vehicles(self) -> list[dict[str, Any]]:
+    def _vehicles_for_tenant(self, tenant_id: str | None) -> list[Vehicle]:
+        self._ensure_fresh()
+        if tenant_id is None:
+            return list(self._vehicles.values())
+        tid = _normalize_tenant_id(tenant_id)
+        return [v for v in self._vehicles.values() if self._vehicle_tenant_id(v) == tid]
+
+    def get_vehicle_for_tenant(self, vehicle_id: str, tenant_id: str) -> Vehicle | None:
+        self._ensure_fresh()
+        v = self._vehicles.get(vehicle_id)
+        if not v:
+            return None
+        if self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
+            return None
+        return v
+
+    def list_vehicles(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+        vehicles = self._vehicles_for_tenant(tenant_id)
+        return sorted((self._vehicle_response(v) for v in vehicles), key=lambda x: x["plate_number"])
+
+    def list_public_vehicles(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
         """Vehicles for marketing homepage — no sensitive fleet data."""
         rows: list[dict[str, Any]] = []
-        for v in self._vehicles.values():
+        for v in self._vehicles_for_tenant(tenant_id):
             if not v.show_on_website:
                 continue
             status = self.compute_service_status(v)
@@ -324,25 +474,32 @@ class ServiceService:
                     "make": v.make,
                     "model": v.model,
                     "category": v.category,
+                    "category_label": _category_label_el(v.category),
                     "year": v.year,
                     "seat_count": v.seat_count,
                     "amenities": amenities,
                     "summary": v.public_summary
-                    or f"{v.category} · {v.seat_count} θέσεις · Euro VI",
+                    or f"{_category_label_el(v.category)} · {v.seat_count} θέσεις · Euro VI",
                     "image_url": v.public_image_url or "/images/hero-bus-achillio.png",
                     "status_label": status_label,
                 }
             )
         return sorted(rows, key=lambda x: x["name"])
 
-    def get_vehicle(self, vehicle_id: str) -> dict[str, Any] | None:
+    def get_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
+            return None
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
             return None
         return self._vehicle_response(v)
 
     def create_vehicle(self, payload: dict[str, Any]) -> dict[str, Any]:
+        # Reload first so persist does not clobber peer-worker writes.
+        self._ensure_fresh()
         vid = payload.get("id") or f"FL-{str(uuid4())[:8].upper()}"
+        category = str(payload.get("category") or "Standard")
         v = Vehicle(
             id=vid,
             make=payload["make"].strip(),
@@ -361,23 +518,44 @@ class ServiceService:
             purchase_price=float(payload.get("purchase_price", 100000)),
             fuel_cost_total=float(payload.get("fuel_cost_total", 0)),
             insurance_cost_total=float(payload.get("insurance_cost_total", 0)),
-            category=str(payload.get("category") or "Standard"),
-            seat_count=int(payload.get("seat_count") or _default_seats(str(payload.get("category") or "Standard"))),
-            amenities=list(payload.get("amenities") or _default_amenities(str(payload.get("category") or "Standard"))),
+            category=category,
+            seat_count=int(payload.get("seat_count") or _default_seats(category)),
+            amenities=list(payload.get("amenities") or _default_amenities(category)),
             public_image_url=str(payload.get("public_image_url") or ""),
+            gallery_urls=[
+                str(u).strip()
+                for u in (payload.get("gallery_urls") or [])
+                if str(u).strip()
+            ],
             public_summary=str(payload.get("public_summary") or ""),
             show_on_website=bool(payload.get("show_on_website", True)),
+            tenant_id=_normalize_tenant_id(payload.get("tenant_id")),
+            documents=list(payload.get("documents") or []),
         )
+        if v.public_image_url and v.public_image_url not in v.gallery_urls:
+            v.gallery_urls = [v.public_image_url, *v.gallery_urls]
+        elif not v.public_image_url and v.gallery_urls:
+            v.public_image_url = v.gallery_urls[0]
         self._vehicles[v.id] = v
         self._persist()
         return self._vehicle_response(v)
 
-    def update_vehicle(self, vehicle_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    def update_vehicle(
+        self,
+        vehicle_id: str,
+        patch: dict[str, Any],
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        self._ensure_fresh()
         v = self._vehicles.get(vehicle_id)
         if not v:
             raise KeyError("Vehicle not found")
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
+            raise KeyError("Vehicle not found")
         for key, value in patch.items():
             if value is None:
+                continue
+            if key == "tenant_id" or key == "documents":
                 continue
             if key in {"last_service_date", "legal_deadline", "insurance_due_date"}:
                 setattr(v, key, _parse_date(str(value)))
@@ -385,10 +563,17 @@ class ServiceService:
                 setattr(v, key, int(value))
             elif key == "amenities" and isinstance(value, list):
                 setattr(v, key, [str(a).strip() for a in value if str(a).strip()])
+            elif key == "gallery_urls" and isinstance(value, list):
+                urls = [str(u).strip() for u in value if str(u).strip()]
+                setattr(v, key, urls)
+                if urls and not (patch.get("public_image_url") or v.public_image_url):
+                    v.public_image_url = urls[0]
             elif key == "show_on_website":
                 setattr(v, key, bool(value))
             elif key in {"category", "public_image_url", "public_summary"}:
                 setattr(v, key, str(value).strip())
+                if key == "public_image_url" and value and str(value).strip() not in (v.gallery_urls or []):
+                    v.gallery_urls = [str(value).strip(), *(v.gallery_urls or [])]
             elif key in {"current_odometer", "last_service_mileage", "next_service_threshold", "purchase_price", "fuel_cost_total", "insurance_cost_total"}:
                 setattr(v, key, float(value))
             elif hasattr(v, key):
@@ -397,8 +582,12 @@ class ServiceService:
         self._persist()
         return self._vehicle_response(v)
 
-    def delete_vehicle(self, vehicle_id: str) -> bool:
-        if vehicle_id not in self._vehicles:
+    def delete_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> bool:
+        self._ensure_fresh()
+        v = self._vehicles.get(vehicle_id)
+        if not v:
+            return False
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
             return False
         del self._vehicles[vehicle_id]
         self._events = {eid: e for eid, e in self._events.items() if e.vehicle_id != vehicle_id}
@@ -410,6 +599,7 @@ class ServiceService:
         return self.update_vehicle(vehicle_id, {"current_odometer": odometer_km})
 
     def list_maintenance_events(self, vehicle_id: str | None = None) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         events = list(self._events.values())
         if vehicle_id:
             events = [e for e in events if e.vehicle_id == vehicle_id]
@@ -417,6 +607,7 @@ class ServiceService:
         return [_iso(asdict(e)) for e in events]
 
     def create_maintenance_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._ensure_fresh()
         if payload["vehicle_id"] not in self._vehicles:
             raise KeyError("Vehicle not found")
         e = MaintenanceEvent(
@@ -449,6 +640,7 @@ class ServiceService:
         return _iso(asdict(e))
 
     def attach_to_event(self, event_id: str, file_name: str, mime_type: str, size_bytes: int, storage_path: str) -> dict[str, Any]:
+        self._ensure_fresh()
         event = self._events.get(event_id)
         if not event:
             raise KeyError("Maintenance event not found")
@@ -465,6 +657,7 @@ class ServiceService:
         return row
 
     def scan_predictive_alerts(self) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         now = date.today()
         existing = {
             (a.vehicle_id, a.kind): a
@@ -538,6 +731,7 @@ class ServiceService:
         )
 
     def list_alerts(self, unresolved_only: bool = True) -> list[dict[str, Any]]:
+        self._ensure_fresh()
         alerts = list(self._alerts.values())
         if unresolved_only:
             alerts = [a for a in alerts if not a.resolved]
@@ -545,6 +739,7 @@ class ServiceService:
         return [_iso(asdict(a)) for a in alerts]
 
     def resolve_alert(self, alert_id: str) -> dict[str, Any]:
+        self._ensure_fresh()
         alert = self._alerts.get(alert_id)
         if not alert:
             raise KeyError("Alert not found")
@@ -560,6 +755,7 @@ class ServiceService:
         trip_title: str | None = None,
     ) -> dict[str, Any]:
         """Log blocked booking attempt; notify fleet manager (email log file)."""
+        self._ensure_fresh()
         plate = (plate_number or "").strip().upper().replace(" ", "")
         vehicle_id = "unknown"
         for v in self._vehicles.values():
@@ -655,9 +851,12 @@ class ServiceService:
             "mileage_factor": round(mileage_factor, 4),
         }
 
-    def dashboard_cards(self) -> dict[str, Any]:
-        vehicles = self.list_vehicles()
+    def dashboard_cards(self, tenant_id: str | None = None) -> dict[str, Any]:
+        vehicles = self.list_vehicles(tenant_id=tenant_id)
         unresolved = self.list_alerts(unresolved_only=True)
+        if tenant_id is not None:
+            owned_ids = {v["id"] for v in vehicles}
+            unresolved = [a for a in unresolved if a.get("vehicle_id") in owned_ids]
         urgent = [v for v in vehicles if v["service_status"] == "Urgent"]
         warning = [v for v in vehicles if v["service_status"] == "Warning"]
         monthly_cost = sum(v.get("insurance_cost_total", 0) for v in vehicles) / 12 + sum(v.get("fuel_cost_total", 0) for v in vehicles) / 12
@@ -734,6 +933,239 @@ class ServiceService:
             warning = "Προσοχή: το όχημα πλησιάζει όριο service — η κράτηση επιτρέπεται."
 
         return {**base, "available": True, "reason": warning, "warning": warning}
+
+    def list_availability(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for v in self._vehicles_for_tenant(tenant_id):
+            avail = self.check_dispatch_availability(v.plate_number)
+            rows.append(
+                {
+                    **avail,
+                    "make": v.make,
+                    "model": v.model,
+                    "category": v.category,
+                    "legal_deadline": v.legal_deadline.isoformat() if v.legal_deadline else None,
+                    "insurance_due_date": v.insurance_due_date.isoformat() if v.insurance_due_date else None,
+                    "name": f"{v.make} {v.model}",
+                }
+            )
+        rows.sort(key=lambda r: (r.get("available") is False, r.get("plate") or ""))
+        return rows
+
+    def list_calendar(self, tenant_id: str | None = None, within_days: int = 120) -> list[dict[str, Any]]:
+        today = date.today()
+        horizon = today + timedelta(days=max(1, within_days))
+        items: list[dict[str, Any]] = []
+        for v in self._vehicles_for_tenant(tenant_id):
+            name = f"{v.make} {v.model}"
+            if v.legal_deadline and today <= v.legal_deadline <= horizon:
+                items.append(
+                    {
+                        "id": f"kteo-{v.id}",
+                        "kind": "kteo",
+                        "title": f"ΚΤΕΟ · {name}",
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "due_date": v.legal_deadline.isoformat(),
+                        "days_left": (v.legal_deadline - today).days,
+                        "severity": "urgent" if (v.legal_deadline - today).days <= 14 else "warning",
+                    }
+                )
+            if v.insurance_due_date and today <= v.insurance_due_date <= horizon:
+                items.append(
+                    {
+                        "id": f"ins-{v.id}",
+                        "kind": "insurance",
+                        "title": f"Ασφάλεια · {name}",
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "due_date": v.insurance_due_date.isoformat(),
+                        "days_left": (v.insurance_due_date - today).days,
+                        "severity": "urgent" if (v.insurance_due_date - today).days <= 14 else "warning",
+                    }
+                )
+            # Overdue
+            if v.legal_deadline and v.legal_deadline < today:
+                items.append(
+                    {
+                        "id": f"kteo-overdue-{v.id}",
+                        "kind": "kteo",
+                        "title": f"ΚΤΕΟ ληγμένο · {name}",
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "due_date": v.legal_deadline.isoformat(),
+                        "days_left": (v.legal_deadline - today).days,
+                        "severity": "urgent",
+                    }
+                )
+            if v.insurance_due_date and v.insurance_due_date < today:
+                items.append(
+                    {
+                        "id": f"ins-overdue-{v.id}",
+                        "kind": "insurance",
+                        "title": f"Ασφάλεια ληγμένη · {name}",
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "due_date": v.insurance_due_date.isoformat(),
+                        "days_left": (v.insurance_due_date - today).days,
+                        "severity": "urgent",
+                    }
+                )
+            next_service = v.last_service_date + timedelta(days=v.service_interval_days)
+            km_left = self._service_threshold(v) - v.current_odometer
+            if next_service <= horizon or km_left <= v.service_interval_km * 0.15:
+                items.append(
+                    {
+                        "id": f"svc-{v.id}",
+                        "kind": "service",
+                        "title": f"Service · {name}",
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "due_date": next_service.isoformat(),
+                        "days_left": (next_service - today).days,
+                        "km_to_service": round(km_left, 1),
+                        "severity": "urgent" if km_left <= 0 or (next_service - today).days <= 0 else "warning",
+                    }
+                )
+            for doc in v.documents or []:
+                exp = _parse_date(doc.get("expires_at"))
+                if not exp:
+                    continue
+                if exp < today or today <= exp <= horizon:
+                    items.append(
+                        {
+                            "id": f"doc-{doc.get('id')}",
+                            "kind": "document",
+                            "title": f"{doc.get('kind') or 'Έγγραφο'} · {name}",
+                            "vehicle_id": v.id,
+                            "plate_number": v.plate_number,
+                            "due_date": exp.isoformat(),
+                            "days_left": (exp - today).days,
+                            "severity": "urgent" if (exp - today).days <= 14 else "warning",
+                        }
+                    )
+        items.sort(key=lambda x: (x.get("due_date") or "", x.get("title") or ""))
+        return items
+
+    def add_vehicle_document(
+        self,
+        vehicle_id: str,
+        meta: dict[str, Any],
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        v = self.get_vehicle_for_tenant(vehicle_id, tenant_id) if tenant_id else self._vehicles.get(vehicle_id)
+        if not v:
+            raise KeyError("Vehicle not found")
+        doc = {
+            "id": f"VD-{str(uuid4())[:10].upper()}",
+            "kind": str(meta.get("kind") or "other"),
+            "file_name": str(meta.get("file_name") or "document"),
+            "mime_type": str(meta.get("mime_type") or "application/octet-stream"),
+            "size_bytes": int(meta.get("size_bytes") or 0),
+            "storage_path": str(meta.get("storage_path") or ""),
+            "url": str(meta.get("url") or ""),
+            "expires_at": meta.get("expires_at"),
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        docs = list(v.documents or [])
+        docs.append(doc)
+        v.documents = docs
+        v.updated_at = datetime.now(timezone.utc)
+        self._persist()
+        return doc
+
+    def delete_vehicle_document(
+        self,
+        vehicle_id: str,
+        document_id: str,
+        tenant_id: str | None = None,
+    ) -> bool:
+        v = self.get_vehicle_for_tenant(vehicle_id, tenant_id) if tenant_id else self._vehicles.get(vehicle_id)
+        if not v:
+            return False
+        before = len(v.documents or [])
+        v.documents = [d for d in (v.documents or []) if d.get("id") != document_id]
+        if len(v.documents) == before:
+            return False
+        v.updated_at = datetime.now(timezone.utc)
+        self._persist()
+        return True
+
+    def list_documents(self, tenant_id: str | None = None, vehicle_id: str | None = None) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        vehicles = self._vehicles_for_tenant(tenant_id)
+        if vehicle_id:
+            vehicles = [v for v in vehicles if v.id == vehicle_id]
+        for v in vehicles:
+            for doc in v.documents or []:
+                rows.append(
+                    {
+                        **doc,
+                        "vehicle_id": v.id,
+                        "plate_number": v.plate_number,
+                        "vehicle_name": f"{v.make} {v.model}",
+                    }
+                )
+        rows.sort(key=lambda d: d.get("expires_at") or "9999")
+        return rows
+
+    def list_expenses(
+        self,
+        tenant_id: str | None = None,
+        vehicle_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self._ensure_fresh()
+        items = list(self._expenses.values())
+        if tenant_id is not None:
+            tid = _normalize_tenant_id(tenant_id)
+            items = [e for e in items if _normalize_tenant_id(e.tenant_id) == tid]
+        if vehicle_id:
+            items = [e for e in items if e.vehicle_id == vehicle_id]
+        items.sort(key=lambda e: e.expense_date, reverse=True)
+        return [_iso(asdict(e)) for e in items]
+
+    def create_expense(self, payload: dict[str, Any]) -> dict[str, Any]:
+        vehicle_id = payload["vehicle_id"]
+        tenant_id = _normalize_tenant_id(payload.get("tenant_id"))
+        v = self.get_vehicle_for_tenant(vehicle_id, tenant_id)
+        if not v:
+            raise KeyError("Vehicle not found")
+        category = str(payload.get("category") or "other").strip().lower()
+        if category not in {"fuel", "tolls", "insurance", "other"}:
+            category = "other"
+        amount = float(payload.get("amount") or 0)
+        e = FleetExpense(
+            id=f"FX-{str(uuid4())[:10].upper()}",
+            vehicle_id=vehicle_id,
+            tenant_id=tenant_id,
+            expense_date=_parse_date(payload.get("expense_date")) or date.today(),
+            category=category,
+            amount=amount,
+            liters=float(payload["liters"]) if payload.get("liters") is not None else None,
+            odometer=float(payload["odometer"]) if payload.get("odometer") is not None else None,
+            note=str(payload.get("note") or "").strip(),
+        )
+        self._expenses[e.id] = e
+        if category == "fuel":
+            v.fuel_cost_total = float(v.fuel_cost_total or 0) + amount
+        elif category == "insurance":
+            v.insurance_cost_total = float(v.insurance_cost_total or 0) + amount
+        if e.odometer is not None:
+            v.current_odometer = max(float(v.current_odometer or 0), float(e.odometer))
+        v.updated_at = datetime.now(timezone.utc)
+        self._persist()
+        return _iso(asdict(e))
+
+    def delete_expense(self, expense_id: str, tenant_id: str | None = None) -> bool:
+        self._ensure_fresh()
+        e = self._expenses.get(expense_id)
+        if not e:
+            return False
+        if tenant_id is not None and _normalize_tenant_id(e.tenant_id) != _normalize_tenant_id(tenant_id):
+            return False
+        del self._expenses[expense_id]
+        self._persist()
+        return True
 
 
 service_service = ServiceService()

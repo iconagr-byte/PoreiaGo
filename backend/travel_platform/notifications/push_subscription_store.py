@@ -1,14 +1,56 @@
-"""Persist Web Push subscriptions per customer email (JSON file)."""
+"""Persist Web Push subscriptions per customer/admin (JSON file on durable volume)."""
 
 from __future__ import annotations
 
 import json
+import logging
+import os
+import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-_STORE_FILE = Path(__file__).resolve().parent / "push_subscriptions.json"
+logger = logging.getLogger(__name__)
+
+# Legacy path inside the image (wiped on every API recreate / deploy).
+_LEGACY_STORE_FILE = Path(__file__).resolve().parent / "push_subscriptions.json"
+
+
+def _data_dir() -> Path:
+    raw = (os.getenv("POREIAGO_DATA_DIR") or "").strip()
+    if raw:
+        return Path(raw)
+    return Path(__file__).resolve().parents[2] / "data"
+
+
+def _store_path() -> Path:
+    """Durable path on the api_data volume (`/app/data` in production)."""
+    return _data_dir() / "push_subscriptions.json"
+
+
+# Tests patch this name; keep a module-level Path that resolves at call time via _resolved_store.
+_STORE_FILE: Path | None = None
+
+
+def _resolved_store() -> Path:
+    if _STORE_FILE is not None:
+        return _STORE_FILE
+    return _store_path()
+
+
+def _migrate_legacy_if_needed(target: Path) -> None:
+    """Copy image-local subscriptions into the durable volume once."""
+    if target.exists():
+        return
+    if not _LEGACY_STORE_FILE.is_file():
+        return
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_LEGACY_STORE_FILE, target)
+        logger.info("Migrated push subscriptions from %s → %s", _LEGACY_STORE_FILE, target)
+    except OSError as exc:
+        logger.warning("Could not migrate legacy push subscriptions: %s", exc)
 
 
 def _now_iso() -> str:
@@ -16,10 +58,12 @@ def _now_iso() -> str:
 
 
 def _load() -> dict[str, Any]:
-    if not _STORE_FILE.exists():
+    path = _resolved_store()
+    _migrate_legacy_if_needed(path)
+    if not path.exists():
         return {"subscriptions": []}
     try:
-        data = json.loads(_STORE_FILE.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and isinstance(data.get("subscriptions"), list):
             return data
     except (json.JSONDecodeError, OSError):
@@ -28,23 +72,33 @@ def _load() -> dict[str, Any]:
 
 
 def _save(data: dict[str, Any]) -> None:
-    _STORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _STORE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = _resolved_store()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _normalize_email(email: str) -> str:
     return str(email or "").strip().lower()
 
 
-def list_subscriptions_for_email(email: str) -> list[dict[str, Any]]:
+def list_subscriptions_for_email(
+    email: str,
+    *,
+    audience: str | None = None,
+) -> list[dict[str, Any]]:
     target = _normalize_email(email)
     if not target:
         return []
-    return [
-        dict(row)
-        for row in _load().get("subscriptions", [])
-        if _normalize_email(row.get("email")) == target
-    ]
+    rows: list[dict[str, Any]] = []
+    for row in _load().get("subscriptions", []):
+        if _normalize_email(row.get("email")) != target:
+            continue
+        if audience is not None:
+            row_audience = str(row.get("audience") or "customer")
+            if row_audience != audience:
+                continue
+        rows.append(dict(row))
+    return rows
 
 
 def list_subscriptions_for_tenant(tenant_id: str, *, audience: str | None = "admin") -> list[dict[str, Any]]:
@@ -55,6 +109,17 @@ def list_subscriptions_for_tenant(tenant_id: str, *, audience: str | None = "adm
     for row in _load().get("subscriptions", []):
         if str(row.get("tenant_id") or "") != tid:
             continue
+        row_audience = str(row.get("audience") or "customer")
+        if audience and row_audience != audience:
+            continue
+        rows.append(dict(row))
+    return rows
+
+
+def list_all_subscriptions(*, audience: str | None = "admin") -> list[dict[str, Any]]:
+    """All push subscriptions for an audience (fallback when tenant ids diverge)."""
+    rows: list[dict[str, Any]] = []
+    for row in _load().get("subscriptions", []):
         row_audience = str(row.get("audience") or "customer")
         if audience and row_audience != audience:
             continue
@@ -88,28 +153,56 @@ def upsert_subscription(
     *,
     email: str,
     endpoint: str,
-    keys: dict[str, str],
+    keys: dict[str, str] | None = None,
     user_agent: str | None = None,
     tenant_id: str | None = None,
     audience: str = "customer",
     driver_id: str | None = None,
+    channel: str = "web",
+    platform: str | None = None,
+    fcm_token: str | None = None,
 ) -> dict[str, Any]:
     normalized_email = _normalize_email(email)
+    channel_norm = str(channel or "web").strip().lower() or "web"
+    token = str(fcm_token or "").strip()
     endpoint = str(endpoint or "").strip()
-    p256dh = str((keys or {}).get("p256dh") or "").strip()
-    auth = str((keys or {}).get("auth") or "").strip()
-    if not normalized_email or not endpoint or not p256dh or not auth:
+
+    if channel_norm == "fcm":
+        if not token and endpoint.startswith("fcm:"):
+            token = endpoint[4:].strip()
+        if not token and endpoint and not endpoint.startswith("http"):
+            # Native clients may pass the raw FCM registration token as endpoint.
+            token = endpoint
+        if not token:
+            raise ValueError("Invalid FCM push subscription payload")
+        endpoint = f"fcm:{token}"
+        p256dh = "fcm"
+        auth = "fcm"
+    else:
+        p256dh = str((keys or {}).get("p256dh") or "").strip()
+        auth = str((keys or {}).get("auth") or "").strip()
+        if not normalized_email or not endpoint or not p256dh or not auth:
+            raise ValueError("Invalid push subscription payload")
+        token = None
+
+    if not normalized_email or not endpoint:
         raise ValueError("Invalid push subscription payload")
 
     data = _load()
     rows: list[dict[str, Any]] = list(data.get("subscriptions") or [])
     now = _now_iso()
+    platform_norm = str(platform or "").strip().lower() or None
 
     for row in rows:
         if row.get("endpoint") == endpoint:
             row["email"] = normalized_email
             row["keys"] = {"p256dh": p256dh, "auth": auth}
             row["user_agent"] = user_agent or row.get("user_agent") or ""
+            row["channel"] = channel_norm
+            if token:
+                row["fcm_token"] = token
+            if platform_norm:
+                row["platform"] = platform_norm
             if tenant_id:
                 row["tenant_id"] = str(tenant_id)
             if audience:
@@ -129,6 +222,9 @@ def upsert_subscription(
         "tenant_id": str(tenant_id) if tenant_id else None,
         "audience": audience or "customer",
         "driver_id": str(driver_id).strip() if driver_id else None,
+        "channel": channel_norm,
+        "fcm_token": token,
+        "platform": platform_norm,
         "created_at": now,
         "updated_at": now,
     }

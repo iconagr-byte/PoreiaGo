@@ -20,17 +20,20 @@ export default function TripPriceDisplay({
   const priceClass = size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-lg' : 'text-2xl';
 
   return (
-    <div className={className}>
-      {quote.hasAdjustment && (
-        <span className="text-sm text-gray-400 line-through block mb-0.5">
-          €{quote.basePrice.toFixed(2)}
-        </span>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
+    <div className={`flex flex-col justify-end min-h-[3.75rem] ${className}`}>
+      <span
+        className={`text-sm text-gray-400 line-through block mb-0.5 min-h-[1.25rem] ${
+          quote.hasAdjustment ? '' : 'invisible'
+        }`}
+        aria-hidden={!quote.hasAdjustment}
+      >
+        €{quote.basePrice.toFixed(2)}
+      </span>
+      <div className="flex flex-wrap items-center gap-2 min-h-[1.75rem]">
         <span className={`font-bold text-on-surface tracking-tight ${priceClass}`}>
           €{quote.finalPrice.toFixed(2)}
         </span>
-        {label && (
+        {label ? (
           <span
             className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
               quote.adjustmentPct > 0
@@ -41,7 +44,7 @@ export default function TripPriceDisplay({
             {label} {quote.adjustmentPct > 0 ? '+' : ''}
             {quote.adjustmentPct}%
           </span>
-        )}
+        ) : null}
       </div>
       {showOccupancy && (
         <p className="text-[10px] text-gray-500 mt-1">
