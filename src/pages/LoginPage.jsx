@@ -691,6 +691,39 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               </Link>
             ) : null}
           </div>
+          {!isPhone ? (
+            <aside className="wallet-auth-aside wallet-auth-aside--right" aria-label="Πώς λειτουργεί">
+              <p className="wallet-auth-aside-kicker">Πώς λειτουργεί</p>
+              <h2 className="wallet-auth-aside-title wallet-auth-aside-title--sm">
+                Από τη σύνδεση
+                <br />
+                στην επιβίβαση
+              </h2>
+              <ol className="wallet-auth-aside-steps">
+                <li>
+                  <span className="wallet-auth-aside-step">1</span>
+                  <div>
+                    <strong>Συνδεθείτε</strong>
+                    <span>Email ή Google — ασφαλή είσοδος.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">2</span>
+                  <div>
+                    <strong>Ανοίξτε το My Wallet</strong>
+                    <span>Εισιτήριο, θέση και QR σε μία οθόνη.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">3</span>
+                  <div>
+                    <strong>Επιβιβαστείτε με QR</strong>
+                    <span>Δείξτε το στον οδηγό — χωρίς χαρτί.</span>
+                  </div>
+                </li>
+              </ol>
+            </aside>
+          ) : null}
         </div>
       </div>
     </div>
