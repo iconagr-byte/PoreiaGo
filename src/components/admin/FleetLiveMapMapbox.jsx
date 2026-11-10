@@ -43,7 +43,7 @@ function HeatmapDots({ points = [], visible = true }) {
     return (
       <Marker key={`heat-${p.lat}-${p.lng}-${i}`} longitude={p.lng} latitude={p.lat} anchor="center">
         <div
-          className="rounded-full border border-orange-500 bg-red-500/40"
+          className="rounded-full border border-orange-400/60 bg-red-400/35"
           style={{
             width: `${16 * scale}px`,
             height: `${16 * scale}px`,
@@ -315,6 +315,7 @@ export default function FleetLiveMapMapbox({
       mapStyle={MAPBOX_STYLE}
       style={{ width: '100%', height: '100%' }}
       attributionControl
+      logoPosition="bottom-right"
     >
       <NavigationControl position="bottom-right" showCompass={false} />
       <GreecePlacesMapboxLayer visible={showPlaces} />
