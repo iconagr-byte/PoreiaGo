@@ -38,7 +38,7 @@ export default function PasswordField({
   onChange,
   autoComplete = 'new-password',
   placeholder = '••••••••',
-  required = true,
+  required = false,
   minLength,
   className,
   inputClassName,
@@ -65,6 +65,7 @@ export default function PasswordField({
           required={required}
           minLength={minLength}
           autoComplete={autoComplete}
+          disabled={disabled}
           {...(controlled ? { value, onChange } : { onChange })}
           className={inputCls}
           placeholder={placeholder}

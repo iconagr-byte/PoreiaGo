@@ -7,6 +7,7 @@ import {
   getDriverSession,
   resolveDriverAuthOnLaunch,
 } from '../../lib/driver/driverSession.js';
+import { applyDriverShiftInvite } from '../../lib/driver/applyDriverShiftInvite.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
@@ -187,9 +188,8 @@ export default function DriverCommandCenter() {
   ].join(' ');
 
   useEffect(() => {
-    if (!authenticated) {
-      clearDriverShiftLaunchState();
-    }
+    // Login / logout never inherits a previous shift — GPS starts only via button.
+    clearDriverShiftLaunchState();
   }, [authenticated]);
 
   const [onBreak, setOnBreak] = useState(false);
@@ -327,10 +327,51 @@ export default function DriverCommandCenter() {
         clearDriverNotifications({ onlyStale: true }).catch(() => {});
       }
     };
+
+    let inviteBusy = false;
     const onSwMessage = (event) => {
-      if (event?.data?.type === 'DRIVER_NOTIFICATION_OPENED') {
+      const data = event?.data;
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'DRIVER_NOTIFICATION_OPENED') {
         clearDriverNotifications({ onlyStale: false }).catch(() => {});
       }
+
+      if (data.type !== 'DRIVER_SHIFT_INVITE') return;
+      if (inviteBusy) return;
+      inviteBusy = true;
+      clearDriverNotifications({ onlyStale: false }).catch(() => {});
+      applyDriverShiftInvite(data)
+        .then((session) => {
+          resetDriverEntryAlerts().catch(() => {});
+          clearDriverShiftLaunchState();
+          setAuthenticated(true);
+          setProfileTick((n) => n + 1);
+          setParams({ tab: 'home' });
+          if (session?.tripId) {
+            window.dispatchEvent(
+              new CustomEvent('driver-manifest-updated', {
+                detail: { tripId: session.tripId },
+              }),
+            );
+          }
+          const label =
+            session?.tripTitle ||
+            (session?.tripId ? `Εκδρομή #${session.tripId}` : 'Εκδρομή');
+          toast.success(`${label} φορτώθηκε — πατήστε Έναρξη βάρδιας`, {
+            id: 'driver-shift-invite',
+            duration: 4200,
+          });
+        })
+        .catch((err) => {
+          toast.error(err?.message || 'Αποτυχία φόρτωσης εκδρομής από Push', {
+            id: 'driver-shift-invite-err',
+            duration: 5000,
+          });
+        })
+        .finally(() => {
+          inviteBusy = false;
+        });
     };
 
     document.addEventListener('visibilitychange', onVisible);
@@ -343,13 +384,13 @@ export default function DriverCommandCenter() {
         navigator.serviceWorker.removeEventListener('message', onSwMessage);
       }
     };
-  }, [authenticated]);
+  }, [setParams]);
 
   useEffect(() => {
-    if (tachograph.limitReached && telemetryOnline) {
+    if (tachograph.limitReached && authenticated && safetyOk) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
     }
-  }, [tachograph.limitReached, telemetryOnline]);
+  }, [tachograph.limitReached, authenticated, safetyOk]);
 
   const setTab = (id) => {
     setParams({ tab: id });

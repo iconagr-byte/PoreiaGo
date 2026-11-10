@@ -33,8 +33,11 @@ export default function AgencySignupPage() {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') || 'professional';
   const initialInterval = searchParams.get('interval') || 'month';
+  const initialAddon = searchParams.get('addon') || null;
 
-  const [planId, setPlanId] = useState(initialPlan);
+  const [planId, setPlanId] = useState(
+    wantsRentAddon && initialPlan === 'rent' ? 'professional' : initialPlan,
+  );
   const [interval, setInterval] = useState(
     initialInterval === 'year' ? 'year' : 'month',
   );
@@ -140,6 +143,13 @@ export default function AgencySignupPage() {
 
     setWorking(true);
     try {
+      if (wantsRentAddon) {
+        try {
+          sessionStorage.setItem('poreiago_pending_rent_addon_v1', '1');
+        } catch {
+          /* ignore */
+        }
+      }
       const result = await createSignupCheckout({
         legalName: legalName.trim(),
         adminEmail: adminEmail.trim().toLowerCase(),
@@ -147,6 +157,7 @@ export default function AgencySignupPage() {
         password,
         plan: planId,
         billingInterval: interval,
+        rent_addon: initialAddon === 'rent' && planId !== 'rent',
       });
       if (result?.checkout_url) {
         if (result.demo) {
@@ -169,8 +180,11 @@ export default function AgencySignupPage() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <PlatformBrand variant="light" />
           <nav className="flex items-center gap-3">
-            <Link to="/grafeia" className="text-sm font-semibold text-gray-600 hover:text-primary">
-              Συμβόλαια
+            <Link
+              to={planId === 'rent' || wantsRentAddon ? '/grafeia/rent' : '/grafeia'}
+              className="text-sm font-semibold text-gray-600 hover:text-primary"
+            >
+              {planId === 'rent' || wantsRentAddon ? 'Συμβόλαια ενοικιάσεων' : 'Συμβόλαια λεωφορείων'}
             </Link>
             <Link
               to="/admin/login"

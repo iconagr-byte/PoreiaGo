@@ -1,9 +1,17 @@
 import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 
 export default function AgencySignupSuccessPage() {
   const [searchParams] = useSearchParams();
   const billingOk = searchParams.get('billing') === 'success';
+  const pendingRentAddon = useMemo(() => {
+    try {
+      return sessionStorage.getItem('poreiago_pending_rent_addon_v1') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -18,7 +26,7 @@ export default function AgencySignupSuccessPage() {
           <span className="material-symbols-outlined text-5xl text-emerald-600">check_circle</span>
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">
-              {billingOk ? 'Η πληρωμία ολοκληρώθηκε!' : 'Ευχαριστούμε!'}
+              {billingOk ? 'Η πληρωμή ολοκληρώθηκε!' : 'Ευχαριστούμε!'}
             </h1>
             <p className="text-sm text-on-surface-variant leading-relaxed">
               {billingOk
@@ -42,7 +50,19 @@ export default function AgencySignupSuccessPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               to="/admin/login"
-              state={{ officeSetup: true, activeTab: 'dashboard' }}
+              state={{
+                officeSetup: true,
+                activeTab: 'dashboard',
+                ...(pendingRentAddon
+                  ? {
+                      afterLogin: {
+                        activeTab: 'settings',
+                        settingsSubTab: 'contracts',
+                        focusRentModule: true,
+                      },
+                    }
+                  : {}),
+              }}
               className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-primary text-white font-bold text-sm hover:opacity-90"
             >
               Σύνδεση & ρύθμιση γραφείου

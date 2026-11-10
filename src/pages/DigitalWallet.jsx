@@ -263,12 +263,24 @@ export default function DigitalWallet({ demoMode = false }) {
 
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (!activeBooking) {
                   toast.error('Δεν υπάρχει ενεργή κράτηση');
                   return;
                 }
-                navigate(ticketPrintPath(activeBooking.id));
+                try {
+                  const mode = await startWalletTicketPrint({
+                    booking: activeBooking,
+                    trip,
+                    brandLabel: 'My Wallet',
+                    navigate,
+                  });
+                  if (mode === 'download') {
+                    toast.success('Κατέβηκε το εισιτήριο — άνοιξέ το για Εκτύπωση / PDF');
+                  }
+                } catch (err) {
+                  toast.error(err?.message || 'Αποτυχία εκτύπωσης');
+                }
               }}
               className="mt-8 flex items-center justify-center gap-2 bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-md font-bold py-3 px-6 rounded-full w-full max-w-[400px] transition-all"
             >
