@@ -1,44 +1,21 @@
 /**
  * Accumulate live GPS breadcrumbs for each active fleet vehicle.
- * Prefers server trail (full shift path) and keeps drawing while the pin is active.
+ * Merges server trail (Redis shift path) with live pin append so the
+ * route keeps growing while the bus moves — even when the API only
+ * returns a short / 1-point trail.
  */
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  mergeVehicleTrail,
+  normalizeServerTrail,
+  sameTrailTip,
+} from '../lib/maps/fleetTrailMerge.js';
 
-const EARTH_M = 6371000;
-
-function haversineM(a, b) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_M * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+export { haversineM, mergeVehicleTrail, normalizeServerTrail } from '../lib/maps/fleetTrailMerge.js';
 
 function vehicleKey(v) {
   return String(v?.id || v?.vehicle_id || v?.driver_id || '');
-}
-
-function normalizeServerTrail(raw) {
-  if (!Array.isArray(raw) || !raw.length) return null;
-  const points = [];
-  for (const p of raw) {
-    const lat = Number(p?.lat);
-    const lng = Number(p?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    points.push({
-      lat,
-      lng,
-      t: p.t || p.recorded_at || null,
-      s: Number.isFinite(Number(p.s ?? p.speed_kmh)) ? Number(p.s ?? p.speed_kmh) : null,
-      h: Number.isFinite(Number(p.h ?? p.heading_deg)) ? Number(p.h ?? p.heading_deg) : null,
-    });
-  }
-  return points.length ? points : null;
 }
 
 /**
@@ -79,39 +56,15 @@ export function useFleetVehicleTrails(vehicles, opts = {}) {
       const serverPts = normalizeServerTrail(v.trail);
       const lat = Number(v.targetLat ?? v.lat);
       const lng = Number(v.targetLng ?? v.lng);
+      const prev = trailsRef.current.get(id) || [];
+      const next = mergeVehicleTrail(prev, serverPts, { lat, lng }, { maxPoints, minMoveM });
 
-      if (serverPts && serverPts.length >= 1) {
-        const prev = trailsRef.current.get(id);
-        const sameLen = prev && prev.length === serverPts.length;
-        const sameTail =
-          sameLen &&
-          Math.abs(prev[prev.length - 1].lat - serverPts[serverPts.length - 1].lat) < 1e-6 &&
-          Math.abs(prev[prev.length - 1].lng - serverPts[serverPts.length - 1].lng) < 1e-6;
-        if (!sameTail) {
-          trailsRef.current.set(id, serverPts.slice(-maxPoints));
-          changed = true;
-        }
-        continue;
-      }
-
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-
-      let pts = trailsRef.current.get(id);
-      if (!pts) {
-        pts = [{ lat, lng }];
-        trailsRef.current.set(id, pts);
+      const prevTip = prev[prev.length - 1];
+      const nextTip = next[next.length - 1];
+      if (prev.length !== next.length || !sameTrailTip(prevTip, nextTip)) {
+        trailsRef.current.set(id, next);
         changed = true;
-        continue;
       }
-
-      const last = pts[pts.length - 1];
-      if (haversineM(last, { lat, lng }) < minMoveM) continue;
-
-      pts.push({ lat, lng });
-      if (pts.length > maxPoints) {
-        pts.splice(0, pts.length - maxPoints);
-      }
-      changed = true;
     }
 
     for (const id of [...trailsRef.current.keys()]) {

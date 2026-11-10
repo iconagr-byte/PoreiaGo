@@ -33,7 +33,8 @@ _ADMIN_ROLES = {"tenant_admin", "dispatcher", "superadmin"}
 _DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
 _RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
 _RENTAL_DOC_DIR = _DATA_ROOT / "uploads" / "rental_docs"
-_MAX_PHOTO_BYTES = 4 * 1024 * 1024
+# Phone camera originals are often 5–10 MB; we compress after read (nginx allows 12m).
+_MAX_PHOTO_BYTES = 12 * 1024 * 1024
 _MAX_DOC_BYTES = 12 * 1024 * 1024
 
 
@@ -696,21 +697,26 @@ async def upload_inspection_photo(
     file: UploadFile = File(...),
     _: dict = Depends(_require_admin),
 ):
-    """Damage selfie / check-in photo — returns public URL for photo_urls."""
-    from travel_platform.media.image_optimize import optimize_driver_photo
+    """Vehicle / damage / check-in photo — returns public URL for photo_urls."""
+    from travel_platform.media.image_optimize import looks_like_image, optimize_driver_photo
 
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Άδειο αρχείο")
     if len(content) > _MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 12 MB)")
+    if not looks_like_image(content, file.content_type, file.filename):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
 
     optimized = optimize_driver_photo(content, max_side=1600, quality=84)
-    if optimized.ext == ".bin":
+    if optimized.ext == ".heic":
+        raise HTTPException(
+            status_code=400,
+            detail="Μορφή HEIC δεν υποστηρίζεται — αποθηκεύστε ως JPG/PNG από το κινητό",
+        )
+    if optimized.ext == ".bin" or not optimized.content:
         raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
-    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "damage").stem)[:40] or "damage"
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "photo").stem)[:40] or "photo"
     filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
 
     _RENTAL_PHOTO_DIR.mkdir(parents=True, exist_ok=True)

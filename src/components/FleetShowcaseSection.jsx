@@ -1,4 +1,6 @@
 import { amenityIcon } from '../services/fleetPublicApi.js';
+import { fleetCategoryLabel, fleetCategoryMeta } from '../lib/fleet/fleetVehicleCategories.js';
+import { PreviewBuilderControl } from './storefront/preview/PreviewDesignMode.jsx';
 
 export default function FleetShowcaseSection({
   vehicles,
@@ -14,9 +16,19 @@ export default function FleetShowcaseSection({
       className={`py-24 px-margin-desktop max-w-container-max mx-auto bg-surface-container-lowest border-y border-black/[0.04] ${sectionClassName}`.trim()}
     >
       <div className="text-center mb-16 max-w-2xl mx-auto">
-        <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
-          Ο Στόλος Μας
-        </span>
+        {/* One Builder for the whole fleet card template — beside Ο Στόλος Μας, not per vehicle. */}
+        <div className="sf-preview-trips-section-head mb-3">
+          <span className="text-primary font-semibold tracking-wider uppercase text-sm">
+            Ο Στόλος Μας
+          </span>
+          <PreviewBuilderControl
+            sectionId="general"
+            label="Στόλος"
+            variant="inline"
+            instanceId="fleet-section-title"
+            className="sf-preview-trips-section-head__builder"
+          />
+        </div>
         <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight mb-4">
           Premium λεωφορεία & παροχές
         </h2>
@@ -34,58 +46,69 @@ export default function FleetShowcaseSection({
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
-          {vehicles.map((bus) => (
-            <div key={bus.id} className="h-full">
-              <article className="relative group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
-                <div className="relative h-52 w-full overflow-hidden shrink-0">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
-                  <img
-                    src={bus.image_url || '/images/fleet-bus-white-tourismo.png'}
-                    alt={bus.name}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <span className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-white/95 text-xs font-bold text-primary shadow-sm flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">directions_bus</span>
-                    {bus.category}
-                  </span>
-                  <span className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-emerald-600/90 text-white text-xs font-bold shadow-sm">
-                    {bus.status_label}
-                  </span>
-                  <div className="absolute bottom-4 left-6 right-6 z-20">
-                    <h3 className="font-headline-md text-white font-bold drop-shadow-md">{bus.name}</h3>
-                    <p className="text-sm text-white/85 mt-1">
-                      {bus.year} · {bus.seat_count} θέσεις
-                      {bus.color ? ` · ${bus.color}` : ''}
-                    </p>
+          {vehicles.map((bus) => {
+            const categoryLabel =
+              bus.category_label || fleetCategoryLabel(bus.category);
+            const categoryIcon = fleetCategoryMeta(bus.category)?.icon || 'directions_bus';
+            const cardKey = String(bus.id ?? bus.name ?? categoryLabel);
+            return (
+              <div key={cardKey} className="h-full">
+                <article className="group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
+                  <div className="relative h-52 w-full overflow-hidden shrink-0">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
+                    <img
+                      src={bus.image_url || '/images/fleet-bus-white-tourismo.png'}
+                      alt={bus.name}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <span className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-white/95 text-xs font-bold text-primary shadow-sm flex items-center gap-1 max-w-[70%]">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">
+                        {categoryIcon}
+                      </span>
+                      <span className="truncate">{categoryLabel}</span>
+                    </span>
+                    <span className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-emerald-600/90 text-white text-xs font-bold shadow-sm">
+                      {bus.status_label}
+                    </span>
+                    <div className="absolute bottom-4 left-6 right-6 z-20">
+                      <h3 className="font-headline-md text-white font-bold drop-shadow-md">
+                        {bus.name}
+                      </h3>
+                      <p className="text-sm text-white/85 mt-1">
+                        {bus.year} · {bus.seat_count} θέσεις
+                        {bus.color ? ` · ${bus.color}` : ''}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-8 flex flex-col flex-1 min-h-0">
-                  <p className="text-on-surface-variant font-body-md text-sm mb-6 line-clamp-3 min-h-[3.75rem]">
-                    {bus.summary || '\u00a0'}
-                  </p>
-                  <div className="mt-auto">
-                    <p className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-3">
-                      Παροχές
+                  <div className="p-8 flex flex-col flex-1 min-h-0">
+                    <p className="text-on-surface-variant font-body-md text-sm mb-4 line-clamp-3">
+                      {bus.summary || '\u00a0'}
                     </p>
-                    <ul className="flex flex-wrap gap-2 min-h-[4.5rem] content-start">
-                      {(bus.amenities || []).map((item) => (
-                        <li
-                          key={`${bus.id}-${item}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/[0.06] text-xs font-medium text-on-surface shadow-sm"
-                        >
-                          <span className="material-symbols-outlined text-[16px] text-primary">
-                            {amenityIcon(item)}
-                          </span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
+                    {/* Pack κάτω από την περιγραφή — όχι mt-auto (άφηνε άσχημο κενό στις κοντές κάρτες). */}
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-3">
+                        Παροχές
+                      </p>
+                      <ul className="flex flex-wrap gap-2 content-start">
+                        {(bus.amenities || []).map((item) => (
+                          <li
+                            key={`${cardKey}-${item}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/[0.06] text-xs font-medium text-on-surface shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[16px] text-primary">
+                              {amenityIcon(item)}
+                            </span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              </article>
-            </div>
-          ))}
+                </article>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

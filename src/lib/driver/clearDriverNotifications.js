@@ -27,14 +27,21 @@ export async function clearDriverNotifications({ onlyStale = false } = {}) {
     for (const n of list) {
       const data = n.data || {};
       const created = Number(data.createdAt || data.created_at || 0);
-      const isDriverTag =
-        typeof n.tag === 'string' &&
-        (n.tag.startsWith('driver-') || n.tag === 'driver-pwa' || n.tag.includes('invite'));
+      const tag = String(n.tag || '');
+      const isTest = tag.includes('push-test') || tag.includes('local-test');
+      // Fresh invites / chat / tests must stay visible until the driver taps them.
       const staleByAge = created > 0 && now - created > 2 * 60 * 60 * 1000; // >2h
-      if (!onlyStale || isDriverTag || staleByAge || !created) {
-        n.close();
-        closed += 1;
+      const missingAge = !created;
+      if (onlyStale) {
+        if (isTest) continue;
+        if (staleByAge || missingAge) {
+          n.close();
+          closed += 1;
+        }
+        continue;
       }
+      n.close();
+      closed += 1;
     }
     return closed;
   } catch {

@@ -39,6 +39,7 @@ export default function RentalPaperworkDesk({
   onOpenWizard,
   onConsumedFocus,
   onBookingUpdated,
+  onInspectionsUpdated,
   onToast,
 }) {
   const [query, setQuery] = useState('');
@@ -149,6 +150,7 @@ export default function RentalPaperworkDesk({
           setSelectedId(null);
         }}
         onBookingUpdated={onBookingUpdated}
+        onInspectionsUpdated={onInspectionsUpdated}
         onToast={onToast}
       />
     );
