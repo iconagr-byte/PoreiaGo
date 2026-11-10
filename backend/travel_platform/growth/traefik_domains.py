@@ -40,74 +40,43 @@ def _router_id(domain: str) -> str:
 
 
 def platform_ingress_ips() -> set[str]:
-    """IPs that serve PoreiaGo Traefik (apex A records must match one of these)."""
-    raw = (os.getenv("PLATFORM_INGRESS_IPS") or os.getenv("PLATFORM_INGRESS_IP") or "").strip()
-    ips: set[str] = {p.strip() for p in raw.split(",") if p.strip()}
-    cname = (os.getenv("OLYMPUS_INGRESS_CNAME") or os.getenv("DEFAULT_INGRESS_CNAME") or "www.poreiago.com").strip()
-    if cname:
-        try:
-            for info in socket.getaddrinfo(cname, None, type=socket.SOCK_STREAM):
-                ips.add(info[4][0])
-        except OSError:
-            logger.debug("Could not resolve ingress CNAME %s", cname, exc_info=True)
-    # Known production Droplet (belt-and-suspenders when DNS lookup is blocked).
-    ips.add("34.141.98.145")
+    """IPs that count as “points at PoreiaGo” for apex DNS checks."""
+    raw = (os.getenv("PLATFORM_INGRESS_IP") or os.getenv("PLATFORM_INGRESS_IPS") or "").strip()
+    ips = {p.strip() for p in raw.split(",") if p.strip()}
+    # Well-known production ingress (www/api.poreiago.com on Contabo).
+    ips.add("169.58.199.186")
     return ips
 
 
-def resolve_host_ips(hostname: str) -> set[str]:
-    try:
-        return {info[4][0] for info in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)}
-    except OSError:
-        return set()
-
-
-def apex_points_at_platform(domain: str, *, ingress_ips: set[str] | None = None) -> bool:
-    """True when apex A/AAAA already targets the PoreiaGo ingress."""
+def apex_points_to_platform(domain: str, *, ingress_ips: set[str] | None = None) -> bool:
+    """True when apex A/AAAA records include a platform ingress IP."""
     host = _normalize_domain(domain)
     if not host:
         return False
-    ips = resolve_host_ips(host)
-    if not ips:
-        return False
     allowed = ingress_ips if ingress_ips is not None else platform_ingress_ips()
-    return bool(ips & allowed)
-
-
-def should_include_apex(domain: str, *, force: bool | None = None) -> bool:
-    """Include apex router when forced, env-enabled, or DNS already points at us."""
-    if force is not None:
-        return force
-    env = (os.getenv("TRAEFIK_INCLUDE_APEX") or "").strip().lower()
-    if env in {"1", "true", "yes", "always", "all"}:
-        return True
-    if env in {"0", "false", "no", "never"}:
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
         return False
-    forced = {
-        _normalize_domain(d)
-        for d in (os.getenv("TRAEFIK_FORCE_APEX_DOMAINS") or "").split(",")
-        if d.strip()
-    }
-    host = _normalize_domain(domain)
-    if host in forced:
-        return True
-    # Default: provisional apex router so the moment DNS flips, LE can issue.
-    # Separate www/apex certs — failed apex ACME does not break www.
-    return True
+    resolved = {info[4][0] for info in infos if info and info[4]}
+    return bool(resolved & allowed)
 
 
 def render_custom_domains_yaml(
     domains: list[str],
     *,
     include_apex: bool | None = None,
+    apex_domains: set[str] | None = None,
 ) -> str:
     """Build Traefik dynamic YAML for custom domains.
 
-    Always routes ``www.{domain}`` with its own Let's Encrypt cert.
+    By default only ``www.{domain}`` is certified/routed. Apex is included when:
+    - ``include_apex=True`` for all domains, or
+    - the domain is listed in ``apex_domains``, or
+    - ``include_apex is None`` (auto) and apex DNS already points at the platform.
 
-    Apex (``{domain}``) gets a *separate* router/cert when ``include_apex`` is
-    true (default). Separate certs keep www working even if apex DNS still
-    points at old hosting and LE cannot validate the apex yet.
+    Apex and www use **separate** Let's Encrypt mains (not SANs) so a bad apex
+    DNS record cannot break the www certificate.
     """
     unique: list[str] = []
     seen: set[str] = set()
@@ -123,8 +92,8 @@ def render_custom_domains_yaml(
 
     lines = [
         "# AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt",
-        "# Do not edit by hand; regenerated when Domain settings are saved.",
-        "# www and apex use separate routers/certs so apex DNS lag cannot break www TLS.",
+        "# Do not edit by hand; regenerated when Domain settings are saved / API boots.",
+        "# Apex is added only when DNS A/AAAA already points at PLATFORM_INGRESS_IP.",
         "",
         "http:",
         "  routers:",
@@ -145,8 +114,21 @@ def render_custom_domains_yaml(
         return "\n".join(lines)
 
     for domain in unique:
-        www_host = f"www.{domain}"
-        www_rid = _router_id("www-" + domain)
+        use_apex = False
+        if include_apex is True:
+            use_apex = True
+        elif include_apex is False:
+            use_apex = False
+        elif apex_domains is not None:
+            use_apex = domain in apex_domains
+        else:
+            use_apex = apex_points_to_platform(domain)
+
+        hosts = [f"www.{domain}"]
+        if use_apex:
+            hosts.insert(0, domain)
+        rid = _router_id("www-" + domain if not use_apex else domain)
+        rule = " || ".join(f"Host(`{h}`)" for h in hosts)
         lines.extend(
             [
                 f"    {www_rid}:",
@@ -158,12 +140,22 @@ def render_custom_domains_yaml(
                 "      tls:",
                 "        certResolver: letsencrypt",
                 "        domains:",
-                f'          - main: "{www_host}"',
+            ]
+        )
+        # Separate LE certificates — never attach apex as SAN of www.
+        for host in hosts:
+            lines.append(f'          - main: "{host}"')
+        lines.extend(
+            [
                 "      middlewares:",
                 "        - security-headers@file",
                 "",
             ]
         )
+        if use_apex:
+            logger.info("Traefik custom domain includes apex: %s", domain)
+        else:
+            logger.info("Traefik custom domain www-only (apex DNS not on platform): %s", domain)
 
         use_apex = should_include_apex(domain) if include_apex is None else include_apex
         if use_apex:
@@ -199,7 +191,12 @@ def render_custom_domains_yaml(
     return "\n".join(lines)
 
 
-def write_custom_domains_file(domains: list[str], *, path: Path | None = None) -> Path | None:
+def write_custom_domains_file(
+    domains: list[str],
+    *,
+    path: Path | None = None,
+    include_apex: bool | None = None,
+) -> Path | None:
     target_dir = path.parent if path else _traefik_dynamic_dir()
     if target_dir is None:
         logger.info("TRAEFIK_DYNAMIC_DIR unset — skip custom domain Traefik sync")
@@ -208,7 +205,7 @@ def write_custom_domains_file(domains: list[str], *, path: Path | None = None) -
     out = path or (target_dir / "custom-domains.yml")
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
-        content = render_custom_domains_yaml(domains)
+        content = render_custom_domains_yaml(domains, include_apex=include_apex)
         tmp = out.with_suffix(".yml.tmp")
         tmp.write_text(content, encoding="utf-8")
         tmp.replace(out)
@@ -236,5 +233,5 @@ async def sync_traefik_custom_domains_from_db(session) -> list[str]:
     if not domains:
         logger.info("No tenants.custom_domain rows — leave Traefik custom-domains.yml unchanged")
         return []
-    write_custom_domains_file(domains)
+    write_custom_domains_file(domains, include_apex=None)
     return domains

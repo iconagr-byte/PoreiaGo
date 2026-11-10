@@ -44,7 +44,7 @@ export default function CustomerRoute({ children, allowGuest = false }) {
           to="/driver"
           className="px-6 py-3 rounded-full bg-emerald-600 text-white font-bold text-sm"
         >
-          Driver Portal
+          Είσοδος οδηγού
         </Link>
       </div>
     );

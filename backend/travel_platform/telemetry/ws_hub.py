@@ -17,7 +17,7 @@ from travel_platform.telemetry.eta_serializers import snapshot_to_payload
 
 logger = logging.getLogger(__name__)
 
-ETA_PUSH_INTERVAL_SEC = 5
+ETA_PUSH_INTERVAL_SEC = 1
 
 
 class EtaWsHub:
@@ -126,6 +126,26 @@ class AlertsWsHub:
         for ws in dead:
             self.disconnect(tenant_id, ws)
 
+    async def broadcast_alert_cleared(self, tenant_id: str, alert: dict[str, Any]) -> None:
+        payload = {
+            "type": "telemetry_alert_cleared",
+            "id": alert.get("id"),
+            "tenant_id": alert.get("tenant_id") or tenant_id,
+            "alert_type": alert.get("alert_type"),
+            "cleared_at": alert.get("cleared_at"),
+            "message": alert.get("message"),
+        }
+        room = list(self._rooms.get(tenant_id, set()))
+        text = json.dumps(payload)
+        dead: list[WebSocket] = []
+        for ws in room:
+            try:
+                await ws.send_text(text)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(tenant_id, ws)
+
 
 _eta_hub = EtaWsHub()
 _alerts_hub = AlertsWsHub()
@@ -146,6 +166,28 @@ async def push_eta_snapshot(snap) -> None:
 
 
 async def push_telemetry_alert(alert: dict[str, Any]) -> None:
-    tenant_id = str(alert.get("tenant_id", ""))
-    if tenant_id:
-        await get_alerts_ws_hub().broadcast_alert(tenant_id, alert)
+    """Broadcast to the alert tenant room and legacy demo room (tenant-id drift)."""
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+    primary = str(alert.get("tenant_id") or "").strip()
+    rooms = []
+    for tid in (primary, DEFAULT_TENANT):
+        if tid and tid not in rooms:
+            rooms.append(tid)
+    hub = get_alerts_ws_hub()
+    for tid in rooms:
+        await hub.broadcast_alert(tid, alert)
+
+
+async def push_telemetry_alert_cleared(alert: dict[str, Any]) -> None:
+    """Tell admin clients to drop an SOS pin after office dismiss."""
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+    primary = str(alert.get("tenant_id") or "").strip()
+    rooms = []
+    for tid in (primary, DEFAULT_TENANT):
+        if tid and tid not in rooms:
+            rooms.append(tid)
+    hub = get_alerts_ws_hub()
+    for tid in rooms:
+        await hub.broadcast_alert_cleared(tid, alert)

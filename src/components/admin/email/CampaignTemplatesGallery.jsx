@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye } from 'lucide-react';
 import {
   STITCH_TEMPLATE_CATEGORIES,
@@ -6,6 +6,10 @@ import {
   getStitchTemplatePreviewHtml,
   getStitchTemplatesByCategory,
 } from '../../../lib/email/stitchTemplates.js';
+import {
+  filterStitchCategories,
+  filterStitchTemplates,
+} from '../../../lib/email/stitchTemplateAccess.js';
 
 const PREVIEW_BASE =
   typeof window !== 'undefined' ? window.location.origin : '';
@@ -27,26 +31,51 @@ export default function CampaignTemplatesGallery({
   onSelect,
   variant = 'modal',
   initialCategory = 'all',
+  access = { rentEnabled: false, newsletterEnabled: false },
 }) {
-  const [category, setCategory] = useState(initialCategory);
+  const visibleCategories = useMemo(
+    () => filterStitchCategories(STITCH_TEMPLATE_CATEGORIES, access),
+    [access],
+  );
+
+  const [category, setCategory] = useState(() =>
+    visibleCategories.some((c) => c.id === initialCategory) ? initialCategory : 'all',
+  );
   const [lightboxTpl, setLightboxTpl] = useState(null);
-  const templates = useMemo(() => getStitchTemplatesByCategory(category), [category]);
+
+  useEffect(() => {
+    if (!visibleCategories.some((c) => c.id === category)) {
+      setCategory('all');
+    }
+  }, [visibleCategories, category]);
+
+  const templates = useMemo(() => {
+    const list = getStitchTemplatesByCategory(category);
+    return filterStitchTemplates(list, access);
+  }, [category, access]);
+
+  const visibleAll = useMemo(
+    () => filterStitchTemplates(STITCH_CAMPAIGN_TEMPLATES, access),
+    [access],
+  );
 
   const previewById = useMemo(() => {
     const map = {};
-    for (const tpl of STITCH_CAMPAIGN_TEMPLATES) {
+    for (const tpl of visibleAll) {
       map[tpl.id] = getStitchTemplatePreviewHtml(tpl, PREVIEW_BASE);
     }
     return map;
-  }, []);
+  }, [visibleAll]);
 
   const counts = useMemo(() => {
-    const map = { all: getStitchTemplatesByCategory('all').length };
-    for (const c of STITCH_TEMPLATE_CATEGORIES) {
-      if (c.id !== 'all') map[c.id] = getStitchTemplatesByCategory(c.id).length;
+    const map = { all: visibleAll.length };
+    for (const c of visibleCategories) {
+      if (c.id !== 'all') {
+        map[c.id] = filterStitchTemplates(getStitchTemplatesByCategory(c.id), access).length;
+      }
     }
     return map;
-  }, []);
+  }, [visibleCategories, visibleAll, access]);
 
   const isPage = variant === 'page';
   const catClass = isPage ? 'emh-templates-categories--page' : 'emh-templates-categories--modal';
@@ -59,7 +88,7 @@ export default function CampaignTemplatesGallery({
   return (
     <>
       <nav className={`emh-templates-categories ${catClass}`} aria-label="Κατηγορίες προτύπων">
-        {STITCH_TEMPLATE_CATEGORIES.map((cat) => (
+        {visibleCategories.map((cat) => (
           <button
             key={cat.id}
             type="button"

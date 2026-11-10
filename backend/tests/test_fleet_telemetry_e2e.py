@@ -58,8 +58,20 @@ def _tenant_app() -> FastAPI:
 class FleetTelemetryE2ETests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import os
+
         import api.ws_telemetry as ws_mod
 
+        cls._env = patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "test",
+                "ADMIN_AUTH_DISABLED": "1",
+                "AUTH_JWT_SECRET": TEST_JWT_SECRET,
+            },
+            clear=False,
+        )
+        cls._env.start()
         cls._orig_secrets = ws_mod._jwt_secrets
         ws_mod._jwt_secrets = lambda: [TEST_JWT_SECRET]
         cls.ws_mod = ws_mod
@@ -71,6 +83,13 @@ class FleetTelemetryE2ETests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.ws_mod._jwt_secrets = cls._orig_secrets
+        cls._env.stop()
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
     def test_ws_ingress_to_egress_roundtrip(self):
         token = _driver_token()
         with self.ws_client.websocket_connect(f"/ws/telemetry/ingress?token={token}") as ingress:

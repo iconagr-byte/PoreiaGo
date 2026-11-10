@@ -1,0 +1,205 @@
+/* Public office contact form page */
+
+.oc-page {
+  --oc-ink: #0f172a;
+  --oc-muted: #64748b;
+  --oc-accent: var(--sf-accent, #0ea5e9);
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 480px at 10% -10%, rgba(14, 165, 233, 0.12), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  color: var(--oc-ink);
+}
+
+.oc-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 5.5rem 1rem 3rem;
+  box-sizing: border-box;
+}
+
+.oc-card {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 28px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  padding: 1.75rem 1.35rem 1.5rem;
+}
+
+.oc-kicker {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.oc-title {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.55rem, 4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.oc-lead {
+  margin: 0 0 1.35rem;
+  color: var(--oc-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.oc-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 1.35rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.oc-to .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--oc-accent);
+}
+
+.oc-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.oc-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.oc-field input,
+.oc-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--oc-ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.oc-field input:focus,
+.oc-field textarea:focus {
+  border-color: color-mix(in srgb, var(--oc-accent) 55%, #94a3b8);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--oc-accent) 18%, transparent);
+}
+
+.oc-field textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.oc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.oc-hp {
+  position: absolute;
+  left: -10000px;
+  opacity: 0;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.oc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.oc-submit {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 2.85rem;
+  padding: 0 1.35rem;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.92rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oc-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.oc-back {
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  min-height: 2.85rem;
+  padding: 0 1.15rem;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.oc-error {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.oc-success {
+  text-align: center;
+  padding: 1.25rem 0.5rem 0.5rem;
+}
+
+.oc-success .material-symbols-outlined {
+  font-size: 42px;
+  color: #10b981;
+}
+
+@media (max-width: 640px) {
+  .oc-shell {
+    padding-top: 4.75rem;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .oc-card {
+    border-radius: 22px;
+    padding: 1.35rem 1.1rem 1.25rem;
+  }
+
+  .oc-row {
+    grid-template-columns: 1fr;
+  }
+}

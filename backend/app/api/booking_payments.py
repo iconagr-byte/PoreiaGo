@@ -60,7 +60,8 @@ async def _sync_booking_cache(admin_dict: dict) -> None:
         from ticketing.customer_bookings import upsert_booking
 
         email = admin_dict.get("email") or "unknown@local.invalid"
-        await upsert_booking(admin_dict, customer_email=email)
+        tid = admin_dict.get("tenant_id") or admin_dict.get("tenantId")
+        await upsert_booking(admin_dict, customer_email=email, tenant_id=str(tid) if tid else None)
     except Exception:
         pass
 
@@ -145,7 +146,11 @@ async def record_cash_payment_saas(
             send_payment_confirmation_notifications,
         )
 
-        await send_payment_confirmation_notifications(merged, event=EVENT_CASH_PAYMENT)
+        await send_payment_confirmation_notifications(
+            merged,
+            event=EVENT_CASH_PAYMENT,
+            require_office=True,
+        )
     except Exception:
         pass
 
