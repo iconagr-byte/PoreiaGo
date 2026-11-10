@@ -24,6 +24,11 @@ export default function MasterQrGate({ onAuthenticated }) {
   ].join(' ');
 
   useEffect(() => {
+    const fromQuery = searchParams.get('user');
+    if (fromQuery) setUsername(fromQuery);
+  }, [searchParams]);
+
+  useEffect(() => {
     document.documentElement.classList.add('driver-route');
     const viewport = document.querySelector('meta[name="viewport"]');
     const prevContent = viewport?.getAttribute('content') || '';

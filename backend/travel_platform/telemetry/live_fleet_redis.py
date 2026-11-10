@@ -23,10 +23,11 @@ _redis = None
 
 
 def _ttl_seconds() -> int:
+    # Keep pins long enough for brief GPS gaps (tunnels / iOS background).
     try:
-        return max(60, int(os.getenv("FLEET_LIVE_REDIS_TTL_SEC", "180")))
+        return max(120, int(os.getenv("FLEET_LIVE_REDIS_TTL_SEC", "1200")))
     except ValueError:
-        return 180
+        return 1200
 
 
 async def _get_redis():
@@ -120,6 +121,7 @@ async def load_live_vehicles(tenant_id: str) -> list[dict[str, Any]]:
 
     out: list[dict[str, Any]] = []
     stale: list[str] = []
+    ttl = _ttl_seconds()
     for vid in vehicle_ids:
         try:
             raw = await r.get(_vehicle_key(tid, vid))
@@ -138,10 +140,20 @@ async def load_live_vehicles(tenant_id: str) -> list[dict[str, Any]]:
         if meta.get("lat") is None or meta.get("lng") is None:
             continue
         out.append(meta)
+        # Admin poll keeps the pin warm while the map is open.
+        try:
+            await r.expire(_vehicle_key(tid, vid), ttl)
+        except Exception:
+            pass
 
     if stale:
         try:
             await r.srem(_tenant_index_key(tid), *stale)
+        except Exception:
+            pass
+    if out:
+        try:
+            await r.expire(_tenant_index_key(tid), ttl)
         except Exception:
             pass
     return out

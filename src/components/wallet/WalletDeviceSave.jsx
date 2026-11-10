@@ -3,11 +3,11 @@
  * Apple Wallet / Google Wallet when server certificates are configured.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { API_BASE } from '../../config/api.js';
 import { customerAuthHeaders } from '../../services/customerAuthApi.js';
-import { ticketPrintPath } from '../../lib/ticketing/printTicket.js';
+import { startWalletTicketPrint } from '../../lib/ticketing/printTicket.js';
 import {
   downloadBookingIcs,
   googleCalendarUrl,
@@ -26,9 +26,16 @@ async function fetchPassStatus() {
   }
 }
 
-export default function WalletDeviceSave({ booking, compact = false }) {
+export default function WalletDeviceSave({
+  booking,
+  compact = false,
+  brandLabel = 'My Wallet',
+  coverImage = '',
+}) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [passStatus, setPassStatus] = useState({ apple: false, google: false });
+  const [printBusy, setPrintBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -155,19 +162,40 @@ export default function WalletDeviceSave({ booking, compact = false }) {
                 </a>
               ) : null}
 
-              <Link
+              <button
+                type="button"
                 className="wallet-device-row"
-                to={ticketPrintPath(booking.id, { autoPrint: true })}
-                onClick={() => setOpen(false)}
+                disabled={printBusy}
+                onClick={async () => {
+                  if (printBusy) return;
+                  setPrintBusy(true);
+                  try {
+                    const mode = await startWalletTicketPrint({
+                      booking,
+                      tripTitle: booking.tripTitle,
+                      coverImage,
+                      brandLabel,
+                      navigate,
+                    });
+                    setOpen(false);
+                    if (mode === 'download') {
+                      toast.success('Κατέβηκε το εισιτήριο — άνοιξέ το για PDF');
+                    }
+                  } catch (err) {
+                    toast.error(err?.message || 'Αποτυχία εκτύπωσης');
+                  } finally {
+                    setPrintBusy(false);
+                  }
+                }}
               >
                 <span className="material-symbols-outlined" aria-hidden>
                   picture_as_pdf
                 </span>
                 <span>
                   <strong>PDF / Εκτύπωση</strong>
-                  <small>Boarding pass</small>
+                  <small>{printBusy ? 'Προετοιμασία…' : 'Boarding pass'}</small>
                 </span>
-              </Link>
+              </button>
 
               <button type="button" className="wallet-device-row" onClick={onShare}>
                 <span className="material-symbols-outlined" aria-hidden>

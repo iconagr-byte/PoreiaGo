@@ -163,7 +163,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       String(appearance.rent_office_name || '').trim() ||
         String(appearance.rent_logo_url || '').trim() ||
         String(appearance.rent_hero_title || '').trim() ||
-        String(appearance.rent_hero_copy || '').trim(),
+        String(appearance.rent_hero_copy || '').trim() ||
+        String(appearance.rent_hero_kicker || '').trim(),
     ),
   };
 }

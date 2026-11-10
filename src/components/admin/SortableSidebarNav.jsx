@@ -61,6 +61,7 @@ function SharedScopeChip({ label }) {
 
 /** Per-item color for shared (Κοινά) rows — avoids flat grey “μουντά” look. */
 const SHARED_NAV_ACCENTS = {
+  wallet_registrations: 'sky',
   dashboard: 'indigo',
   fleet_live_map: 'emerald',
   email: 'sky',
