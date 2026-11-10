@@ -183,8 +183,8 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   fuel_price_eur_per_liter: 1.85,
   gforce_spike_threshold_g: 0.45,
   prefer_tracker_events: true,
-  eta_refresh_seconds: 5,
-  eta_ws_push_seconds: 5,
+  eta_refresh_seconds: 1,
+  eta_ws_push_seconds: 1,
   driver_stale_seconds: 90,
   google_maps_configured: false,
   fleet_digest_enabled: true,
@@ -253,11 +253,31 @@ export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = ad
     const res = await fetch(`${API_BASE}/api/admin/telemetry/alerts?limit=${limit}`, {
       headers: authHeaders,
     });
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
   } catch {
-    /* offline */
+    /* ignore — fall through */
   }
-  return getMockAlerts();
+  // Never inject demo ROUTE_DEVIATION («120m εκτός διαδρόμου») into real offices.
+  // That mock leaked into every γραφείο via a shared session inbox.
+  return [];
+}
+
+/** Office dismisses driver SOS — pin leaves the live map. */
+export async function clearTelemetryAlert(alertId, authHeaders = adminAuthHeaders()) {
+  const id = String(alertId || '').trim();
+  if (!id) throw new Error('Λείπει alert id');
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/alerts/${encodeURIComponent(id)}/clear`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία απενεργοποίησης συναγερμού');
+  }
+  return data;
 }
 
 export async function compareTripRoutes(tripA, tripB, { limit = 5000 } = {}, authHeaders = adminAuthHeaders()) {
@@ -386,22 +406,6 @@ export async function downloadTripRouteExport(
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
-}
-
-function getMockAlerts() {
-  const now = new Date().toISOString();
-  return [
-    {
-      id: 'mock-1',
-      alert_type: 'ROUTE_DEVIATION',
-      tenant_id: '00000000-0000-0000-0000-000000000001',
-      vehicle_id: 'demo-vehicle-1',
-      trip_id: 1,
-      message: 'Αποκλίνουσα διαδρομή — 120m εκτός διαδρόμου',
-      metadata: { distance_outside_m: 120, buffer_m: 75 },
-      created_at: now,
-    },
-  ];
 }
 
 function getMockFleet() {

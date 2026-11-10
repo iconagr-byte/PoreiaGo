@@ -24,10 +24,13 @@ import {
   replyMailboxMessage,
   syncMailbox,
 } from '../../../services/emailClientApi.js';
+import { useResizableRailWidth } from '../../../hooks/useResizableRailWidth.js';
 import '../../../styles/emailMarketingHub.css';
 import '../../../styles/emailMailbox.css';
 import EmailComposeModal from './EmailComposeModal.jsx';
 import RichTextEditor from './RichTextEditor.jsx';
+
+const LIST_WIDTH_KEY = 'poreiago.email.mailbox.listWidth';
 
 function mailboxToastError(message) {
   toast.error(message, { id: 'mailbox-request-error' });
@@ -89,36 +92,100 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [checkedIds, setCheckedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const autoSyncedFor = useRef('');
+  const syncInFlight = useRef(false);
+  // Survives IMAP poll / list reload races so a just-opened mail stays marked read.
+  const locallyReadIdsRef = useRef(new Set());
+  const selectedIdRef = useRef(null);
+  const { width: listWidth, onPointerDown: onListResize } = useResizableRailWidth({
+    storageKey: LIST_WIDTH_KEY,
+    defaultWidth: 300,
+    minWidth: 220,
+    maxWidth: 560,
+  });
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const loadFolders = useCallback(async () => {
+    // No office mailbox → empty counts (never show another tenant's unread).
+    if (!emailSettingsId) {
+      setFolders(Object.keys(FOLDER_META).map((name) => ({ name, unread: 0 })));
+      return;
+    }
     try {
-      const data = await fetchMailboxFolders(emailSettingsId || undefined);
+      const data = await fetchMailboxFolders(emailSettingsId);
       setFolders(data.folders || []);
     } catch (err) {
       mailboxToastError(err.message);
     }
   }, [emailSettingsId]);
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await fetchMailboxMessages(activeFolder, {
-        accountId: emailSettingsId || undefined,
+  const applyMessageList = useCallback((list) => {
+    const readIds = locallyReadIdsRef.current;
+    const merged = (list || []).map((m) =>
+      readIds.has(m.id) || m.is_read ? { ...m, is_read: true } : m,
+    );
+    setMessages((prev) => {
+      // Also keep any id that was already read in UI even if ref missed a beat.
+      const next = merged.map((m) => {
+        const was = prev.find((p) => p.id === m.id);
+        if (was?.is_read && !m.is_read) {
+          readIds.add(m.id);
+          return { ...m, is_read: true };
+        }
+        return m;
       });
-      setMessages(list);
-      if (selectedId && !list.find((m) => m.id === selectedId)) {
+      if (
+        prev.length === next.length &&
+        prev.every(
+          (m, i) =>
+            m.id === next[i]?.id &&
+            m.is_read === next[i]?.is_read &&
+            m.subject === next[i]?.subject,
+        )
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    return merged;
+  }, []);
+
+  const loadMessages = useCallback(
+    async ({ silent = false } = {}) => {
+      // SEAL: without this office's account id, never fetch the shared cache.
+      if (!emailSettingsId) {
+        setMessages([]);
         setSelectedId(null);
         setDetail(null);
         setCustomer(null);
+        return [];
       }
-      return list;
-    } catch (err) {
-      mailboxToastError(err.message);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [activeFolder, selectedId, emailSettingsId]);
+      if (!silent) setLoading(true);
+      try {
+        const list = await fetchMailboxMessages(activeFolder, {
+          accountId: emailSettingsId,
+        });
+        const merged = applyMessageList(list);
+        const currentSelected = selectedIdRef.current;
+        if (currentSelected && !merged.find((m) => m.id === currentSelected)) {
+          setSelectedId(null);
+          setDetail(null);
+          setCustomer(null);
+        }
+        return merged;
+      } catch (err) {
+        if (!silent) mailboxToastError(err.message);
+        return [];
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    // selectedId must NOT be a dep — changing selection used to re-fetch the list
+    // and race ahead of mark-as-read, bringing the blue unread dot back.
+    [activeFolder, emailSettingsId, applyMessageList],
+  );
 
   useEffect(() => {
     loadFolders();
@@ -158,7 +225,11 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         if (!quiet) mailboxToastError('Επιλέξτε λογαριασμό email');
         return;
       }
-      setSyncing(true);
+      if (syncInFlight.current) return;
+      syncInFlight.current = true;
+      // Quiet background polls must not flip syncing/loading UI — that
+      // inserted «Φόρτωση…» and spun the button every 5s (list jitter).
+      if (!quiet) setSyncing(true);
       try {
         const r = await syncMailbox(emailSettingsId);
         if (!r?.ok) {
@@ -170,25 +241,36 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         setLastSyncError('');
         if (!quiet) {
           toast.success(
-            n ? `Συγχρονίστηκαν ${n} μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα',
+            n ? `Συγχρονίστηκαν ${n} νέα μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα',
           );
         } else if (n) {
-          toast.success(`Συγχρονίστηκαν ${n} μηνύματα`, { id: 'mailbox-auto-sync' });
+          toast.success(`Συγχρονίστηκαν ${n} νέα μηνύματα`, { id: 'mailbox-auto-sync' });
         }
         if (Array.isArray(r.errors) && r.errors.length) {
           setLastSyncError(r.errors[0]);
-          toast.error(r.errors[0], { id: 'mailbox-sync-warn', duration: 6000 });
+          if (!quiet) {
+            toast.error(r.errors[0], { id: 'mailbox-sync-warn', duration: 6000 });
+          }
         }
-        await loadFolders();
-        await loadMessages();
+        // Quiet poll with zero new mail: leave the list alone (no layout shift).
+        if (!quiet || n > 0) {
+          await loadFolders();
+          await loadMessages({ silent: quiet });
+        }
       } catch (err) {
-        mailboxToastError(err.message);
+        if (!quiet) mailboxToastError(err.message);
       } finally {
-        setSyncing(false);
+        syncInFlight.current = false;
+        if (!quiet) setSyncing(false);
       }
     },
     [emailSettingsId, loadFolders, loadMessages],
   );
+
+  // Account switch: drop sticky reads from the previous mailbox.
+  useEffect(() => {
+    locallyReadIdsRef.current = new Set();
+  }, [emailSettingsId]);
 
   // First open of an account: pull IMAP so the inbox is not stuck empty.
   useEffect(() => {
@@ -198,16 +280,44 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     runSync({ quiet: true });
   }, [emailSettingsId, runSync]);
 
+  // While the mailbox tab is open, poll IMAP every 5s for new mail.
+  useEffect(() => {
+    if (!emailSettingsId) return undefined;
+    const id = window.setInterval(() => {
+      runSync({ quiet: true });
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [emailSettingsId, runSync]);
+
   const selectMessage = async (id) => {
+    const wasUnread = Boolean(messages.find((m) => m.id === id && !m.is_read));
     setSelectedId(id);
     setReplyOpen(false);
+    // Sticky local read: list reloads / IMAP poll must not revive this blue dot.
+    locallyReadIdsRef.current.add(id);
+    // Optimistic: clear the blue unread dot immediately.
+    if (wasUnread) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
+      setFolders((prev) =>
+        prev.map((f) =>
+          f.name === activeFolder && f.unread > 0
+            ? { ...f, unread: Math.max(0, (f.unread || 0) - 1) }
+            : f,
+        ),
+      );
+    }
     try {
       const msg = await fetchMailboxMessage(id);
       setDetail(msg);
+      locallyReadIdsRef.current.add(id);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)),
+      );
       const cust = await fetchMessageCustomer(id);
       setCustomer(cust);
       loadFolders();
-      loadMessages();
     } catch (err) {
       mailboxToastError(err.message);
     }
@@ -306,7 +416,8 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       {!emailSettingsId && (
         <div className="embox-banner" role="status">
           <AlertCircle size={18} strokeWidth={2} aria-hidden />
-          Προσθέστε λογαριασμό email από την καρτέλα «Ρυθμίσεις Email».
+          Προσθέστε λογαριασμό email από την καρτέλα «Ρυθμίσεις Email». Χωρίς
+          δικό σας λογαριασμό δεν εμφανίζονται μηνύματα άλλων γραφείων.
         </div>
       )}
       {emailSettingsId && lastSyncError && (
@@ -392,7 +503,10 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
           })}
         </aside>
 
-        <section className="embox-list">
+        <section
+          className="embox-list"
+          style={{ ['--embox-list-width']: `${listWidth}px` }}
+        >
           <div className="embox-list-head">
             <label className="embox-check-all">
               <input
@@ -464,6 +578,15 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
               );
             })}
           </ul>
+          <button
+            type="button"
+            className="embox-list-resize"
+            aria-label="Αλλαγή πλάτους λίστας / προεπισκόπησης"
+            title="Σύρετε για περισσότερο χώρο στην προεπισκόπηση"
+            onPointerDown={onListResize}
+          >
+            <span className="embox-list-resize-grip" aria-hidden />
+          </button>
         </section>
 
         <section className="embox-detail">

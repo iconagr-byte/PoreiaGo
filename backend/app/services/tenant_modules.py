@@ -61,6 +61,9 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
         settings["site_appearance"] = {
             "rent_office_name": name,
             "footer_brand_name": name,
+            # Never seed Achillio bus photo on rent-only offices — coastal sea hero.
+            "hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+            "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
             "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
             "rent_hero_copy": (
                 "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -80,7 +83,40 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
             "show_fleet_section": False,
             "show_why_us_section": False,
         }
+    else:
+        settings["modules"] = {"trips_enabled": True, "rent_enabled": False}
     return settings
+
+
+def resolve_provision_plan_and_settings(
+    *,
+    plan: TenantPlan | str,
+    service_mode: str | None = None,
+    office_name: str | None = None,
+) -> tuple[TenantPlan, dict[str, Any]]:
+    """Map UI service mode → TenantPlan + settings_json seed."""
+    mode = str(service_mode or "buses").strip().lower()
+    if mode not in {"buses", "rent", "both"}:
+        mode = "buses"
+
+    raw_plan = plan if isinstance(plan, TenantPlan) else TenantPlan(str(plan or "starter"))
+    if mode == "rent":
+        resolved = TenantPlan.RENT
+        return resolved, initial_settings_for_plan(resolved, office_name=office_name)
+
+    # Bus bill plans never use the standalone rent enum.
+    if raw_plan == TenantPlan.RENT:
+        raw_plan = TenantPlan.STARTER
+
+    settings = initial_settings_for_plan(raw_plan, office_name=office_name)
+    if mode == "both":
+        settings = enable_rent_addon_in_settings(settings)
+    else:
+        settings["modules"] = {"trips_enabled": True, "rent_enabled": False}
+        addons = dict(settings.get("addons") or {})
+        addons["rent"] = False
+        settings["addons"] = addons
+    return raw_plan, settings
 
 
 def modules_for_settings(
@@ -320,7 +356,7 @@ async def _heal_subscription_plan_column(session: Any) -> None:
         logger.exception("Could not heal subscriptions.plan column")
 
 
-async def _heal_legacy_tenant_name_column(session: Any) -> None:
+async def _heal_legacy_tenant_name_column(session: Any, *, commit: bool = True) -> None:
     """
     Contabo legacy schema still has tenants.name NOT NULL.
 
@@ -341,23 +377,308 @@ async def _heal_legacy_tenant_name_column(session: Any) -> None:
                       AND table_name = 'tenants'
                       AND column_name = 'name'
                   ) THEN
+                    ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL;
                     BEGIN
-                      ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL;
+                      ALTER TABLE tenants ALTER COLUMN name SET DEFAULT '';
                     EXCEPTION WHEN OTHERS THEN
                       NULL;
                     END;
                     UPDATE tenants
-                       SET name = COALESCE(NULLIF(BTRIM(name), ''), legal_name, slug)
+                       SET name = COALESCE(NULLIF(BTRIM(name), ''), legal_name, slug, '')
                      WHERE name IS NULL OR BTRIM(COALESCE(name, '')) = '';
                   END IF;
                 END $$;
                 """
             )
         )
-        await session.commit()
+        if commit:
+            await session.commit()
     except Exception:
-        await session.rollback()
+        if commit:
+            await session.rollback()
         logger.exception("Could not heal legacy tenants.name column")
+        if not commit:
+            raise
+
+
+async def pg_tenant_plan_type_exists(session: Any) -> bool:
+    """True only when PostgreSQL has a real enum/domain type named tenant_plan."""
+    from sqlalchemy import text
+
+    return bool(
+        await session.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM pg_type t
+                  JOIN pg_namespace n ON n.oid = t.typnamespace
+                  WHERE n.nspname = 'public'
+                    AND t.typname = 'tenant_plan'
+                )
+                """
+            )
+        )
+    )
+
+
+async def detect_tenant_plan_persist_style(session: Any) -> str:
+    """
+    Contabo often stores plan as uppercase tokens (STARTER) in VARCHAR,
+    while alembic/dev uses lowercase values (starter). Detect which.
+    """
+    from sqlalchemy import text
+
+    from app.models.tenant import TenantPlan
+
+    sample = await session.scalar(
+        text("SELECT plan::text FROM tenants WHERE plan IS NOT NULL LIMIT 1")
+    )
+    if sample is not None:
+        token = str(sample).strip()
+        names = {m.name for m in TenantPlan}
+        values = {m.value for m in TenantPlan}
+        if token in names:
+            return "name"
+        if token in values:
+            return "value"
+        if token.upper() in names:
+            return "name"
+        if token.lower() in values:
+            return "value"
+
+    # Prefer enum labels only when the PG type actually exists.
+    if await pg_tenant_plan_type_exists(session):
+        label = await session.scalar(
+            text(
+                """
+                SELECT e.enumlabel
+                FROM pg_enum e
+                JOIN pg_type t ON t.oid = e.enumtypid
+                WHERE t.typname = 'tenant_plan'
+                ORDER BY e.enumsortorder
+                LIMIT 1
+                """
+            )
+        )
+        if label is not None:
+            token = str(label).strip()
+            if token in {m.name for m in TenantPlan} or token.isupper():
+                return "name"
+    return "value"
+
+
+def tenant_plan_db_token(plan: Any, style: str) -> str:
+    """Persist TenantPlan as Contabo expects (name vs value)."""
+    if hasattr(plan, "name") and hasattr(plan, "value"):
+        return plan.name if style == "name" else plan.value
+    raw = str(plan or "starter").strip()
+    if style == "name":
+        return raw.upper()
+    return raw.lower()
+
+
+def tenant_plan_sql_expr(*, has_plan_enum: bool) -> str:
+    """
+    Bind expression for plan inserts.
+    CAST only when PG type tenant_plan exists — Contabo VARCHAR must stay plain.
+    """
+    if has_plan_enum:
+        return "CAST(:plan AS tenant_plan)"
+    return ":plan"
+
+
+# Contabo subscription rows often lag the ORM model — soft-add these on create.
+_SUBSCRIPTION_SOFT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("plan", "VARCHAR(32) NOT NULL DEFAULT 'starter'"),
+    ("status", "VARCHAR(32) NOT NULL DEFAULT 'trialing'"),
+    ("base_amount_cents", "INTEGER NOT NULL DEFAULT 0"),
+    ("metered_buses", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("metered_trips", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("cancel_at_period_end", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("trial_ends_at", "TIMESTAMPTZ"),
+    ("current_period_start", "TIMESTAMPTZ"),
+    ("current_period_end", "TIMESTAMPTZ"),
+    ("canceled_at", "TIMESTAMPTZ"),
+    ("stripe_subscription_id", "VARCHAR(64)"),
+    ("stripe_price_id", "VARCHAR(64)"),
+)
+
+
+async def list_table_columns(session: Any, table: str) -> set[str]:
+    from sqlalchemy import text
+
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = :table
+                """
+            ),
+            {"table": table},
+        )
+    ).scalars()
+    return {str(c) for c in rows}
+
+
+def build_subscription_insert_sql(
+    *,
+    columns: set[str],
+    plan_sql: str,
+) -> tuple[str, list[str]]:
+    """
+    Build INSERT for Contabo subscriptions using only columns that exist.
+    Returns (sql, bind_keys) — bind_keys are the :param names to pass.
+    """
+    # Always required for a usable row.
+    wanted: list[tuple[str, str]] = [
+        ("id", ":id"),
+        ("tenant_id", ":tenant_id"),
+    ]
+    optional: list[tuple[str, str]] = [
+        ("plan", plan_sql),
+        ("status", ":status"),
+        ("base_amount_cents", ":base_amount_cents"),
+        ("trial_ends_at", ":trial_ends_at"),
+        ("cancel_at_period_end", "false"),
+        ("metered_buses", "true"),
+        ("metered_trips", "true"),
+    ]
+    cols: list[str] = []
+    vals: list[str] = []
+    binds: list[str] = ["id", "tenant_id"]
+    for name, expr in wanted + optional:
+        if name not in columns and name not in {"id", "tenant_id"}:
+            continue
+        if name in {"id", "tenant_id"} or name in columns:
+            cols.append(name)
+            vals.append(expr)
+            if expr.startswith(":"):
+                binds.append(expr[1:])
+    if "plan" not in cols:
+        # Extremely old Contabo: no plan column — still create the row.
+        pass
+    sql = (
+        f"INSERT INTO subscriptions ({', '.join(cols)}) "
+        f"VALUES ({', '.join(vals)})"
+    )
+    # Unique bind keys preserving order.
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for b in binds:
+        if b not in seen:
+            seen.add(b)
+            ordered.append(b)
+    return sql, ordered
+
+
+async def prepare_contabo_tenant_write(session: Any) -> dict[str, Any]:
+    """
+    Same-transaction schema softeners for Contabo create-office inserts.
+
+    - tenants.name NOT NULL → nullable (+ empty default)
+    - plan check constraints that omit ``rent`` → dropped
+    - PG enum tenant_plan missing rent → ADD VALUE (only if type exists)
+    - subscriptions missing billing columns → ADD COLUMN IF NOT EXISTS
+    Does NOT commit — stays inside the request transaction.
+    """
+    from sqlalchemy import text
+
+    flags: dict[str, Any] = {
+        "has_name_col": False,
+        "plan_softened": False,
+        "plan_style": "value",
+        "has_plan_enum": False,
+        "subscription_columns": set(),
+    }
+    try:
+        flags["has_plan_enum"] = await pg_tenant_plan_type_exists(session)
+    except Exception:
+        logger.debug("tenant_plan type detect failed", exc_info=True)
+        flags["has_plan_enum"] = False
+    try:
+        flags["plan_style"] = await detect_tenant_plan_persist_style(session)
+    except Exception:
+        logger.debug("plan persist style detect failed", exc_info=True)
+        flags["plan_style"] = "value"
+
+    flags["has_name_col"] = bool(
+        await session.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public'
+                    AND table_name = 'tenants'
+                    AND column_name = 'name'
+                )
+                """
+            )
+        )
+    )
+    async def _safe(label: str, sql: str) -> bool:
+        try:
+            async with session.begin_nested():
+                await session.execute(text(sql))
+            return True
+        except Exception:
+            logger.debug("prepare_contabo_tenant_write %s skipped", label, exc_info=True)
+            return False
+
+    if flags["has_name_col"]:
+        # asyncpg rejects multi-statement prepared SQL — one ALTER per execute.
+        await _safe("drop_name_not_null", "ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL")
+        await _safe("name_default", "ALTER TABLE tenants ALTER COLUMN name SET DEFAULT ''")
+
+    # PG enum type (if any). Contabo usually uses VARCHAR (native_enum=False).
+    if flags["has_plan_enum"]:
+        # Contabo labels are uppercase; also try lowercase for drifted schemas.
+        if await _safe("enum_rent_upper", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'RENT'"):
+            flags["plan_softened"] = True
+        if await _safe("enum_rent_lower", "ALTER TYPE tenant_plan ADD VALUE IF NOT EXISTS 'rent'"):
+            flags["plan_softened"] = True
+
+    # Soft-add subscription billing columns Contabo often lacks.
+    for col, ddl in _SUBSCRIPTION_SOFT_COLUMNS:
+        if await _safe(
+            f"sub_col_{col}",
+            f"ALTER TABLE IF EXISTS subscriptions ADD COLUMN IF NOT EXISTS {col} {ddl}",
+        ):
+            flags["plan_softened"] = True
+
+    try:
+        flags["subscription_columns"] = await list_table_columns(session, "subscriptions")
+    except Exception:
+        logger.debug("subscription columns detect failed", exc_info=True)
+        flags["subscription_columns"] = set()
+
+    # Drop CHECK constraints that lock plan to starter/professional/enterprise.
+    if await _safe(
+        "plan_checks",
+        """
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT c.conname, t.relname AS tbl
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE n.nspname = 'public'
+              AND t.relname IN ('tenants', 'subscriptions')
+              AND c.contype = 'c'
+              AND pg_get_constraintdef(c.oid) ILIKE '%plan%'
+              AND pg_get_constraintdef(c.oid) NOT ILIKE '%rent%'
+          LOOP
+            EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', r.tbl, r.conname);
+          END LOOP;
+        END $$;
+        """,
+    ):
+        flags["plan_softened"] = True
+    return flags
 
 
 def _tenant_noload_options():
@@ -532,11 +853,41 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     except Exception:
         pass
 
+    trips_seeded = 0
+    bookings_healed = 0
+    from travel_platform.operations.achillio_seed_trips import (
+        achillio_seed_trip_catalog,
+        heal_achillio_seed_booking_departures,
+        seed_achillio_office_excursions,
+    )
+
+    try:
+        seed_result = seed_achillio_office_excursions(str(office.id))
+        trips_seeded = int(seed_result.get("saved") or 0)
+    except Exception:
+        logger.exception("Achillio office excursion seed failed")
+        seed_result = {}
+
+    try:
+        heal = await heal_achillio_seed_booking_departures(
+            session,
+            tenant_id=str(office.id),
+            trips=achillio_seed_trip_catalog(),
+        )
+        bookings_healed = int(heal.get("updated") or 0)
+    except Exception:
+        logger.exception(
+            "Achillio seed booking departure heal failed (catalog saved=%s)",
+            trips_seeded,
+        )
+
     return {
         "created": created,
         "domain_set": domain_set,
         "poison_cleared": poison_cleared,
         "admin_upserted": admin_upserted,
+        "trips_seeded": trips_seeded,
+        "bookings_healed": bookings_healed,
         "slug": _tenant_slug(office),
         "tenant_id": str(office.id),
         "custom_domain": office.custom_domain or "",

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import {
   DEFAULT_RENT_APP_BRANDING,
+  rentBrandMarkStyleVars,
   splitRentBrandLabel,
 } from '../../lib/rental/rentAppBranding.js';
 
@@ -19,6 +20,12 @@ export default function RentBrandMark({
   subtitle = '',
   compact = false,
   variant = 'default',
+  logoHeightPx,
+  logoMaxWidthPx,
+  logoRadiusPx,
+  logoPaddingPx,
+  logoBgMode,
+  logoShadow,
 } = {}) {
   const [imgBroken, setImgBroken] = useState(false);
   const name = String(label || '').trim() || DEFAULT_LABEL;
@@ -27,13 +34,24 @@ export default function RentBrandMark({
   const sub = String(subtitle || '').trim();
   const showSub = Boolean(sub) && sub.toLowerCase() !== name.toLowerCase();
   const onDark = variant === 'onDark';
+  const bgMode = String(logoBgMode || 'none').trim().toLowerCase();
   const rootClass = [
     'rent-brand-mark',
     compact ? 'rent-brand-mark--compact' : '',
     onDark ? 'rent-brand-mark--on-dark' : '',
+    bgMode !== 'none' ? `rent-brand-mark--bg-${bgMode}` : '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const sizeStyle = rentBrandMarkStyleVars({
+    logoHeightPx,
+    logoMaxWidthPx,
+    logoRadiusPx,
+    logoPaddingPx,
+    logoBgMode,
+    logoShadow,
+  });
 
   const wordmark = (
     <span className="rent-brand-mark-copy">
@@ -47,7 +65,7 @@ export default function RentBrandMark({
 
   if (src) {
     return (
-      <span className={rootClass}>
+      <span className={rootClass} style={sizeStyle}>
         <span className="rent-brand-mark-logo-wrap">
           <img
             src={src}
@@ -62,7 +80,7 @@ export default function RentBrandMark({
   }
 
   return (
-    <span className={rootClass}>
+    <span className={rootClass} style={sizeStyle}>
       <span className="rent-brand-mark-badge" aria-hidden>
         <span className="material-symbols-outlined rent-brand-mark-icon">directions_car</span>
       </span>

@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 from ticketing.email_dispatch import send_email
 from ticketing.customer_accounts import (
     authenticate_account,
+    change_account_email,
     change_account_password,
     create_password_reset_token,
     get_account,
@@ -17,6 +18,7 @@ from ticketing.customer_accounts import (
     reset_password_with_token,
     upsert_google_account,
 )
+from api.customer_wallet_seal import jwt_tenant_id, resolve_login_wallet_tenant
 from ticketing.customer_jwt import create_customer_token, decode_customer_token
 from ticketing.wallet_magic import (
     MAGIC_TTL_MINUTES,
@@ -44,6 +46,11 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(default="", max_length=128)
     new_password: str = Field(min_length=6, max_length=128)
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    current_password: str = Field(min_length=1, max_length=128)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -81,7 +88,13 @@ def _public_base_url() -> str:
     return (os.getenv("PUBLIC_APP_URL") or os.getenv("VITE_APP_URL") or "http://localhost:5173").rstrip("/")
 
 
-def _profile_response(account: dict, access_token: str) -> dict:
+def _profile_response(account: dict, access_token: str, *, tenant_id: str | None = None) -> dict:
+    tid = (tenant_id or "").strip() or None
+    if tid is None:
+        try:
+            tid = jwt_tenant_id(decode_customer_token(access_token))
+        except Exception:
+            tid = None
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -92,7 +105,40 @@ def _profile_response(account: dict, access_token: str) -> dict:
         "provider": account.get("auth_provider") or "email",
         "customer_id": account.get("customer_id"),
         "has_password": account.get("has_password", False),
+        "tenant_id": tid,
     }
+
+
+async def _issue_customer_token(
+    request: Request,
+    email: str,
+    *,
+    extra: dict | None = None,
+    account: dict | None = None,
+    preferred_tenant_id: str | None = None,
+) -> tuple[str, str, dict]:
+    """Mint JWT sealed to Host / home office / preferred booking office."""
+    acct = account or await get_account(email)
+    tid = await resolve_login_wallet_tenant(
+        request,
+        account=acct,
+        preferred_tenant_id=preferred_tenant_id,
+    )
+    payload_extra = dict(extra or {})
+    payload_extra["tenant_id"] = tid
+    # Refresh account after bind so profile carries home office.
+    fresh = await get_account(email) or acct or {"email": email}
+    cid = str((fresh or {}).get("customer_id") or "").strip()
+    if cid:
+        payload_extra["customer_id"] = cid
+    # Keep office Πελάτες in sync with wallet name / Google profile.
+    try:
+        from travel_platform.settings.wallet_crm_bridge import mirror_wallet_account_to_crm
+
+        mirror_wallet_account_to_crm(tid, fresh)
+    except Exception:
+        pass
+    return create_customer_token(email, extra=payload_extra), tid, fresh
 
 
 async def get_current_customer(authorization: str | None = Header(default=None)) -> dict:
@@ -107,11 +153,16 @@ async def get_current_customer(authorization: str | None = Header(default=None))
     account = await get_account(payload["sub"])
     if not account:
         raise HTTPException(status_code=401, detail="Ο λογαριασμός δεν βρέθηκε")
+    # Attach JWT seal for downstream wallet routers (never trust client body).
+    account = dict(account)
+    sealed = jwt_tenant_id(payload) or jwt_tenant_id(account)
+    account["tenant_id"] = sealed
+    account["_jwt_payload"] = payload
     return account
 
 
 @router.post("/register")
-async def register_customer(body: RegisterRequest):
+async def register_customer(request: Request, body: RegisterRequest):
     email = body.email.strip().lower()
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
@@ -119,8 +170,8 @@ async def register_customer(body: RegisterRequest):
         account = await register_account(email, body.password, body.name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    token = create_customer_token(email)
-    return _profile_response(account, token)
+    token, tid, account = await _issue_customer_token(request, email, account=account)
+    return _profile_response(account, token, tenant_id=tid)
 
 
 @router.post("/login")
@@ -140,7 +191,7 @@ async def login_customer(request: Request, body: LoginRequest):
             detail="Λάθος email ή κωδικός",
         )
         raise HTTPException(status_code=401, detail="Λάθος email ή κωδικός")
-    token = create_customer_token(email)
+    token, tid, account = await _issue_customer_token(request, email, account=account)
     record_login_from_request(
         request,
         actor_type="customer",
@@ -149,8 +200,9 @@ async def login_customer(request: Request, body: LoginRequest):
         actor_id=str(account.get("customer_id") or email),
         actor_name=account.get("name"),
         method="password",
+        tenant_id=tid,
     )
-    return _profile_response(account, token)
+    return _profile_response(account, token, tenant_id=tid)
 
 
 @router.get("/me")
@@ -163,6 +215,7 @@ async def customer_me(account: dict = Depends(get_current_customer)):
         "provider": account.get("auth_provider") or "email",
         "customer_id": account.get("customer_id"),
         "has_password": account.get("has_password", False),
+        "tenant_id": account.get("tenant_id"),
     }
 
 
@@ -176,6 +229,24 @@ async def change_password(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "message": "Ο κωδικός ενημερώθηκε"}
+
+
+@router.post("/change-email")
+async def change_email(
+    request: Request,
+    body: ChangeEmailRequest,
+    account: dict = Depends(get_current_customer),
+):
+    try:
+        updated = await change_account_email(
+            account["email"], body.new_email, body.current_password
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    token, tid, updated = await _issue_customer_token(
+        request, updated["email"], account=updated
+    )
+    return _profile_response(updated, token, tenant_id=tid)
 
 
 @router.post("/forgot-password")
@@ -201,13 +272,15 @@ async def forgot_password(body: ForgotPasswordRequest):
 
 
 @router.post("/reset-password")
-async def reset_password(body: ResetPasswordRequest):
+async def reset_password(request: Request, body: ResetPasswordRequest):
     try:
         account = await reset_password_with_token(body.token, body.new_password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    token = create_customer_token(account["email"])
-    return _profile_response(account, token)
+    token, tid, account = await _issue_customer_token(
+        request, account["email"], account=account
+    )
+    return _profile_response(account, token, tenant_id=tid)
 
 
 @router.get("/google/config")
@@ -250,7 +323,9 @@ async def verify_google_token(request: Request, body: GoogleTokenRequest):
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
 
     account = await upsert_google_account(email, data.get("name"), data.get("picture"))
-    token = create_customer_token(email, extra={"provider": "google"})
+    token, tid, account = await _issue_customer_token(
+        request, email, extra={"provider": "google"}, account=account
+    )
     record_login_from_request(
         request,
         actor_type="customer",
@@ -259,8 +334,9 @@ async def verify_google_token(request: Request, body: GoogleTokenRequest):
         actor_id=str(account.get("customer_id") or email),
         actor_name=account.get("name") or data.get("name"),
         method="google",
+        tenant_id=tid,
     )
-    return _profile_response(account, token)
+    return _profile_response(account, token, tenant_id=tid)
 
 
 @router.post("/wallet-magic/issue")
@@ -311,7 +387,7 @@ async def issue_wallet_magic(body: WalletMagicIssueRequest):
 
 
 @router.post("/wallet-magic/consume")
-async def consume_wallet_magic(body: WalletMagicConsumeRequest):
+async def consume_wallet_magic(request: Request, body: WalletMagicConsumeRequest):
     """Exchange a magic-link token for a customer JWT + focused booking."""
     try:
         result = await consume_wallet_magic_token(body.token)
@@ -319,8 +395,35 @@ async def consume_wallet_magic(body: WalletMagicConsumeRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     account = result["account"]
-    access = create_customer_token(account["email"], extra={"provider": "magic"})
-    profile = _profile_response(account, access)
+    booking_tid = None
+    try:
+        from ticketing.customer_bookings import get_booking
+
+        booking = await get_booking(result["booking_id"], tenant_id=None)
+        if booking:
+            booking_tid = str(
+                booking.get("tenant_id") or booking.get("tenantId") or ""
+            ).strip() or None
+            # Email must match booking owner when present.
+            be = str(booking.get("email") or "").strip().lower()
+            if be and be != account["email"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Η κράτηση δεν ανήκει σε αυτόν τον λογαριασμό.",
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        booking_tid = None
+
+    access, tid, account = await _issue_customer_token(
+        request,
+        account["email"],
+        extra={"provider": "magic"},
+        account=account,
+        preferred_tenant_id=booking_tid,
+    )
+    profile = _profile_response(account, access, tenant_id=tid)
     profile["provider"] = "magic"
     profile["highlight_booking"] = result["booking_id"]
     return profile

@@ -72,7 +72,33 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["bus_plate"] = raw.get("bus_plate") or raw.get("vehicle_code")
     if raw.get("heading_deg") is not None:
         meta["heading_deg"] = raw.get("heading_deg")
-    if raw.get("driver_id"):
+    if raw.get("altitude_m") is not None:
+        try:
+            meta["altitude_m"] = float(raw.get("altitude_m"))
+        except (TypeError, ValueError):
+            pass
+    if raw.get("satellites") is not None:
+        try:
+            meta["satellites"] = int(raw.get("satellites"))
+        except (TypeError, ValueError):
+            pass
+    if raw.get("source"):
+        meta["source"] = str(raw.get("source"))
+    if raw.get("imei"):
+        meta["imei"] = str(raw.get("imei"))
+    # Teltonika must not inherit phone driver_id (shift-end would wipe the pin).
+    source_l = str(raw.get("source") or meta.get("source") or "").strip().lower()
+    is_tracker = source_l.startswith("teltonika") or source_l in {
+        "tracker",
+        "test_ping",
+        "teltonika_test_ping",
+    }
+    if is_tracker:
+        if raw.get("driver_id"):
+            meta["driver_id"] = raw.get("driver_id")
+        else:
+            meta.pop("driver_id", None)
+    elif raw.get("driver_id"):
         meta["driver_id"] = raw.get("driver_id")
     preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
     if preferred_title:
@@ -165,11 +191,48 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     except Exception:
         logger.exception("live trail append failed vehicle=%s", vehicle_id)
 
+    source = str(raw.get("source") or "").lower()
+    is_tracker_src = source.startswith("teltonika") or source in {"test_ping", "tracker"}
+
+    if is_tracker_src:
+        # Keep App heartbeat across Teltonika refreshes (multi-worker Redis).
+        try:
+            await _live.absorb_plate_app_signal(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika absorb app signal skipped", exc_info=True)
+        try:
+            await _live.purge_phone_siblings_for_plate(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika phone-sibling purge skipped", exc_info=True)
+
     try:
         from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+        from travel_platform.telemetry.tracker_priority import (
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
 
         meta = _live._vehicles.get(str(vehicle_id), {})
         if meta:
+            if is_tracker_src:
+                sources = resolve_live_gps_sources(
+                    meta,
+                    max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                    tenant_id=str(update.tenant_id),
+                )
+                # Trust resolve only — do not force teltonika when signal is stale.
+                meta["gps_sources"] = ["teltonika", "app"] if (
+                    "teltonika" in sources and "app" in sources
+                ) else sources
+                _live._vehicles[str(vehicle_id)] = meta
             ok = await save_live_vehicle(meta)
             if not ok:
                 logger.warning(
@@ -179,6 +242,53 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 )
     except Exception:
         logger.warning("live fleet Redis save failed", exc_info=True)
+
+    # Driver PWA already publishes fleet_location from fleet_ingress. Tracker
+    # (Teltonika) path needs its own egress so the map badge updates live.
+    if is_tracker_src:
+        try:
+            from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
+            from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            meta = _live._vehicles.get(str(vehicle_id), {}) or {}
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                tenant_id=str(update.tenant_id),
+            )
+            egress = {
+                "type": "fleet_location",
+                "tenant_id": str(update.tenant_id),
+                "trip_id": update.trip_id or meta.get("trip_id"),
+                "trip_title": meta.get("trip_title"),
+                "driver_id": meta.get("driver_id") or raw.get("driver_id") or meta.get("app_driver_id"),
+                "driver_name": meta.get("driver_name") or raw.get("driver_name"),
+                "bus_plate": meta.get("bus_plate") or update.vehicle_code,
+                "vehicle_code": update.vehicle_code,
+                "vehicle_id": str(vehicle_id),
+                "lat": float(update.latitude),
+                "lng": float(update.longitude),
+                "speed": float(update.speed_kmh or 0),
+                "heading": raw.get("heading_deg") if raw.get("heading_deg") is not None else meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(update.engine_on),
+                "timestamp": update.recorded_at.isoformat(),
+                "source": raw.get("source") or meta.get("source") or "teltonika",
+                "imei": raw.get("imei") or meta.get("imei"),
+                "tracker_signal_at": meta.get("tracker_signal_at"),
+                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
+                "app_seen_at": meta.get("app_seen_at"),
+                "gps_sources": gps_sources,
+            }
+            await publish_fleet_location(str(update.tenant_id), egress)
+            await get_fleet_egress_hub().broadcast(str(update.tenant_id), egress)
+        except Exception:
+            logger.debug("teltonika fleet_location egress skipped", exc_info=True)
 
     return NormalizedTelemetry(
         update=update,
