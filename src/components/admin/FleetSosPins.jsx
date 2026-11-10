@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { ALERT_MAP_STYLES } from '../../lib/admin/fleetMapAlerts.js';
@@ -24,8 +25,32 @@ function formatSosTime(iso) {
   }
 }
 
+function SosClearButton({ alertId, onClearSos }) {
+  const [busy, setBusy] = useState(false);
+  if (!alertId || !onClearSos) return null;
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      className="mt-2 w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60"
+      onClick={async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setBusy(true);
+        try {
+          await onClearSos(alertId);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? 'Απενεργοποίηση…' : 'Απενεργοποίηση συναγερμού'}
+    </button>
+  );
+}
+
 /** Prominent pulsing SOS / incident markers — Leaflet. */
-export default function FleetSosPins({ alerts = [], visible = true }) {
+export default function FleetSosPins({ alerts = [], visible = true, onClearSos = null }) {
   if (!visible || !alerts.length) return null;
 
   return alerts.map((alert) => {
@@ -53,6 +78,7 @@ export default function FleetSosPins({ alerts = [], visible = true }) {
               {meta.accuracy_m != null ? ` (±${Math.round(meta.accuracy_m)}m)` : ''}
             </p>
             <p className="text-[10px] text-gray-400">{formatSosTime(alert.created_at)}</p>
+            <SosClearButton alertId={alert.id} onClearSos={onClearSos} />
           </div>
         </Popup>
       </Marker>

@@ -10,6 +10,9 @@ from typing import Any
 
 from core.config import get_platform_settings
 
+# Live ETA / WS / fleet push — locked platform-wide (not tenant-configurable).
+LOCKED_LIVE_REFRESH_SECONDS = 1
+
 
 @dataclass
 class TelemetryRuntimeSettings:
@@ -22,11 +25,12 @@ class TelemetryRuntimeSettings:
     fuel_price_eur_per_liter: float = 1.85
     gforce_spike_threshold_g: float = 0.45
     prefer_tracker_events: bool = True
-    eta_refresh_seconds: int = 300
-    eta_ws_push_seconds: int = 30
+    eta_refresh_seconds: int = 1
+    eta_ws_push_seconds: int = 1
     driver_stale_seconds: int = 90
     gps_retention_days: int = 90
-    driver_gps_max_per_minute: int = 60
+    # 1 Hz GPS needs ≥60; headroom for retries / dual transport.
+    driver_gps_max_per_minute: int = 120
     fleet_webhook_enabled: bool = True
     fleet_webhook_min_interval_sec: int = 30
     fleet_digest_enabled: bool = True
@@ -51,7 +55,7 @@ def _defaults() -> TelemetryRuntimeSettings:
         eta_refresh_seconds=s.eta_refresh_seconds,
         driver_stale_seconds=getattr(s, "driver_stale_seconds", 90),
         gps_retention_days=getattr(s, "gps_retention_days", 90),
-        driver_gps_max_per_minute=getattr(s, "driver_gps_max_per_minute", 60),
+        driver_gps_max_per_minute=getattr(s, "driver_gps_max_per_minute", 120),
         fleet_webhook_enabled=getattr(s, "fleet_webhook_enabled", True),
         fleet_webhook_min_interval_sec=getattr(s, "fleet_webhook_min_interval_sec", 30),
         fleet_digest_enabled=getattr(s, "fleet_digest_enabled", True),
@@ -68,6 +72,9 @@ def get_telemetry_settings(tenant_id: str | None = None) -> TelemetryRuntimeSett
     base = asdict(_store)
     if tenant_id and tenant_id in _tenant_overrides:
         base.update(_tenant_overrides[tenant_id])
+    # Hard lock — ignore any saved/override values for live refresh.
+    base["eta_ws_push_seconds"] = LOCKED_LIVE_REFRESH_SECONDS
+    base["eta_refresh_seconds"] = LOCKED_LIVE_REFRESH_SECONDS
     return TelemetryRuntimeSettings(**base)
 
 
@@ -81,15 +88,22 @@ def update_telemetry_settings(
 
     allowed = set(TelemetryRuntimeSettings.__dataclass_fields__.keys()) - {
         "google_maps_configured",
+        # Locked — cannot be changed from admin UI / API.
+        "eta_ws_push_seconds",
+        "eta_refresh_seconds",
     }
     clean = {k: v for k, v in patch.items() if k in allowed}
 
     if tenant_id:
         cur = _tenant_overrides.setdefault(tenant_id, {})
         cur.update(clean)
+        cur["eta_ws_push_seconds"] = LOCKED_LIVE_REFRESH_SECONDS
+        cur["eta_refresh_seconds"] = LOCKED_LIVE_REFRESH_SECONDS
     else:
         for k, v in clean.items():
             setattr(_store, k, v)
+        _store.eta_ws_push_seconds = LOCKED_LIVE_REFRESH_SECONDS
+        _store.eta_refresh_seconds = LOCKED_LIVE_REFRESH_SECONDS
 
     settings = get_telemetry_settings(tenant_id)
     apply_telemetry_settings_to_services(settings)
@@ -115,8 +129,8 @@ def _apply_to_services(settings: TelemetryRuntimeSettings) -> None:
 
     driving_mod.G_SPIKE_THRESHOLD = settings.gforce_spike_threshold_g
 
-    eta_mod.REFRESH_SECONDS = settings.eta_refresh_seconds
-    ws_mod.ETA_PUSH_INTERVAL_SEC = settings.eta_ws_push_seconds
+    eta_mod.REFRESH_SECONDS = LOCKED_LIVE_REFRESH_SECONDS
+    ws_mod.ETA_PUSH_INTERVAL_SEC = LOCKED_LIVE_REFRESH_SECONDS
 
     idling = get_idling()
     idling._threshold = settings.idle_alert_seconds

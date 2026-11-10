@@ -1,5 +1,8 @@
 """
 WebSocket endpoints — passenger ETA, admin alerts, driver GPS ingress, fleet egress.
+
+Admin egress/alerts require a SaaS admin JWT (?token=). Tenant is taken from the
+JWT only — path/query tenant_id cannot grant access to another office.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["telemetry-ws"])
 
 JWT_ALGORITHM = "HS256"
+_ADMIN_WS_ROLES = frozenset({"tenant_admin", "dispatcher", "superadmin", "auditor"})
 
 
 def _jwt_secrets() -> list[str]:
@@ -45,6 +49,32 @@ def _jwt_secrets() -> list[str]:
     return out
 
 
+def _admin_jwt_secrets() -> list[str]:
+    ordered = [
+        os.getenv("AUTH_JWT_SECRET"),
+        os.getenv("TICKET_JWT_SECRET"),
+        local_secret(),
+    ]
+    try:
+        from app.core.config import get_settings
+        from app.core.security import get_jwt_verification_key
+
+        settings = get_settings()
+        key = get_jwt_verification_key(settings)
+        if key:
+            ordered.insert(0, key if isinstance(key, str) else key.decode("utf-8", errors="ignore"))
+    except Exception:
+        pass
+    seen: set[str] = set()
+    out: list[str] = []
+    for secret in ordered:
+        if not secret or secret in seen:
+            continue
+        seen.add(secret)
+        out.append(str(secret))
+    return out
+
+
 def _decode_driver_token(token: str) -> dict:
     raw = token.strip()
     last_error: Exception | None = None
@@ -62,13 +92,86 @@ def _decode_driver_token(token: str) -> dict:
     return payload
 
 
+def _decode_admin_ws_token(token: str | None) -> dict:
+    """Validate admin Bearer/query token for live-map / alerts WebSockets."""
+    from middleware.tenant import _admin_auth_disabled_allowed
+
+    if (
+        _admin_auth_disabled_allowed()
+        and os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes")
+    ):
+        return {
+            "tenant_id": os.getenv("DEFAULT_TENANT_ID") or str(DEMO_TENANT),
+            "roles": ["tenant_admin", "superadmin"],
+            "sub": "dev-admin",
+        }
+    raw = (token or "").strip()
+    if not raw:
+        raise jwt.InvalidTokenError("Missing admin token")
+    last_error: Exception | None = None
+    payload = None
+    algo = os.getenv("AUTH_JWT_ALGORITHM", "HS256")
+    for secret in _admin_jwt_secrets():
+        try:
+            payload = jwt.decode(raw, secret, algorithms=[algo])
+            break
+        except jwt.PyJWTError as exc:
+            last_error = exc
+            payload = None
+    else:
+        raise last_error or jwt.InvalidTokenError("Invalid admin token")
+    roles = set(payload.get("roles") or [])
+    if not roles & _ADMIN_WS_ROLES:
+        raise jwt.InvalidTokenError("Admin access required")
+    if not payload.get("tenant_id"):
+        raise jwt.InvalidTokenError("tenant_id required")
+    return payload
+
+
+async def _reject_ws(websocket: WebSocket, code: int, detail: str) -> None:
+    await websocket.accept()
+    await websocket.send_text(json.dumps({"type": "error", "detail": detail}))
+    await websocket.close(code=code)
+
+
 @router.websocket("/ws/passenger/eta/{trip_id}")
 async def passenger_eta_ws(
     websocket: WebSocket,
     trip_id: int,
     tenant_id: UUID | None = Query(default=None),
+    token: str | None = Query(default=None),
 ):
-    tid = tenant_id or DEMO_TENANT
+    """
+    Passenger ETA feed. Prefer signed track token when provided.
+    Client-supplied tenant_id alone is ignored in production unless
+    PASSENGER_ETA_ALLOW_TENANT_QUERY=1 (dev only).
+    """
+    tid = DEMO_TENANT
+    allow_query = os.getenv("PASSENGER_ETA_ALLOW_TENANT_QUERY", "").lower() in ("1", "true", "yes")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if token:
+        try:
+            # Track tokens may embed tenant_id — reuse admin/driver secret decode loosely.
+            payload = None
+            for secret in _jwt_secrets():
+                try:
+                    payload = jwt.decode(token.strip(), secret, algorithms=[JWT_ALGORITHM])
+                    break
+                except jwt.PyJWTError:
+                    continue
+            if payload and payload.get("tenant_id"):
+                tid = UUID(str(payload["tenant_id"]))
+            elif tenant_id and (allow_query or env in ("development", "dev", "local")):
+                tid = tenant_id
+        except Exception:
+            await _reject_ws(websocket, 4401, "invalid_token")
+            return
+    elif tenant_id and (allow_query or env in ("development", "dev", "local")):
+        tid = tenant_id
+    elif env not in ("development", "dev", "local"):
+        await _reject_ws(websocket, 4401, "track_token_required")
+        return
+
     hub = get_eta_ws_hub()
     await hub.connect(trip_id, websocket)
 
@@ -88,9 +191,22 @@ async def passenger_eta_ws(
 @router.websocket("/ws/admin/telemetry/alerts")
 async def admin_telemetry_alerts_ws(
     websocket: WebSocket,
+    token: str | None = Query(default=None),
     tenant_id: UUID | None = Query(default=None),
 ):
-    tid = str(tenant_id or DEMO_TENANT)
+    try:
+        payload = _decode_admin_ws_token(token)
+    except jwt.PyJWTError:
+        await _reject_ws(websocket, 4401, "unauthorized")
+        return
+
+    jwt_tid = str(payload["tenant_id"])
+    # Ignore client-supplied tenant_id unless it matches the JWT (legacy query).
+    if tenant_id is not None and str(tenant_id) != jwt_tid:
+        await _reject_ws(websocket, 4403, "tenant_mismatch")
+        return
+
+    tid = jwt_tid
     hub = get_alerts_ws_hub()
     await hub.connect(tid, websocket)
 
@@ -203,19 +319,143 @@ async def driver_telemetry_ingress_ws(
 async def admin_fleet_egress_ws(
     websocket: WebSocket,
     tenant_id: UUID,
+    token: str | None = Query(default=None),
 ):
-    """Admin live map — streams fleet_location events from Redis pub/sub (+ in-process fan-out)."""
-    tid = str(tenant_id)
+    """Admin live map — streams fleet_location events. Tenant from JWT only."""
+    try:
+        payload = _decode_admin_ws_token(token)
+    except jwt.PyJWTError:
+        await _reject_ws(websocket, 4401, "unauthorized")
+        return
+
+    jwt_tid = str(payload["tenant_id"])
+    roles = set(payload.get("roles") or [])
+    # Office admins always bind to JWT tenant (path cannot spoof another office).
+    # Superadmin may open any tenant's egress stream.
+    if "superadmin" in roles:
+        tid = str(tenant_id)
+        tenant_uuid = tenant_id
+    else:
+        if str(tenant_id) != jwt_tid:
+            await _reject_ws(websocket, 4403, "tenant_mismatch")
+            return
+        tid = jwt_tid
+        tenant_uuid = UUID(jwt_tid)
+
     hub = get_fleet_egress_hub()
     await ensure_redis_bridge(tid)
     await hub.connect(tid, websocket)
 
     from travel_platform.telemetry.processor import get_live_fleet
 
+    try:
+        from travel_platform.telemetry.teltonika.hydrate_live import (
+            hydrate_tenant_live_from_devices,
+        )
+
+        await hydrate_tenant_live_from_devices(tid)
+    except Exception:
+        pass
+
     live = get_live_fleet()
+    active_rows = await live.list_active_for_admin_async(tenant_uuid)
+    if not active_rows:
+        try:
+            from travel_platform.telemetry.teltonika.device_store import list_devices
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                clear_hydrate_throttle,
+                hydrate_tenant_live_from_devices,
+            )
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                clear_shift_suppress,
+            )
+
+            for device in list_devices(tid):
+                clear_shift_suppress(tid, device.get("vehicle_code") or device.get("imei"))
+            clear_hydrate_throttle(tid)
+            await hydrate_tenant_live_from_devices(tid, force=True)
+            active_rows = await live.list_active_for_admin_async(tenant_uuid)
+        except Exception:
+            pass
     snapshot = []
-    for vehicle in live.list_active(tenant_id):
-        meta = live._vehicles.get(vehicle.vehicle_id, {})
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
+    for vehicle in active_rows:
+        meta = await live.vehicle_meta_async(tenant_uuid, vehicle.vehicle_id)
+        if not meta:
+            meta = live._vehicles.get(vehicle.vehicle_id, {})
+        if not office_allows_live_driver(tid, meta.get("driver_id"), meta):
+            continue
+        from travel_platform.telemetry.active_excursion_resolve import (
+            enrich_meta_with_active_excursion,
+        )
+
+        trip_id, trip_title_hint, meta = enrich_meta_with_active_excursion(
+            tid,
+            meta,
+            vehicle_code=vehicle.vehicle_code,
+            trip_id=vehicle.trip_id,
+        )
+        try:
+            live._vehicles[str(vehicle.vehicle_id)] = {
+                **live._vehicles.get(str(vehicle.vehicle_id), {}),
+                **meta,
+            }
+        except Exception:
+            pass
+        trip_title = await resolve_trip_title(
+            trip_id, preferred=trip_title_hint or meta.get("trip_title")
+        )
+        tracker_signal_at = meta.get("tracker_signal_at")
+        hydrated_from_store = bool(meta.get("hydrated_from_store"))
+        try:
+            from travel_platform.telemetry.tracker_priority import (
+                is_tracker_binding_alive,
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            alive_sec = resolve_tracker_alive_seconds(tid)
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=alive_sec,
+                tenant_id=tid,
+            )
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+
+                device = get_enabled_device_by_vehicle_code(
+                    tid,
+                    meta.get("vehicle_code")
+                    or meta.get("bus_plate")
+                    or vehicle.vehicle_code,
+                )
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                    if "teltonika" not in (gps_sources or []):
+                        gps_sources = ["teltonika", *(gps_sources or [])]
+                    tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
+                    hydrated_from_store = False
+                    if not meta.get("imei") and device.get("imei"):
+                        meta["imei"] = device.get("imei")
+                from travel_platform.telemetry.tracker_priority import age_seconds
+
+                app_age = age_seconds(meta.get("app_seen_at"))
+                if (
+                    is_tracker_binding_alive(device, max_age_sec=alive_sec)
+                    and app_age is not None
+                    and app_age <= alive_sec
+                ):
+                    gps_sources = ["teltonika", "app"]
+            except Exception:
+                pass
+        except Exception:
+            gps_sources = []
+        app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
+        chat_driver_id = str(meta.get("driver_id") or app_driver_id or "").strip() or None
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -223,13 +463,26 @@ async def admin_fleet_egress_ws(
                 "vehicle_code": vehicle.vehicle_code,
                 "bus_plate": meta.get("bus_plate", vehicle.vehicle_code),
                 "driver_name": meta.get("driver_name", "—"),
-                "driver_id": meta.get("driver_id"),
-                "trip_id": vehicle.trip_id,
+                "driver_id": chat_driver_id,
+                "app_driver_id": app_driver_id,
+                "trip_id": trip_id,
+                "trip_title": trip_title or None,
+                "tracking_started_at": meta.get("tracking_started_at"),
                 "lat": vehicle.lat,
                 "lng": vehicle.lng,
                 "speed": vehicle.speed_kmh,
                 "heading": meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(vehicle.engine_on),
+                "idle_seconds_trip": int(vehicle.idle_seconds_trip or 0),
                 "timestamp": vehicle.updated_at.isoformat(),
+                "source": meta.get("source"),
+                "imei": meta.get("imei"),
+                "gps_sources": gps_sources,
+                "app_seen_at": meta.get("app_seen_at"),
+                "tracker_signal_at": tracker_signal_at,
+                "hydrated_from_store": hydrated_from_store,
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))
