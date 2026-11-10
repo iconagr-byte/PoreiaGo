@@ -184,7 +184,8 @@ function App() {
             <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
             <Route path="/" element={<NativeAwareHome />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
-            <Route path="/grafeia" element={<AgencyPlansPage />} />
+            <Route path="/grafeia" element={<AgencyPlansPage product="buses" />} />
+            <Route path="/grafeia/rent" element={<AgencyPlansPage product="rent" />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />

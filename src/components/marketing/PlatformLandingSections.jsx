@@ -60,7 +60,7 @@ export function HeroSection() {
               to="/grafeia"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-slate-900 rounded-full font-bold text-base hover:scale-[1.02] shadow-xl shadow-black/20 transition-transform"
             >
-              Δείτε τα συμβόλαια
+              Συμβόλαια λεωφορείων
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <a
@@ -344,10 +344,10 @@ export function RentProductSection() {
                 Άνοιγμα Rent
               </Link>
               <Link
-                to="/grafeia"
+                to="/rent/services"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
               >
-                Συμβόλαια Rent
+                Υπηρεσίες πελάτη
               </Link>
             </div>
           </div>

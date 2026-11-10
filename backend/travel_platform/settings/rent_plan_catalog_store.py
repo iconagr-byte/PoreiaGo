@@ -28,8 +28,8 @@ DEFAULT_STANDALONE: dict[str, Any] = {
         "Αρχική σελίδα γραφείου μόνο με Rent (χωρίς λεωφορεία)",
         "Desk Ενοικιάσεις στο Control Panel",
     ],
-    "ctaLoggedIn": "Επιλογή Rent συμβολαίου",
-    "ctaGuest": "Εγγραφή μόνο για Rent",
+    "ctaLoggedIn": "Εγγραφή",
+    "ctaGuest": "Εγγραφή",
     "visible": True,
 }
 
@@ -39,13 +39,13 @@ DEFAULT_ADDON: dict[str, Any] = {
     "tagline": "Προσθήκη Rent πάνω στο συμβόλαιο λεωφορείων",
     "monthlyEur": 79,
     "features": [
-        "Όλα του Rent module πάνω στο υπάρχον πλάνο",
-        "Ίδιο /rent app & wallet για πελάτες",
+        "Όλα του Rent module πάνω στο υπάρχον πλάνο λεωφορείων",
+        "Ξεχωριστό Rent Wallet (/rent/wallet) — πράσινο, όχι το My Wallet λεωφορείων",
         "SOS · οδική · ασφάλεια · share · checklist",
         "Χωρίς αλλαγή του core συμβολαίου λεωφορείων",
     ],
-    "ctaLoggedIn": "Ενεργοποίηση add-on στο συμβόλαιο",
-    "ctaGuest": "Θέλω λεωφορεία + Rent",
+    "ctaLoggedIn": "Εγγραφή",
+    "ctaGuest": "Εγγραφή",
     "servicesLinkLabel": "Δες δημόσια σελίδα υπηρεσιών →",
     "visible": True,
 }
@@ -65,9 +65,37 @@ def _normalize_str_list(value: Any) -> list[str]:
     return []
 
 
+_LEGACY_CTA_LABELS = frozenset(
+    {
+        "Εγγραφή μόνο για Rent",
+        "Θέλω λεωφορεία + Rent",
+        "Επιλογή Rent συμβολαίου",
+        "Ενεργοποίηση add-on στο συμβόλαιο",
+        "Start Rent-only contract",
+        "Add on a bus contract",
+        "Sign up for Rent only",
+        "I want buses + Rent",
+    }
+)
+
+
+def _normalize_cta_label(value: Any, fallback: str = "Εγγραφή") -> str:
+    text = str(value or "").strip()
+    if not text or text in _LEGACY_CTA_LABELS:
+        return fallback
+    low = text.lower()
+    if ("rent" in low or "λεωφορ" in low) and any(
+        k in low for k in ("εγγραφ", "signup", "sign up", "θέλω", "επιλογή", "ενεργοπ")
+    ):
+        return fallback
+    return text
+
+
 def _merge_card(base: dict[str, Any], raw: dict | None) -> dict[str, Any]:
     merged = deepcopy(base)
     if not isinstance(raw, dict):
+        merged["ctaLoggedIn"] = _normalize_cta_label(merged.get("ctaLoggedIn"))
+        merged["ctaGuest"] = _normalize_cta_label(merged.get("ctaGuest"))
         return merged
     for key in (
         "badge",
@@ -90,6 +118,8 @@ def _merge_card(base: dict[str, Any], raw: dict | None) -> dict[str, Any]:
             merged["features"] = features
     if "visible" in raw:
         merged["visible"] = bool(raw["visible"])
+    merged["ctaLoggedIn"] = _normalize_cta_label(merged.get("ctaLoggedIn"))
+    merged["ctaGuest"] = _normalize_cta_label(merged.get("ctaGuest"))
     return merged
 
 
