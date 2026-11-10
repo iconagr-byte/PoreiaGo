@@ -2,20 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import { fetchFleetDrivers } from '../../services/platformApi.js';
+import { createFleetDriver, fetchFleetDrivers } from '../../services/platformApi.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import LocationPicker from './LocationPicker.jsx';
-import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
-import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
-import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
-import AirportBufferEditor from './hybrid/AirportBufferEditor.jsx';
-import HybridChangeLogPanel from './hybrid/HybridChangeLogPanel.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
-import HybridSupplierCosts from './hybrid/HybridSupplierCosts.jsx';
-import HybridRebookWhatsApp from './hybrid/HybridRebookWhatsApp.jsx';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -39,6 +33,20 @@ L.Marker.prototype.options.icon = redIcon;
 const DURATION_PRESETS = ['Ημιημερήσια', 'Ημερήσια', '2 ημέρες', '3 ημέρες', 'Weekend', 'Πολυήμερη'];
 const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Early bird'];
 const HIGHLIGHT_SUGGESTIONS = ['Ξενάγηση', 'Γεύμα', 'Wi‑Fi', 'A/C', 'USB φόρτιση', 'Ασφάλεια'];
+
+const VEHICLE_TYPE_OPTIONS = [
+  { value: 'Luxury Coach', label: 'Πολυτελές λεωφορείο (50 θέσεις)' },
+  { value: 'Premium Express', label: 'Εξπρές πολυτελείας (30 θέσεις)' },
+  { value: 'VIP Minibus', label: 'VIP μικρό λεωφορείο (15 θέσεις)' },
+];
+
+const emptyFleetRow = () => ({
+  driverId: '',
+  driverName: '',
+  vehicleType: 'Luxury Coach',
+  vehiclePlate: '',
+  vehicleCode: '',
+});
 
 const fieldClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400';
@@ -73,6 +81,112 @@ function Field({ label, hint, children, className = '' }) {
   );
 }
 
+/** Minimal inline create — name only (optional phone / plate). */
+function QuickAddDriverPanel({ onCreated, onCancel }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [plate, setPlate] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    const clean = name.trim();
+    if (clean.length < 2) {
+      toast.error('Γράψτε το όνομα του οδηγού');
+      return;
+    }
+    setBusy(true);
+    try {
+      const stamp = Date.now().toString(36).slice(-6);
+      const slug =
+        clean
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .slice(0, 14) || 'driver';
+      const created = await createFleetDriver({
+        name: clean,
+        license_no: `TMP${stamp}`.toUpperCase().slice(0, 12),
+        phone: phone.trim(),
+        email: `${slug}.${stamp}@drivers.poreiago.com`,
+        status: 'active',
+        license_plate: plate.trim() || null,
+        vehicle_code: plate.trim() || null,
+        password: 'driver123',
+        hiring_date: new Date().toISOString().slice(0, 10),
+      });
+      toast.success('Ο οδηγός προστέθηκε — μπορείτε να συμπληρώσετε στοιχεία αργότερα στους Οδηγούς');
+      onCreated?.(created);
+      setName('');
+      setPhone('');
+      setPlate('');
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία δημιουργίας οδηγού');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 space-y-3">
+      <p className="text-xs font-bold text-teal-900">Νέος οδηγός (μόνο όνομα αρκεί)</p>
+      <div className="grid sm:grid-cols-3 gap-2">
+        <input
+          className={fieldClass}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Όνομα επώνυμο *"
+          autoFocus
+          minLength={2}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <input
+          className={fieldClass}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Τηλέφωνο (προαιρετικό)"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+        />
+        <input
+          className={`${fieldClass} font-mono`}
+          value={plate}
+          onChange={(e) => setPlate(e.target.value)}
+          placeholder="Πινακίδα (προαιρετικό)"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submit}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">person_add</span>
+          {busy ? 'Αποθήκευση…' : 'Προσθήκη οδηγού'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-2 rounded-xl border text-xs font-bold text-slate-600"
+        >
+          Άκυρο
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TripForm({
   formData,
   setFormData,
@@ -86,7 +200,12 @@ export default function TripForm({
 }) {
   const [drivers, setDrivers] = useState([]);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [highlightDraft, setHighlightDraft] = useState('');
+  const [quickAddFor, setQuickAddFor] = useState(null); // 'primary' | number index | null
+
+  const galleryImages = Array.isArray(formData.images) ? formData.images : [];
+  const MAX_GALLERY = 8;
 
   useEffect(() => {
     fetchFleetDrivers().then(setDrivers);
@@ -109,12 +228,12 @@ export default function TripForm({
   const isInternational = formData.market === MARKET_INTERNATIONAL;
   const isDraft = formData.status === 'draft';
 
-  const handleDriverChange = (driverId) => {
+  const handleDriverChange = (driverId, list = drivers) => {
     if (!driverId) {
       patch({ driverId: '', driverName: '', vehiclePlate: '', vehicleCode: '' });
       return;
     }
-    const driver = drivers.find((d) => d.id === driverId);
+    const driver = list.find((d) => d.id === driverId);
     if (!driver) return;
     patch({
       driverId: driver.id,
@@ -123,6 +242,79 @@ export default function TripForm({
       vehicleCode: driver.vehicle_code || formData.vehicleCode || '',
     });
   };
+
+  const additionalFleet = Array.isArray(formData.additionalFleet) ? formData.additionalFleet : [];
+
+  const setAdditionalFleet = (next) => patch({ additionalFleet: next });
+
+  const addFleetUnit = () => {
+    setAdditionalFleet([...additionalFleet, emptyFleetRow()]);
+    setQuickAddFor(additionalFleet.length);
+  };
+
+  /** Extra coach/plate row without opening the quick-add driver form. */
+  const addVehicleUnit = () => {
+    setAdditionalFleet([...additionalFleet, emptyFleetRow()]);
+    setQuickAddFor(null);
+  };
+
+  const onQuickDriverCreated = async (created, target) => {
+    let list = drivers;
+    try {
+      list = await fetchFleetDrivers();
+    } catch {
+      /* keep current list */
+    }
+    if (created?.id && !list.some((d) => d.id === created.id)) {
+      list = [...list, created];
+    }
+    setDrivers(list);
+    const id = created?.id;
+    if (!id) {
+      setQuickAddFor(null);
+      return;
+    }
+    if (target === 'primary') {
+      handleDriverChange(id, list);
+    } else if (typeof target === 'number') {
+      assignAdditionalDriver(target, id, list);
+    }
+    setQuickAddFor(null);
+  };
+
+  const updateAdditionalFleet = (index, partial) => {
+    setAdditionalFleet(
+      additionalFleet.map((row, i) => (i === index ? { ...row, ...partial } : row)),
+    );
+  };
+
+  const assignAdditionalDriver = (index, driverId, list = drivers) => {
+    if (!driverId) {
+      updateAdditionalFleet(index, {
+        driverId: '',
+        driverName: '',
+        vehiclePlate: '',
+        vehicleCode: '',
+      });
+      return;
+    }
+    const driver = list.find((d) => d.id === driverId);
+    if (!driver) return;
+    updateAdditionalFleet(index, {
+      driverId: driver.id,
+      driverName: driver.name,
+      vehiclePlate: driver.license_plate || additionalFleet[index]?.vehiclePlate || '',
+      vehicleCode: driver.vehicle_code || additionalFleet[index]?.vehicleCode || '',
+    });
+  };
+
+  const removeAdditionalFleet = (index) => {
+    setAdditionalFleet(additionalFleet.filter((_, i) => i !== index));
+  };
+
+  const usedDriverIds = new Set(
+    [formData.driverId, ...additionalFleet.map((r) => r.driverId)].filter(Boolean),
+  );
 
   const handleAddStop = () => {
     const newId = Date.now();
@@ -172,6 +364,70 @@ export default function TripForm({
       setCoverUploading(false);
       e.target.value = '';
     }
+  };
+
+  const handleGalleryUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const room = Math.max(0, MAX_GALLERY - galleryImages.length);
+    if (room <= 0) {
+      toast.error(`Μέχρι ${MAX_GALLERY} φωτογραφίες στο gallery`);
+      e.target.value = '';
+      return;
+    }
+    const batch = files.slice(0, room);
+    setGalleryUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of batch) {
+        if (file.size > 12 * 1024 * 1024) {
+          toast.error(`${file.name}: πολύ μεγάλο (μέγ. 12MB)`);
+          continue;
+        }
+        try {
+          uploaded.push(await fileToTripCoverDataUrl(file));
+        } catch (err) {
+          toast.error(
+            err.message?.includes('large')
+              ? `${file.name}: πολύ μεγάλη μετά τη συμπίεση`
+              : `Αποτυχία: ${file.name}`,
+          );
+        }
+      }
+      if (!uploaded.length) return;
+      setFormData((prev) => {
+        const nextImages = [...(Array.isArray(prev.images) ? prev.images : []), ...uploaded];
+        return {
+          ...prev,
+          images: nextImages,
+          image: prev.image || uploaded[0],
+        };
+      });
+      toast.success(
+        uploaded.length > 1
+          ? `Προστέθηκαν ${uploaded.length} φωτογραφίες`
+          : 'Προστέθηκε φωτογραφία',
+      );
+    } finally {
+      setGalleryUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeGalleryImage = (url) => {
+    setFormData((prev) => {
+      const nextImages = (Array.isArray(prev.images) ? prev.images : []).filter((u) => u !== url);
+      return {
+        ...prev,
+        images: nextImages,
+        image: prev.image === url ? nextImages[0] || '' : prev.image,
+      };
+    });
+  };
+
+  const setCoverFromGallery = (url) => {
+    patch({ image: url });
+    toast.success('Ορίστηκε ως κύρια φωτογραφία κάρτας');
   };
 
   const addHighlight = (raw) => {
@@ -312,7 +568,11 @@ export default function TripForm({
         )}
       </Section>
 
-      <Section icon="photo_camera" title="Εικόνα & κάρτα" hint="Η φωτογραφία εμφανίζεται στην αρχική σελίδα.">
+      <Section
+        icon="photo_camera"
+        title="Εικόνα & κάρτα"
+        hint="Κύρια φωτογραφία κάρτας + gallery για τη σελίδα εκδρομής (bento)."
+      >
         <div className="grid lg:grid-cols-[220px_1fr] gap-5">
           <div
             className={`relative h-44 rounded-xl overflow-hidden border border-dashed flex items-center justify-center ${
@@ -340,12 +600,12 @@ export default function TripForm({
             <div className="flex flex-wrap gap-2">
               <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold cursor-pointer hover:bg-slate-800">
                 <span className="material-symbols-outlined text-[18px]">upload</span>
-                {formData.image ? 'Αλλαγή' : 'Ανέβασμα'}
+                {formData.image ? 'Αλλαγή κύριας' : 'Ανέβασμα κύριας'}
                 <input
                   type="file"
                   accept={TRIP_COVER_ACCEPT}
                   className="hidden"
-                  disabled={coverUploading}
+                  disabled={coverUploading || galleryUploading}
                   onChange={handleCoverImageUpload}
                 />
               </label>
@@ -355,7 +615,7 @@ export default function TripForm({
                   onClick={() => patch({ image: '' })}
                   className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50"
                 >
-                  Αφαίρεση
+                  Αφαίρεση κύριας
                 </button>
               )}
             </div>
@@ -405,6 +665,90 @@ export default function TripForm({
               />
             </Field>
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Gallery εκδρομής
+              </span>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Έως {MAX_GALLERY} φωτογραφίες — εμφανίζονται στη σελίδα λεπτομερειών (bento).
+              </p>
+            </div>
+            <label
+              className={`inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:underline cursor-pointer ${
+                galleryUploading || galleryImages.length >= MAX_GALLERY
+                  ? 'opacity-50 pointer-events-none'
+                  : ''
+              }`}
+            >
+              {galleryUploading ? 'Ανέβασμα…' : '+ Προσθήκη'}
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading || galleryImages.length >= MAX_GALLERY}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          </div>
+          {galleryImages.length ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {galleryImages.map((url, idx) => (
+                <div
+                  key={`${idx}-${String(url).slice(0, 48)}`}
+                  className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border ${
+                    url === formData.image
+                      ? 'border-sky-500 ring-2 ring-sky-200'
+                      : 'border-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    title="Ορισμός ως κύρια"
+                    className="absolute inset-0"
+                    onClick={() => setCoverFromGallery(url)}
+                  >
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                    onClick={() => removeGalleryImage(url)}
+                    aria-label="Αφαίρεση"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-8 text-sm text-slate-500 hover:bg-slate-50">
+              <span className="material-symbols-outlined mb-1 text-[28px] opacity-40">
+                photo_library
+              </span>
+              Σύρε ή επίλεξε φωτογραφίες της εκδρομής
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          )}
+          {galleryUploading && (
+            <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+              <span className="material-symbols-outlined animate-spin text-[16px]">
+                progress_activity
+              </span>
+              Συμπίεση & αποθήκευση…
+            </p>
+          )}
         </div>
       </Section>
 
@@ -555,7 +899,8 @@ export default function TripForm({
 
       <Section
         icon="badge"
-        title="Οδηγός & όχημα"
+        title="Οδηγοί & λεωφορεία"
+        hint="Προσθέστε οδηγό ή όχημα — το ένα δεν απαιτεί το άλλο."
         action={
           <Link
             to="/admin"
@@ -566,52 +911,196 @@ export default function TripForm({
           </Link>
         }
       >
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Οδηγός" className="sm:col-span-2">
-            <select
-              value={formData.driverId || ''}
-              onChange={(e) => handleDriverChange(e.target.value)}
-              className={fieldClass}
-            >
-              <option value="">— Επιλέξτε οδηγό —</option>
-              {assignableDrivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.license_plate ? ` · ${d.license_plate}` : ''}
-                  {d.status === 'on_leave' ? ' (άδεια)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Τύπος οχήματος">
-            <select
-              value={formData.vehicleType}
-              onChange={(e) => patch({ vehicleType: e.target.value })}
-              className={fieldClass}
-            >
-              <option value="Luxury Coach">Luxury Coach (50 θέσεις)</option>
-              <option value="Premium Express">Premium Express (30 θέσεις)</option>
-              <option value="VIP Minibus">VIP Minibus (15 θέσεις)</option>
-            </select>
-          </Field>
-          <Field label="Πινακίδα">
-            <input
-              type="text"
-              value={formData.vehiclePlate || ''}
-              onChange={(e) => patch({ vehiclePlate: e.target.value })}
-              className={`${fieldClass} font-mono`}
-              placeholder="π.χ. XAH-4021"
-            />
-          </Field>
-        </div>
-      </Section>
+        <div className="space-y-3">
+          <article className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Κύριος οδηγός
+              </p>
+              <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
+                #1
+              </span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2 space-y-2">
+                <Field label="Οδηγός">
+                  <select
+                    value={formData.driverId || ''}
+                    onChange={(e) => {
+                      handleDriverChange(e.target.value);
+                      setQuickAddFor(null);
+                    }}
+                    className={fieldClass}
+                  >
+                    <option value="">— Επιλέξτε οδηγό —</option>
+                    {assignableDrivers
+                      .filter((d) => d.id === formData.driverId || !usedDriverIds.has(d.id))
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                          {d.license_plate || d.vehicle_code
+                            ? ` · ${d.license_plate || d.vehicle_code}`
+                            : ''}
+                          {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                {quickAddFor === 'primary' ? (
+                  <QuickAddDriverPanel
+                    onCreated={(created) => onQuickDriverCreated(created, 'primary')}
+                    onCancel={() => setQuickAddFor(null)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddFor('primary')}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person_add</span>
+                    + Νέος οδηγός
+                  </button>
+                )}
+              </div>
+              <Field label="Τύπος οχήματος" hint="Προαιρετικό">
+                <select
+                  value={formData.vehicleType}
+                  onChange={(e) => patch({ vehicleType: e.target.value })}
+                  className={fieldClass}
+                >
+                  {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Πινακίδα" hint="Προαιρετικό">
+                <input
+                  type="text"
+                  value={formData.vehiclePlate || ''}
+                  onChange={(e) => patch({ vehiclePlate: e.target.value })}
+                  className={`${fieldClass} font-mono`}
+                  placeholder="π.χ. XAH-4021"
+                />
+              </Field>
+            </div>
+          </article>
 
-      <Section
-        icon="connecting_airports"
-        title="Hybrid χρονολόγιο (έδαφος + αέρας)"
-        hint="Συνδυάστε hotel transfer, πτήσεις και τοπικά van σε ενιαία ακολουθία."
-      >
-        <HybridTimelineBuilder formData={formData} setFormData={setFormData} tripId={tripId} />
+          {additionalFleet.map((row, index) => (
+            <article
+              key={`fleet-extra-${index}`}
+              className="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  {row.driverId || row.driverName ? 'Επιπλέον οδηγός' : 'Επιπλέον όχημα'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                    #{index + 2}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeAdditionalFleet(index);
+                      setQuickAddFor((cur) =>
+                        cur === index ? null : typeof cur === 'number' && cur > index ? cur - 1 : cur,
+                      );
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Αφαίρεση
+                  </button>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-2">
+                  <Field label="Οδηγός">
+                    <select
+                      value={row.driverId || ''}
+                      onChange={(e) => {
+                        assignAdditionalDriver(index, e.target.value);
+                        setQuickAddFor(null);
+                      }}
+                      className={fieldClass}
+                    >
+                      <option value="">— Επιλέξτε οδηγό —</option>
+                      {assignableDrivers
+                        .filter((d) => d.id === row.driverId || !usedDriverIds.has(d.id))
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                            {d.license_plate || d.vehicle_code
+                              ? ` · ${d.license_plate || d.vehicle_code}`
+                              : ''}
+                            {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  {quickAddFor === index ? (
+                    <QuickAddDriverPanel
+                      onCreated={(created) => onQuickDriverCreated(created, index)}
+                      onCancel={() => setQuickAddFor(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setQuickAddFor(index)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">person_add</span>
+                      + Νέος οδηγός
+                    </button>
+                  )}
+                </div>
+                <Field label="Τύπος οχήματος" hint="Προαιρετικό">
+                  <select
+                    value={row.vehicleType || 'Luxury Coach'}
+                    onChange={(e) => updateAdditionalFleet(index, { vehicleType: e.target.value })}
+                    className={fieldClass}
+                  >
+                    {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Πινακίδα" hint="Προαιρετικό">
+                  <input
+                    type="text"
+                    value={row.vehiclePlate || ''}
+                    onChange={(e) => updateAdditionalFleet(index, { vehiclePlate: e.target.value })}
+                    className={`${fieldClass} font-mono`}
+                    placeholder="π.χ. XAH-4021"
+                  />
+                </Field>
+              </div>
+            </article>
+          ))}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addFleetUnit}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              Προσθήκη οδηγού
+            </button>
+            <button
+              type="button"
+              onClick={addVehicleUnit}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
+            >
+              <span className="material-symbols-outlined text-[18px]">directions_bus</span>
+              Προσθήκη οχήματος
+            </button>
+          </div>
+        </div>
       </Section>
 
       <Section
@@ -623,72 +1112,11 @@ export default function TripForm({
       </Section>
 
       <Section
-        icon="flight_land"
-        title="Airport buffer rules"
-        hint="Ελάχιστα λεπτά buffer ανά αεροδρόμιο για connection risk."
-      >
-        <AirportBufferEditor formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="calculate"
-        title="Αυτόματο κόστος & yield"
-        hint="Συγκεντρώνει fuel/rental ground + group PNR και προτείνει τιμή ανά άτομο."
-      >
-        <HybridCostCalculator formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="airline_seat_recline_extra"
-        title="Ενιαίο manifest (λεωφορείο + πτήση)"
-        hint="Χαρτογράφηση θέσης λεωφορείου, θέσης πτήσης και PNR/ticket ανά επιβάτη."
-        action={
-          tripId ? (
-            <a
-              href={`/tour-leader/${tripId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[16px]">luggage</span>
-              Tour leader
-            </a>
-          ) : null
-        }
-      >
-        <HybridPassengerManifest formData={formData} setFormData={setFormData} tripId={tripId} />
-      </Section>
-
-      <Section
-        icon="history"
-        title="Hybrid change log"
-        hint="Ποιος άλλαξε πτήσεις / pickup / manifest και πότε."
-      >
-        <HybridChangeLogPanel formData={formData} />
-      </Section>
-
-      <Section
         icon="bed"
         title="Rooming & extras"
         hint="Δωμάτια ξενοδοχείου και ασφάλεια / έξτρα ανά επιβάτη."
       >
         <HybridRoomingExtras formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="receipt_long"
-        title="Supplier cost sheets"
-        hint="Κόστος αεροπορικής / λεωφορείου / ξενοδοχείου με αναφορά αρχείου."
-      >
-        <HybridSupplierCosts formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="sms"
-        title="Rebook & WhatsApp templates"
-        hint="Πρόταση εναλλακτικής πτήσης και εγκεκριμένα πρότυπα μηνυμάτων."
-      >
-        <HybridRebookWhatsApp formData={formData} setFormData={setFormData} tripId={tripId} />
       </Section>
 
       <Section
@@ -770,9 +1198,11 @@ export default function TripForm({
           <div className="h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
             <MapContainer center={[38.5, 23.0]} zoom={6} className="h-full w-full">
               <TileLayer
-                attribution="&copy; OpenStreetMap"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               <LocationPicker activeStopId={activeStopId} setFormData={setFormData} />
               {(formData.stops || []).map((stop) => (
                 <Marker key={stop.id} position={[stop.lat, stop.lng]} />

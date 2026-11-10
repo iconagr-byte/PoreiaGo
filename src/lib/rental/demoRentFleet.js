@@ -1,47 +1,71 @@
 /**
- * Client-side demo rent fleet (3 cars + 3 vans).
- * Used when the public catalog API is empty/unreachable so storefront still looks real.
+ * Client-side demo rent fleet (compact cars + vans).
+ * 2025–2026 generation models with matching Wikimedia Commons exterior photos.
+ *
+ * Showcase ONLY on the PoreiaGo marketing host (/rent guest landing) so
+ * prospective contract buyers see how the product looks. Never invent fleet
+ * for tenant offices (Achillio, slug.poreiago.com, custom domains).
  */
+
+import { isPlatformMarketingHost } from '../platform/tenantHost.js';
+
+const WM = (path) =>
+  `https://upload.wikimedia.org/wikipedia/commons/${path}`;
+
 export const DEMO_RENT_FLEET = [
   {
+    id: 'demo-rent-car-i10',
+    category: 'MINI',
+    model: 'Toyota Aygo X',
+    seating_capacity: 4,
+    daily_rate_eur: 32,
+    one_way_surcharge_eur: 25,
+    with_driver_daily_eur: 80,
+    photo_url: WM('thumb/a/a2/Toyota_Aygo_X_1X7A0063.jpg/1280px-Toyota_Aygo_X_1X7A0063.jpg'),
+    description:
+      'Μοντέλο 2026 — μικρό city crossover, ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+  },
+  {
+    id: 'demo-rent-car-c3',
+    category: 'COMPACT',
+    model: 'Peugeot 208',
+    seating_capacity: 5,
+    daily_rate_eur: 38,
+    one_way_surcharge_eur: 28,
+    with_driver_daily_eur: 85,
+    photo_url: WM(
+      'thumb/d/d8/Peugeot_208_B_facelift_DSC_7227.jpg/1280px-Peugeot_208_B_facelift_DSC_7227.jpg',
+    ),
+    description:
+      'Μοντέλο 2026 — compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+  },
+  {
     id: 'demo-rent-car-yaris',
-    category: 'CAR',
-    model: 'Toyota Yaris',
+    category: 'COMPACT',
+    model: 'Renault Clio',
     seating_capacity: 5,
-    daily_rate_eur: 35,
-    photo_url:
-      'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80',
-    description: 'Οικονομικό επιβατικό για πόλη και κοντινές αποδράσεις.',
-  },
-  {
-    id: 'demo-rent-car-corolla',
-    category: 'CAR',
-    model: 'Toyota Corolla',
-    seating_capacity: 5,
-    daily_rate_eur: 48,
-    photo_url:
-      'https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80',
-    description: 'Άνετο οικογενειακό sedan με χαμηλή κατανάλωση.',
-  },
-  {
-    id: 'demo-rent-car-tucson',
-    category: 'CAR',
-    model: 'Hyundai Tucson',
-    seating_capacity: 5,
-    daily_rate_eur: 65,
-    photo_url:
-      'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80',
-    description: 'SUV επιβατικό για μεγαλύτερα ταξίδια και αποσκευές.',
+    daily_rate_eur: 42,
+    one_way_surcharge_eur: 30,
+    with_driver_daily_eur: 90,
+    photo_url: WM(
+      'thumb/c/c6/Renault_Clio_V_%282023%29_1X7A1577.jpg/1280px-Renault_Clio_V_%282023%29_1X7A1577.jpg',
+    ),
+    description:
+      'Μοντέλο 2026 — compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
   },
   {
     id: 'demo-rent-van-transporter',
     category: 'VAN',
-    model: 'VW Transporter',
-    seating_capacity: 9,
+    model: 'VW Multivan',
+    seating_capacity: 7,
     daily_rate_eur: 95,
-    photo_url:
-      'https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80',
-    description: 'Van 9 θέσεων για ομάδες και μεταφορές.',
+    one_way_surcharge_eur: 50,
+    with_driver_daily_eur: 140,
+    photo_url: WM(
+      'thumb/c/c5/Volkswagen_T7_Multivan_1X7A0297.jpg/1280px-Volkswagen_T7_Multivan_1X7A0297.jpg',
+    ),
+    description:
+      'Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό.',
   },
   {
     id: 'demo-rent-van-vito',
@@ -49,31 +73,85 @@ export const DEMO_RENT_FLEET = [
     model: 'Mercedes Vito',
     seating_capacity: 8,
     daily_rate_eur: 110,
-    photo_url:
-      'https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80',
-    description: 'Premium van για άνετες μετακινήσεις ομάδας.',
+    one_way_surcharge_eur: 55,
+    with_driver_daily_eur: 150,
+    photo_url: WM(
+      'thumb/5/5c/MERCEDES-BENZ_VITO_%28W447%29_China.jpg/1280px-MERCEDES-BENZ_VITO_%28W447%29_China.jpg',
+    ),
+    description:
+      'Μοντέλο 2026 — premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
   },
   {
     id: 'demo-rent-van-trafic',
-    category: 'VAN',
-    model: 'Renault Trafic',
+    category: 'MINIBUS',
+    model: 'Ford Transit Custom',
     seating_capacity: 9,
     daily_rate_eur: 88,
-    photo_url:
-      'https://images.unsplash.com/photo-1544620341-1adc1baa16c2?auto=format&fit=crop&w=1200&q=80',
-    description: 'Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις.',
+    one_way_surcharge_eur: 45,
+    with_driver_daily_eur: 130,
+    photo_url: WM(
+      'thumb/e/e4/Ford_Transit_Custom_%282023%29_1X7A1605.jpg/1280px-Ford_Transit_Custom_%282023%29_1X7A1605.jpg',
+    ),
+    description:
+      'Μοντέλο 2026 — ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα.',
   },
 ];
 
-export function rentCategoryLabel(category) {
-  const c = String(category || '').toUpperCase();
-  if (c === 'VAN') return 'Van';
-  if (c === 'MINIBUS') return 'Minibus';
-  if (c === 'CAR') return 'Επιβατικό';
-  return category || '';
+export { rentCategoryLabel } from './rentVehicleCategories.js';
+
+/**
+ * @deprecated Prefer isPlatformMarketingHost — kept for call sites / tests.
+ * True on any live PoreiaGo / Achillio customer hostname (incl. platform apex).
+ */
+export function isLiveProductionHost(hostname = '') {
+  const h = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .trim()
+    .toLowerCase();
+  if (!h || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) return false;
+  return (
+    h === 'www.poreiago.com' ||
+    h === 'poreiago.com' ||
+    h.endsWith('.poreiago.com') ||
+    h === 'achilliotravel.com' ||
+    h === 'www.achilliotravel.com' ||
+    h.endsWith('.achilliotravel.com')
+  );
 }
 
-export function withDemoRentFleet(vehicles) {
+/**
+ * When catalog is empty: inject showcase fleet ONLY on PoreiaGo marketing host.
+ * Tenant offices always get the real list (or []).
+ *
+ * @param {unknown} vehicles
+ * @param {{ allowShowcase?: boolean, hostname?: string }} [opts]
+ *   allowShowcase=false — e.g. date search returned no availability (don't fake it)
+ */
+export function withDemoRentFleet(vehicles, opts = {}) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;
+  const allowShowcase = opts.allowShowcase !== false;
+  if (!allowShowcase) return [];
+
+  const hostname =
+    opts.hostname != null
+      ? opts.hostname
+      : typeof window !== 'undefined'
+        ? window.location.hostname
+        : '';
+
+  // No window + no explicit host (SSR / unit without mock) → never invent.
+  if (!hostname && opts.hostname == null && typeof window === 'undefined') return [];
+
+  if (!isPlatformMarketingHost(hostname)) return [];
   return DEMO_RENT_FLEET;
+}
+
+/** True when fleet is the client-only showcase fallback (not office store). */
+export function isClientDemoFleetId(id) {
+  return /^demo-rent-(car|van)-/i.test(String(id || ''));
+}
+
+/** True when the list is (or includes) the marketing showcase fleet. */
+export function isClientDemoFleet(vehicles) {
+  if (!Array.isArray(vehicles) || !vehicles.length) return false;
+  return vehicles.some((v) => isClientDemoFleetId(v?.id));
 }

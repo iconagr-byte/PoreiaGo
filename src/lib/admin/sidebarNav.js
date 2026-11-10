@@ -1,27 +1,44 @@
-/** Admin sidebar — τμήματα: λειτουργίες · πλατφόρμα SaaS · ρυθμίσεις. */
+/** Admin sidebar — τμήματα: λειτουργίες · ενοικιάσεις · πλατφόρμα SaaS · ρυθμίσεις. */
 
 import {
   TENANT_SETTINGS_TABS,
   PLATFORM_OPERATOR_TABS,
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
+import { buildRentDeskNavItems, RENT_DESK_NAV_IDS } from './rentDeskNav.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v9';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v13';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
+/** One-shot factory reset so broken local layouts cannot hide the sidebar. */
+export const NAV_FACTORY_RESET_KEY = 'poreiago_admin_nav_factory_reset_v13';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
-/** Default ids under «Λειτουργίες Στόλου» (users can drag them anywhere). */
+/** Hub subtabs only — never shown as top-level sidebar rows. */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
-  'hybrid_sla',
-  'driver_chat',
   'fleet_route_playback',
   'fleet_calendar',
   'fleet_availability',
   'fleet_documents',
   'fleet_expenses',
   'fleet_digest',
+];
+
+const FLEET_OPS_ONLY_SET = new Set(FLEET_OPS_ONLY_IDS);
+
+/** Core left-nav rows that must always remain reachable in «main». */
+const CRITICAL_MAIN_IDS = [
+  'dashboard',
+  'fleet_live_map',
+  'routes',
+  'customers',
+  'fleet',
+  'fleet_ops',
+  'drivers',
+  'lost_found',
+  'bookings',
+  'email',
 ];
 
 /** Platform SaaS tabs (Tenants, SaaS Infra, Backup, Growth) — superadmin only. */
@@ -33,7 +50,7 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'routes',
   'customers',
   'fleet',
-  'fleet_rental',
+  'fleet_ops',
   'drivers',
   'lost_found',
   'email',
@@ -41,15 +58,19 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'bookings',
 ];
 
+/** Rent desk tabs under sidebar section «Ενοικιάσεις». */
+export const DEFAULT_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
+
 /** Rent-only office — no bus trips / coach fleet / driver ops. */
 export const RENT_ONLY_MAIN_NAV_ORDER = [
   'dashboard',
-  'fleet_rental',
   'customers',
   'fleet_live_map',
   'email',
   'email_templates',
 ];
+
+export const RENT_ONLY_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
 
 export const RENT_ONLY_SETTINGS_NAV_ORDER = [
   'settings_platform',
@@ -60,7 +81,6 @@ export const RENT_ONLY_SETTINGS_NAV_ORDER = [
   'settings_contracts',
   'settings_compliance',
   'settings_users',
-  'settings_telematics',
 ];
 
 export const RENT_ONLY_TAB_IDS = new Set([
@@ -69,16 +89,26 @@ export const RENT_ONLY_TAB_IDS = new Set([
   'fleet_rental',
 ]);
 
-export const LEGACY_NAV_IDS = new Set(['settings', 'payments', 'fleet_active_drivers']);
+/** Old single «Ενοικιάσεις» entry — replaced by rent desk subtabs. */
+export const LEGACY_NAV_IDS = new Set([
+  'settings',
+  'payments',
+  'fleet_active_drivers',
+  'fleet_rental',
+  'hybrid_sla',
+  // Miles+Bonus / Επιβραβεύσεις — hidden from sidebar (code kept, not deleted).
+  'loyalty',
+]);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
 const PLATFORM_ID_SET = new Set(PLATFORM_IDS);
-const SECTION_KEYS = ['main', 'fleet_ops', 'platform', 'settings'];
+const SECTION_KEYS = ['main', 'rent', 'fleet_ops', 'platform', 'settings'];
 
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
     main: [...DEFAULT_MAIN_NAV_ORDER],
+    rent: [...DEFAULT_RENT_NAV_ORDER],
     fleet_ops: [...FLEET_OPS_ONLY_IDS],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...OFFICE_SETTINGS_IDS],
@@ -94,11 +124,15 @@ function allKnownNavIds(isSuperAdmin) {
   return new Set(SECTION_KEYS.flatMap((key) => defaults[key] || []));
 }
 
-/** Preserve free cross-section placement; only drop unknown / forbidden ids. */
+/**
+ * Preserve free cross-section placement; only drop unknown / forbidden ids.
+ * Also rescue menu rows that were dragged into the orphaned «fleet_ops» bucket
+ * (that section is no longer rendered as a sidebar zone).
+ */
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const known = allKnownNavIds(isSuperAdmin);
-  const next = { main: [], fleet_ops: [], platform: [], settings: [] };
+  const next = { main: [], rent: [], fleet_ops: [], platform: [], settings: [] };
   const seen = new Set();
 
   for (const section of SECTION_KEYS) {
@@ -108,6 +142,14 @@ function migrateNavLayout(layout, isSuperAdmin) {
       if (!known.has(id)) continue;
       if (!isSuperAdmin && PLATFORM_ID_SET.has(id)) continue;
       if (seen.has(id)) continue;
+
+      // fleet_ops section may only hold hub subtabs — everything else belongs in main.
+      if (section === 'fleet_ops' && !FLEET_OPS_ONLY_SET.has(id)) {
+        seen.add(id);
+        next.main.push(id);
+        continue;
+      }
+
       seen.add(id);
       next[section].push(id);
     }
@@ -127,12 +169,36 @@ function migrateNavLayout(layout, isSuperAdmin) {
     }
   }
 
+  // Guarantee core office tools are always in main (repair empty / wiped menus).
+  for (const id of CRITICAL_MAIN_IDS) {
+    if (!known.has(id) || seen.has(id)) continue;
+    if (next.main.includes(id)) continue;
+    seen.add(id);
+    next.main.push(id);
+  }
+  for (const id of CRITICAL_MAIN_IDS) {
+    if (next.main.includes(id)) continue;
+    // Was only in another section — pull into main.
+    for (const section of SECTION_KEYS) {
+      if (section === 'main') continue;
+      const idx = next[section].indexOf(id);
+      if (idx < 0) continue;
+      next[section].splice(idx, 1);
+      next.main.push(id);
+      break;
+    }
+  }
+
+  // Keep fleet_ops bucket = hub subtabs only.
+  next.fleet_ops = FLEET_OPS_ONLY_IDS.filter((id) => known.has(id));
+
   return next;
 }
 
 function splitLegacyFlatOrder(flat, isSuperAdmin) {
   const layout = getDefaultNavLayout(isSuperAdmin);
   const main = [];
+  const rent = [];
   const platform = [];
   const settings = [];
   const fleet_ops = [];
@@ -143,10 +209,11 @@ function splitLegacyFlatOrder(flat, isSuperAdmin) {
       if (isSuperAdmin) platform.push(id);
     } else if (OFFICE_SETTINGS_IDS.includes(id)) settings.push(id);
     else if (FLEET_OPS_ONLY_IDS.includes(id)) fleet_ops.push(id);
+    else if (DEFAULT_RENT_NAV_ORDER.includes(id)) rent.push(id);
     else if (layout.main.includes(id) || ADMIN_NAV_ITEMS[id]) main.push(id);
   }
 
-  return migrateNavLayout({ main, fleet_ops, platform, settings }, isSuperAdmin);
+  return migrateNavLayout({ main, rent, fleet_ops, platform, settings }, isSuperAdmin);
 }
 
 export function loadNavLayout(isSuperAdmin) {
@@ -154,6 +221,10 @@ export function loadNavLayout(isSuperAdmin) {
   const storageKey = layoutStorageKey(isSuperAdmin);
   const legacyKeys = [
     storageKey,
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v12_super' : 'aerostride_admin_nav_layout_v12',
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v11_super' : 'aerostride_admin_nav_layout_v11',
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v10_super' : 'aerostride_admin_nav_layout_v10',
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v9_super' : 'aerostride_admin_nav_layout_v9',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v7_super' : 'aerostride_admin_nav_layout_v7',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v6_super' : 'aerostride_admin_nav_layout_v6',
   ];
@@ -167,6 +238,7 @@ export function loadNavLayout(isSuperAdmin) {
         return migrateNavLayout(
           {
             main: parsed.main || [],
+            rent: parsed.rent || [],
             fleet_ops: parsed.fleet_ops || [],
             platform: parsed.platform || [],
             settings: parsed.settings || [],
@@ -195,6 +267,60 @@ export function loadNavLayout(isSuperAdmin) {
 export function saveNavLayout(isSuperAdmin, layout) {
   const safe = migrateNavLayout(layout || getDefaultNavLayout(isSuperAdmin), isSuperAdmin);
   localStorage.setItem(layoutStorageKey(isSuperAdmin), JSON.stringify(safe));
+}
+
+/** Wipe all known layout keys and write a clean default menu. */
+export function resetNavLayoutToDefault(isSuperAdmin) {
+  const defaults = getDefaultNavLayout(isSuperAdmin);
+  const keys = [
+    layoutStorageKey(isSuperAdmin),
+    layoutStorageKey(!isSuperAdmin),
+    'aerostride_admin_nav_layout_v13',
+    'aerostride_admin_nav_layout_v13_super',
+    'aerostride_admin_nav_layout_v12',
+    'aerostride_admin_nav_layout_v12_super',
+    'aerostride_admin_nav_layout_v11',
+    'aerostride_admin_nav_layout_v11_super',
+    'aerostride_admin_nav_layout_v10',
+    'aerostride_admin_nav_layout_v10_super',
+    'aerostride_admin_nav_layout_v9',
+    'aerostride_admin_nav_layout_v9_super',
+    'aerostride_admin_nav_layout_v7',
+    'aerostride_admin_nav_layout_v7_super',
+    'aerostride_admin_nav_layout_v6',
+    'aerostride_admin_nav_layout_v6_super',
+    NAV_ORDER_STORAGE_KEY,
+    `${NAV_ORDER_STORAGE_KEY}_super`,
+  ];
+  for (const key of keys) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
+  saveNavLayout(isSuperAdmin, defaults);
+  try {
+    localStorage.setItem(NAV_FACTORY_RESET_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+  return defaults;
+}
+
+/**
+ * One-shot hard reset for browsers that still have a broken custom layout.
+ * Returns the layout to use (fresh defaults when reset runs).
+ */
+export function ensureFactoryNavReset(isSuperAdmin) {
+  try {
+    if (localStorage.getItem(NAV_FACTORY_RESET_KEY) === '1') {
+      return loadNavLayout(isSuperAdmin);
+    }
+  } catch {
+    /* fall through to reset */
+  }
+  return resetNavLayoutToDefault(isSuperAdmin);
 }
 
 export const ADMIN_NAV_ITEMS = {
@@ -228,9 +354,19 @@ export const ADMIN_NAV_ITEMS = {
     navGroup: 'main',
     accent: 'violet',
   },
+  loyalty: {
+    id: 'loyalty',
+    label: 'Επιβραβεύσεις',
+    icon: 'stars',
+    filled: true,
+    type: 'tab',
+    tab: 'loyalty',
+    navGroup: 'main',
+    accent: 'amber',
+  },
   fleet: {
     id: 'fleet',
-    label: 'Στόλος',
+    label: 'Στόλος λεωφορείων',
     icon: 'directions_bus',
     filled: true,
     type: 'tab',
@@ -238,16 +374,17 @@ export const ADMIN_NAV_ITEMS = {
     navGroup: 'main',
     accent: 'sky',
   },
-  fleet_rental: {
-    id: 'fleet_rental',
-    label: 'Ενοικιάσεις',
-    icon: 'car_rental',
+  fleet_ops: {
+    id: 'fleet_ops',
+    label: 'Λειτουργίες στόλου',
+    icon: 'query_stats',
     filled: true,
     type: 'tab',
-    tab: 'fleet_rental',
+    tab: 'fleet_ops',
     navGroup: 'main',
-    accent: 'teal',
+    accent: 'cyan',
   },
+  ...buildRentDeskNavItems(),
   drivers: {
     id: 'drivers',
     label: 'Οδηγοί / App',
@@ -278,16 +415,6 @@ export const ADMIN_NAV_ITEMS = {
     navGroup: 'fleet_ops',
     accent: 'violet',
   },
-  hybrid_sla: {
-    id: 'hybrid_sla',
-    label: 'Hybrid SLA',
-    icon: 'connecting_airports',
-    filled: true,
-    type: 'tab',
-    tab: 'hybrid_sla',
-    navGroup: 'fleet_ops',
-    accent: 'indigo',
-  },
   driver_chat: {
     id: 'driver_chat',
     label: 'Chat Οδηγών',
@@ -295,7 +422,7 @@ export const ADMIN_NAV_ITEMS = {
     filled: true,
     type: 'tab',
     tab: 'driver_chat',
-    navGroup: 'fleet_ops',
+    navGroup: 'main',
     accent: 'sky',
   },
   fleet_route_playback: {
@@ -390,7 +517,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   bookings: {
     id: 'bookings',
-    label: 'Κρατήσεις',
+    label: 'Κρατήσεις λεωφορείων',
     icon: 'book_online',
     filled: false,
     type: 'tab',
@@ -459,6 +586,7 @@ export function moveNavItem(layout, itemId, toSection, toIndex) {
 
   const next = {
     main: [...(layout.main || [])],
+    rent: [...(layout.rent || [])],
     fleet_ops: [...(layout.fleet_ops || [])],
     platform: [...(layout.platform || [])],
     settings: [...(layout.settings || [])],
@@ -517,6 +645,7 @@ export const DEFAULT_ADMIN_NAV_ORDER = DEFAULT_MAIN_NAV_ORDER;
 export function getRentOnlyNavLayout(isSuperAdmin) {
   return {
     main: [...RENT_ONLY_MAIN_NAV_ORDER],
+    rent: [...RENT_ONLY_RENT_NAV_ORDER],
     fleet_ops: [],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...RENT_ONLY_SETTINGS_NAV_ORDER],
@@ -543,6 +672,7 @@ const BUS_ONLY_TABS = new Set([
   'lost_found',
   'bookings',
   'driver_scan',
+  'fleet_ops',
   ...FLEET_OPS_ONLY_IDS,
 ]);
 
