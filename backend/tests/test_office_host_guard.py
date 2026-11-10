@@ -7,7 +7,9 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from travel_platform.settings.office_host_guard import (
+    host_is_shared_api,
     host_looks_like_achillio_travel,
+    login_host_forced_tenant_id,
     office_host_mismatch_detail,
 )
 
@@ -18,17 +20,24 @@ class OfficeHostGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(host_looks_like_achillio_travel("achilliotravel.com"))
         self.assertFalse(host_looks_like_achillio_travel("www.poreiago.com"))
         self.assertFalse(host_looks_like_achillio_travel("api.poreiago.com"))
+        self.assertTrue(host_is_shared_api("api.poreiago.com"))
+        self.assertTrue(host_is_shared_api("api-blue"))
+        self.assertFalse(host_is_shared_api("www.poreiago.com"))
+
+    async def test_shared_api_host_never_blocks_achillio_jwt(self):
+        """Achillio seat-pricing/drivers must work via api.poreiago.com."""
+        tid = str(uuid4())
+        detail = await office_host_mismatch_detail(
+            host="api.poreiago.com",
+            tenant_id=tid,
+            roles=["tenant_admin"],
+            is_platform_host=True,
+        )
+        self.assertIsNone(detail)
 
     async def test_achillio_jwt_blocked_on_poreiago_platform_host(self):
         tid = str(uuid4())
-        with patch(
-            "travel_platform.settings.office_host_guard.AsyncSessionLocal",
-            create=True,
-        ):
-            pass
-        with patch(
-            "app.core.database.AsyncSessionLocal"
-        ) as session_local, patch(
+        with patch("app.core.database.AsyncSessionLocal") as session_local, patch(
             "app.services.tenant_modules.is_achillio_travel_office",
             return_value=True,
         ):
@@ -50,14 +59,80 @@ class OfficeHostGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(detail)
         self.assertIn("achilliotravel.com", detail.lower())
 
-    async def test_superadmin_may_cross_host(self):
-        detail = await office_host_mismatch_detail(
-            host="www.poreiago.com",
-            tenant_id=str(uuid4()),
-            roles=["superadmin"],
+    async def test_superadmin_without_impersonation_also_blocked(self):
+        """Bare Achillio JWT on poreiago.com must not delete Achillio drivers."""
+        tid = str(uuid4())
+        with patch("app.core.database.AsyncSessionLocal") as session_local, patch(
+            "app.services.tenant_modules.is_achillio_travel_office",
+            return_value=True,
+        ):
+            cm = AsyncMock()
+            db = AsyncMock()
+            result = AsyncMock()
+            result.scalar_one_or_none = lambda: object()
+            db.execute = AsyncMock(return_value=result)
+            cm.__aenter__.return_value = db
+            cm.__aexit__.return_value = None
+            session_local.return_value = cm
+
+            detail = await office_host_mismatch_detail(
+                host="www.poreiago.com",
+                tenant_id=tid,
+                roles=["superadmin"],
+                is_platform_host=True,
+                impersonating=False,
+            )
+        self.assertIsNotNone(detail)
+
+    async def test_impersonating_superadmin_may_cross_host(self):
+        tid = str(uuid4())
+        with patch("app.core.database.AsyncSessionLocal") as session_local, patch(
+            "app.services.tenant_modules.is_achillio_travel_office",
+            return_value=True,
+        ):
+            cm = AsyncMock()
+            db = AsyncMock()
+            result = AsyncMock()
+            result.scalar_one_or_none = lambda: object()
+            db.execute = AsyncMock(return_value=result)
+            cm.__aenter__.return_value = db
+            cm.__aexit__.return_value = None
+            session_local.return_value = cm
+
+            detail = await office_host_mismatch_detail(
+                host="www.poreiago.com",
+                tenant_id=tid,
+                roles=["superadmin"],
+                is_platform_host=True,
+                impersonating=True,
+            )
+        self.assertIsNone(detail)
+
+    async def test_office_subdomain_forces_resolved_tenant(self):
+        office_id = uuid4()
+        resolved = type("R", (), {"tenant_id": office_id, "is_active": True})()
+        with patch("app.core.database.AsyncSessionLocal") as session_local, patch(
+            "olympus.tenant.domain_resolver.DomainResolver",
+        ) as resolver_cls:
+            cm = AsyncMock()
+            db = AsyncMock()
+            cm.__aenter__.return_value = db
+            cm.__aexit__.return_value = None
+            session_local.return_value = cm
+            resolver_cls.return_value.resolve = AsyncMock(return_value=resolved)
+
+            forced = await login_host_forced_tenant_id(
+                "dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com",
+                is_platform_host=False,
+            )
+        self.assertEqual(forced, office_id)
+
+    async def test_platform_host_does_not_force_office(self):
+        forced = await login_host_forced_tenant_id(
+            "www.poreiago.com",
             is_platform_host=True,
         )
-        self.assertIsNone(detail)
+        self.assertIsNone(forced)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import PlatformSettingsPanel from './PlatformSettingsPanel.jsx';
 import PaymentManagementPanel from './PaymentManagementPanel.jsx';
 import FiscalSettingsPanel from './FiscalSettingsPanel.jsx';
 import SeatPricingPanel from './SeatPricingPanel.jsx';
+import TripExtrasEditor from './TripExtrasEditor.jsx';
 import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
@@ -10,9 +11,11 @@ import GdprCompliancePanel from './GdprCompliancePanel.jsx';
 import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
+import AdminPasswordResetPanel from './AdminPasswordResetPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
 import BackupPanel from './BackupPanel.jsx';
-import IntegrationsPanel from './IntegrationsPanel.jsx';
+import TeltonikaDevicesPanel from './TeltonikaDevicesPanel.jsx';
+import TripReminderSettingsPanel from './TripReminderSettingsPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { PLATFORM_ONLY_TAB_IDS } from '../../lib/admin/settingsTabs.js';
 
@@ -32,9 +35,11 @@ export default function SettingsTabPanels({
   }
 
   if (tab === 'tenants') return <SuperAdminPanel />;
+  if (tab === 'password_reset') return <AdminPasswordResetPanel />;
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
-  if (tab === 'integrations') return <IntegrationsPanel />;
   if (tab === 'backup') return <BackupPanel />;
+  if (tab === 'telematics') return <TeltonikaDevicesPanel />;
+  if (tab === 'trip_reminder') return <TripReminderSettingsPanel />;
 
   if (tab === 'platform') {
     return (
@@ -49,6 +54,16 @@ export default function SettingsTabPanels({
             <div className="h-px flex-1 bg-slate-200" />
           </div>
           <SeatPricingPanel />
+        </div>
+        <div id="trip-extras" className="scroll-mt-28 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Υπηρεσίες εκδρομής
+            </p>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <TripExtrasEditor />
         </div>
       </div>
     );

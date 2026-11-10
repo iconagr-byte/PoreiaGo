@@ -53,6 +53,7 @@ PUBLIC_PATHS = {
     "/health",
     "/api/v1/health",
     "/api/v1/auth/login",
+    "/api/v1/auth/google",
     "/api/v1/auth/dev-login",
     "/api/v1/auth/refresh",
     "/api/v1/aade/webhook",
@@ -63,6 +64,7 @@ PUBLIC_PATHS = {
     "/api/v1/telemetry/update",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
+    "/api/v1/bookings/occupied-seats",
 }
 
 # Swagger only in non-production (FastAPI also disables docs_url there).
@@ -87,6 +89,12 @@ ADMIN_ACCESS_ROLES = frozenset({
 ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/pricing/quote",
     "/api/admin/platform/site-appearance",
+)
+
+# Public POST — password reset confirm / forgot request (no session yet)
+ADMIN_PUBLIC_POST_PREFIXES = (
+    "/api/admin/platform/password-reset/confirm",
+    "/api/admin/platform/password-reset/request",
 )
 
 # Email / mailbox / campaigns — SQLite-backed, must not be world-writable.
@@ -151,6 +159,8 @@ def _attach_bearer_tenant_context(
     roles = list(payload.get("roles") or [])
     if roles:
         request.state.roles = roles
+    if payload.get("impersonating"):
+        request.state.impersonating = True
 
 
 def _requires_jwt(path: str) -> bool:
@@ -161,6 +171,10 @@ def _requires_jwt(path: str) -> bool:
 
 def _admin_public_get(path: str, method: str) -> bool:
     return method.upper() == "GET" and any(path.startswith(p) for p in ADMIN_PUBLIC_GET_PREFIXES)
+
+
+def _admin_public_post(path: str, method: str) -> bool:
+    return method.upper() == "POST" and any(path.startswith(p) for p in ADMIN_PUBLIC_POST_PREFIXES)
 
 
 def _is_file_store_admin(path: str) -> bool:
@@ -225,8 +239,10 @@ async def _require_admin_bearer(
             status_code=403,
             content={"detail": "Admin access required"},
         )
+    if payload.get("impersonating"):
+        request.state.impersonating = True
     # SEAL: Achillio Travel JWT must not serve drivers/settings on poreiago.com
-    # (and the reverse). This was the path that showed the same οδηγός on both URLs.
+    # (and the reverse). Same οδηγός appearing / deleting on both URLs.
     try:
         from middleware.domain_tenant import _is_platform_host, _request_host
         from travel_platform.settings.office_host_guard import office_host_mismatch_detail
@@ -237,6 +253,7 @@ async def _require_admin_bearer(
             tenant_id=str(request.state.tenant_id),
             roles=roles,
             is_platform_host=_is_platform_host(host),
+            impersonating=bool(payload.get("impersonating")),
         )
         if detail:
             return JSONResponse(status_code=403, content={"detail": detail})
@@ -337,7 +354,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if path.startswith(ADMIN_PREFIX):
-            if _admin_public_get(path, request.method):
+            if _admin_public_get(path, request.method) or _admin_public_post(path, request.method):
                 return await call_next(request)
             if admin_auth_disabled:
                 await _apply_dev_admin_context(request)

@@ -205,5 +205,16 @@ elif [[ -n "$_g_vite" && -z "$_g_api" ]]; then
   replace_kv "GOOGLE_CLIENT_ID" "$_g_vite"
   echo "  ~ synced GOOGLE_CLIENT_ID from VITE_GOOGLE_CLIENT_ID"
 fi
+# Fallback: public client id file (safe to commit — browser-embedded).
+_g_api="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+_g_file="$(dirname "$ENV_FILE")/google-oauth.client-id"
+if [[ -z "$_g_api" && -f "$_g_file" ]]; then
+  _g_fallback="$(grep -v '^[[:space:]]*#' "$_g_file" | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]' || true)"
+  if [[ -n "$_g_fallback" && "$_g_fallback" == *.apps.googleusercontent.com ]]; then
+    replace_kv "GOOGLE_CLIENT_ID" "$_g_fallback"
+    replace_kv "VITE_GOOGLE_CLIENT_ID" "$_g_fallback"
+    echo "  ~ filled GOOGLE_CLIENT_ID from deploy/google-oauth.client-id"
+  fi
+fi
 
 echo "==> .env.prod ready"

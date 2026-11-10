@@ -271,12 +271,46 @@ def _normalize_username(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
-# Emails that must live on Achillio Travel after the cross-office fiasco.
-_ACHILLIO_HOME_EMAILS = frozenset(
+# Emails that must live on the PoreiaGo platform office (not Achillio Travel).
+_POREIAGO_HOME_EMAILS = frozenset(
     {
         "axilleas0@yahoo.gr",
     }
 )
+# Back-compat alias — older call sites / tests.
+_ACHILLIO_HOME_EMAILS = _POREIAGO_HOME_EMAILS
+
+# Profiles used only when a home driver row is missing entirely (recreate).
+# force_password: deploy/boot repair resets the hash so unified /login and
+# /driver always unlock with the known password (same pattern as axdafnis).
+# Override at deploy via POREIAGO_AXILLEAS_PASSWORD.
+_POREIAGO_HOME_PROFILES: dict[str, dict] = {
+    "axilleas0@yahoo.gr": {
+        "name": "Αχιλλέας Χαραλαμπίδης",
+        "license_no": "AXILLEAS-HOME-LIC",
+        "phone": "+306900000001",
+        "password": "Dimtsa@1234",
+        "force_password": True,
+    },
+}
+_ACHILLIO_HOME_PROFILES = _POREIAGO_HOME_PROFILES
+
+# Achillio Travel ops drivers — kept on the Achillio office (native Wallet login).
+# Password may be overridden at deploy via ACHILLIO_AXDAFNIS_PASSWORD.
+_ACHILLIO_OPS_EMAILS = frozenset(
+    {
+        "axdafnis@gmail.com",
+    }
+)
+_ACHILLIO_OPS_PROFILES: dict[str, dict] = {
+    "axdafnis@gmail.com": {
+        "name": "Αχιλλέας Δάφνης",
+        "license_no": "AXDAFNIS-ACHILLIO-LIC",
+        "phone": "",
+        "password": "Mpouri@1234",
+        "force_password": True,
+    },
+}
 
 
 def find_drivers_by_email(email: str) -> list[FleetDriver]:
@@ -292,10 +326,11 @@ def find_drivers_by_email(email: str) -> list[FleetDriver]:
 
 def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool = True) -> dict:
     """
-    Move DEMO orphan rows with this email onto ``tenant_id``.
+    Move driver rows with this email onto ``tenant_id``.
 
-    SEAL: never steal a driver from a real office (PoreiaGo ↔ Achillio).
-    Boot repair may only claim DEMO leftovers.
+    Default SEAL: only DEMO orphans (never steal from a real office).
+    Known PoreiaGo home emails may pass ``only_from_demo=False`` so boot repair
+    can pull Achilleas back from Achillio Travel / DEMO onto PoreiaGo.
     """
     tid = _normalize_tenant_id(tenant_id)
     if not tid or tid == DEMO_TENANT_ID:
@@ -339,35 +374,193 @@ def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool 
     }
 
 
-async def repair_achillio_home_drivers() -> dict:
-    """Boot repair: known Achillio drivers must not stay on PoreiaGo/DEMO."""
-    try:
-        from sqlalchemy import select
+def _profile_for_home_email(email_n: str) -> dict | None:
+    return (
+        _POREIAGO_HOME_PROFILES.get(email_n)
+        or _ACHILLIO_OPS_PROFILES.get(email_n)
+        or None
+    )
 
-        from app.core.database import AsyncSessionLocal
-        from app.models.tenant import Tenant
-        from app.services.tenant_modules import is_achillio_travel_office
+
+def ensure_home_driver_on_tenant(
+    email: str,
+    tenant_id: str,
+    *,
+    password_override: str | None = None,
+) -> dict:
+    """
+    Make sure a known home/ops driver exists on ``tenant_id``.
+
+    1) Force-rehome any existing row (even from another real office).
+    2) If missing entirely, recreate from home/ops profiles.
+    3) When profile.force_password (or password_override), reset the hash so
+       /driver login matches the known unlock password.
+    """
+    email_n = _normalize_username(email)
+    tid = _normalize_tenant_id(tenant_id)
+    if not email_n or not tid or tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "invalid_args", "email": email}
+
+    profile = _profile_for_home_email(email_n) or {}
+    want_password = (
+        str(password_override).strip()
+        if password_override and str(password_override).strip()
+        else str(profile.get("password") or "").strip() or DEFAULT_DRIVER_PASSWORD
+    )
+    force_password = bool(profile.get("force_password")) or bool(password_override)
+
+    existing = find_drivers_by_email(email_n)
+    action = "already_home"
+    if existing:
+        report = rehome_driver_to_tenant(email_n, tid, only_from_demo=False)
+        action = "rehomed" if report.get("moved") else "already_home"
+        on_home = [d for d in find_drivers_by_email(email_n) if _driver_tenant_id(d) == tid]
+        password_reset = False
+        if on_home and force_password and want_password:
+            for d in on_home:
+                update_driver(d.id, {"password": want_password, "status": "active"})
+            password_reset = True
+        return {
+            "ok": True,
+            "action": action,
+            "email": email_n,
+            "tenant_id": tid,
+            "ids": [d.id for d in on_home],
+            "rehome": report,
+            "password_reset": password_reset,
+        }
+
+    if not profile:
+        return {"ok": False, "reason": "no_profile", "email": email_n}
+
+    # License may collide with a leftover row — uniquify once.
+    license_no = str(profile.get("license_no") or "HOME-LIC")
+    try:
+        created = create_driver(
+            {
+                "name": profile.get("name") or email_n,
+                "license_no": license_no,
+                "phone": profile.get("phone") or "",
+                "email": email_n,
+                "password": want_password,
+                "status": "active",
+                "tenant_id": tid,
+                "_allow_demo_tenant": False,
+            }
+        )
+    except ValueError as exc:
+        # Retry with a unique license if the fixed one is taken.
+        if "άδειας" in str(exc) or "license" in str(exc).lower():
+            created = create_driver(
+                {
+                    "name": profile.get("name") or email_n,
+                    "license_no": f"{license_no}-{uuid4().hex[:6].upper()}",
+                    "phone": profile.get("phone") or "",
+                    "email": email_n,
+                    "password": want_password,
+                    "status": "active",
+                    "tenant_id": tid,
+                }
+            )
+        else:
+            return {"ok": False, "reason": "create_failed", "detail": str(exc), "email": email_n}
+
+    logger.warning(
+        "ENSURE home driver created %s (%s) on tenant %s",
+        created.id,
+        created.email,
+        tid,
+    )
+    return {
+        "ok": True,
+        "action": "created",
+        "email": email_n,
+        "tenant_id": tid,
+        "ids": [created.id],
+        "password_reset_to_default": True,
+        "password_reset": True,
+    }
+
+
+async def repair_poreiago_home_drivers() -> dict:
+    """
+    Boot repair: known home drivers (Achilleas) must live on PoreiaGo platform —
+    pull them off Achillio Travel / DEMO and recreate if missing.
+    """
+    try:
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
     except Exception as exc:
         return {"ok": False, "reason": f"imports:{exc}"}
 
-    achillio_tid: str | None = None
     try:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Tenant).limit(50))
-            for tenant in result.scalars().all():
-                if is_achillio_travel_office(tenant):
-                    achillio_tid = str(tenant.id)
-                    break
+        platform_tid = await resolve_poreiago_platform_tenant_id()
     except Exception as exc:
         return {"ok": False, "reason": f"db:{exc}"}
 
-    if not achillio_tid:
+    if not platform_tid or platform_tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "poreiago_platform_tenant_missing"}
+
+    env_pw = str(os.getenv("POREIAGO_AXILLEAS_PASSWORD") or "").strip()
+    reports = []
+    for email in _POREIAGO_HOME_EMAILS:
+        override = env_pw if email == "axilleas0@yahoo.gr" and env_pw else None
+        reports.append(
+            ensure_home_driver_on_tenant(
+                email,
+                platform_tid,
+                password_override=override,
+            )
+        )
+    return {
+        "ok": True,
+        "poreiago_tenant_id": platform_tid,
+        "reports": reports,
+    }
+
+
+async def repair_achillio_home_drivers() -> dict:
+    """Deprecated alias — Achilleas home is PoreiaGo, not Achillio Travel."""
+    return await repair_poreiago_home_drivers()
+
+
+async def repair_achillio_ops_drivers() -> dict:
+    """
+    Boot/deploy repair: Achillio Travel ops drivers (axdafnis@…) must live on
+    the Achillio office with a working /driver password for native Wallet.
+    """
+    try:
+        from travel_platform.settings.office_host_guard import (
+            resolve_achillio_travel_tenant_id,
+        )
+    except Exception as exc:
+        return {"ok": False, "reason": f"imports:{exc}"}
+
+    try:
+        ach_tid = await resolve_achillio_travel_tenant_id()
+    except Exception as exc:
+        return {"ok": False, "reason": f"db:{exc}"}
+
+    if not ach_tid or ach_tid == DEMO_TENANT_ID:
         return {"ok": False, "reason": "achillio_tenant_missing"}
 
+    env_pw = str(os.getenv("ACHILLIO_AXDAFNIS_PASSWORD") or "").strip()
     reports = []
-    for email in _ACHILLIO_HOME_EMAILS:
-        reports.append(rehome_driver_to_tenant(email, achillio_tid))
-    return {"ok": True, "achillio_tenant_id": achillio_tid, "reports": reports}
+    for email in _ACHILLIO_OPS_EMAILS:
+        override = env_pw if email == "axdafnis@gmail.com" and env_pw else None
+        reports.append(
+            ensure_home_driver_on_tenant(
+                email,
+                ach_tid,
+                password_override=override,
+            )
+        )
+    return {
+        "ok": True,
+        "achillio_tenant_id": ach_tid,
+        "reports": reports,
+    }
 
 
 def _load_from_disk() -> tuple[dict[str, FleetDriver], float] | None:
@@ -767,15 +960,31 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
     return d
 
 
-def delete_driver(driver_id: str) -> None:
-    if driver_id not in _ensure():
+def delete_driver(driver_id: str, *, tenant_id: str | None = None) -> None:
+    """
+    Delete a driver. When ``tenant_id`` is set (always from admin API), the row
+    must belong to that office — never delete across PoreiaGo ↔ Achillio.
+    """
+    drivers = _ensure()
+    d = drivers.get(driver_id)
+    if not d:
         raise KeyError("Driver not found")
-    del _ensure()[driver_id]
+    if tenant_id is not None:
+        want = _normalize_tenant_id(tenant_id)
+        if _driver_tenant_id(d) != want:
+            logger.warning(
+                "SEAL: blocked cross-office driver delete id=%s row_tenant=%s actor_tenant=%s",
+                driver_id,
+                _driver_tenant_id(d),
+                want,
+            )
+            raise KeyError("Driver not found")
+    del drivers[driver_id]
     _persist()
 
 
-def drivers_for_export() -> list[dict]:
-    return [_driver_to_row(d) for d in list_drivers()]
+def drivers_for_export(tenant_id: str | None = None) -> list[dict]:
+    return [_driver_to_row(d) for d in list_drivers(tenant_id=tenant_id)]
 
 
 def replace_drivers_from_backup(rows: list[dict]) -> int:
@@ -786,3 +995,20 @@ def replace_drivers_from_backup(rows: list[dict]) -> int:
         _drivers[driver.id] = driver
     _persist()
     return len(_drivers)
+
+
+def replace_drivers_for_tenant(tenant_id: str, rows: list[dict]) -> int:
+    """Replace only this office's drivers — leave other tenants untouched."""
+    global _drivers
+    tid = _normalize_tenant_id(tenant_id)
+    kept = {did: d for did, d in _ensure().items() if _driver_tenant_id(d) != tid}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        patched = {**row, "tenant_id": tid}
+        driver = _driver_from_row(patched)
+        driver.tenant_id = tid
+        kept[driver.id] = driver
+    _drivers = kept
+    _persist()
+    return sum(1 for d in _drivers.values() if _driver_tenant_id(d) == tid)
