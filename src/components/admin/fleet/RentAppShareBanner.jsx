@@ -18,7 +18,7 @@ export default function RentAppShareBanner() {
 
   useEffect(() => {
     let cancelled = false;
-    // 1) Resolve current office (JWT tenant branding), 2) then emit Rent Wallet link + QR.
+    // 1) Resolve current office (JWT tenant branding), 2) then emit My Wallet rentals link + QR.
     // Session seal: on PoreiaGo admin host never emit Achillio Travel domain.
     const contextHost =
       typeof window !== 'undefined' ? window.location.hostname : '';
@@ -113,7 +113,7 @@ export default function RentAppShareBanner() {
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">
-                Σύνδεσμος Rent Wallet
+                Σύνδεσμος My Wallet
               </p>
               <code className="text-[11px] break-all text-[#1d1d1f] leading-snug">
                 {loading ? 'Φόρτωση γραφείου…' : rentUrl || '—'}
