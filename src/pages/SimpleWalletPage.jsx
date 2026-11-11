@@ -72,6 +72,7 @@ import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
+  isRentOnlyModules,
   shouldShowRentStorefront,
 } from '../services/officeModulesApi.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
@@ -100,6 +101,12 @@ const ALL_TABS = [
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Ενοικιάσεις', icon: 'directions_car' },
   { id: 'more', label: 'Περισσότερα', icon: 'travel_explore' },
+];
+
+/** Rent-only My Wallet — no bus trips / tickets / bookings chrome. */
+const RENT_ONLY_TABS = [
+  { id: 'rentals', label: 'Ενοικιάσεις', icon: 'directions_car' },
+  { id: 'account', label: 'Λογαριασμός', icon: 'person' },
 ];
 
 function tabIsActive(activeTab, tabId) {
@@ -445,16 +452,24 @@ function WalletAuthenticatedApp() {
   const rentAvailable = shouldShowRentStorefront(officeModules, {
     native: nativeWallet,
   });
-  const tabs = useMemo(
-    () => (rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals')),
-    [rentAvailable],
-  );
+  // Native rent demo OR rent-only office contract → no bus menu at all.
+  const rentOnlyShell = Boolean(isNativeRentDemo() || isRentOnlyModules(officeModules));
+  const tabs = useMemo(() => {
+    if (rentOnlyShell) return RENT_ONLY_TABS;
+    return rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals');
+  }, [rentAvailable, rentOnlyShell]);
 
   useEffect(() => {
+    if (rentOnlyShell) {
+      if (activeTab !== 'rentals' && activeTab !== 'account' && activeTab !== 'lost_found') {
+        setActiveTab('rentals');
+      }
+      return;
+    }
     if (!rentAvailable && activeTab === 'rentals') {
       setActiveTab('home');
     }
-  }, [rentAvailable, activeTab]);
+  }, [rentAvailable, rentOnlyShell, activeTab]);
 
   const handleLogout = () => {
     logoutCustomer();
@@ -951,11 +966,13 @@ function WalletAuthenticatedApp() {
               officeBrand.displayName ||
               (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
             }
-            rentAvailable={rentAvailable}
+            rentAvailable={rentAvailable && !rentOnlyShell}
             onOpenAccount={() => switchTab('account')}
             onOpenSecurity={() => openAccountSecurity()}
-            onOpenLostFound={() => switchTab('lost_found')}
-            onOpenRent={openRentWallet}
+            onOpenLostFound={
+              rentOnlyShell ? undefined : () => switchTab('lost_found')
+            }
+            onOpenRent={rentOnlyShell ? undefined : openRentWallet}
             onLogout={handleLogout}
           />
           <div className="wallet-topbar-brand">
@@ -1003,7 +1020,7 @@ function WalletAuthenticatedApp() {
         ) : null}
 
         <main className="wallet-main">
-        {activeTab === 'home' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
               <div className="wallet-desktop-pass-col">
@@ -1028,7 +1045,7 @@ function WalletAuthenticatedApp() {
           )
         ) : null}
 
-        {activeTab === 'pass' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'pass' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
               <div className="wallet-desktop-pass-col">{homePass}</div>
@@ -1039,7 +1056,7 @@ function WalletAuthenticatedApp() {
           )
         ) : null}
 
-        {activeTab === 'bookings' && (
+        {!rentOnlyShell && activeTab === 'bookings' && (
           <div className="wallet-stack">
             {rentAvailable ? <WalletRentSection onOpenRentals={openRentWallet} /> : null}
             <div className="wallet-panel">
@@ -1131,7 +1148,11 @@ function WalletAuthenticatedApp() {
                 </span>
                 <div>
                   <h2>Ενοικιάσεις</h2>
-                  <p>Οι κάρτες οχήματός σας στο ίδιο My Wallet.</p>
+                  <p>
+                    {rentOnlyShell
+                      ? 'Κάρτες οχήματος και κράτηση — μόνο ενοικιάσεις.'
+                      : 'Οι κάρτες οχήματός σας στο ίδιο My Wallet.'}
+                  </p>
                 </div>
               </div>
               <RentalWalletPanel
@@ -1166,7 +1187,7 @@ function WalletAuthenticatedApp() {
           </div>
         ) : null}
 
-        {activeTab === 'more' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'more' && !isTicketView ? (
           <WalletMorePanel
             bookings={bookings}
             brandLabel={brandLabel}
@@ -1177,7 +1198,7 @@ function WalletAuthenticatedApp() {
           />
         ) : null}
 
-        {activeTab === 'lost_found' && (
+        {!rentOnlyShell && activeTab === 'lost_found' && (
           <LostFoundPanel
             bookings={bookings}
             onBack={() => switchTab('account')}
@@ -1220,25 +1241,27 @@ function WalletAuthenticatedApp() {
                 ))}
               </dl>
             </section>
-            <section className="wallet-panel">
-              <div className="wallet-panel-head">
-                <span className="wallet-panel-head-icon" aria-hidden>
-                  <span className="material-symbols-outlined">support_agent</span>
-                </span>
-                <div>
-                  <h2>Απωλεσθέντα</h2>
-                  <p>Δήλωση αντικειμένου που ξεχάσατε στο λεωφορείο.</p>
+            {!rentOnlyShell ? (
+              <section className="wallet-panel">
+                <div className="wallet-panel-head">
+                  <span className="wallet-panel-head-icon" aria-hidden>
+                    <span className="material-symbols-outlined">support_agent</span>
+                  </span>
+                  <div>
+                    <h2>Απωλεσθέντα</h2>
+                    <p>Δήλωση αντικειμένου που ξεχάσατε στο λεωφορείο.</p>
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                className="wallet-btn wallet-btn-ghost wallet-btn-block"
-                onClick={() => switchTab('lost_found')}
-              >
-                Άνοιγμα απωλεσθέντων
-              </button>
-            </section>
-            {rentAvailable ? (
+                <button
+                  type="button"
+                  className="wallet-btn wallet-btn-ghost wallet-btn-block"
+                  onClick={() => switchTab('lost_found')}
+                >
+                  Άνοιγμα απωλεσθέντων
+                </button>
+              </section>
+            ) : null}
+            {rentAvailable && !rentOnlyShell ? (
               <section className="wallet-panel">
                 <div className="wallet-panel-head">
                   <span className="wallet-panel-head-icon" aria-hidden>
@@ -1285,7 +1308,7 @@ function WalletAuthenticatedApp() {
           </div>
         )}
 
-        {isTicketView && (
+        {!rentOnlyShell && isTicketView && (
           <WalletTicketDetail
             booking={selectedBooking}
             coverImage={coverForBooking(selectedBooking)}
