@@ -52,6 +52,7 @@ import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.js
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
+import WalletRentBookHome from '../components/wallet/WalletRentBookHome.jsx';
 import WalletAccountMenu from '../components/wallet/WalletAccountMenu.jsx';
 import WalletRentSection from '../components/wallet/WalletRentSection.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
@@ -90,6 +91,7 @@ import {
   rememberWalletOfficeTrips,
 } from '../lib/wallet/walletOfficeTrips.js';
 import '../styles/wallet-pass.css';
+import '../styles/rental-pwa.css';
 
 /** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · [Ενοικιάσεις] · Περισσότερα.
  * Desktop → left sidebar; phone → bottom dock.
@@ -236,6 +238,9 @@ function WalletAuthenticatedApp() {
   const [offlineSnap, setOfflineSnap] = useState(() => loadLastPass());
 
   const [profileTick, setProfileTick] = useState(0);
+  /** Bump when book-first «Δες οχήματα» runs — drives RentalCatalogPanel search. */
+  const [rentSearchTick, setRentSearchTick] = useState(0);
+  const [rentFleetOpen, setRentFleetOpen] = useState(false);
   /** Deep-link into CustomerSecurityPanel action from the account sheet. */
   const [securityFocus, setSecurityFocus] = useState(null);
   const profile = useMemo(() => resolveCustomerProfile(), [profileTick]);
@@ -1140,15 +1145,40 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'rentals' && rentAvailable ? (
-          <div className="wallet-stack">
+          <div className="wallet-stack wallet-stack--rent-book">
+            <WalletRentBookHome
+              siteAppearance={siteAppearance}
+              welcomeName={profile.name}
+              onSearch={() => {
+                setRentFleetOpen(true);
+                setRentSearchTick((n) => n + 1);
+                window.setTimeout(() => {
+                  document
+                    .getElementById('wallet-rent-fleet')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+              }}
+            />
+
+            {rentFleetOpen || rentSearchTick > 0 ? (
+              <RentalCatalogPanel
+                mode="full"
+                bookFirst
+                searchTick={rentSearchTick}
+                onBooked={() => {
+                  setRentFleetOpen(true);
+                }}
+              />
+            ) : null}
+
             <section className="wallet-panel wallet-panel--rent-passes">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
                   <span className="material-symbols-outlined">directions_car</span>
                 </span>
                 <div>
-                  <h2>Ενοικιάσεις</h2>
-                  <p>Οι κάρτες οχήματός σας στο ίδιο My Wallet.</p>
+                  <h2>Οι ενοικιάσεις μου</h2>
+                  <p>Κάρτες οχήματος στο My Wallet.</p>
                 </div>
               </div>
               <RentalWalletPanel
@@ -1156,30 +1186,12 @@ function WalletAuthenticatedApp() {
                 passengerName={profile.name}
                 highlightBookingId={highlightRentalBookingId}
                 onBookVehicle={() => {
-                  // Stay inside My Wallet; catalog is on this same rentals tab.
-                  const el = document.getElementById('wallet-rent-catalog');
-                  if (el && typeof el.scrollIntoView === 'function') {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
+                  document
+                    .getElementById('rent-guest-search')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }}
               />
             </section>
-            <section id="wallet-rent-catalog" className="wallet-panel">
-              <div className="wallet-panel-head">
-                <span className="wallet-panel-head-icon" aria-hidden>
-                  <span className="material-symbols-outlined">garage</span>
-                </span>
-                <div>
-                  <h2>Κατάλογος οχημάτων</h2>
-                  <p>
-                    {isNativeRentDemo()
-                      ? 'Demo στόλος — χωρίς πραγματικό γραφείο.'
-                      : 'Διαθεσιμότητα και νέα κράτηση από το γραφείο σας.'}
-                  </p>
-                </div>
-              </div>
-            </section>
-            <RentalCatalogPanel mode="full" />
           </div>
         ) : null}
 
