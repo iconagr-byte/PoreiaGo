@@ -159,7 +159,12 @@ if ($selfPath -and (Test-Path -LiteralPath $selfPath)) {
 Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
 git fetch origin $Branch
 if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
-git checkout $Branch
+# wallet-run always rebuilds from origin — drop local dirt so checkout cannot fail
+# (e.g. a hand-edited capacitor.config.json left from a previous APK try).
+git reset --hard HEAD
+if ($LASTEXITCODE -ne 0) { throw "git reset --hard HEAD failed" }
+git clean -fd -e android/local.properties -e android/.gradle -e node_modules
+git checkout -B $Branch ("origin/" + $Branch)
 if ($LASTEXITCODE -ne 0) { throw ("git checkout failed for " + $Branch) }
 git reset --hard ("origin/" + $Branch)
 if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branch) }
