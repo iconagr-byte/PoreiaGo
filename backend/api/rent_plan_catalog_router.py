@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from travel_platform.settings.rent_plan_catalog_store import (
@@ -11,6 +11,12 @@ from travel_platform.settings.rent_plan_catalog_store import (
 )
 
 router = APIRouter(tags=["rent-plan-catalog"])
+
+
+def _require_superadmin(request: Request) -> None:
+    roles = {str(r).lower() for r in (getattr(request.state, "roles", None) or [])}
+    if "superadmin" not in roles:
+        raise HTTPException(status_code=403, detail="Superadmin only")
 
 
 class RentPlanCardModel(BaseModel):
@@ -56,7 +62,8 @@ async def get_admin_rent_plan_catalog():
 
 
 @router.patch("/api/admin/platform/rent-plan-catalog", response_model=RentPlanCatalogResponse)
-async def patch_rent_plan_catalog(body: RentPlanCatalogPatch):
+async def patch_rent_plan_catalog(request: Request, body: RentPlanCatalogPatch):
+    _require_superadmin(request)
     patch = body.model_dump(exclude_unset=True)
     if not patch:
         raise HTTPException(status_code=400, detail="Empty patch")
