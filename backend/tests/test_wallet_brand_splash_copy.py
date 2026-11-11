@@ -1,4 +1,4 @@
-"""Native wallet splash: office logo+name when sealed, else PoreiaGo wordmark."""
+"""Native wallet splash: PoreiaGo wordmark only (no Achillio office seal)."""
 
 from __future__ import annotations
 
@@ -21,22 +21,15 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         self.assertNotIn("WALLET_SPLASH_HOOK", text)
         self.assertNotIn("WALLET_SPLASH_SUPPORT", text)
 
-    def test_component_loads_office_logo_and_name(self):
+    def test_component_is_poreiago_wordmark_only(self):
         jsx = SPLASH_JSX.read_text(encoding="utf-8")
-        self.assertIn("resolveOfficeSplashBrand", jsx)
-        self.assertIn("pg-wallet-splash-office-name", jsx)
-        self.assertIn("pg-wallet-splash-logo", jsx)
-        self.assertIn("getWalletTenantId", jsx)
         self.assertIn("pg-wallet-splash-wordmark", jsx)
+        self.assertIn("WALLET_SPLASH_BRAND", jsx)
         self.assertNotIn("Αγγίξτε για συνέχεια", jsx)
-
-    def test_splash_brand_helper_keeps_achillio_name(self):
-        helper = (
-            ROOT / "src" / "lib" / "wallet" / "officeSplashBrand.js"
-        ).read_text(encoding="utf-8")
-        self.assertIn("Achillio Travel", helper)
-        self.assertIn("pickOfficeName", helper)
-        self.assertIn("footer_brand_name", helper)
+        self.assertNotIn("Achillio", jsx)
+        self.assertNotIn("achillio-travel-mark", jsx)
+        self.assertNotIn("resolveOfficeSplashBrand", jsx)
+        self.assertNotIn("ACHILLIO_TRAVEL_NAME", jsx)
 
     def test_not_b2b_office_platform_line(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
