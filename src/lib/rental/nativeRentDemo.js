@@ -1,6 +1,6 @@
 /**
- * Native Capacitor: open My Wallet → Ενοικιάσεις sealed to IconaRent (iconarent)
- * so catalog/bookings hit a real rent office — not Achillio / PoreiaGo platform.
+ * Native Capacitor: open My Wallet → Ενοικιάσεις sealed to IconaRent (iconarent).
+ * Issues a real customer JWT against that office host so catalog/bookings work.
  */
 
 import { loginAsCustomer } from '../auth.js';
@@ -9,12 +9,14 @@ import { markPreferRentLookup } from './preferRentLookup.js';
 
 export const NATIVE_RENT_DEMO_KEY = 'poreiago_native_rent_demo_v1';
 export const NATIVE_RENT_DEMO_EMAIL = 'demo-rent@poreiago.local';
+/** @deprecated Soft token — prefer real JWT from /api/auth/native-rent-demo */
 export const NATIVE_RENT_DEMO_TOKEN = 'native-rent-demo';
 
-/** IconaRent office — Ιψονα ρεντ / iconarent.poreiago.com */
+/** IconaRent office — Ιψονα ρεντ / Dodopoulos… O.E. */
 export const NATIVE_RENT_DEMO_OFFICE_SLUG = 'iconarent';
 export const NATIVE_RENT_DEMO_OFFICE_HOST = 'iconarent.poreiago.com';
-/** Production tenant id fallback when appearance resolve fails. */
+export const NATIVE_RENT_DEMO_API_BASE = `https://${NATIVE_RENT_DEMO_OFFICE_HOST}`;
+/** Production tenant id fallback when session resolve fails. */
 export const NATIVE_RENT_DEMO_TENANT_FALLBACK = '0b0f6982-caa6-4efb-8e4e-7ea5a231f1cd';
 
 export function isNativeRentDemo() {
@@ -35,15 +37,18 @@ export function enableNativeRentDemo() {
   markPreferRentLookup();
 }
 
+export function nativeRentDemoApiBase() {
+  return NATIVE_RENT_DEMO_API_BASE;
+}
+
 /**
- * Resolve IconaRent tenant_id from office appearance asset URL, else fallback.
+ * Resolve IconaRent tenant_id from office appearance, else fallback.
  * @returns {Promise<string>}
  */
 export async function resolveNativeRentDemoTenantId() {
   const fallback = NATIVE_RENT_DEMO_TENANT_FALLBACK;
   try {
-    const url = `https://${NATIVE_RENT_DEMO_OFFICE_HOST}/api/site/appearance`;
-    const res = await fetch(url, {
+    const res = await fetch(`${NATIVE_RENT_DEMO_API_BASE}/api/site/appearance`, {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
     });
@@ -53,32 +58,68 @@ export async function resolveNativeRentDemoTenantId() {
     const hit = logo.match(/office-assets\/([0-9a-f-]{36})\//i);
     if (hit?.[1]) return hit[1];
   } catch {
-    /* offline / CORS — use known IconaRent id */
+    /* offline / CORS */
   }
   return fallback;
 }
 
-/** Enter My Wallet rentals tab sealed to IconaRent. */
+/**
+ * Mint real JWT sealed to IconaRent (must hit that office host).
+ * @returns {Promise<{access_token: string, tenant_id: string, email: string, name: string}>}
+ */
+export async function fetchNativeRentDemoSession() {
+  const res = await fetch(`${NATIVE_RENT_DEMO_API_BASE}/api/auth/native-rent-demo`, {
+    method: 'POST',
+    credentials: 'omit',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Office-Host': NATIVE_RENT_DEMO_OFFICE_HOST,
+    },
+    body: '{}',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    throw new Error(
+      typeof detail === 'string' ? detail : `Demo rent login failed (${res.status})`,
+    );
+  }
+  return data;
+}
+
+/** Enter My Wallet rentals tab sealed to IconaRent with a real customer JWT. */
 export async function enterNativeRentDemoWallet() {
   enableNativeRentDemo();
+  let profile = null;
   try {
-    const tid = await resolveNativeRentDemoTenantId();
+    profile = await fetchNativeRentDemoSession();
+  } catch {
+    profile = null;
+  }
+
+  const tid =
+    String(profile?.tenant_id || '').trim() ||
+    (await resolveNativeRentDemoTenantId()) ||
+    NATIVE_RENT_DEMO_TENANT_FALLBACK;
+
+  try {
     if (tid) setWalletTenantId(tid);
     else clearWalletTenantId();
   } catch {
-    try {
-      setWalletTenantId(NATIVE_RENT_DEMO_TENANT_FALLBACK);
-    } catch {
-      clearWalletTenantId();
-    }
+    /* ignore */
   }
+
   loginAsCustomer(
-    NATIVE_RENT_DEMO_EMAIL,
+    profile?.email || NATIVE_RENT_DEMO_EMAIL,
     {
-      name: 'Demo Rent',
-      provider: 'demo',
+      name: profile?.name || 'Demo Rent',
+      provider: profile?.provider || 'demo',
+      tenant_id: tid,
+      customer_id: profile?.customer_id,
+      picture: profile?.picture,
     },
-    NATIVE_RENT_DEMO_TOKEN,
+    profile?.access_token || null,
   );
 }
 

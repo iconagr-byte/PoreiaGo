@@ -46,9 +46,24 @@ async def public_tenant_id(request: "Request", *, allow_demo_fallback: bool = Tr
     if tid:
         return str(tid)
 
-    # Only proxy Host headers — never Origin/Referer (client-spoofable office switch).
+    # Explicit sealed wallet office (native Capacitor rent demo).
+    for header in ("x-wallet-tenant-id",):
+        raw = (request.headers.get(header) or "").strip()
+        if raw and len(raw) >= 8:
+            request.state.tenant_id = raw
+            return raw
+    try:
+        q_tid = (request.query_params.get("tenant_id") or "").strip()
+    except Exception:
+        q_tid = ""
+    if q_tid and len(q_tid) >= 8:
+        request.state.tenant_id = q_tid
+        return q_tid
+
+    # Host + X-Office-Host (native → iconarent.poreiago.com while WebView is localhost).
+    # Never Origin/Referer (client-spoofable office switch).
     hosts: list[str] = []
-    for header in ("x-forwarded-host", "host"):
+    for header in ("x-office-host", "x-forwarded-host", "host"):
         raw = (request.headers.get(header) or "").strip()
         if not raw:
             continue

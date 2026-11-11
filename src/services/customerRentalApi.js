@@ -1,11 +1,47 @@
-import { API_BASE } from '../config/api.js';
+import { getApiBase } from '../config/api.js';
 import { customerAuthHeaders } from './customerAuthApi.js';
+import {
+  isNativeRentDemo,
+  NATIVE_RENT_DEMO_OFFICE_HOST,
+} from '../lib/rental/nativeRentDemo.js';
+
+async function sealedOfficeHeaders() {
+  const headers = {};
+  try {
+    const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+    const tid = getWalletTenantId();
+    if (tid) headers['X-Wallet-Tenant-Id'] = tid;
+  } catch {
+    /* ignore */
+  }
+  if (isNativeRentDemo()) {
+    headers['X-Office-Host'] = NATIVE_RENT_DEMO_OFFICE_HOST;
+  }
+  return headers;
+}
+
+function withTenantQuery(path) {
+  try {
+    // Sync read — seal is in localStorage.
+    const tid =
+      typeof localStorage !== 'undefined'
+        ? String(localStorage.getItem('wallet_tenant_id') || '').trim()
+        : '';
+    if (!tid) return path;
+    const join = path.includes('?') ? '&' : '?';
+    return `${path}${join}tenant_id=${encodeURIComponent(tid)}`;
+  } catch {
+    return path;
+  }
+}
 
 async function customerRentalFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}/api/customer/rentals${path}`, {
+  const officeHeaders = await sealedOfficeHeaders();
+  const res = await fetch(`${getApiBase()}/api/customer/rentals${withTenantQuery(path)}`, {
     ...options,
     headers: {
       ...customerAuthHeaders(),
+      ...officeHeaders,
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     },
@@ -31,7 +67,14 @@ export async function fetchCustomerRentalCatalog(category) {
 }
 
 async function publicRentalFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}/api/customer/rentals${path}`, options);
+  const officeHeaders = await sealedOfficeHeaders();
+  const res = await fetch(`${getApiBase()}/api/customer/rentals${withTenantQuery(path)}`, {
+    ...options,
+    headers: {
+      ...officeHeaders,
+      ...(options.headers || {}),
+    },
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = data?.detail;

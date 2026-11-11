@@ -54,6 +54,12 @@ async def resolve_login_wallet_tenant(
     host_tid = await stamp_tenant_for_request(request)
     home = jwt_tenant_id(account) if account else None
     preferred = str(preferred_tenant_id or "").strip() or None
+    path = ""
+    try:
+        path = str(getattr(request.url, "path", "") or "")
+    except Exception:
+        path = ""
+    native_rent_demo = "native-rent-demo" in path
 
     if host_tid and home and host_tid != home:
         raise HTTPException(
@@ -65,13 +71,18 @@ async def resolve_login_wallet_tenant(
             status_code=403,
             detail="Η κράτηση ανήκει σε άλλο γραφείο από τον λογαριασμό σας.",
         )
-    if host_tid and preferred and host_tid != preferred:
+    if host_tid and preferred and host_tid != preferred and not native_rent_demo:
         raise HTTPException(
             status_code=403,
             detail="Η κράτηση δεν ανήκει σε αυτό το γραφείο.",
         )
 
-    chosen = host_tid or preferred or home
+    # Native rent demo: mint JWT sealed to IconaRent even if the shared API
+    # Host would otherwise resolve to Achillio / platform.
+    if native_rent_demo and preferred and not home:
+        chosen = preferred
+    else:
+        chosen = host_tid or preferred or home
     if not chosen:
         raise HTTPException(
             status_code=400,
