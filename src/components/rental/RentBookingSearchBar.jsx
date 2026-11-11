@@ -11,6 +11,7 @@ import {
   readRentBookingPrefs,
   writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
+import RentLocationPicker from './RentLocationPicker.jsx';
 
 function formatLegDate(isoDate) {
   if (!isoDate) return '—';
@@ -229,20 +230,16 @@ export default function RentBookingSearchBar({
             </span>
             <div className="rent-book-place-body">
               <span className="rent-book-label">Παραλαβή &amp; παράδοση</span>
-              <select
+              <RentLocationPicker
+                id="rent-pickup-location"
+                label="Σημείο παραλαβής"
                 value={pickupLocation}
-                onChange={(e) => {
-                  setPickupLocation(e.target.value);
-                  if (!differentDropoff) setDropoffLocation(e.target.value);
+                locations={locations}
+                onChange={(next) => {
+                  setPickupLocation(next);
+                  if (!differentDropoff) setDropoffLocation(next);
                 }}
-                aria-label="Σημείο παραλαβής"
-              >
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.value}>
-                    {loc.label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -254,17 +251,13 @@ export default function RentBookingSearchBar({
                 </span>
                 <div className="rent-book-place-body">
                   <span className="rent-book-label">Διαφορετικό σημείο παράδοσης</span>
-                  <select
+                  <RentLocationPicker
+                    id="rent-dropoff-location"
+                    label="Σημείο επιστροφής"
                     value={dropoffLocation}
-                    onChange={(e) => setDropoffLocation(e.target.value)}
-                    aria-label="Σημείο επιστροφής"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.value}>
-                        {loc.label}
-                      </option>
-                    ))}
-                  </select>
+                    locations={locations}
+                    onChange={setDropoffLocation}
+                  />
                 </div>
                 <button
                   type="button"
