@@ -23,7 +23,12 @@ console.assert(emptyAllowed.length === 0, 'allow empty');
 
 const layout = resolveRentGuestSearchLayout({});
 console.assert(layout.showDropoffToggle && layout.showPromo, 'layout defaults on');
-console.assert(layout.submitLabel === 'Αναζήτηση', 'submit default');
+console.assert(layout.submitLabel === 'Δες οχήματα', 'submit default');
+
+const obsoleteSubmit = resolveRentGuestSearchLayout({
+  rent_search_submit_label: 'Αναζήτηση',
+});
+console.assert(obsoleteSubmit.submitLabel === 'Δες οχήματα', 'obsolete submit remaps');
 
 const off = resolveRentGuestSearchLayout({
   rent_search_show_dropoff_toggle: false,

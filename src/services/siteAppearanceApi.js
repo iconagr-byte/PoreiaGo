@@ -79,7 +79,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   ],
   rent_search_show_dropoff_toggle: true,
   rent_search_show_promo: true,
-  rent_search_submit_label: 'Αναζήτηση',
+  rent_search_submit_label: 'Δες οχήματα',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
   rent_coverage_options: [],

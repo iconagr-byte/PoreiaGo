@@ -76,7 +76,7 @@ console.assert(guest.titleAccent === DEFAULT_RENT_APP_BRANDING.rent_guest_hero_t
 console.assert(guest.benefits.length === 3, 'default benefits');
 console.assert(guest.searchLayout.showDropoffToggle === true, 'dropoff on');
 console.assert(guest.searchLayout.showPromo === true, 'promo on');
-console.assert(guest.searchLayout.submitLabel === 'Αναζήτηση', 'submit label');
+console.assert(guest.searchLayout.submitLabel === 'Δες οχήματα', 'submit label');
 
 const guestCustom = resolveRentAppBranding(
   {
