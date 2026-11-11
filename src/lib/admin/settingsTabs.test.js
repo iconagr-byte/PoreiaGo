@@ -36,4 +36,10 @@ assert.ok(platformTabs.some((t) => t.id === 'growth'));
 assert.ok(!platformTabs.some((t) => t.id === 'integrations'));
 assert.ok(platformTabs.some((t) => t.id === 'domain'));
 
+const rentOnlyTabs = settingsTabsForRole(false, 'rent_only');
+assert.ok(rentOnlyTabs.some((t) => t.id === 'platform'));
+assert.ok(rentOnlyTabs.some((t) => t.id === 'contracts'));
+assert.ok(!rentOnlyTabs.some((t) => t.id === 'trip_reminder'));
+assert.equal(sanitizeSettingsSubTab('trip_reminder', false, 'rent_only'), 'platform');
+
 console.log('settingsTabs role gating: OK');

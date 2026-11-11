@@ -18,14 +18,17 @@ import TeltonikaDevicesPanel from './TeltonikaDevicesPanel.jsx';
 import TripReminderSettingsPanel from './TripReminderSettingsPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { PLATFORM_ONLY_TAB_IDS } from '../../lib/admin/settingsTabs.js';
+import { officeShowsBusSeatTools } from '../../lib/admin/officeDesignPages.js';
 
 /** Κοινό περιεχόμενο καρτελών ρυθμίσεων — tenant + super admin. */
 export default function SettingsTabPanels({
   tab,
   onOpenPayments,
   contractPrefs,
+  officeMode = 'trips_only',
 }) {
   const superAdmin = isSaasSuperAdmin();
+  const showBusSeatTools = officeShowsBusSeatTools(officeMode);
   if (PLATFORM_ONLY_TAB_IDS.has(tab) && !superAdmin) {
     return (
       <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
@@ -39,32 +42,48 @@ export default function SettingsTabPanels({
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
   if (tab === 'backup') return <BackupPanel />;
   if (tab === 'telematics') return <TeltonikaDevicesPanel />;
-  if (tab === 'trip_reminder') return <TripReminderSettingsPanel />;
+  if (tab === 'trip_reminder') {
+    if (!showBusSeatTools) {
+      return (
+        <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+          Η υπενθύμιση εκδρομής δεν ισχύει για γραφείο μόνο ενοικιάσεων.
+        </div>
+      );
+    }
+    return <TripReminderSettingsPanel />;
+  }
 
   if (tab === 'platform') {
     return (
       <div className="space-y-8">
-        <PlatformSettingsPanel onOpenPayments={onOpenPayments} />
-        <div id="seat-pricing" className="scroll-mt-28 space-y-3">
-          <div className="flex items-center gap-3 px-1">
-            <div className="h-px flex-1 bg-slate-200" />
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Θέσεις & τιμές
-            </p>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-          <SeatPricingPanel />
-        </div>
-        <div id="trip-extras" className="scroll-mt-28 space-y-3">
-          <div className="flex items-center gap-3 px-1">
-            <div className="h-px flex-1 bg-slate-200" />
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Υπηρεσίες εκδρομής
-            </p>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-          <TripExtrasEditor />
-        </div>
+        <PlatformSettingsPanel
+          onOpenPayments={onOpenPayments}
+          officeMode={officeMode}
+        />
+        {showBusSeatTools ? (
+          <>
+            <div id="seat-pricing" className="scroll-mt-28 space-y-3">
+              <div className="flex items-center gap-3 px-1">
+                <div className="h-px flex-1 bg-slate-200" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Θέσεις & τιμές
+                </p>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+              <SeatPricingPanel />
+            </div>
+            <div id="trip-extras" className="scroll-mt-28 space-y-3">
+              <div className="flex items-center gap-3 px-1">
+                <div className="h-px flex-1 bg-slate-200" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Υπηρεσίες εκδρομής
+                </p>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+              <TripExtrasEditor />
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }

@@ -5,6 +5,7 @@ import {
   contractDesignLabel,
   designPagesForModules,
   officeModeFromModules,
+  officeShowsBusSeatTools,
   resolveDesignPageForModules,
 } from './officeDesignPages.js';
 
@@ -36,5 +37,8 @@ console.assert(resolveDesignPageForModules('rent', both) === 'rent', 'both keeps
 console.assert(resolveDesignPageForModules('wallet', both) === 'wallet', 'both keeps wallet');
 console.assert(resolveDesignPageForModules('wallet', tripsOnly) === 'wallet', 'trips keeps wallet');
 console.assert(contractDesignLabel('both').includes('Λεωφορεία'), 'label both');
+console.assert(officeShowsBusSeatTools('trips_only') === true, 'trips show seat tools');
+console.assert(officeShowsBusSeatTools('both') === true, 'both show seat tools');
+console.assert(officeShowsBusSeatTools('rent_only') === false, 'rent hides seat tools');
 
 console.log('officeDesignPages: OK');

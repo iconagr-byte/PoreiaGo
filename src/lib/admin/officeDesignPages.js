@@ -49,3 +49,8 @@ export function contractDesignLabel(mode) {
   if (mode === 'both') return 'Συμβόλαιο · Λεωφορεία + Ενοικιάσεις';
   return 'Συμβόλαιο · μόνο Λεωφορεία';
 }
+
+/** Seat map pricing, VIP seats, trip extras — bus/excursions only. */
+export function officeShowsBusSeatTools(mode) {
+  return mode !== 'rent_only';
+}
