@@ -123,10 +123,14 @@ export default function RentalCatalogPanel({
   onBooked,
   preferredVehicle = null,
   onClearPreferred,
+  /** Hide legacy datetime form — trip comes from book-first search bar. */
+  bookFirst = false,
+  /** Bump to re-read prefs and run availability search. */
+  searchTick = 0,
 } = {}) {
   const showBook = mode === 'full' || mode === 'book';
-  const showMine = mode === 'full' || mode === 'mine';
-  const bare = mode !== 'full';
+  const showMine = !bookFirst && (mode === 'full' || mode === 'mine');
+  const bare = mode !== 'full' && !bookFirst;
   const [form, setForm] = useState(EMPTY);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -234,56 +238,109 @@ export default function RentalCatalogPanel({
     return true;
   };
 
-  const search = async (e) => {
-    e.preventDefault();
-    if (!validateDates()) return;
-    setBusy(true);
-    try {
-      let rows = [];
-      try {
-        rows = await fetchCustomerRentalAvailability({
-          startTime: new Date(form.start_time).toISOString(),
-          endTime: new Date(form.end_time).toISOString(),
-          category: form.category || undefined,
-          minSeats: form.min_seats || undefined,
-          pickupLocation: form.pickup_location,
-          dropoffLocation: form.dropoff_location,
-          driverMode: form.driver_mode,
-        });
-      } catch (err) {
-        // Native rent demo is sealed to IconaRent — never invent a second fleet.
-        if (isNativeRentDemo()) {
-          const { fetchPublicRentalAvailability } = await import(
-            '../../services/customerRentalApi.js'
-          );
-          rows = await fetchPublicRentalAvailability({
-            startTime: new Date(form.start_time).toISOString(),
-            endTime: new Date(form.end_time).toISOString(),
-            category: form.category || undefined,
-            minSeats: form.min_seats || undefined,
-            pickupLocation: form.pickup_location,
-            dropoffLocation: form.dropoff_location,
-            driverMode: form.driver_mode,
-          });
-        } else {
-          throw err;
-        }
+  const runAvailability = useCallback(
+    async (override = null) => {
+      const next = override
+        ? {
+            ...form,
+            start_time: override.start_time || form.start_time,
+            end_time: override.end_time || form.end_time,
+            pickup_location: override.pickup_location || form.pickup_location,
+            dropoff_location: override.dropoff_location || form.dropoff_location,
+          }
+        : form;
+      if (!next.start_time || !next.end_time) {
+        toast.error('Επιλέξτε ημερομηνίες');
+        return;
       }
-      setSuggestions(rows);
-      const preferredId = preferredVehicle?.id;
-      const selected =
-        preferredId && rows.some((v) => String(v.id) === String(preferredId))
-          ? preferredId
-          : rows[0]?.id || '';
-      setSelectedId(selected);
-      trackFunnel('availability_loaded', { count: rows.length, preferred: Boolean(preferredVehicle) });
-      if (!rows.length) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusy(false);
-    }
+      const start = new Date(next.start_time);
+      const end = new Date(next.end_time);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+        toast.error('Μη έγκυρες ημερομηνίες');
+        return;
+      }
+      if (override) setForm((f) => ({ ...f, ...next }));
+      setBusy(true);
+      try {
+        let rows = [];
+        try {
+          rows = await fetchCustomerRentalAvailability({
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            category: next.category || undefined,
+            minSeats: next.min_seats || undefined,
+            pickupLocation: next.pickup_location,
+            dropoffLocation: next.dropoff_location,
+            driverMode: next.driver_mode,
+          });
+        } catch (err) {
+          // Native rent demo is sealed to IconaRent — never invent a second fleet.
+          if (isNativeRentDemo()) {
+            const { fetchPublicRentalAvailability } = await import(
+              '../../services/customerRentalApi.js'
+            );
+            rows = await fetchPublicRentalAvailability({
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+              category: next.category || undefined,
+              minSeats: next.min_seats || undefined,
+              pickupLocation: next.pickup_location,
+              dropoffLocation: next.dropoff_location,
+              driverMode: next.driver_mode,
+            });
+          } else {
+            throw err;
+          }
+        }
+        setSuggestions(rows);
+        const preferredId = preferredVehicle?.id;
+        const selected =
+          preferredId && rows.some((v) => String(v.id) === String(preferredId))
+            ? preferredId
+            : rows[0]?.id || '';
+        setSelectedId(selected);
+        trackFunnel('availability_loaded', {
+          count: rows.length,
+          preferred: Boolean(preferredVehicle),
+        });
+        if (!rows.length) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [form, preferredVehicle],
+  );
+
+  const search = async (e) => {
+    e?.preventDefault?.();
+    if (!validateDates()) return;
+    await runAvailability();
   };
+
+  useEffect(() => {
+    if (!bookFirst || !searchTick) return;
+    let raw = {};
+    try {
+      raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    } catch {
+      raw = {};
+    }
+    const patch = {
+      start_time: raw.start_time || '',
+      end_time: raw.end_time || '',
+      pickup_location: raw.pickup_location || 'Γραφείο',
+      dropoff_location: raw.dropoff_location || raw.pickup_location || 'Γραφείο',
+      category: raw.category || '',
+      min_seats: Number(raw.min_seats || 5),
+      driver_mode: raw.driver_mode || 'SELF_DRIVE',
+    };
+    setForm((f) => ({ ...f, ...patch }));
+    void runAvailability(patch);
+    // Only react to searchTick bumps from the book-first bar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTick, bookFirst]);
 
   const book = async () => {
     if (!selectedId) {
@@ -372,8 +429,8 @@ export default function RentalCatalogPanel({
   return (
     <div className={bare ? 'rent-catalog' : 'wallet-stack'}>
       {showBook ? (
-      <section className={bare ? '' : 'wallet-panel'}>
-        {!bare ? (
+      <section className={bare ? '' : 'wallet-panel'} id={bookFirst ? 'wallet-rent-fleet' : undefined}>
+        {!bare && !bookFirst ? (
         <div className="wallet-panel-head">
           <span className="wallet-panel-head-icon" aria-hidden>
             <span className="material-symbols-outlined">directions_car</span>
@@ -383,6 +440,27 @@ export default function RentalCatalogPanel({
             <p>Βρείτε διαθέσιμο όχημα και κλείστε άμεσα από το κινητό.</p>
           </div>
         </div>
+        ) : null}
+
+        {bookFirst && (form.start_time || form.end_time) ? (
+          <div className="wallet-rent-trip-chip" aria-label="Επιλεγμένο ταξίδι">
+            <span className="material-symbols-outlined" aria-hidden>
+              calendar_month
+            </span>
+            <div>
+              <strong>
+                {form.pickup_location || 'Γραφείο'}
+                {form.dropoff_location &&
+                form.dropoff_location !== form.pickup_location
+                  ? ` → ${form.dropoff_location}`
+                  : ''}
+              </strong>
+              <p>
+                {formatWhen(form.start_time)} – {formatWhen(form.end_time)}
+              </p>
+            </div>
+            {busy ? <span className="wallet-rent-trip-chip-busy">Αναζήτηση…</span> : null}
+          </div>
         ) : null}
 
         {preferredVehicle ? (
@@ -421,6 +499,7 @@ export default function RentalCatalogPanel({
           </div>
         ) : null}
 
+        {!bookFirst ? (
         <form className="wallet-form" onSubmit={search}>
           <div className="rent-booking-steps" aria-label="Βήματα κράτησης">
             <span className={preferredVehicle ? 'is-done' : 'is-active'}>1. Όχημα</span>
@@ -559,6 +638,51 @@ export default function RentalCatalogPanel({
             Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
           </p>
         </form>
+        ) : selectedId ? (
+          <div className="wallet-form wallet-form--bookfirst-extras">
+            <div className="wallet-field">
+              <label htmlFor="rent-phone-bf">Τηλέφωνο (προαιρετικό)</label>
+              <input
+                id="rent-phone-bf"
+                className="wallet-input"
+                value={form.client_phone}
+                onChange={(e) => setForm((f) => ({ ...f, client_phone: e.target.value }))}
+              />
+            </div>
+            <div className="wallet-field">
+              <label>Extras</label>
+              <div className="rent-extras">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.extra_insurance}
+                    onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
+                  />
+                  Extra insurance (+€12/ημέρα)
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.child_seat}
+                    onChange={(e) => setForm((f) => ({ ...f, child_seat: e.target.checked }))}
+                  />
+                  Παιδικό κάθισμα (+€7/ημέρα)
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.gps_pack}
+                    onChange={(e) => setForm((f) => ({ ...f, gps_pack: e.target.checked }))}
+                  />
+                  GPS pack (+€5/ημέρα)
+                </label>
+              </div>
+              {extrasTotal > 0 ? (
+                <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
       ) : null}
 
