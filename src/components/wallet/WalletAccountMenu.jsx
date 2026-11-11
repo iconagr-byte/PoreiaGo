@@ -303,26 +303,28 @@ export default function WalletAccountMenu({
             </div>
           ) : null}
 
-          <div className="wallet-account-sheet-section" role="group" aria-label="Υποστήριξη">
-            <p className="wallet-account-sheet-section-label">Υποστήριξη</p>
-            <button
-              type="button"
-              role="menuitem"
-              className="wallet-account-sheet-item"
-              onClick={() => go(onOpenLostFound)}
-            >
-              <span className="wallet-account-sheet-item-icon is-sunset" aria-hidden>
-                <span className="material-symbols-outlined">support_agent</span>
-              </span>
-              <span className="wallet-account-sheet-item-body">
-                <span className="wallet-account-sheet-item-label">Απωλεσθέντα</span>
-                <span className="wallet-account-sheet-item-hint">Δήλωση αντικειμένου</span>
-              </span>
-              <span className="material-symbols-outlined wallet-account-sheet-chevron" aria-hidden>
-                chevron_right
-              </span>
-            </button>
-          </div>
+          {typeof onOpenLostFound === 'function' ? (
+            <div className="wallet-account-sheet-section" role="group" aria-label="Υποστήριξη">
+              <p className="wallet-account-sheet-section-label">Υποστήριξη</p>
+              <button
+                type="button"
+                role="menuitem"
+                className="wallet-account-sheet-item"
+                onClick={() => go(onOpenLostFound)}
+              >
+                <span className="wallet-account-sheet-item-icon is-sunset" aria-hidden>
+                  <span className="material-symbols-outlined">support_agent</span>
+                </span>
+                <span className="wallet-account-sheet-item-body">
+                  <span className="wallet-account-sheet-item-label">Απωλεσθέντα</span>
+                  <span className="wallet-account-sheet-item-hint">Δήλωση αντικειμένου</span>
+                </span>
+                <span className="material-symbols-outlined wallet-account-sheet-chevron" aria-hidden>
+                  chevron_right
+                </span>
+              </button>
+            </div>
+          ) : null}
 
           <div className="wallet-account-sheet-footer">
             <button

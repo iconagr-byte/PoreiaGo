@@ -72,6 +72,7 @@ import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
+  isRentOnlyModules,
   shouldShowRentStorefront,
 } from '../services/officeModulesApi.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
@@ -100,6 +101,13 @@ const ALL_TABS = [
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Ενοικιάσεις', icon: 'directions_car' },
   { id: 'more', label: 'Περισσότερα', icon: 'travel_explore' },
+];
+
+/** Native rent demo / rent-only office — no bus chrome; Κρατήσεις = rent only. */
+const RENT_ONLY_TABS = [
+  { id: 'rentals', label: 'Ενοικιάσεις', icon: 'directions_car' },
+  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'account', label: 'Λογαριασμός', icon: 'person' },
 ];
 
 function tabIsActive(activeTab, tabId) {
@@ -445,16 +453,22 @@ function WalletAuthenticatedApp() {
   const rentAvailable = shouldShowRentStorefront(officeModules, {
     native: nativeWallet,
   });
-  const tabs = useMemo(
-    () => (rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals')),
-    [rentAvailable],
-  );
+  const rentOnlyShell = Boolean(isNativeRentDemo() || isRentOnlyModules(officeModules));
+  const tabs = useMemo(() => {
+    if (rentOnlyShell) return RENT_ONLY_TABS;
+    return rentAvailable ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'rentals');
+  }, [rentAvailable, rentOnlyShell]);
 
   useEffect(() => {
+    if (rentOnlyShell) {
+      const allowed = new Set(['rentals', 'bookings', 'account', 'lost_found']);
+      if (!allowed.has(activeTab)) setActiveTab('rentals');
+      return;
+    }
     if (!rentAvailable && activeTab === 'rentals') {
       setActiveTab('home');
     }
-  }, [rentAvailable, activeTab]);
+  }, [rentAvailable, rentOnlyShell, activeTab]);
 
   const handleLogout = () => {
     logoutCustomer();
@@ -951,11 +965,13 @@ function WalletAuthenticatedApp() {
               officeBrand.displayName ||
               (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
             }
-            rentAvailable={rentAvailable}
+            rentAvailable={rentAvailable && !rentOnlyShell}
             onOpenAccount={() => switchTab('account')}
             onOpenSecurity={() => openAccountSecurity()}
-            onOpenLostFound={() => switchTab('lost_found')}
-            onOpenRent={openRentWallet}
+            onOpenLostFound={
+              rentOnlyShell ? undefined : () => switchTab('lost_found')
+            }
+            onOpenRent={rentOnlyShell ? undefined : openRentWallet}
             onLogout={handleLogout}
           />
           <div className="wallet-topbar-brand">
@@ -1003,7 +1019,7 @@ function WalletAuthenticatedApp() {
         ) : null}
 
         <main className="wallet-main">
-        {activeTab === 'home' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
               <div className="wallet-desktop-pass-col">
@@ -1028,7 +1044,7 @@ function WalletAuthenticatedApp() {
           )
         ) : null}
 
-        {activeTab === 'pass' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'pass' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
               <div className="wallet-desktop-pass-col">{homePass}</div>
@@ -1042,83 +1058,84 @@ function WalletAuthenticatedApp() {
         {activeTab === 'bookings' && (
           <div className="wallet-stack">
             {rentAvailable ? <WalletRentSection onOpenRentals={openRentWallet} /> : null}
-            <div className="wallet-panel">
-              <h2>Κρατήσεις λεωφορείου</h2>
-              <p className="wallet-panel-lead">
-                {bookings.length
-                  ? `${bookings.length} εισιτήρια στο λογαριασμό σας`
-                  : 'Δεν υπάρχουν εισιτήρια ακόμα'}
-              </p>
+            {!rentOnlyShell ? (
+              <div className="wallet-panel">
+                <h2>Κρατήσεις λεωφορείου</h2>
+                <p className="wallet-panel-lead">
+                  {bookings.length
+                    ? `${bookings.length} εισιτήρια στο λογαριασμό σας`
+                    : 'Δεν υπάρχουν εισιτήρια ακόμα'}
+                </p>
 
-              {bookings.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '1.5rem 0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.65rem',
-                    alignItems: 'center',
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="wallet-btn wallet-btn-primary"
-                    onClick={openOfficeTrips}
+                {bookings.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '1.5rem 0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                      alignItems: 'center',
+                    }}
                   >
-                    Κράτηση εκδρομής
-                  </button>
-                  {nativeWallet ? (
-                    <Link to="/my-booking" className="wallet-btn wallet-btn-ghost">
-                      Εύρεση κράτησης
-                    </Link>
-                  ) : null}
-                </div>
-              ) : (
-                <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>
-                  {bookings.map((b) => {
-                    const st = statusStyle(b);
-                    const paid = isPaid(b);
-                    const cover = coverForBooking(b);
-                    return (
-                      <article key={b.id} className="wallet-booking-card">
-                        <div
-                          className="wallet-booking-cover"
-                          style={cover ? { backgroundImage: `url(${cover})` } : undefined}
-                        >
-                          <div className="wallet-booking-cover-shade" />
-                          <div className="wallet-booking-cover-copy">
-                            <h3>{b.tripTitle}</h3>
-                            <span
-                              className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${st.className}`}
-                            >
-                              {b.status}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="wallet-booking-body">
-                          <p>
-                            {b.date} · {b.time || '—'} · θέση <strong>{b.seat}</strong>
-                          </p>
-                          <p className="wallet-booking-mono">
-                            {b.pnr || b.id}
-                            {bookingFiscalMark(b) ? ` · MARK ${bookingFiscalMark(b)}` : ''}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => openTicket(b)}
-                            className="wallet-btn wallet-btn-primary wallet-btn-block"
-                            style={{ marginTop: '0.75rem' }}
+                    <button
+                      type="button"
+                      className="wallet-btn wallet-btn-primary"
+                      onClick={openOfficeTrips}
+                    >
+                      Κράτηση εκδρομής
+                    </button>
+                    {nativeWallet ? (
+                      <Link to="/my-booking" className="wallet-btn wallet-btn-ghost">
+                        Εύρεση κράτησης
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>
+                    {bookings.map((b) => {
+                      const st = statusStyle(b);
+                      const cover = coverForBooking(b);
+                      return (
+                        <article key={b.id} className="wallet-booking-card">
+                          <div
+                            className="wallet-booking-cover"
+                            style={cover ? { backgroundImage: `url(${cover})` } : undefined}
                           >
-                            Προβολή εισιτηρίου
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                            <div className="wallet-booking-cover-shade" />
+                            <div className="wallet-booking-cover-copy">
+                              <h3>{b.tripTitle}</h3>
+                              <span
+                                className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${st.className}`}
+                              >
+                                {b.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="wallet-booking-body">
+                            <p>
+                              {b.date} · {b.time || '—'} · θέση <strong>{b.seat}</strong>
+                            </p>
+                            <p className="wallet-booking-mono">
+                              {b.pnr || b.id}
+                              {bookingFiscalMark(b) ? ` · MARK ${bookingFiscalMark(b)}` : ''}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => openTicket(b)}
+                              className="wallet-btn wallet-btn-primary wallet-btn-block"
+                              style={{ marginTop: '0.75rem' }}
+                            >
+                              Προβολή εισιτηρίου
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -1166,7 +1183,7 @@ function WalletAuthenticatedApp() {
           </div>
         ) : null}
 
-        {activeTab === 'more' && !isTicketView ? (
+        {!rentOnlyShell && activeTab === 'more' && !isTicketView ? (
           <WalletMorePanel
             bookings={bookings}
             brandLabel={brandLabel}
