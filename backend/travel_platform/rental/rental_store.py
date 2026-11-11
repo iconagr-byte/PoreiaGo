@@ -555,12 +555,115 @@ def purge_demo_rental_fleet(tenant_id: str | None = None) -> dict[str, int]:
         return {"vehicles": len(demo_ids), "bookings": removed_bookings}
 
 
+def starter_rent_fleet_slugs() -> frozenset[str]:
+    """
+    Offices that get a one-shot demo fleet when their rent catalog is empty.
+    Default: IconaRent (iconarent) for native wallet integration tests.
+    Override / extend with RENT_STARTER_FLEET_SLUGS=slug1,slug2
+    """
+    raw = (os.getenv("RENT_STARTER_FLEET_SLUGS") or "iconarent").strip().lower()
+    if not raw or raw in ("0", "false", "no", "off", "-"):
+        return frozenset()
+    return frozenset(s.strip() for s in raw.split(",") if s.strip())
+
+
 def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
-    """Deprecated no-op — demo rent fleet is no longer seeded."""
+    """Deprecated — no global demo seed. Starter fleets use ensure_starter_rent_fleet."""
     if not demo_rental_fleet_allowed():
         return 0
+    # Keep purge behaviour for leftover showcase rows when the old flag is on.
     purge_demo_rental_fleet(tenant_id)
     return 0
+
+
+def ensure_starter_rent_fleet(
+    tenant_id: str | None = None,
+    *,
+    slug: str | None = None,
+) -> int:
+    """
+    Seed showcase fleet for allowlisted empty rent offices (e.g. iconarent).
+    Safe in production — only when slug is allowlisted and fleet is empty.
+    """
+    slug_norm = str(slug or "").strip().lower()
+    if not slug_norm or slug_norm not in starter_rent_fleet_slugs():
+        return 0
+    return _seed_demo_vehicle_specs(tenant_id)
+
+
+def _seed_demo_vehicle_specs(tenant_id: str | None = None) -> int:
+    """Insert _DEMO_VEHICLE_SPECS when the tenant has zero vehicles. Idempotent."""
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
+        if existing:
+            return 0
+        now = _now()
+        added = 0
+        for spec in _DEMO_VEHICLE_SPECS:
+            photo = str(spec.get("photo_url") or "").strip() or None
+            row = {
+                "id": f"demo-rent-{tid[:8]}-{spec['id_suffix']}",
+                "tenant_id": tid,
+                "plate_number": spec["plate_number"],
+                "category": normalize_vehicle_category(
+                    spec.get("category"),
+                    seats=spec.get("seating_capacity"),
+                    model=spec.get("model"),
+                ),
+                "model": spec["model"],
+                "year": int(spec.get("year") or 2026),
+                "seating_capacity": int(spec["seating_capacity"]),
+                "current_status": "AVAILABLE",
+                "current_mileage": int(spec.get("current_mileage") or 0),
+                "daily_rate_eur": float(spec["daily_rate_eur"]),
+                "one_way_surcharge_eur": float(spec.get("one_way_surcharge_eur") or 0),
+                "with_driver_daily_eur": float(spec.get("with_driver_daily_eur") or 0),
+                "gps_device_id": None,
+                "photo_url": photo,
+                "photo_urls": [photo] if photo else [],
+                "description": spec.get("description"),
+                "notes": _DEMO_FLEET_MARKER,
+                "created_at": now,
+                "updated_at": now,
+            }
+            data["vehicles"].append(row)
+            added += 1
+        if added:
+            _write(data)
+        return added
+
+
+async def seed_starter_rent_fleets_from_db() -> dict[str, Any]:
+    """Startup: resolve allowlisted slugs → tenant ids and seed empty fleets."""
+    slugs = starter_rent_fleet_slugs()
+    if not slugs:
+        return {"seeded": {}, "slugs": []}
+    from sqlalchemy import or_, select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+
+    seeded: dict[str, int] = {}
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Tenant).where(
+                or_(
+                    Tenant.slug.in_(sorted(slugs)),
+                    Tenant.subdomain.in_(sorted(slugs)),
+                )
+            )
+        )
+        tenants = list(result.scalars().all())
+    for tenant in tenants:
+        key = str(tenant.slug or tenant.subdomain or "").strip().lower()
+        if key not in slugs:
+            continue
+        n = ensure_starter_rent_fleet(str(tenant.id), slug=key)
+        if n:
+            seeded[key] = n
+    return {"seeded": seeded, "slugs": sorted(slugs)}
 
 
 def _ensure_demo_sign_vehicle(tenant_id: str) -> dict[str, Any]:
@@ -3474,9 +3577,15 @@ def set_damage_deposit_status(
     return updated
 
 
-def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
+def public_catalog(
+    tenant_id: str | None,
+    *,
+    category: str | None = None,
+    slug: str | None = None,
+) -> list[dict[str, Any]]:
     """Customer-facing vehicle cards for this office. Demo seed only when allowed."""
     ensure_demo_rental_fleet(tenant_id)
+    ensure_starter_rent_fleet(tenant_id, slug=slug)
     rows = list_vehicles(tenant_id, category=category)
     out = []
     for v in rows:

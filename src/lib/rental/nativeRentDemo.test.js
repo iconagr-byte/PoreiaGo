@@ -4,6 +4,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   NATIVE_RENT_DEMO_KEY,
+  NATIVE_RENT_DEMO_TENANT_FALLBACK,
   clearNativeRentDemo,
   enableNativeRentDemo,
   enterNativeRentDemoWallet,
@@ -16,6 +17,7 @@ vi.mock('../auth.js', () => ({
 
 vi.mock('../wallet/walletTenantSeal.js', () => ({
   clearWalletTenantId: vi.fn(),
+  setWalletTenantId: vi.fn(),
 }));
 
 describe('nativeRentDemo', () => {
@@ -30,6 +32,13 @@ describe('nativeRentDemo', () => {
         store.delete(k);
       },
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        json: async () => ({}),
+      })),
+    );
   });
 
   afterEach(() => {
@@ -46,10 +55,12 @@ describe('nativeRentDemo', () => {
     expect(isNativeRentDemo()).toBe(false);
   });
 
-  it('enterNativeRentDemoWallet enables flag and soft-login', async () => {
+  it('enterNativeRentDemoWallet seals IconaRent and soft-login', async () => {
     const { loginAsCustomer } = await import('../auth.js');
-    enterNativeRentDemoWallet();
+    const { setWalletTenantId } = await import('../wallet/walletTenantSeal.js');
+    await enterNativeRentDemoWallet();
     expect(isNativeRentDemo()).toBe(true);
+    expect(setWalletTenantId).toHaveBeenCalledWith(NATIVE_RENT_DEMO_TENANT_FALLBACK);
     expect(loginAsCustomer).toHaveBeenCalled();
   });
 });

@@ -150,10 +150,27 @@ async def rental_summary(
 async def list_vehicles(
     category: str | None = None,
     tenant_id: UUID = Depends(get_current_tenant_id),
-    _: dict = Depends(_require_admin),
+    payload: dict = Depends(_require_admin),
 ):
     tid = _tid(tenant_id)
     store.ensure_demo_rental_fleet(tid)
+    slug = str(payload.get("tenant_slug") or payload.get("slug") or "").strip().lower()
+    if not slug:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.models.tenant import Tenant
+            from sqlalchemy import select
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Tenant).where(Tenant.id == tenant_id).limit(1)
+                )
+                tenant = result.scalar_one_or_none()
+                if tenant:
+                    slug = str(tenant.slug or tenant.subdomain or "").strip().lower()
+        except Exception:
+            slug = ""
+    store.ensure_starter_rent_fleet(tid, slug=slug or None)
     store.ensure_demo_rental_sample_booking(tid)
     return {"vehicles": store.list_vehicles(tid, category=category)}
 
