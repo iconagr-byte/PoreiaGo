@@ -60,7 +60,7 @@ import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestDock from '../components/rental/RentGuestDock.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
-import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
+import RentOfferCard from '../components/rental/RentOfferCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
@@ -539,19 +539,17 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     {fleetLoading ? (
                       <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                     ) : filteredHomeFleet.length ? (
-                      <div
-                        className={`rent-pick-grid rent-pick-grid--${String(rentTheme.fleetLayout || 'rent_grid_three').replace(/_/g, '-')}`}
-                      >
+                      <div className="rent-offer-list rent-offer-list--guest">
                         {filteredHomeFleet.map((v, index) => (
-                          <RentHomeFleetCard
+                          <RentOfferCard
                             key={v.id}
                             vehicle={v}
-                            favorite={favorites.includes(v.id)}
-                            onToggleFavorite={() => toggleFavorite(v.id)}
+                            recommended={index === 0}
+                            totalPrice={v.daily_rate_eur}
+                            priceKicker="από / ημέρα"
+                            ctaLabel="Επιλογή"
                             onSelect={() => goToServicesStep(v)}
                             onOpenDetails={() => setDetailVehicle(v)}
-                            templateId={rentTheme.fleetCard}
-                            featured={rentTheme.fleetLayout === 'rent_featured' && index === 0}
                           />
                         ))}
                       </div>
@@ -966,13 +964,15 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
                   {fleetLoading ? (
                     <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                   ) : filteredHomeFleet.length ? (
-                    <div className="rent-pick-grid rent-pick-grid--home">
-                      {filteredHomeFleet.map((v) => (
-                        <RentHomeFleetCard
+                    <div className="rent-offer-list rent-offer-list--home">
+                      {filteredHomeFleet.map((v, index) => (
+                        <RentOfferCard
                           key={v.id}
                           vehicle={v}
-                          favorite={favorites.includes(v.id)}
-                          onToggleFavorite={() => toggleFavorite(v.id)}
+                          recommended={index === 0}
+                          totalPrice={v.daily_rate_eur}
+                          priceKicker="από / ημέρα"
+                          ctaLabel="Επιλογή"
                           onSelect={() => pickVehicle(v)}
                           onOpenDetails={() => setDetailVehicle(v)}
                         />
