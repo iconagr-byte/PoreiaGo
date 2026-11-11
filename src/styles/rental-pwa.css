@@ -8770,3 +8770,236 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+
+/* —— Offer cards (competitor-inspired vehicle results, not a Hertz clone) —— */
+.rent-offer-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+@media (min-width: 720px) {
+  .rent-offer-list--guest,
+  .rent-offer-list--home {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .rent-offer-list--guest,
+  .rent-offer-list--home {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.rent-results-tools--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.85rem;
+  align-items: center;
+}
+
+.rent-results-sort select {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  background: #fff;
+}
+
+.rent-offer {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button.rent-offer {
+  width: 100%;
+  appearance: none;
+}
+
+.rent-offer.is-selected {
+  border-color: color-mix(in srgb, var(--rent-teal, #0a7a6c) 55%, #fff);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--rent-teal, #0a7a6c) 22%, transparent),
+    0 12px 28px rgba(15, 23, 42, 0.1);
+}
+
+.rent-offer-badge {
+  display: inline-flex;
+  align-self: start;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.rent-offer-head {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.rent-offer-class {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+  line-height: 1.15;
+}
+
+.rent-offer-model {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #6e6e73;
+  letter-spacing: -0.015em;
+}
+
+.rent-offer-specs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.95rem;
+}
+
+.rent-offer-specs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.rent-offer-specs .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: #86868b;
+}
+
+.rent-offer-media {
+  display: grid;
+  place-items: center;
+  min-height: 9.5rem;
+  margin: 0.15rem 0 0.1rem;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
+  cursor: zoom-in;
+}
+
+.rent-offer-media img {
+  width: 100%;
+  max-height: 10.5rem;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+.rent-offer-media-fallback {
+  font-size: 3rem;
+  color: #94a3b8;
+}
+
+.rent-offer-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rent-offer-price-block {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.rent-offer-kicker {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #86868b;
+  letter-spacing: 0.01em;
+}
+
+.rent-offer-prices {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.rent-offer-price {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-offer-price--muted {
+  color: #86868b;
+  font-weight: 650;
+}
+
+.rent-offer-was {
+  font-size: 0.92rem;
+  color: #86868b;
+  text-decoration: line-through;
+}
+
+.rent-offer-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.rent-offer-cta .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-offer.is-selected .rent-offer-cta {
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-results-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.rent-results-toolbar h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-results-loc {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--rent-blue, #0071e3);
+}

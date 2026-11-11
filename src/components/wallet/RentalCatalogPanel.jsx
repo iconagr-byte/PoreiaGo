@@ -10,6 +10,7 @@ import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
+import RentOfferCard from '../rental/RentOfferCard.jsx';
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
@@ -688,21 +689,22 @@ export default function RentalCatalogPanel({
 
       {showBook && suggestions.length > 0 ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
-          <h2>Επιλέξτε όχημα</h2>
-          <p className="wallet-panel-lead">
-            {sortedSuggestions.length} από {suggestions.length} διαθέσιμα — δείτε φωτογραφίες και περιγραφή πριν την
-            κράτηση.
-          </p>
-          <div className="rent-results-tools">
-            <label>
-              Sort
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <div className="rent-results-toolbar">
+            <div>
+              <h2>Οχήματα</h2>
+              <p className="rent-results-loc">{form.pickup_location || 'Γραφείο'}</p>
+            </div>
+            <label className="rent-results-sort">
+              <span className="visually-hidden">Ταξινόμηση</span>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Ταξινόμηση">
                 <option value="fit">Προτεινόμενα</option>
                 <option value="price_asc">Τιμή ↑</option>
                 <option value="price_desc">Τιμή ↓</option>
                 <option value="seats_desc">Θέσεις ↓</option>
               </select>
             </label>
+          </div>
+          <div className="rent-results-tools rent-results-tools--compact">
             <label>
               Max €{Math.round(priceCap)}
               <input
@@ -722,87 +724,34 @@ export default function RentalCatalogPanel({
               />
               Με φωτογραφίες
             </label>
-            <label className="rent-check-inline">
-              <input
-                type="checkbox"
-                checked={onlyTopRated}
-                onChange={(e) => setOnlyTopRated(e.target.checked)}
-              />
-              Top rated
-            </label>
           </div>
-          <div className="rent-vehicle-list">
-            {sortedSuggestions.map((v) => {
-              const photos = vehiclePhotos(v);
+          <div className="rent-offer-list" role="listbox" aria-label="Διαθέσιμα οχήματα">
+            {sortedSuggestions.map((v, idx) => {
               const isSelected = selectedId === v.id;
-              const trust = trustBadge(v.id);
+              const listPrice = Number(v.list_total || v.compare_at_total || 0);
+              const total = Number(v.suggested_total || 0);
+              const compareAt = listPrice > total ? listPrice : null;
               return (
-                <label
+                <RentOfferCard
                   key={v.id}
-                  className={`rent-vehicle-card${isSelected ? ' is-selected' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="rent-vehicle"
-                    className="rent-vehicle-radio"
-                    checked={isSelected}
-                    onChange={() => setSelectedId(v.id)}
-                  />
-                  <div className="rent-vehicle-media">
-                    {photos.length ? (
-                      <div className="rent-vehicle-gallery" aria-label="Φωτογραφίες οχήματος">
-                        {photos.slice(0, 4).map((url) => (
-                          <img key={url} src={url} alt="" loading="lazy" />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rent-vehicle-placeholder" aria-hidden>
-                        <span className="material-symbols-outlined">directions_car</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="rent-vehicle-body">
-                    <div className="rent-vehicle-title-row">
-                      <h3>
-                        {v.model}
-                        <span className="rent-vehicle-cat">{v.category}</span>
-                      </h3>
-                      <p className="rent-vehicle-price">{euro(v.suggested_total)}</p>
-                    </div>
-                    <p className="rent-vehicle-meta">
-                      {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες · από{' '}
-                      {euro(v.daily_rate_eur)}/ημέρα
-                    </p>
-                    <p className="rent-vehicle-trust">
-                      ⭐ {trust.rating} · {trust.booked} κρατήσεις τον μήνα
-                    </p>
-                    {v.description ? (
-                      <p className="rent-vehicle-desc">{v.description}</p>
-                    ) : (
-                      <p className="rent-vehicle-desc is-muted">
-                        Χωρίς αναλυτική περιγραφή — επικοινωνήστε με το γραφείο για λεπτομέρειες.
-                      </p>
-                    )}
-                    {(v.one_way_surcharge > 0 || v.driver_surcharge > 0) && (
-                      <p className="wallet-booking-mono">
-                        Βάση {euro(v.base_total)}
-                        {v.driver_surcharge > 0 ? ` · οδηγός ${euro(v.driver_surcharge)}` : ''}
-                        {v.one_way_surcharge > 0 ? ` · one-way ${euro(v.one_way_surcharge)}` : ''}
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      className="rent-vehicle-more"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setDetails(v);
-                        trackFunnel('vehicle_open_details', { vehicle_id: v.id });
-                      }}
-                    >
-                      Λεπτομέρειες
-                    </button>
-                  </div>
-                </label>
+                  as="button"
+                  vehicle={v}
+                  selected={isSelected}
+                  recommended={idx === 0 && sortBy === 'fit'}
+                  totalPrice={v.suggested_total}
+                  compareAt={compareAt}
+                  priceKicker={
+                    v.suggested_days
+                      ? `Σύνολο · ${v.suggested_days} ημέρες`
+                      : 'Συνολική τιμή'
+                  }
+                  ctaLabel={isSelected ? 'Επιλεγμένο' : 'Επιλογή'}
+                  onSelect={() => setSelectedId(v.id)}
+                  onOpenDetails={(row) => {
+                    setDetails(row);
+                    trackFunnel('vehicle_open_details', { vehicle_id: row.id });
+                  }}
+                />
               );
             })}
           </div>
