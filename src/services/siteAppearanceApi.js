@@ -289,6 +289,21 @@ export async function updateSiteAppearance(patch) {
       if (Object.prototype.hasOwnProperty.call(patch, 'hero_image_url') && patch.hero_image_url) {
         merged.hero_image_url = patch.hero_image_url;
       }
+      // Pickup points must round-trip — silent drop left /rent + native wallet stale.
+      if (Object.prototype.hasOwnProperty.call(patch, 'rent_pickup_locations')) {
+        const norm = (list) =>
+          (Array.isArray(list) ? list : [])
+            .map((x) => String(x || '').trim())
+            .filter(Boolean);
+        const expected = norm(patch.rent_pickup_locations);
+        const got = norm(data?.rent_pickup_locations);
+        if (JSON.stringify(expected) !== JSON.stringify(got)) {
+          throw new Error(
+            'Τα σημεία παραλαβής δεν αποθηκεύτηκαν στο γραφείο. Ανανεώστε και δοκιμάστε ξανά.',
+          );
+        }
+        merged.rent_pickup_locations = got;
+      }
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {

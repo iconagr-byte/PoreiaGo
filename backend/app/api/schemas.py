@@ -485,6 +485,9 @@ class TenantSiteAppearanceResponse(BaseModel):
     hero_search_label: str = ""
     footer_brand_name: str = ""
     footer_copyright: str = ""
+    footer_address: str = ""
+    footer_contact_phone: str = ""
+    footer_contact_email: str = ""
     rent_office_name: str = ""
     rent_hero_title: str = ""
     rent_hero_copy: str = ""
@@ -492,6 +495,7 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_guest_hero_title_accent: str = ""
     rent_guest_hero_copy: str = ""
     rent_guest_hero_benefits: list[str] = []
+    rent_pickup_locations: list[str] = []
     rent_search_show_dropoff_toggle: bool = True
     rent_search_show_promo: bool = True
     rent_search_submit_label: str = "Αναζήτηση"
@@ -584,6 +588,9 @@ class TenantSiteAppearanceUpdate(BaseModel):
     hero_search_label: str | None = None
     footer_brand_name: str | None = None
     footer_copyright: str | None = None
+    footer_address: str | None = None
+    footer_contact_phone: str | None = None
+    footer_contact_email: str | None = None
     rent_office_name: str | None = None
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
@@ -591,6 +598,7 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_guest_hero_title_accent: str | None = None
     rent_guest_hero_copy: str | None = None
     rent_guest_hero_benefits: list[str] | None = None
+    rent_pickup_locations: list[str] | None = None
     rent_search_show_dropoff_toggle: bool | None = None
     rent_search_show_promo: bool | None = None
     rent_search_submit_label: str | None = None
