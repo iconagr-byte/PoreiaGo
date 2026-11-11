@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#6e6e73</color>
-    <color name="colorPrimaryDark">#4a4a4e</color>
+    <color name="colorPrimary">#0071e3</color>
+    <color name="colorPrimaryDark">#005bb5</color>
     <color name="colorAccent">#0071e3</color>
-    <!-- Matches Achillio Travel native splash grey banner. -->
-    <color name="splash_background">#6e6e73</color>
+    <color name="splash_background">#ffffff</color>
 </resources>
