@@ -25,13 +25,13 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
-  rent_guest_hero_title_accent: '— στόλος γραφείου · κράτηση σε λεπτά',
+  rent_guest_hero_title_accent: 'στον στόλο του γραφείου',
   rent_guest_hero_copy: '',
   rent_guest_hero_benefits: [...RENT_GUEST_HERO_BENEFITS],
   rent_search_show_dropoff_toggle: RENT_GUEST_SEARCH_DEFAULTS.show_dropoff_toggle,
   rent_search_show_promo: RENT_GUEST_SEARCH_DEFAULTS.show_promo,
   rent_search_submit_label: RENT_GUEST_SEARCH_DEFAULTS.submit_label,
-  rent_cta_label: 'Βρες όχημα',
+  rent_cta_label: 'Δες οχήματα',
 };
 
 /** Names that look like empty admin placeholders — never show alone on /rent. */
@@ -46,6 +46,7 @@ const OBSOLETE_RENT_GUEST_HERO_COPY =
 const OBSOLETE_RENT_GUEST_HERO_ACCENTS = new Set([
   '— αναζήτησε, σύγκρινε & κλείσε',
   '— αναζήτησε, σύγκρινε & κλείσε.',
+  '— στόλος γραφείου · κράτηση σε λεπτά',
 ]);
 
 export function isGenericRentOfficeLabel(name) {

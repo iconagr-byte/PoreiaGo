@@ -9,8 +9,8 @@ import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
 import RentBrandMark from './RentBrandMark.jsx';
 
 /**
- * Full-bleed guest /rent hero — Rentalcars-style: headline, trust checks, search in-hero.
- * No stays/flights nav — rent only.
+ * Full-bleed guest /rent hero — book-first: brand, short welcome, search card.
+ * Benefits stay out of the first viewport (hero budget).
  */
 export default function RentGuestHero({
   brandLabel = 'Poreiago Rent',
@@ -28,6 +28,8 @@ export default function RentGuestHero({
   title,
   titleAccent,
   copy,
+  welcomeName = '',
+  showBenefits = false,
   benefits: benefitsProp,
   siteAppearance,
   children,
@@ -35,9 +37,15 @@ export default function RentGuestHero({
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
   const subtitle = String(copy || '').trim();
+  const guestFirst = String(welcomeName || '')
+    .trim()
+    .split(/\s+/)[0];
+  const welcomeLine = guestFirst
+    ? `Καλώς ήρθες, ${guestFirst}`
+    : 'Καλώς ήρθες — βρες όχημα σε λεπτά';
   const benefits = useMemo(
-    () => resolveRentGuestHeroBenefits(benefitsProp),
-    [benefitsProp],
+    () => (showBenefits ? resolveRentGuestHeroBenefits(benefitsProp) : []),
+    [benefitsProp, showBenefits],
   );
   const slider = readPageSlider(siteAppearance, 'rent');
 
@@ -47,7 +55,7 @@ export default function RentGuestHero({
 
   return (
     <section
-      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode} rent-hero-layout--${heroLayout}`}
+      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--bookfirst rent-hero--${heroMode} rent-hero-layout--${heroLayout}`}
       data-rent-hero={heroMode}
       data-rent-hero-layout={heroLayout}
       aria-label="Ενοικίαση"
@@ -97,6 +105,8 @@ export default function RentGuestHero({
             logoShadow={logoShadow}
           />
         </div>
+
+        <p className="rent-hero-welcome">{welcomeLine}</p>
 
         <h1 className="rent-hero-landing-title rent-hero-booking-title">
           <span className="rent-hero-title-main">{headline}</span>

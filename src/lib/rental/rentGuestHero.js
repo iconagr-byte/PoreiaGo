@@ -12,24 +12,27 @@ export function isBusDemoHeroUrl(url) {
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
-  titleAccent: '— στόλος γραφείου · κράτηση σε λεπτά',
+  titleAccent: 'στον στόλο του γραφείου',
   subtitle: '',
   tagline: 'Ο στόλος του γραφείου σας, έτοιμος για κράτηση.',
 };
 
-/** Trust line under the headline (Rentalcars-style checks). */
+/** Trust line under the headline — optional; book-first hero hides these. */
 export const RENT_GUEST_HERO_BENEFITS = [
   'Δωρεάν ακύρωση στις περισσότερες κρατήσεις',
   'Πολλαπλά σημεία παραλαβής',
   'Υποστήριξη γραφείου & οδική βοήθεια',
 ];
 
-/** Default hero search-strip layout knobs (admin-editable). */
+/** Default hero search layout knobs (admin-editable). */
 export const RENT_GUEST_SEARCH_DEFAULTS = {
   show_dropoff_toggle: true,
   show_promo: true,
-  submit_label: 'Αναζήτηση',
+  submit_label: 'Δες οχήματα',
 };
+
+/** Legacy CTA labels still stored in appearance → map to book-first default. */
+const OBSOLETE_RENT_SEARCH_SUBMIT = new Set(['Αναζήτηση', 'Search', 'search']);
 
 /**
  * Normalize admin-stored benefits (array or newline text) → clean string list.
@@ -63,9 +66,11 @@ export function resolveRentGuestSearchLayout(appearance = {}) {
   const showPromo =
     appearance.rent_search_show_promo !== false &&
     appearance.rent_search_show_promo !== 'false';
+  const rawSubmit = String(appearance.rent_search_submit_label || '').trim();
   const submitLabel =
-    String(appearance.rent_search_submit_label || '').trim() ||
-    RENT_GUEST_SEARCH_DEFAULTS.submit_label;
+    !rawSubmit || OBSOLETE_RENT_SEARCH_SUBMIT.has(rawSubmit)
+      ? RENT_GUEST_SEARCH_DEFAULTS.submit_label
+      : rawSubmit;
   return {
     showDropoffToggle: showDropoff,
     showPromo,

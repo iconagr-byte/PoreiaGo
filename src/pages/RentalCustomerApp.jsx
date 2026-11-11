@@ -58,6 +58,7 @@ import RentWalletCheckInBand from '../components/rental/RentWalletCheckInBand.js
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
+import RentGuestDock from '../components/rental/RentGuestDock.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
@@ -386,7 +387,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               title={branding.title}
               titleAccent={branding.titleAccent}
               copy={branding.copy}
-              benefits={branding.benefits}
+              welcomeName={getCustomerName() || ''}
               siteAppearance={siteAppearance}
             >
               <RentBookingSearchBar
@@ -397,7 +398,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 preferredPickup={heroPickup}
                 showDropoffToggle={branding.searchLayout?.showDropoffToggle !== false}
                 showPromo={branding.searchLayout?.showPromo !== false}
-                submitLabel={branding.searchLayout?.submitLabel}
+                submitLabel={branding.searchLayout?.submitLabel || branding.ctaLabel || 'Δες οχήματα'}
                 onSearch={async (prefs) => {
                   const prior = readRentBookingPrefs();
                   const resumeServices =
@@ -607,6 +608,32 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             </footer>
           ) : null}
         </main>
+
+        <RentGuestDock
+          active="book"
+          helpHref={
+            String(siteAppearance?.footer_contact_phone || '').trim()
+              ? `tel:${String(siteAppearance.footer_contact_phone).replace(/\s+/g, '')}`
+              : ''
+          }
+          onBook={() => {
+            document
+              .getElementById('rent-guest-search')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+          onRentals={onRequireLogin}
+          onAccount={onRequireLogin}
+          onHelp={() => {
+            const phone = String(siteAppearance?.footer_contact_phone || '').trim();
+            if (phone) {
+              window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+              return;
+            }
+            document
+              .getElementById('rent-guest-search')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+        />
       </div>
       <RentVehicleDetailSheet
         vehicle={detailVehicle}

@@ -12,9 +12,23 @@ import {
   writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
 
+function formatLegDate(isoDate) {
+  if (!isoDate) return '—';
+  try {
+    const d = new Date(`${isoDate}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    return new Intl.DateTimeFormat('el-GR', {
+      day: 'numeric',
+      month: 'short',
+    }).format(d);
+  } catch {
+    return isoDate;
+  }
+}
+
 /**
- * Rent search bar — Hertz/Rentalcars horizontal strip, rent teal brand.
- * variant="hero" = booking.com-style single strip inside the hero.
+ * Rent search — book-first panel on hero (location → trip legs → promo → CTA).
+ * variant="hero" = white booking card over the photo.
  */
 export default function RentBookingSearchBar({
   brandLabel = 'Γραφείο',
@@ -26,10 +40,10 @@ export default function RentBookingSearchBar({
   variant = 'default',
   showDropoffToggle = true,
   showPromo = true,
-  submitLabel = 'Αναζήτηση',
+  submitLabel = 'Δες οχήματα',
 } = {}) {
   const isHero = variant === 'hero';
-  const ctaLabel = String(submitLabel || '').trim() || 'Αναζήτηση';
+  const ctaLabel = String(submitLabel || '').trim() || 'Δες οχήματα';
   const locations = useMemo(
     () => buildRentLocationOptions({ brandLabel, footerAddress, pickupLocations }),
     [brandLabel, footerAddress, pickupLocations],
@@ -75,7 +89,6 @@ export default function RentBookingSearchBar({
     }
   }, []);
 
-  // Mount + SPA re-entry (Επιλογή while already on /rent).
   useEffect(() => {
     const applyPending = () => {
       const pending = consumeNeedRentDates();
@@ -175,7 +188,7 @@ export default function RentBookingSearchBar({
   const rootClass = [
     'rent-search',
     compact ? 'rent-search--compact' : '',
-    isHero ? 'rent-search--hero' : '',
+    isHero ? 'rent-search--hero rent-search--book' : '',
     datesFocus ? 'rent-search--need-dates' : '',
   ]
     .filter(Boolean)
@@ -208,16 +221,14 @@ export default function RentBookingSearchBar({
             </button>
           </div>
         ) : null}
-        <div
-          id="rent-search-dates"
-          className={`rent-search-row${differentDropoff ? ' rent-search-row--split' : ''}${datesFocus ? ' is-dates-focus' : ''}`}
-        >
-          <div className="rent-search-field rent-search-field--place">
-            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              search
+
+        <div className="rent-book-card">
+          <div className="rent-book-place">
+            <span className="rent-book-place-icon material-symbols-outlined" aria-hidden>
+              location_on
             </span>
-            <div className="rent-search-field-body">
-              <span className="rent-search-label">Σημείο παραλαβής</span>
+            <div className="rent-book-place-body">
+              <span className="rent-book-label">Παραλαβή &amp; παράδοση</span>
               <select
                 value={pickupLocation}
                 onChange={(e) => {
@@ -235,153 +246,154 @@ export default function RentBookingSearchBar({
             </div>
           </div>
 
-          {differentDropoff ? (
-            <div className="rent-search-field rent-search-field--place">
-              <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-                flag
-              </span>
-              <div className="rent-search-field-body">
-                <span className="rent-search-label">Σημείο επιστροφής</span>
-                <select
-                  value={dropoffLocation}
-                  onChange={(e) => setDropoffLocation(e.target.value)}
-                  aria-label="Σημείο επιστροφής"
+          {showDropoffToggle ? (
+            differentDropoff ? (
+              <div className="rent-book-place rent-book-place--drop">
+                <span className="rent-book-place-icon material-symbols-outlined" aria-hidden>
+                  flag
+                </span>
+                <div className="rent-book-place-body">
+                  <span className="rent-book-label">Διαφορετικό σημείο παράδοσης</span>
+                  <select
+                    value={dropoffLocation}
+                    onChange={(e) => setDropoffLocation(e.target.value)}
+                    aria-label="Σημείο επιστροφής"
+                  >
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.value}>
+                        {loc.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="rent-book-link rent-book-link--inline"
+                  onClick={() => {
+                    setDifferentDropoff(false);
+                    setDropoffLocation(pickupLocation);
+                  }}
                 >
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.value}>
-                      {loc.label}
-                    </option>
-                  ))}
-                </select>
+                  Ίδιο σημείο
+                </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                className="rent-book-link"
+                onClick={() => setDifferentDropoff(true)}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  add
+                </span>
+                Διαφορετικό σημείο παράδοσης
+              </button>
+            )
+          ) : null}
+
+          <div className={`rent-book-trip${datesFocus ? ' is-dates-focus' : ''}`} id="rent-search-dates">
+            <label className={`rent-book-leg${datesFocus ? ' is-prompt' : ''}`}>
+              <span className="rent-book-leg-kicker">Παραλαβή</span>
+              <span className="rent-book-leg-date">{formatLegDate(pickupParts.date)}</span>
+              <span className="rent-book-leg-inputs">
+                <input
+                  ref={pickupDateRef}
+                  id="rent-pickup-date"
+                  type="date"
+                  value={pickupParts.date}
+                  onChange={(e) => {
+                    const next = mergeDateTime(e.target.value, pickupParts.time);
+                    setStartTime(next);
+                    if (endTime && next && new Date(endTime) <= new Date(next)) {
+                      setEndTime(defaultReturnDateTime(next));
+                    }
+                  }}
+                  aria-label="Ημερομηνία παραλαβής"
+                />
+                <input
+                  type="time"
+                  value={pickupParts.time}
+                  onChange={(e) => setStartTime(mergeDateTime(pickupParts.date, e.target.value))}
+                  aria-label="Ώρα παραλαβής"
+                />
+              </span>
+            </label>
+
+            <span className="rent-book-trip-arrow material-symbols-outlined" aria-hidden>
+              arrow_forward
+            </span>
+
+            <label className={`rent-book-leg${datesFocus ? ' is-prompt' : ''}`}>
+              <span className="rent-book-leg-kicker">Παράδοση</span>
+              <span className="rent-book-leg-date">{formatLegDate(returnParts.date)}</span>
+              <span className="rent-book-leg-inputs">
+                <input
+                  id="rent-return-date"
+                  type="date"
+                  value={returnParts.date}
+                  onChange={(e) => setEndTime(mergeDateTime(e.target.value, returnParts.time))}
+                  aria-label="Ημερομηνία επιστροφής"
+                />
+                <input
+                  type="time"
+                  value={returnParts.time}
+                  onChange={(e) => setEndTime(mergeDateTime(returnParts.date, e.target.value))}
+                  aria-label="Ώρα επιστροφής"
+                />
+              </span>
+            </label>
+          </div>
+
+          {showPromo ? (
+            <div className="rent-book-promo">
+              {promoOpen ? (
+                <>
+                  <label className="rent-book-promo-field">
+                    <span className="rent-book-label">Κωδικός προσφοράς</span>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPromoCode(v);
+                        writeRentBookingPrefs({ promo_code: String(v || '').trim() });
+                      }}
+                      placeholder="π.χ. RENT10"
+                      aria-label="Κωδικός προσφοράς"
+                      autoCapitalize="characters"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="rent-book-link rent-book-link--inline"
+                    onClick={() => {
+                      setPromoOpen(false);
+                      setPromoCode('');
+                      writeRentBookingPrefs({ promo_code: '' });
+                    }}
+                  >
+                    Αφαίρεση
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="rent-book-link"
+                  onClick={() => setPromoOpen(true)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    sell
+                  </span>
+                  Προσθήκη κωδικού προσφοράς
+                </button>
+              )}
             </div>
           ) : null}
 
-          <div className={`rent-search-field rent-search-field--date${datesFocus ? ' is-prompt' : ''}`}>
-            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              calendar_month
-            </span>
-            <div className="rent-search-field-body">
-              <span className="rent-search-label">Παραλαβή</span>
-              <input
-                ref={pickupDateRef}
-                id="rent-pickup-date"
-                type="date"
-                value={pickupParts.date}
-                onChange={(e) => {
-                  const next = mergeDateTime(e.target.value, pickupParts.time);
-                  setStartTime(next);
-                  if (endTime && next && new Date(endTime) <= new Date(next)) {
-                    setEndTime(defaultReturnDateTime(next));
-                  }
-                }}
-                aria-label="Ημερομηνία παραλαβής"
-              />
-            </div>
-          </div>
-
-          <div className="rent-search-field rent-search-field--time">
-            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              schedule
-            </span>
-            <div className="rent-search-field-body">
-              <span className="rent-search-label">Ώρα</span>
-              <input
-                type="time"
-                value={pickupParts.time}
-                onChange={(e) => setStartTime(mergeDateTime(pickupParts.date, e.target.value))}
-                aria-label="Ώρα παραλαβής"
-              />
-            </div>
-          </div>
-
-          <div className={`rent-search-field rent-search-field--date${datesFocus ? ' is-prompt' : ''}`}>
-            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              event_available
-            </span>
-            <div className="rent-search-field-body">
-              <span className="rent-search-label">Επιστροφή</span>
-              <input
-                id="rent-return-date"
-                type="date"
-                value={returnParts.date}
-                onChange={(e) => setEndTime(mergeDateTime(e.target.value, returnParts.time))}
-                aria-label="Ημερομηνία επιστροφής"
-              />
-            </div>
-          </div>
-
-          <div className="rent-search-field rent-search-field--time">
-            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              schedule
-            </span>
-            <div className="rent-search-field-body">
-              <span className="rent-search-label">Ώρα</span>
-              <input
-                type="time"
-                value={returnParts.time}
-                onChange={(e) => setEndTime(mergeDateTime(returnParts.date, e.target.value))}
-                aria-label="Ώρα επιστροφής"
-              />
-            </div>
-          </div>
-
-          <button type="submit" className="rent-search-submit">
+          <button type="submit" className="rent-search-submit rent-book-submit">
             {ctaLabel}
           </button>
         </div>
-
-        {showDropoffToggle || showPromo ? (
-          <div className="rent-search-footer">
-            {showDropoffToggle ? (
-              <label className="rent-search-check">
-                <input
-                  type="checkbox"
-                  checked={differentDropoff}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setDifferentDropoff(on);
-                    if (!on) setDropoffLocation(pickupLocation);
-                  }}
-                />
-                <span>Παράδοση σε διαφορετικό σημείο</span>
-              </label>
-            ) : null}
-            {showPromo ? (
-              <>
-                <label className="rent-search-check">
-                  <input
-                    type="checkbox"
-                    checked={promoOpen}
-                    onChange={(e) => {
-                      const on = e.target.checked;
-                      setPromoOpen(on);
-                      writeRentBookingPrefs({
-                        promo_code: on ? String(promoCode || '').trim() : '',
-                      });
-                    }}
-                  />
-                  <span>Κωδικός προσφοράς</span>
-                </label>
-                {promoOpen ? (
-                  <input
-                    className="rent-search-promo-input"
-                    type="text"
-                    value={promoCode}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setPromoCode(v);
-                      writeRentBookingPrefs({ promo_code: String(v || '').trim() });
-                    }}
-                    placeholder="π.χ. RENT10"
-                    aria-label="Κωδικός προσφοράς"
-                    autoCapitalize="characters"
-                  />
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        ) : null}
 
         {error ? <p className="rent-search-error">{error}</p> : null}
       </form>
