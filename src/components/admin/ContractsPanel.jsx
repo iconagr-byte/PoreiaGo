@@ -23,6 +23,7 @@ import {
 } from '../../services/billingApi.js';
 import { fetchAdminOfficeModules } from '../../services/officeModulesApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
+import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { fetchPublicAgencyPlanCatalog } from '../../services/agencyPlanCatalogApi.js';
 import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlanCatalogEditor from './AgencyPlanCatalogEditor.jsx';
@@ -93,6 +94,7 @@ export default function ContractsPanel({
   initialInterval = 'month',
   focusRentModule = false,
 } = {}) {
+  const superAdmin = isSaasSuperAdmin();
   const [sub, setSub] = useState(null);
   const [billingConfig, setBillingConfig] = useState(null);
   const [modules, setModules] = useState(null);
@@ -386,8 +388,12 @@ export default function ContractsPanel({
       </div>
 
       <div className="p-6 space-y-5">
-        <AgencyPlanCatalogEditor />
-        <RentPlanCardsEditor />
+        {superAdmin ? (
+          <>
+            <AgencyPlanCatalogEditor />
+            <RentPlanCardsEditor />
+          </>
+        ) : null}
 
         {loading ? (
           <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />
@@ -403,7 +409,9 @@ export default function ContractsPanel({
               <div>
                 <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο λεωφορείων</p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Τα features εμφανίζονται από την παραμετροποίηση πάνω · Ετήσιο = 2 μήνες δώρο
+                  {superAdmin
+                    ? 'Τα features εμφανίζονται από την παραμετροποίηση πάνω · Ετήσιο = 2 μήνες δώρο'
+                    : 'Ετήσιο πλάνο = 2 μήνες δώρο'}
                 </p>
               </div>
               <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
