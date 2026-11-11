@@ -4,11 +4,18 @@ import {
   cancelCustomerRentalBooking,
   createCustomerRentalBooking,
   fetchCustomerRentalAvailability,
+  fetchCustomerRentalCatalog,
   fetchMyRentalBookings,
+  fetchPublicRentalAvailability,
+  fetchPublicRentalCatalog,
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
+import {
+  defaultPickupDateTime,
+  defaultReturnDateTime,
+} from '../../lib/rental/rentBookingSearch.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 import RentOfferCard from '../rental/RentOfferCard.jsx';
 
@@ -239,28 +246,52 @@ export default function RentalCatalogPanel({
     return true;
   };
 
-  const runAvailability = useCallback(
-    async (override = null) => {
-      const next = override
-        ? {
-            ...form,
-            start_time: override.start_time || form.start_time,
-            end_time: override.end_time || form.end_time,
-            pickup_location: override.pickup_location || form.pickup_location,
-            dropoff_location: override.dropoff_location || form.dropoff_location,
-          }
-        : form;
-      if (!next.start_time || !next.end_time) {
-        toast.error('Επιλέξτε ημερομηνίες');
-        return;
+  const asOfferRows = (rows) =>
+    (Array.isArray(rows) ? rows : []).map((v) => ({
+      ...v,
+      suggested_total:
+        v.suggested_total != null && v.suggested_total !== ''
+          ? Number(v.suggested_total)
+          : Number(v.daily_rate_eur || 0),
+      suggested_days: v.suggested_days != null ? v.suggested_days : 1,
+    }));
+
+  const loadCatalogFallback = useCallback(async () => {
+    try {
+      let rows = [];
+      try {
+        rows = await fetchCustomerRentalCatalog();
+      } catch {
+        rows = await fetchPublicRentalCatalog();
       }
+      return asOfferRows(rows);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const runAvailability = useCallback(
+    async (override = null, { quiet = false } = {}) => {
+      const startDefault = defaultPickupDateTime();
+      const next = {
+        ...form,
+        start_time: override?.start_time || form.start_time || startDefault,
+        end_time:
+          override?.end_time || form.end_time || defaultReturnDateTime(startDefault),
+        pickup_location: override?.pickup_location || form.pickup_location || 'Γραφείο',
+        dropoff_location:
+          override?.dropoff_location || form.dropoff_location || form.pickup_location || 'Γραφείο',
+        category: override?.category ?? form.category,
+        min_seats: override?.min_seats ?? form.min_seats,
+        driver_mode: override?.driver_mode || form.driver_mode || 'SELF_DRIVE',
+      };
       const start = new Date(next.start_time);
       const end = new Date(next.end_time);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-        toast.error('Μη έγκυρες ημερομηνίες');
+        if (!quiet) toast.error('Μη έγκυρες ημερομηνίες');
         return;
       }
-      if (override) setForm((f) => ({ ...f, ...next }));
+      setForm((f) => ({ ...f, ...next }));
       setBusy(true);
       try {
         let rows = [];
@@ -275,11 +306,8 @@ export default function RentalCatalogPanel({
             driverMode: next.driver_mode,
           });
         } catch (err) {
-          // Native rent demo is sealed to IconaRent — never invent a second fleet.
-          if (isNativeRentDemo()) {
-            const { fetchPublicRentalAvailability } = await import(
-              '../../services/customerRentalApi.js'
-            );
+          // Native / sealed office — try public availability, then catalog.
+          try {
             rows = await fetchPublicRentalAvailability({
               startTime: start.toISOString(),
               endTime: end.toISOString(),
@@ -289,29 +317,40 @@ export default function RentalCatalogPanel({
               dropoffLocation: next.dropoff_location,
               driverMode: next.driver_mode,
             });
-          } else {
-            throw err;
+          } catch {
+            if (!isNativeRentDemo()) throw err;
+            rows = [];
           }
         }
-        setSuggestions(rows);
+        if (!rows.length) {
+          rows = await loadCatalogFallback();
+        }
+        const offerRows = asOfferRows(rows);
+        setSuggestions(offerRows);
         const preferredId = preferredVehicle?.id;
         const selected =
-          preferredId && rows.some((v) => String(v.id) === String(preferredId))
+          preferredId && offerRows.some((v) => String(v.id) === String(preferredId))
             ? preferredId
-            : rows[0]?.id || '';
+            : offerRows[0]?.id || '';
         setSelectedId(selected);
         trackFunnel('availability_loaded', {
-          count: rows.length,
+          count: offerRows.length,
           preferred: Boolean(preferredVehicle),
         });
-        if (!rows.length) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
+        if (!offerRows.length && !quiet) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
       } catch (err) {
-        toast.error(err.message);
+        const fallback = await loadCatalogFallback();
+        if (fallback.length) {
+          setSuggestions(fallback);
+          setSelectedId(fallback[0]?.id || '');
+        } else if (!quiet) {
+          toast.error(err.message);
+        }
       } finally {
         setBusy(false);
       }
     },
-    [form, preferredVehicle],
+    [form, preferredVehicle, loadCatalogFallback],
   );
 
   const search = async (e) => {
@@ -320,28 +359,28 @@ export default function RentalCatalogPanel({
     await runAvailability();
   };
 
+  // Book-first: load offer cards as soon as the panel mounts (and on each search).
   useEffect(() => {
-    if (!bookFirst || !searchTick) return;
+    if (!bookFirst) return;
     let raw = {};
     try {
       raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     } catch {
       raw = {};
     }
+    const start = raw.start_time || defaultPickupDateTime();
     const patch = {
-      start_time: raw.start_time || '',
-      end_time: raw.end_time || '',
+      start_time: start,
+      end_time: raw.end_time || defaultReturnDateTime(start),
       pickup_location: raw.pickup_location || 'Γραφείο',
       dropoff_location: raw.dropoff_location || raw.pickup_location || 'Γραφείο',
       category: raw.category || '',
       min_seats: Number(raw.min_seats || 5),
       driver_mode: raw.driver_mode || 'SELF_DRIVE',
     };
-    setForm((f) => ({ ...f, ...patch }));
-    void runAvailability(patch);
-    // Only react to searchTick bumps from the book-first bar.
+    void runAvailability(patch, { quiet: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTick, bookFirst]);
+  }, [bookFirst, searchTick]);
 
   const book = async () => {
     if (!selectedId) {
@@ -687,7 +726,7 @@ export default function RentalCatalogPanel({
       </section>
       ) : null}
 
-      {showBook && suggestions.length > 0 ? (
+      {showBook && (bookFirst || suggestions.length > 0) ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
           <div className="rent-results-toolbar">
             <div>
@@ -704,58 +743,69 @@ export default function RentalCatalogPanel({
               </select>
             </label>
           </div>
-          <div className="rent-results-tools rent-results-tools--compact">
-            <label>
-              Max €{Math.round(priceCap)}
-              <input
-                type="range"
-                min={50}
-                max={1200}
-                step={10}
-                value={priceCap}
-                onChange={(e) => setPriceCap(Number(e.target.value))}
-              />
-            </label>
-            <label className="rent-check-inline">
-              <input
-                type="checkbox"
-                checked={onlyWithPhotos}
-                onChange={(e) => setOnlyWithPhotos(e.target.checked)}
-              />
-              Με φωτογραφίες
-            </label>
-          </div>
-          <div className="rent-offer-list" role="listbox" aria-label="Διαθέσιμα οχήματα">
-            {sortedSuggestions.map((v, idx) => {
-              const isSelected = selectedId === v.id;
-              const listPrice = Number(v.list_total || v.compare_at_total || 0);
-              const total = Number(v.suggested_total || 0);
-              const compareAt = listPrice > total ? listPrice : null;
-              return (
-                <RentOfferCard
-                  key={v.id}
-                  as="button"
-                  vehicle={v}
-                  selected={isSelected}
-                  recommended={idx === 0 && sortBy === 'fit'}
-                  totalPrice={v.suggested_total}
-                  compareAt={compareAt}
-                  priceKicker={
-                    v.suggested_days
-                      ? `Σύνολο · ${v.suggested_days} ημέρες`
-                      : 'Συνολική τιμή'
-                  }
-                  ctaLabel={isSelected ? 'Επιλεγμένο' : 'Επιλογή'}
-                  onSelect={() => setSelectedId(v.id)}
-                  onOpenDetails={(row) => {
-                    setDetails(row);
-                    trackFunnel('vehicle_open_details', { vehicle_id: row.id });
-                  }}
-                />
-              );
-            })}
-          </div>
-          {selected ? (
+          {sortedSuggestions.length ? (
+            <>
+              <div className="rent-results-tools rent-results-tools--compact">
+                <label>
+                  Max €{Math.round(priceCap)}
+                  <input
+                    type="range"
+                    min={50}
+                    max={1200}
+                    step={10}
+                    value={priceCap}
+                    onChange={(e) => setPriceCap(Number(e.target.value))}
+                  />
+                </label>
+                <label className="rent-check-inline">
+                  <input
+                    type="checkbox"
+                    checked={onlyWithPhotos}
+                    onChange={(e) => setOnlyWithPhotos(e.target.checked)}
+                  />
+                  Με φωτογραφίες
+                </label>
+              </div>
+              <div className="rent-offer-list" role="listbox" aria-label="Διαθέσιμα οχήματα">
+                {sortedSuggestions.map((v, idx) => {
+                  const isSelected = selectedId === v.id;
+                  const listPrice = Number(v.list_total || v.compare_at_total || 0);
+                  const total = Number(v.suggested_total || 0);
+                  const compareAt = listPrice > total ? listPrice : null;
+                  return (
+                    <RentOfferCard
+                      key={v.id}
+                      as="button"
+                      vehicle={v}
+                      selected={isSelected}
+                      recommended={idx === 0 && sortBy === 'fit'}
+                      totalPrice={v.suggested_total}
+                      compareAt={compareAt}
+                      priceKicker={
+                        Number(v.suggested_days) > 1
+                          ? `Σύνολο · ${v.suggested_days} ημέρες`
+                          : Number(v.daily_rate_eur) > 0 &&
+                              Number(v.suggested_total) === Number(v.daily_rate_eur)
+                            ? 'από / ημέρα'
+                            : 'Συνολική τιμή'
+                      }
+                      ctaLabel={isSelected ? 'Επιλεγμένο' : 'Επιλογή'}
+                      onSelect={() => setSelectedId(v.id)}
+                      onOpenDetails={(row) => {
+                        setDetails(row);
+                        trackFunnel('vehicle_open_details', { vehicle_id: row.id });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="wallet-rent-offer-empty">
+              {busy ? 'Φόρτωση οχημάτων…' : 'Δεν βρέθηκαν οχήματα για αυτές τις ημερομηνίες.'}
+            </p>
+          )}
+          {selected && sortedSuggestions.length ? (
             <button
               type="button"
               className="wallet-btn wallet-btn-primary wallet-btn-block"

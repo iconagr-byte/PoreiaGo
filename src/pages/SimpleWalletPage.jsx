@@ -240,7 +240,6 @@ function WalletAuthenticatedApp() {
   const [profileTick, setProfileTick] = useState(0);
   /** Bump when book-first «Δες οχήματα» runs — drives RentalCatalogPanel search. */
   const [rentSearchTick, setRentSearchTick] = useState(0);
-  const [rentFleetOpen, setRentFleetOpen] = useState(false);
   /** Deep-link into CustomerSecurityPanel action from the account sheet. */
   const [securityFocus, setSecurityFocus] = useState(null);
   const profile = useMemo(() => resolveCustomerProfile(), [profileTick]);
@@ -1150,7 +1149,6 @@ function WalletAuthenticatedApp() {
               siteAppearance={siteAppearance}
               welcomeName={profile.name}
               onSearch={() => {
-                setRentFleetOpen(true);
                 setRentSearchTick((n) => n + 1);
                 window.setTimeout(() => {
                   document
@@ -1160,16 +1158,12 @@ function WalletAuthenticatedApp() {
               }}
             />
 
-            {rentFleetOpen || rentSearchTick > 0 ? (
-              <RentalCatalogPanel
-                mode="full"
-                bookFirst
-                searchTick={rentSearchTick}
-                onBooked={() => {
-                  setRentFleetOpen(true);
-                }}
-              />
-            ) : null}
+            {/* Offer cards always under the book panel (auto-load on mount). */}
+            <RentalCatalogPanel
+              mode="full"
+              bookFirst
+              searchTick={rentSearchTick}
+            />
 
             <section className="wallet-panel wallet-panel--rent-passes">
               <div className="wallet-panel-head">
@@ -1187,8 +1181,8 @@ function WalletAuthenticatedApp() {
                 highlightBookingId={highlightRentalBookingId}
                 onBookVehicle={() => {
                   document
-                    .getElementById('rent-guest-search')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    .getElementById('wallet-rent-fleet')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
               />
             </section>
