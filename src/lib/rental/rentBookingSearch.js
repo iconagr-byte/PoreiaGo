@@ -20,7 +20,13 @@ export function buildRentLocationOptions(office = {}) {
   const officeLabel = address ? `Γραφείο — ${address}` : brand !== 'Γραφείο' ? `Γραφείο · ${brand}` : 'Γραφείο';
 
   const options = [
-    { id: 'office', label: officeLabel, value: officeValue, kind: 'office' },
+    {
+      id: 'office',
+      label: officeLabel,
+      value: officeValue,
+      kind: 'office',
+      hint: address || 'Κύριο σημείο γραφείου',
+    },
   ];
 
   const extras = Array.isArray(office.pickupLocations)
@@ -38,6 +44,7 @@ export function buildRentLocationOptions(office = {}) {
       label,
       value: label,
       kind: 'extra',
+      hint: 'Σημείο παραλαβής / παράδοσης',
     });
   });
 
