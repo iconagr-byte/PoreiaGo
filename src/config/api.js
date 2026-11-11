@@ -42,6 +42,14 @@ function resolveApiBase() {
       buildFlavor === 'driver' ||
       buildFlavor === 'app'
     ) {
+      // Native rent demo → IconaRent office API (not Achillio Travel).
+      try {
+        if (sessionStorage.getItem('poreiago_native_rent_demo_v1') === '1') {
+          return 'https://iconarent.poreiago.com';
+        }
+      } catch {
+        /* ignore */
+      }
       // Driver office seal (unified app or legacy driver package).
       try {
         const raw = localStorage.getItem('driver_native_office_seal');

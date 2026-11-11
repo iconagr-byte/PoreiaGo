@@ -8,7 +8,6 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
-import { DEMO_RENT_FLEET } from '../../lib/rental/demoRentFleet.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
@@ -252,16 +251,23 @@ export default function RentalCatalogPanel({
           driverMode: form.driver_mode,
         });
       } catch (err) {
-        if (!isNativeRentDemo()) throw err;
-        // Soft demo session: show showcase fleet inside My Wallet.
-        rows = DEMO_RENT_FLEET.filter((v) =>
-          form.category ? v.category === form.category : true,
-        );
-      }
-      if (isNativeRentDemo() && !rows.length) {
-        rows = DEMO_RENT_FLEET.filter((v) =>
-          form.category ? v.category === form.category : true,
-        );
+        // Native rent demo is sealed to IconaRent — never invent a second fleet.
+        if (isNativeRentDemo()) {
+          const { fetchPublicRentalAvailability } = await import(
+            '../../services/customerRentalApi.js'
+          );
+          rows = await fetchPublicRentalAvailability({
+            startTime: new Date(form.start_time).toISOString(),
+            endTime: new Date(form.end_time).toISOString(),
+            category: form.category || undefined,
+            minSeats: form.min_seats || undefined,
+            pickupLocation: form.pickup_location,
+            dropoffLocation: form.dropoff_location,
+            driverMode: form.driver_mode,
+          });
+        } else {
+          throw err;
+        }
       }
       setSuggestions(rows);
       const preferredId = preferredVehicle?.id;

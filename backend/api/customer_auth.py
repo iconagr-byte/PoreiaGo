@@ -221,6 +221,78 @@ async def login_customer(request: Request, body: LoginRequest):
     return _profile_response(account, token, tenant_id=tid)
 
 
+@router.post("/native-rent-demo")
+async def native_rent_demo_session(request: Request):
+    """
+    Capacitor «Demo ενοικιάσεις»: mint a real customer JWT sealed to IconaRent
+    (iconarent) so My Wallet catalog/bookings hit that office — not Achillio.
+    """
+    from sqlalchemy import or_, select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from ticketing.customer_accounts import get_account, register_account
+    from travel_platform.rental.rental_store import (
+        ensure_starter_rent_fleet,
+        starter_rent_fleet_slugs,
+    )
+
+    email = "demo-rent@poreiago.local"
+    password = "DemoRent1!"
+    name = "Demo Rent"
+    slugs = starter_rent_fleet_slugs() or frozenset({"iconarent"})
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Tenant).where(
+                or_(
+                    Tenant.slug.in_(sorted(slugs)),
+                    Tenant.subdomain.in_(sorted(slugs)),
+                )
+            ).limit(1)
+        )
+        tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(
+            status_code=404,
+            detail="Δεν βρέθηκε γραφείο ενοικιάσεων (iconarent) για το demo.",
+        )
+    tid = str(tenant.id)
+    slug = str(tenant.slug or tenant.subdomain or "iconarent").strip().lower()
+    try:
+        ensure_starter_rent_fleet(tid, slug=slug)
+    except Exception:
+        pass
+
+    account = await get_account(email)
+    if not account:
+        try:
+            account = await register_account(email, password, name)
+        except ValueError:
+            account = await get_account(email)
+    if not account:
+        raise HTTPException(status_code=500, detail="Αποτυχία δημιουργίας demo λογαριασμού")
+
+    token, sealed_tid, account = await _issue_customer_token(
+        request,
+        email,
+        account=account,
+        preferred_tenant_id=tid,
+    )
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name") or name,
+        method="native-rent-demo",
+        tenant_id=sealed_tid,
+        detail=slug,
+    )
+    return _profile_response(account, token, tenant_id=sealed_tid)
+
+
 @router.get("/me")
 async def customer_me(account: dict = Depends(get_current_customer)):
     return {

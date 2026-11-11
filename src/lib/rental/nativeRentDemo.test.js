@@ -34,10 +34,21 @@ describe('nativeRentDemo', () => {
     });
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        json: async () => ({}),
-      })),
+      vi.fn(async (url) => {
+        if (String(url).includes('/api/auth/native-rent-demo')) {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'jwt-demo',
+              tenant_id: NATIVE_RENT_DEMO_TENANT_FALLBACK,
+              email: 'demo-rent@poreiago.local',
+              name: 'Demo Rent',
+              provider: 'demo',
+            }),
+          };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
     );
   });
 
@@ -55,12 +66,18 @@ describe('nativeRentDemo', () => {
     expect(isNativeRentDemo()).toBe(false);
   });
 
-  it('enterNativeRentDemoWallet seals IconaRent and soft-login', async () => {
+  it('enterNativeRentDemoWallet seals IconaRent with real JWT', async () => {
     const { loginAsCustomer } = await import('../auth.js');
     const { setWalletTenantId } = await import('../wallet/walletTenantSeal.js');
     await enterNativeRentDemoWallet();
     expect(isNativeRentDemo()).toBe(true);
     expect(setWalletTenantId).toHaveBeenCalledWith(NATIVE_RENT_DEMO_TENANT_FALLBACK);
-    expect(loginAsCustomer).toHaveBeenCalled();
+    expect(loginAsCustomer).toHaveBeenCalledWith(
+      'demo-rent@poreiago.local',
+      expect.objectContaining({
+        tenant_id: NATIVE_RENT_DEMO_TENANT_FALLBACK,
+      }),
+      'jwt-demo',
+    );
   });
 });
