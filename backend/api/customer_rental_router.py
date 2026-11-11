@@ -74,6 +74,13 @@ async def _require_rent_module(request: Request, account: dict | None = None) ->
                     status_code=404,
                     detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
                 )
+            slug = str(tenant.slug or tenant.subdomain or "").strip().lower()
+            if slug:
+                try:
+                    request.state.tenant_slug = slug
+                except Exception:
+                    pass
+            store.ensure_starter_rent_fleet(tid, slug=slug or None)
             if is_poreiago_platform_office(tenant):
                 return tid
             mods = modules_for_tenant(tenant)
@@ -246,7 +253,8 @@ async def rental_catalog(
     account: dict = Depends(get_current_customer),
 ):
     tid = await _require_rent_module(request, account)
-    vehicles = store.public_catalog(tid, category=category)
+    slug = str(getattr(request.state, "tenant_slug", None) or "").strip().lower() or None
+    vehicles = store.public_catalog(tid, category=category, slug=slug)
     return {"vehicles": vehicles, "count": len(vehicles), "tenant_id": tid}
 
 
@@ -297,7 +305,9 @@ async def rental_public_catalog(
 
     Booking/availability still requires customer auth.
     """
-    vehicles = store.public_catalog(await _require_rent_module(request), category=category)
+    tid = await _require_rent_module(request)
+    slug = str(getattr(request.state, "tenant_slug", None) or "").strip().lower() or None
+    vehicles = store.public_catalog(tid, category=category, slug=slug)
     public = []
     for v in vehicles:
         public.append(

@@ -329,6 +329,18 @@ async def lifespan(app: FastAPI):
             "Office admin bootstrap skipped: %s", exc
         )
     try:
+        from travel_platform.rental.rental_store import seed_starter_rent_fleets_from_db
+
+        starter = await seed_starter_rent_fleets_from_db()
+        if starter.get("seeded"):
+            __import__("logging").getLogger("poreiago.startup").info(
+                "Starter rent fleet seeded: %s", starter
+            )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Starter rent fleet seed skipped: %s", exc
+        )
+    try:
         from app.core.database import AsyncSessionLocal
         from travel_platform.growth.edge_domains import sync_edge_custom_domains_from_db
 

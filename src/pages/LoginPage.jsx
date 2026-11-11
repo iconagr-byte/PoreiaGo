@@ -655,13 +655,15 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               type="button"
               className="wallet-btn wallet-btn-ghost wallet-btn-block mt-4"
               onClick={() => {
-                // My Wallet shell + Ενοικιάσεις tab (not the separate /rent page).
-                enterNativeRentDemoWallet();
-                rememberNativeRoleHome(NATIVE_ROLE_WALLET);
-                navigate('/wallet?tab=rentals', {
-                  replace: true,
-                  state: { walletTab: 'rentals' },
-                });
+                // My Wallet shell + Ενοικιάσεις tab sealed to IconaRent.
+                void (async () => {
+                  await enterNativeRentDemoWallet();
+                  rememberNativeRoleHome(NATIVE_ROLE_WALLET);
+                  navigate('/wallet?tab=rentals', {
+                    replace: true,
+                    state: { walletTab: 'rentals' },
+                  });
+                })();
               }}
             >
               <span className="inline-flex items-center justify-center gap-2">
