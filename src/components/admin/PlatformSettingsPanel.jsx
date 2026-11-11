@@ -7,6 +7,7 @@ import {
   updatePlatformSettings,
 } from '../../services/platformApi.js';
 import AbandonedRecoveryPanel from './AbandonedRecoveryPanel.jsx';
+import { officeShowsBusSeatTools } from '../../lib/admin/officeDesignPages.js';
 
 const LOCALES = [
   { value: 'el-GR', label: 'Ελληνικά (el-GR)' },
@@ -135,7 +136,19 @@ function ratioFromPct(raw) {
   return Math.min(100, Math.max(0, n)) / 100;
 }
 
-export default function PlatformSettingsPanel({ onOpenPayments }) {
+export default function PlatformSettingsPanel({
+  onOpenPayments,
+  officeMode = 'trips_only',
+}) {
+  const showBusTools = officeShowsBusSeatTools(officeMode);
+  const navSections = useMemo(
+    () =>
+      NAV_SECTIONS.filter((s) => {
+        if (!showBusTools && (s.id === 'pricing' || s.id === 'abandoned')) return false;
+        return true;
+      }),
+    [showBusTools],
+  );
   const [form, setForm] = useState(DEFAULT_PLATFORM_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -161,7 +174,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
   }, [load]);
 
   useEffect(() => {
-    const ids = NAV_SECTIONS.map((s) => s.id);
+    const ids = navSections.map((s) => s.id);
     const nodes = ids.map((id) => document.getElementById(id)).filter(Boolean);
     if (!nodes.length) return undefined;
     const observer = new IntersectionObserver(
@@ -175,7 +188,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
     );
     nodes.forEach((n) => observer.observe(n));
     return () => observer.disconnect();
-  }, [loading]);
+  }, [loading, navSections]);
 
   const patch = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -281,7 +294,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
         </div>
 
         <nav className="flex gap-1.5 overflow-x-auto border-t border-black/[0.04] px-3 py-2.5 sm:px-4">
-          {NAV_SECTIONS.map((item) => {
+          {navSections.map((item) => {
             const active = activeNav === item.id;
             return (
               <button
@@ -412,127 +425,138 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
         </div>
       </SectionCard>
 
-      <SectionCard
-        id="abandoned"
-        icon="shopping_cart_checkout"
-        title="Εγκαταλειμμένες κρατήσεις"
-        description="Πότε θεωρείται εκκρεμής ένα checkout και πόσο συχνά στέλνεται recovery."
-        accent="bg-amber-500"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field
-            label="Εκκρεμείς μετά (λεπτά)"
-            hint="Μετά από πόσα λεπτά χωρίς ολοκλήρωση ξεκινά recovery"
-          >
-            <input
-              type="number"
-              min={15}
-              max={1440}
-              value={form.abandoned_pending_minutes ?? ''}
-              onChange={(e) =>
-                patch('abandoned_pending_minutes', e.target.value === '' ? '' : Number(e.target.value))
-              }
-              className={inputClass}
-            />
-          </Field>
-          <Field
-            label="Cooldown recovery (ώρες)"
-            hint="Ελάχιστο διάστημα πριν ξανασταλεί reminder στον ίδιο πελάτη"
-          >
-            <input
-              type="number"
-              min={1}
-              max={168}
-              value={form.abandoned_recovery_cooldown_hours ?? ''}
-              onChange={(e) =>
-                patch(
-                  'abandoned_recovery_cooldown_hours',
-                  e.target.value === '' ? '' : Number(e.target.value),
-                )
-              }
-              className={inputClass}
-            />
-          </Field>
-        </div>
-        <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-xs text-amber-900">
-          Τρέχων κανόνας: εκκρεμείς μετά από{' '}
-          <strong>{form.abandoned_pending_minutes || 60} λεπτά</strong> · cooldown{' '}
-          <strong>{form.abandoned_recovery_cooldown_hours || 24} ώρες</strong>.
-        </div>
-      </SectionCard>
+      {showBusTools ? (
+        <SectionCard
+          id="abandoned"
+          icon="shopping_cart_checkout"
+          title="Εγκαταλειμμένες κρατήσεις"
+          description="Πότε θεωρείται εκκρεμής ένα checkout και πόσο συχνά στέλνεται recovery."
+          accent="bg-amber-500"
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field
+              label="Εκκρεμείς μετά (λεπτά)"
+              hint="Μετά από πόσα λεπτά χωρίς ολοκλήρωση ξεκινά recovery"
+            >
+              <input
+                type="number"
+                min={15}
+                max={1440}
+                value={form.abandoned_pending_minutes ?? ''}
+                onChange={(e) =>
+                  patch(
+                    'abandoned_pending_minutes',
+                    e.target.value === '' ? '' : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field
+              label="Cooldown recovery (ώρες)"
+              hint="Ελάχιστο διάστημα πριν ξανασταλεί reminder στον ίδιο πελάτη"
+            >
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={form.abandoned_recovery_cooldown_hours ?? ''}
+                onChange={(e) =>
+                  patch(
+                    'abandoned_recovery_cooldown_hours',
+                    e.target.value === '' ? '' : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-xs text-amber-900">
+            Τρέχων κανόνας: εκκρεμείς μετά από{' '}
+            <strong>{form.abandoned_pending_minutes || 60} λεπτά</strong> · cooldown{' '}
+            <strong>{form.abandoned_recovery_cooldown_hours || 24} ώρες</strong>.
+          </div>
+        </SectionCard>
+      ) : null}
 
-      <SectionCard
-        id="pricing"
-        icon="sell"
-        title="Δυναμική τιμολόγηση"
-        description="Αυτόματο markup / έκπτωση ανάλογα με την πληρότητα της εκδρομής."
-        accent="bg-violet-600"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Υψηλή πληρότητα από (%)" hint="Πάνω από αυτό το όριο εφαρμόζεται markup">
-            <input
-              type="number"
-              min={50}
-              max={100}
-              step={5}
-              value={pctFromRatio(form.pricing_high_occupancy_threshold)}
-              onChange={(e) => patch('pricing_high_occupancy_threshold', ratioFromPct(e.target.value))}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Markup (%)" hint="Αύξηση τιμής όταν η πληρότητα είναι υψηλή">
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={form.pricing_high_occupancy_markup_pct ?? ''}
-              onChange={(e) =>
-                patch(
-                  'pricing_high_occupancy_markup_pct',
-                  e.target.value === '' ? '' : Number(e.target.value),
-                )
-              }
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Χαμηλή πληρότητα έως (%)" hint="Κάτω από αυτό το όριο εφαρμόζεται έκπτωση">
-            <input
-              type="number"
-              min={0}
-              max={50}
-              step={5}
-              value={pctFromRatio(form.pricing_low_occupancy_threshold)}
-              onChange={(e) => patch('pricing_low_occupancy_threshold', ratioFromPct(e.target.value))}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Έκπτωση (%)" hint="Μείωση τιμής όταν η πληρότητα είναι χαμηλή">
-            <input
-              type="number"
-              min={0}
-              max={30}
-              value={form.pricing_low_occupancy_discount_pct ?? ''}
-              onChange={(e) =>
-                patch(
-                  'pricing_low_occupancy_discount_pct',
-                  e.target.value === '' ? '' : Number(e.target.value),
-                )
-              }
-              className={inputClass}
-            />
-          </Field>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-3 text-xs text-violet-900">
-            ≥ {pctFromRatio(form.pricing_high_occupancy_threshold) || 80}% πληρότητα → +
-            {form.pricing_high_occupancy_markup_pct ?? 10}% τιμή
+      {showBusTools ? (
+        <SectionCard
+          id="pricing"
+          icon="sell"
+          title="Δυναμική τιμολόγηση"
+          description="Αυτόματο markup / έκπτωση ανάλογα με την πληρότητα της εκδρομής."
+          accent="bg-violet-600"
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Υψηλή πληρότητα από (%)" hint="Πάνω από αυτό το όριο εφαρμόζεται markup">
+              <input
+                type="number"
+                min={50}
+                max={100}
+                step={5}
+                value={pctFromRatio(form.pricing_high_occupancy_threshold)}
+                onChange={(e) =>
+                  patch('pricing_high_occupancy_threshold', ratioFromPct(e.target.value))
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Markup (%)" hint="Αύξηση τιμής όταν η πληρότητα είναι υψηλή">
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={form.pricing_high_occupancy_markup_pct ?? ''}
+                onChange={(e) =>
+                  patch(
+                    'pricing_high_occupancy_markup_pct',
+                    e.target.value === '' ? '' : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Χαμηλή πληρότητα έως (%)" hint="Κάτω από αυτό το όριο εφαρμόζεται έκπτωση">
+              <input
+                type="number"
+                min={0}
+                max={50}
+                step={5}
+                value={pctFromRatio(form.pricing_low_occupancy_threshold)}
+                onChange={(e) =>
+                  patch('pricing_low_occupancy_threshold', ratioFromPct(e.target.value))
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Έκπτωση (%)" hint="Μείωση τιμής όταν η πληρότητα είναι χαμηλή">
+              <input
+                type="number"
+                min={0}
+                max={30}
+                value={form.pricing_low_occupancy_discount_pct ?? ''}
+                onChange={(e) =>
+                  patch(
+                    'pricing_low_occupancy_discount_pct',
+                    e.target.value === '' ? '' : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+              />
+            </Field>
           </div>
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-900">
-            ≤ {pctFromRatio(form.pricing_low_occupancy_threshold) || 30}% πληρότητα → −
-            {form.pricing_low_occupancy_discount_pct ?? 5}% τιμή
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-3 text-xs text-violet-900">
+              ≥ {pctFromRatio(form.pricing_high_occupancy_threshold) || 80}% πληρότητα → +
+              {form.pricing_high_occupancy_markup_pct ?? 10}% τιμή
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-900">
+              ≤ {pctFromRatio(form.pricing_low_occupancy_threshold) || 30}% πληρότητα → −
+              {form.pricing_low_occupancy_discount_pct ?? 5}% τιμή
+            </div>
           </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         id="notify"
@@ -616,7 +640,9 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
         </div>
       </section>
 
-      <AbandonedRecoveryPanel pendingMinutes={form.abandoned_pending_minutes} />
+      {showBusTools ? (
+        <AbandonedRecoveryPanel pendingMinutes={form.abandoned_pending_minutes} />
+      ) : null}
 
       <div
         className={`sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-md transition ${

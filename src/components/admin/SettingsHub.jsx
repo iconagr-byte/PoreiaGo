@@ -351,6 +351,7 @@ export default function SettingsHub({
             tab={tab || defaultTab}
             onOpenPayments={() => selectTab('payments')}
             contractPrefs={contractPrefs}
+            officeMode={officeMode}
           />
         </AdminMenuFade>
       </div>
