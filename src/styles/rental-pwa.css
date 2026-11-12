@@ -9311,6 +9311,77 @@ button.rent-offer {
   background: var(--rent-teal, #0a7a6c);
 }
 
+/* Hertz-inspired offer card (shared with wallet) */
+.rent-offer--hertz {
+  --rent-hertz-yellow: #ffcc00;
+  --rent-hertz-teal: #2f6f7a;
+  --rent-hertz-ink: #111111;
+  --rent-hertz-muted: #6b6b6b;
+  position: relative;
+  gap: 0.55rem;
+  padding: 0.95rem 0.95rem 0.85rem;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rent-offer--hertz::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  background: var(--rent-hertz-yellow);
+}
+
+.rent-offer--hertz .rent-offer-class {
+  font-weight: 800;
+  color: var(--rent-hertz-ink);
+}
+
+.rent-offer--hertz .rent-offer-media {
+  min-height: 11rem;
+  background: #f3f5f6;
+}
+
+.rent-offer--hertz .rent-offer-media img {
+  max-height: 11.5rem;
+}
+
+.rent-offer--hertz .rent-offer-price {
+  color: var(--rent-hertz-ink);
+}
+
+.rent-offer--hertz .rent-offer-cta {
+  background: var(--rent-hertz-teal);
+}
+
+.rent-offer-est {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: var(--rent-hertz-muted, #6b6b6b);
+}
+
+.rent-offer-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--rent-hertz-muted, #6b6b6b);
+}
+
+.rent-offer-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #1a73e8;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.rent-offer-member .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
 .rent-results-toolbar {
   display: flex;
   align-items: center;
