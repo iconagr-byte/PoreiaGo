@@ -1,8 +1,8 @@
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
- * Vehicle result card — competitor-inspired stack (class → specs → photo → total).
- * Not a Hertz clone: office brand colors, Greek copy, no yellow stripe / loyalty chrome.
+ * Vehicle result card — Hertz-inspired stack (class → specs → photo → est. total).
+ * Greek PoreiaGo copy; yellow accent stripe + teal actions (not Hertz trademarks).
  */
 export default function RentOfferCard({
   vehicle,
@@ -10,16 +10,21 @@ export default function RentOfferCard({
   recommended = false,
   totalPrice = null,
   compareAt = null,
-  priceKicker = 'Συνολική τιμή',
+  priceKicker = 'Εκτιμώμενο σύνολο',
+  priceMeta = '',
   ctaLabel = '',
   onSelect,
   onOpenDetails,
   as = 'article',
+  layout = 'hertz',
 } = {}) {
   const v = enrichRentVehicle(vehicle);
   const cover = v.photo_urls?.[0] || v.photo_url || '';
   const classTitle = String(v.category_label || v.size_label || v.display_headline || 'Όχημα').trim();
-  const modelLine = `${v.model || 'Όχημα'}${v.similar_label ? ` ${v.similar_label}` : ''}`;
+  const similar = String(v.similar_label || '').trim();
+  const modelLine = similar
+    ? `${v.model || 'Όχημα'} ${similar}`
+    : `${v.model || 'Όχημα'} ή παρόμοιο`;
 
   const seatsLabel =
     Number(v.seating_capacity) > 0
@@ -54,16 +59,27 @@ export default function RentOfferCard({
       ? Number(compareAt)
       : null;
   const priceIsDaily = totalPrice == null && v.suggested_total == null && v.daily_rate_eur != null;
+  const days = Number(v.suggested_days) > 0 ? Number(v.suggested_days) : 0;
+  const metaLine =
+    priceMeta ||
+    (days > 1
+      ? `${days} ημέρες · απεριόριστα χλμ. σύμφωνα με πολιτική γραφείου`
+      : priceIsDaily
+        ? 'Τιμή ανά ημέρα · επιβεβαίωση στο checkout'
+        : 'Απεριόριστα χλμ. σύμφωνα με πολιτική γραφείου');
 
   const Tag = as === 'button' ? 'button' : 'article';
   const tagProps =
     as === 'button'
       ? { type: 'button', onClick: () => onSelect?.(vehicle) }
       : {};
+  const hertz = layout === 'hertz';
 
   return (
     <Tag
-      className={`rent-offer${selected ? ' is-selected' : ''}${recommended ? ' is-recommended' : ''}`}
+      className={`rent-offer${hertz ? ' rent-offer--hertz' : ''}${selected ? ' is-selected' : ''}${
+        recommended ? ' is-recommended' : ''
+      }`}
       {...tagProps}
       aria-pressed={as === 'button' ? selected : undefined}
     >
@@ -107,10 +123,15 @@ export default function RentOfferCard({
 
       <footer className="rent-offer-foot">
         <div className="rent-offer-price-block">
-          <span className="rent-offer-kicker">{priceIsDaily ? 'από / ημέρα' : priceKicker}</span>
+          <span className="rent-offer-kicker">
+            {priceIsDaily ? 'από / ημέρα' : priceKicker}
+          </span>
           <div className="rent-offer-prices">
             {total != null && Number.isFinite(total) ? (
-              <strong className="rent-offer-price">€{Math.round(total)}</strong>
+              <strong className="rent-offer-price">
+                €{Math.round(total)}
+                {hertz && !priceIsDaily ? <span className="rent-offer-est"> εκτ.</span> : null}
+              </strong>
             ) : (
               <strong className="rent-offer-price rent-offer-price--muted">—</strong>
             )}
@@ -136,13 +157,25 @@ export default function RentOfferCard({
               }
             }}
           >
-            {ctaLabel || (selected ? 'Επιλεγμένο' : 'Επιλογή')}
+            {ctaLabel || (selected ? 'Επιλεγμένο' : 'Δες λεπτομέρειες')}
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
           </span>
         ) : null}
       </footer>
+
+      {hertz ? (
+        <>
+          <p className="rent-offer-meta">{metaLine}</p>
+          <span className="rent-offer-member" aria-hidden={false}>
+            <span className="material-symbols-outlined" aria-hidden>
+              sell
+            </span>
+            Ξεκλείδωσε καλύτερες τιμές με λογαριασμό
+          </span>
+        </>
+      ) : null}
     </Tag>
   );
 }
