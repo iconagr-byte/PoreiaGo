@@ -4194,41 +4194,6 @@ button.wallet-account-row--action.is-open {
   display: none;
 }
 
-.wallet-rent-trip-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0 0 0.85rem;
-  padding: 0.75rem 0.85rem;
-  border-radius: 14px;
-  background: #f5f5f7;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.wallet-rent-trip-chip .material-symbols-outlined {
-  color: var(--wallet-accent, #0071e3);
-  font-size: 1.35rem;
-}
-
-.wallet-rent-trip-chip strong {
-  display: block;
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
-}
-
-.wallet-rent-trip-chip p {
-  margin: 0.15rem 0 0;
-  font-size: 0.8rem;
-  color: #6e6e73;
-}
-
-.wallet-rent-trip-chip-busy {
-  margin-left: auto;
-  font-size: 0.78rem;
-  font-weight: 650;
-  color: var(--wallet-accent, #0071e3);
-}
-
 .wallet-form--bookfirst-extras {
   margin-top: 0.75rem;
 }
