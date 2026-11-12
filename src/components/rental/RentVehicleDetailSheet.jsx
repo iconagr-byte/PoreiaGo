@@ -62,60 +62,64 @@ export default function RentVehicleDetailSheet({
             <h3>{v.model || 'Όχημα'}</h3>
             {v.similar_label ? <p className="rent-sheet-similar">{v.similar_label}</p> : null}
           </div>
-          <button type="button" className="rent-btn rent-btn-ghost" onClick={onClose}>
+          <button type="button" className="rent-btn rent-btn-ghost rent-sheet-close" onClick={onClose}>
             Κλείσιμο
           </button>
         </div>
 
-        <div className={`rent-sheet-gallery${photos.length === 1 ? ' is-single' : ''}`}>
-          {photos.length ? (
-            photos.map((url) => (
-              <img key={url} src={url} alt={v.model || 'Όχημα'} loading="lazy" />
-            ))
-          ) : (
-            <div className="rent-vehicle-placeholder">
-              <span className="material-symbols-outlined">directions_car</span>
-            </div>
-          )}
-        </div>
-
-        <div className="rent-sheet-body">
-          {groupLine ? <p className="rent-sheet-group">{groupLine}</p> : null}
-          {v.price_label ? <p className="rent-sheet-price">{v.price_label}</p> : null}
-          {v.display_headline ? <p className="rent-sheet-headline">{v.display_headline}</p> : null}
-          <p>
-            {v.display_blurb ||
-              v.description ||
-              'Καθαρό, ασφαλές και έτοιμο για παραλαβή. Περιλαμβάνει βασική ασφάλεια σύμφωνα με τους όρους μίσθωσης του γραφείου.'}
-          </p>
-
-          <ul className="rent-sheet-facts">
-            {facts.map((f) => (
-              <li key={`${f.icon}-${f.label}`}>
-                <span className="material-symbols-outlined" aria-hidden>
-                  {f.icon}
-                </span>
-                <span>{f.label}</span>
-              </li>
-            ))}
-          </ul>
-
-          {Array.isArray(v.highlights) && v.highlights.length ? (
-            <ul className="rent-sheet-tags">
-              {v.highlights.map((h) => (
-                <li key={h}>{h}</li>
-              ))}
-            </ul>
-          ) : null}
-
-          <div className="rent-sheet-terms">
-            <p>
-              <strong>Μίσθωση:</strong> ημερήσια χρέωση σύμφωνα με το τιμολόγιο · καύσιμα &
-              χιλιόμετρα βάσει πολιτικής γραφείου · απαιτείται έγκυρη άδεια οδήγησης.
-            </p>
+        <div className="rent-sheet-scroll">
+          <div className={`rent-sheet-gallery${photos.length === 1 ? ' is-single' : ''}`}>
+            {photos.length ? (
+              photos.slice(0, 4).map((url) => (
+                <img key={url} src={url} alt={v.model || 'Όχημα'} loading="lazy" />
+              ))
+            ) : (
+              <div className="rent-vehicle-placeholder">
+                <span className="material-symbols-outlined">directions_car</span>
+              </div>
+            )}
           </div>
 
-          {onSelect ? (
+          <div className="rent-sheet-body">
+            {groupLine ? <p className="rent-sheet-group">{groupLine}</p> : null}
+            {v.price_label ? <p className="rent-sheet-price">{v.price_label}</p> : null}
+            {v.display_headline ? <p className="rent-sheet-headline">{v.display_headline}</p> : null}
+            <p>
+              {v.display_blurb ||
+                v.description ||
+                'Καθαρό, ασφαλές και έτοιμο για παραλαβή. Περιλαμβάνει βασική ασφάλεια σύμφωνα με τους όρους μίσθωσης του γραφείου.'}
+            </p>
+
+            <ul className="rent-sheet-facts">
+              {facts.map((f) => (
+                <li key={`${f.icon}-${f.label}`}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    {f.icon}
+                  </span>
+                  <span>{f.label}</span>
+                </li>
+              ))}
+            </ul>
+
+            {Array.isArray(v.highlights) && v.highlights.length ? (
+              <ul className="rent-sheet-tags">
+                {v.highlights.map((h) => (
+                  <li key={h}>{h}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            <div className="rent-sheet-terms">
+              <p>
+                <strong>Μίσθωση:</strong> ημερήσια χρέωση σύμφωνα με το τιμολόγιο · καύσιμα &
+                χιλιόμετρα βάσει πολιτικής γραφείου · απαιτείται έγκυρη άδεια οδήγησης.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {onSelect ? (
+          <div className="rent-sheet-footer">
             <button
               type="button"
               className="rent-pick-cta rent-sheet-cta"
@@ -126,8 +130,8 @@ export default function RentVehicleDetailSheet({
             >
               {selectLabel}
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

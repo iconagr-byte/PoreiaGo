@@ -309,3 +309,25 @@ html[data-poreiago-app='app'] .wallet-topbar-brand img.office-brand-mark__logo--
   height: 28px !important;
   max-width: min(72px, 28vw) !important;
 }
+
+/* Vehicle detail sheet: stay inside the handset frame. */
+html[data-poreiago-app='wallet'] .rent-sheet-backdrop--over-vehicle,
+html[data-poreiago-app='app'] .rent-sheet-backdrop--over-vehicle {
+  padding: max(0.45rem, env(safe-area-inset-top, 0px)) 0.55rem
+    max(0.45rem, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html[data-poreiago-app='wallet'] .rent-sheet--detail,
+html[data-poreiago-app='app'] .rent-sheet--detail {
+  width: min(100%, calc(100vw - 1.1rem)) !important;
+  max-height: calc(
+    100dvh - 0.9rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  ) !important;
+}
+
+html[data-poreiago-app='wallet'] .rent-sheet-cta,
+html[data-poreiago-app='app'] .rent-sheet-cta {
+  font-size: 0.9rem !important;
+  border-radius: 16px !important;
+  min-height: 2.75rem;
+}
