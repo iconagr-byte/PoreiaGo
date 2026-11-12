@@ -18,6 +18,7 @@ import {
 } from '../../lib/rental/rentBookingSearch.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 import RentOfferCard from '../rental/RentOfferCard.jsx';
+import RentVehicleDetailSheet from '../rental/RentVehicleDetailSheet.jsx';
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
@@ -772,6 +773,11 @@ export default function RentalCatalogPanel({
                   const listPrice = Number(v.list_total || v.compare_at_total || 0);
                   const total = Number(v.suggested_total || 0);
                   const compareAt = listPrice > total ? listPrice : null;
+                  const openVehicleCard = (row) => {
+                    setSelectedId(row.id);
+                    setDetails(row);
+                    trackFunnel('vehicle_open_details', { vehicle_id: row.id });
+                  };
                   return (
                     <RentOfferCard
                       key={v.id}
@@ -790,11 +796,8 @@ export default function RentalCatalogPanel({
                             : 'Συνολική τιμή'
                       }
                       ctaLabel={isSelected ? 'Επιλεγμένο' : 'Επιλογή'}
-                      onSelect={() => setSelectedId(v.id)}
-                      onOpenDetails={(row) => {
-                        setDetails(row);
-                        trackFunnel('vehicle_open_details', { vehicle_id: row.id });
-                      }}
+                      onSelect={() => openVehicleCard(v)}
+                      onOpenDetails={openVehicleCard}
                     />
                   );
                 })}
@@ -807,6 +810,7 @@ export default function RentalCatalogPanel({
           )}
           {selected && sortedSuggestions.length ? (
             <button
+              id="wallet-rent-book-cta"
               type="button"
               className="wallet-btn wallet-btn-primary wallet-btn-block"
               style={{ marginTop: '0.75rem' }}
@@ -819,44 +823,25 @@ export default function RentalCatalogPanel({
         </section>
       ) : null}
 
-      {details ? (
-        <div className="rent-sheet-backdrop" role="dialog" aria-modal="true">
-          <div className="rent-sheet">
-            <div className="rent-sheet-head">
-              <h3>{details.model}</h3>
-              <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setDetails(null)}>
-                Κλείσιμο
-              </button>
-            </div>
-            <div className="rent-sheet-gallery">
-              {vehiclePhotos(details).length ? (
-                vehiclePhotos(details).map((url) => <img key={url} src={url} alt={details.model || 'Vehicle'} loading="lazy" />)
-              ) : (
-                <div className="rent-vehicle-placeholder">
-                  <span className="material-symbols-outlined">directions_car</span>
-                </div>
-              )}
-            </div>
-            <div className="rent-sheet-body">
-              <p>
-                {details.category} · {details.seating_capacity} θέσεις
-              </p>
-              <p>Από {euro(details.daily_rate_eur)}/ημέρα</p>
-              <p>{details.description || 'Καθαρό, ασφαλές και έτοιμο για παραλαβή.'}</p>
-              <button
-                type="button"
-                className="wallet-btn wallet-btn-primary wallet-btn-block"
-                onClick={() => {
-                  setSelectedId(details.id);
-                  setDetails(null);
-                }}
-              >
-                Επιλογή οχήματος
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <RentVehicleDetailSheet
+        vehicle={details}
+        onClose={() => setDetails(null)}
+        selectLabel={
+          selected && selectedId === details?.id
+            ? `Συνέχεια · ${euro(selected.suggested_total || selected.daily_rate_eur)}`
+            : 'Επιλογή οχήματος'
+        }
+        onSelect={(row) => {
+          setSelectedId(row.id);
+          setDetails(null);
+          trackFunnel('vehicle_selected_from_detail', { vehicle_id: row.id });
+          window.setTimeout(() => {
+            document
+              .getElementById('wallet-rent-book-cta')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 80);
+        }}
+      />
 
       {showMine ? (
       <section className={bare ? '' : 'wallet-panel'} style={bare && mode === 'full' ? { marginTop: '1rem' } : undefined}>
