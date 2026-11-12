@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   getCustomerEmail,
@@ -23,6 +23,7 @@ import {
   rentTripSearchReady,
   writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
+import { createEmbeddedWizardNavigate } from '../../lib/rental/rentWizardEmbed.js';
 import { priceRentTotalsWithPromo } from '../../lib/rental/rentPromoCodes.js';
 import {
   PAYMENT_PLAN_DEPOSIT,
@@ -47,12 +48,21 @@ import { isClientDemoFleetId } from '../../lib/rental/demoRentFleet.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
 import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
+import RentWizardLink from './RentWizardLink.jsx';
 
 /**
  * Final rent checkout — plan + method + complete booking CTA.
  */
-export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' } = {}) {
-  const navigate = useNavigate();
+export default function RentBookingPaymentStep({
+  brandLabel = 'Γραφείο',
+  onWizardNav,
+  onBooked,
+} = {}) {
+  const routerNavigate = useNavigate();
+  const navigate = useMemo(
+    () => createEmbeddedWizardNavigate(routerNavigate, onWizardNav),
+    [routerNavigate, onWizardNav],
+  );
   const prefs = useMemo(() => readRentBookingPrefs(), []);
   const snap = useMemo(() => readRentVehicleSnapshot(), []);
   const vehicle = useMemo(() => (snap ? enrichRentVehicle(snap) : null), [snap]);
@@ -354,6 +364,7 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
         amountPaid: summary.amountPaid,
         methodLabel: summary.payment_method_label,
       });
+      if (typeof onBooked === 'function') onBooked(booking);
     } catch (err) {
       toast.error(err?.message || 'Αποτυχία κράτησης');
     } finally {
@@ -405,9 +416,13 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
                 : ' — η κράτησή σας είναι έτοιμη.'}
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link to="/rent#rent-guest-fleet" className="rent-wiz-cta-link">
+              <RentWizardLink
+                to="/rent#rent-guest-fleet"
+                onWizardNav={onWizardNav}
+                className="rent-wiz-cta-link"
+              >
                 Πίσω στον στόλο
-              </Link>
+              </RentWizardLink>
               {!bookingDone.demo ? (
                 <button
                   type="button"
@@ -423,7 +438,7 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
                     })
                   }
                 >
-                  Άνοιγμα My Wallet
+                  Οι ενοικιάσεις μου
                 </button>
               ) : null}
             </div>
@@ -443,9 +458,13 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
       ) : !vehicle ? (
         <div className="rent-wiz-empty">
           <p>Δεν έχει επιλεγεί όχημα ακόμα.</p>
-          <Link to="/rent#rent-guest-fleet" className="rent-wiz-cta-link">
+          <RentWizardLink
+            to="/rent#rent-guest-fleet"
+            onWizardNav={onWizardNav}
+            className="rent-wiz-cta-link"
+          >
             Πήγαινε στον στόλο
-          </Link>
+          </RentWizardLink>
         </div>
       ) : (
         <div className="rent-wiz-layout">

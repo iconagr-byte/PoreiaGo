@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getCustomerToken } from '../../lib/auth.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
@@ -20,18 +20,24 @@ import {
   rentTripSearchReady,
   writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
+import { createEmbeddedWizardNavigate } from '../../lib/rental/rentWizardEmbed.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
 import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
+import RentWizardLink from './RentWizardLink.jsx';
 
 /**
  * Services / coverage step after vehicle pick — teal brand, Hertz-like structure.
  * Next step navigates to /rent/book/details (does not book yet).
  * Catalog comes from office site appearance (admin: Ενοικιάσεις → Υπηρεσίες).
  */
-export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' } = {}) {
-  const navigate = useNavigate();
+export default function RentBookingServicesStep({ brandLabel = 'Γραφείο', onWizardNav } = {}) {
+  const routerNavigate = useNavigate();
+  const navigate = useMemo(
+    () => createEmbeddedWizardNavigate(routerNavigate, onWizardNav),
+    [routerNavigate, onWizardNav],
+  );
   const prefs = useMemo(() => readRentBookingPrefs(), []);
   const snap = useMemo(() => readRentVehicleSnapshot(), []);
   const vehicle = useMemo(() => (snap ? enrichRentVehicle(snap) : null), [snap]);
@@ -131,9 +137,13 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
       {!vehicle ? (
         <div className="rent-wiz-empty">
           <p>Δεν έχει επιλεγεί όχημα ακόμα.</p>
-          <Link to="/rent#rent-guest-fleet" className="rent-wiz-cta-link">
+          <RentWizardLink
+            to="/rent#rent-guest-fleet"
+            onWizardNav={onWizardNav}
+            className="rent-wiz-cta-link"
+          >
             Πήγαινε στον στόλο
-          </Link>
+          </RentWizardLink>
         </div>
       ) : (
         <div className="rent-wiz-layout">

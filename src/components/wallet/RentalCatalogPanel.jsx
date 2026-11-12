@@ -19,6 +19,12 @@ import {
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 import RentOfferCard from '../rental/RentOfferCard.jsx';
 import RentVehicleDetailSheet from '../rental/RentVehicleDetailSheet.jsx';
+import WalletRentCheckout from './WalletRentCheckout.jsx';
+import { rememberRentVehicle } from '../../lib/rental/rentBookingExtras.js';
+import {
+  rentTripSearchReady,
+  writeRentBookingPrefs,
+} from '../../lib/rental/rentBookingSearch.js';
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
@@ -136,6 +142,8 @@ export default function RentalCatalogPanel({
   bookFirst = false,
   /** Bump to re-read prefs and run availability search. */
   searchTick = 0,
+  brandLabel = 'Γραφείο',
+  onCheckoutOpenChange,
 } = {}) {
   const showBook = mode === 'full' || mode === 'book';
   const showMine = !bookFirst && (mode === 'full' || mode === 'mine');
@@ -151,7 +159,12 @@ export default function RentalCatalogPanel({
   const [onlyWithPhotos, setOnlyWithPhotos] = useState(false);
   const [onlyTopRated, setOnlyTopRated] = useState(false);
   const [details, setDetails] = useState(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [recentBooked, setRecentBooked] = useState(null);
+
+  useEffect(() => {
+    if (typeof onCheckoutOpenChange === 'function') onCheckoutOpenChange(checkoutOpen);
+  }, [checkoutOpen, onCheckoutOpenChange]);
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
     try {
       return localStorage.getItem('rent_reminders_enabled_v1') === '1';
@@ -466,6 +479,58 @@ export default function RentalCatalogPanel({
       setBusy(false);
     }
   };
+
+  const startWalletCheckout = (row) => {
+    if (!row?.id) return;
+    const start = form.start_time || defaultPickupDateTime();
+    const end = form.end_time || defaultReturnDateTime(start);
+    rememberRentVehicle(row);
+    writeRentBookingPrefs({
+      vehicle_id: row.id,
+      start_time: start,
+      end_time: end,
+      pickup_location: form.pickup_location || 'Γραφείο',
+      dropoff_location: form.dropoff_location || form.pickup_location || 'Γραφείο',
+      driver_mode: form.driver_mode || 'SELF_DRIVE',
+      extra_insurance: Boolean(form.extra_insurance),
+      child_seat: Boolean(form.child_seat),
+      gps_pack: Boolean(form.gps_pack),
+      client_phone: form.client_phone || '',
+      wizard_step: 'services',
+      wizard_pending_confirm: false,
+    });
+    if (!rentTripSearchReady()) {
+      toast.error('Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.');
+      window.setTimeout(() => {
+        document
+          .querySelector('.wallet-rent-bookfirst')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+      return;
+    }
+    setSelectedId(row.id);
+    setDetails(null);
+    setCheckoutOpen(true);
+    trackFunnel('wallet_checkout_start', { vehicle_id: row.id });
+  };
+
+  if (checkoutOpen) {
+    return (
+      <WalletRentCheckout
+        brandLabel={brandLabel}
+        onExit={() => setCheckoutOpen(false)}
+        onBooked={(booking) => {
+          setCheckoutOpen(false);
+          setRecentBooked(booking || null);
+          setSuggestions([]);
+          setSelectedId('');
+          if (onClearPreferred) onClearPreferred();
+          void loadMine();
+          if (typeof onBooked === 'function') onBooked(booking);
+        }}
+      />
+    );
+  }
 
   return (
     <div className={bare ? 'rent-catalog' : 'wallet-stack'}>
@@ -815,9 +880,9 @@ export default function RentalCatalogPanel({
               className="wallet-btn wallet-btn-primary wallet-btn-block"
               style={{ marginTop: '0.75rem' }}
               disabled={busy}
-              onClick={book}
+              onClick={() => startWalletCheckout(selected)}
             >
-              Κράτηση · {euro(selected.suggested_total)}
+              Συνέχεια · {euro(selected.suggested_total)}
             </button>
           ) : null}
         </section>
@@ -828,18 +893,12 @@ export default function RentalCatalogPanel({
         onClose={() => setDetails(null)}
         selectLabel={
           selected && selectedId === details?.id
-            ? `Συνέχεια · ${euro(selected.suggested_total || selected.daily_rate_eur)}`
-            : 'Επιλογή οχήματος'
+            ? `Συνέχεια στην κράτηση · ${euro(selected.suggested_total || selected.daily_rate_eur)}`
+            : 'Συνέχεια στην κράτηση'
         }
         onSelect={(row) => {
-          setSelectedId(row.id);
-          setDetails(null);
           trackFunnel('vehicle_selected_from_detail', { vehicle_id: row.id });
-          window.setTimeout(() => {
-            document
-              .getElementById('wallet-rent-book-cta')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 80);
+          startWalletCheckout(row);
         }}
       />
 

@@ -240,6 +240,7 @@ function WalletAuthenticatedApp() {
   const [profileTick, setProfileTick] = useState(0);
   /** Bump when book-first «Δες οχήματα» runs — drives RentalCatalogPanel search. */
   const [rentSearchTick, setRentSearchTick] = useState(0);
+  const [rentCheckoutOpen, setRentCheckoutOpen] = useState(false);
   /** Deep-link into CustomerSecurityPanel action from the account sheet. */
   const [securityFocus, setSecurityFocus] = useState(null);
   const profile = useMemo(() => resolveCustomerProfile(), [profileTick]);
@@ -1144,37 +1145,50 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'rentals' && rentAvailable ? (
-          <div className="wallet-stack wallet-stack--rent-book">
-            <WalletRentBookHome
-              siteAppearance={siteAppearance}
-              welcomeName={profile.name}
-              onSearch={() => {
-                setRentSearchTick((n) => n + 1);
-                window.setTimeout(() => {
-                  document
-                    .getElementById('wallet-rent-fleet')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 80);
-              }}
-            />
+          <div
+            className={`wallet-stack wallet-stack--rent-book${
+              rentCheckoutOpen ? ' wallet-stack--rent-checkout' : ''
+            }`}
+          >
+            {!rentCheckoutOpen ? (
+              <WalletRentBookHome
+                siteAppearance={siteAppearance}
+                welcomeName={profile.name}
+                onSearch={() => {
+                  setRentSearchTick((n) => n + 1);
+                  window.setTimeout(() => {
+                    document
+                      .getElementById('wallet-rent-fleet')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 80);
+                }}
+              />
+            ) : null}
 
-            {/* Offer cards always under the book panel (auto-load on mount). */}
+            {/* Offer cards / embedded services→details→payment wizard. */}
             <RentalCatalogPanel
               mode="full"
               bookFirst
               searchTick={rentSearchTick}
-            />
-
-            <RentalWalletPanel
               brandLabel={brandLabel}
-              passengerName={profile.name}
-              highlightBookingId={highlightRentalBookingId}
-              onBookVehicle={() => {
-                document
-                  .getElementById('wallet-rent-fleet')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              onCheckoutOpenChange={setRentCheckoutOpen}
+              onBooked={() => {
+                setRentSearchTick((n) => n + 1);
               }}
             />
+
+            {!rentCheckoutOpen ? (
+              <RentalWalletPanel
+                brandLabel={brandLabel}
+                passengerName={profile.name}
+                highlightBookingId={highlightRentalBookingId}
+                onBookVehicle={() => {
+                  document
+                    .getElementById('wallet-rent-fleet')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
 
