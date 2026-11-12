@@ -14,7 +14,8 @@ describe('rentBookingExtras catalog', () => {
   it('normalizes empty overrides to defaults', () => {
     const opts = normalizeCoverageOptions([]);
     expect(opts.length).toBe(RENT_COVERAGE_OPTIONS.length);
-    expect(opts[0].title).toBe('SCDW Plus');
+    expect(opts[0].title).toBe('Προστασία οχήματος');
+    expect(opts[0].recommended).toBe(true);
   });
 
   it('keeps custom prices and filters hidden from booking', () => {

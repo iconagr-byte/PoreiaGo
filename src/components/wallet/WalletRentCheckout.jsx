@@ -13,8 +13,8 @@ import RentBookingPaymentStep from '../rental/RentBookingPaymentStep.jsx';
 import { parseWizardNavTarget } from '../../lib/rental/rentWizardEmbed.js';
 
 const STEP_META = {
-  services: { title: 'Υπηρεσίες', back: 'Στόλος' },
-  details: { title: 'Στοιχεία', back: 'Υπηρεσίες' },
+  services: { title: 'Καλύψεις', back: 'Στόλος' },
+  details: { title: 'Στοιχεία', back: 'Καλύψεις' },
   payment: { title: 'Πληρωμή', back: 'Στοιχεία' },
 };
 

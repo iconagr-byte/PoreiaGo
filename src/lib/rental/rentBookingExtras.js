@@ -13,57 +13,78 @@ export const RENT_BOOKING_STEPS = [
   { id: 'payment', label: 'Πληρωμή', short: '5' },
 ];
 
-/** Coverage / add-on catalog — teal brand, not Hertz yellow clone. */
+/** Coverage / add-on catalog — PoreiaGo teal brand (not Hertz yellow). */
 export const RENT_COVERAGE_OPTIONS = [
   {
     id: 'scdw',
     icon: 'shield_with_heart',
-    title: 'SCDW Plus',
-    blurb: 'Μειώνει το franchise σε ζημιές αμαξώματος. Ιδανικό αν θες ήσυχο μυαλό στην οδήγηση.',
-    includes: ['Κάλυψη ζημιών αμαξώματος', 'Χαμηλότερο franchise'],
-    excludes: ['Ζημιές από αμέλεια', 'Αντικείμενα στην καμπίνα'],
+    title: 'Προστασία οχήματος',
+    blurb: 'Πλήρης ηρεμία για ζημιές στο αμάξωμα — ιδανική για νησιωτικούς δρόμους και πάρκινγκ.',
+    coverLine: '100% κάλυψη για:',
+    includes: ['Σύγκρουση ή ζημιά εσωτερικού', 'Κλοπή & βανδαλισμός', 'Λάστιχα & χαμένα κλειδιά'],
+    excludes: ['Ζημιές από αμέλεια', 'Προσωπικά αντικείμενα'],
     eurPerDay: 13.5,
     formKey: 'extra_insurance',
+    recommended: true,
+    socialProof: 'Οι περισσότεροι ταξιδιώτες την επιλέγουν',
+    testimonial: {
+      name: 'Ελένη Μ.',
+      role: 'Επιβεβαιωμένη κράτηση',
+      quote:
+        'Μικρό χτύπημα στο πάρκινγκ και έκλεισε χωρίς άγχος — γλίτωσα χρόνο και νεύρα στο desk.',
+    },
   },
   {
     id: 'super_cover',
-    icon: 'verified_user',
-    title: 'Super Cover',
-    blurb: 'Επιπλέον προστασία για γυαλιά, λάστιχα και κάτω μέρος — όταν τα χιλιόμετρα είναι πολλά.',
-    includes: ['Γυαλιά / καθρέφτες', 'Λάστιχα & ζάντες'],
+    icon: 'gavel',
+    title: 'Αστική προστασία',
+    blurb: 'Προστάτεψε τον εαυτό σου από ευθύνη προς τρίτους — ξεκάθαρα όρια, λιγότερο άγχος.',
+    coverLine: 'Σε καλύπτει για:',
+    includes: [
+      'Ζημιές σε άλλα οχήματα / περιουσία',
+      'Μείωση αξιώσεων στο δικό σου ασφαλιστήριο',
+      'Κάλυψη έναντι ανασφάλιστων οδηγών',
+    ],
     excludes: ['Off-road χρήση'],
     eurPerDay: 9.5,
     formKey: 'super_cover',
+    socialProof: 'Ιδανική για μεγάλες διαδρομές',
   },
   {
     id: 'extra_driver',
     icon: 'sports_motorsports',
     title: 'Επιπλέον οδηγός',
-    blurb: 'Δεύτερος οδηγός στο συμβόλαιο — μοιράσου τη διαδρομή χωρίς έξτρα γραφειοκρατία στο desk.',
-    includes: ['Ένας επιπλέον οδηγός', 'Ίδια κάλυψη με κύριο'],
+    blurb: 'Μοιράσου τη διαδρομή χωρίς έξτρα γραφειοκρατία — ίδιος συμβόλαιο, ίδια ηρεμία.',
+    coverLine: 'Περιλαμβάνει:',
+    includes: ['Ένας επιπλέον οδηγός', 'Ίδια κάλυψη με κύριο', 'Άμεση προσθήκη στο συμβόλαιο'],
     excludes: [],
     eurPerDay: 8,
     formKey: 'extra_driver',
+    socialProof: 'Δημοφιλές σε ζευγάρια & παρέες',
   },
   {
     id: 'child_seat',
     icon: 'child_care',
     title: 'Παιδικό κάθισμα',
-    blurb: 'Κάθισμα ασφαλείας για μικρούς επιβάτες — διαθέσιμο στην παραλαβή.',
-    includes: ['1 κάθισμα', 'Τοποθέτηση στο γραφείο'],
+    blurb: 'Ασφάλεια για τους μικρούς επιβάτες — τοποθετημένο στην παραλαβή, έτοιμο για αναχώρηση.',
+    coverLine: 'Περιλαμβάνει:',
+    includes: ['1 κάθισμα ασφαλείας', 'Τοποθέτηση στο γραφείο', 'Καθαρισμένο & ελεγμένο'],
     excludes: [],
     eurPerDay: 7,
     formKey: 'child_seat',
+    socialProof: 'Απαραίτητο για οικογένειες',
   },
   {
     id: 'gps_pack',
     icon: 'explore',
     title: 'GPS pack',
-    blurb: 'Φορητό GPS με ελληνικούς χάρτες — χρήσιμο όταν δεν θες data στο κινητό.',
-    includes: ['Συσκευή + βάση'],
+    blurb: 'Φορητό GPS με ελληνικούς χάρτες — όταν δεν θες data ή σήμα στο κινητό.',
+    coverLine: 'Περιλαμβάνει:',
+    includes: ['Συσκευή + βάση', 'Ελληνικοί χάρτες', 'Οδηγίες επιστροφής'],
     excludes: [],
     eurPerDay: 5,
     formKey: 'gps_pack',
+    socialProof: 'Χρήσιμο σε απομακρυσμένες περιοχές',
   },
 ];
 
@@ -113,16 +134,28 @@ export function createCoverageOption(partial = {}) {
     ? partial.excludes.map((x) => String(x || '').trim()).filter(Boolean)
     : [];
   const price = Number(partial.eurPerDay);
+  const testimonial =
+    partial.testimonial && typeof partial.testimonial === 'object'
+      ? {
+          name: String(partial.testimonial.name || '').trim(),
+          role: String(partial.testimonial.role || '').trim(),
+          quote: String(partial.testimonial.quote || '').trim(),
+        }
+      : null;
   return {
     id,
     icon: String(partial.icon || 'verified_user').trim() || 'verified_user',
     title: String(partial.title || '').trim(),
     blurb: String(partial.blurb || '').trim(),
+    coverLine: String(partial.coverLine || '').trim(),
     includes,
     excludes,
     eurPerDay: Number.isFinite(price) ? Math.max(0, price) : 0,
     formKey,
     visible: partial.visible !== false,
+    recommended: Boolean(partial.recommended),
+    socialProof: String(partial.socialProof || '').trim(),
+    testimonial: testimonial?.quote ? testimonial : null,
   };
 }
 

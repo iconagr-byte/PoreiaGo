@@ -6907,6 +6907,270 @@
   color: #fff;
 }
 
+/* —— Protection package cards (services step) —— */
+.rent-protect-hook {
+  margin: 0 0 0.55rem;
+  font-size: clamp(1.05rem, 3.8vw, 1.28rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-protect-grid {
+  gap: 1.05rem;
+}
+
+.rent-protect-card {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.15rem 1.05rem 1rem;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.rent-protect-card.is-recommended {
+  border-color: rgba(10, 122, 108, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(10, 122, 108, 0.08),
+    0 16px 36px rgba(11, 61, 74, 0.1);
+}
+
+.rent-protect-card.is-recommended::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--rent-teal, #0a7a6c), var(--rent-deep, #0b3d4a));
+}
+
+.rent-protect-card.is-on {
+  border-color: rgba(10, 122, 108, 0.5);
+  box-shadow: 0 14px 34px rgba(10, 122, 108, 0.14);
+}
+
+.rent-protect-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  align-self: start;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  background: var(--rent-teal, #0a7a6c);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.rent-protect-badge .material-symbols-outlined {
+  font-size: 0.95rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-protect-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.rent-protect-copy h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.rent-protect-coverline {
+  margin: 0.28rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-protect-visual {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.55), transparent 55%),
+    linear-gradient(145deg, #d7ebe7 0%, #0a7a6c 55%, #0b3d4a 100%);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(11, 61, 74, 0.22);
+}
+
+.rent-protect-visual .material-symbols-outlined {
+  font-size: 1.75rem;
+}
+
+.rent-protect-blurb {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-protect-flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-protect-flags li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #3c3c43;
+}
+
+.rent-protect-flags .material-symbols-outlined {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-protect-flags .is-yes .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-protect-flags .is-no {
+  color: #8e8e93;
+  font-weight: 600;
+}
+
+.rent-protect-flags .is-no .material-symbols-outlined {
+  color: #c7c7cc;
+  font-variation-settings: 'FILL' 0;
+}
+
+.rent-protect-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.15rem;
+}
+
+.rent-protect-price strong {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-protect-price span {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #86868b;
+  margin-left: 0.2rem;
+}
+
+.rent-protect-proof {
+  margin: 0.28rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-protect-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--rent-teal, #0a7a6c);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.18);
+}
+
+.rent-protect-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 2.65rem;
+  padding: 0 1.15rem;
+  border-radius: 999px;
+  border: 0;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(11, 61, 74, 0.22);
+}
+
+.rent-protect-btn .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-protect-card.is-on .rent-protect-btn {
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+}
+
+.rent-protect-quote {
+  margin: 0.15rem 0 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(10, 122, 108, 0.1), rgba(215, 235, 231, 0.85));
+  border: 1px solid rgba(10, 122, 108, 0.12);
+}
+
+.rent-protect-stars {
+  display: inline-flex;
+  gap: 0.05rem;
+  margin-bottom: 0.35rem;
+  color: #ff9f0a;
+}
+
+.rent-protect-stars .material-symbols-outlined {
+  font-size: 1rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-protect-quote > p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #3c3c43;
+}
+
+.rent-protect-verified {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-protect-quote-text {
+  margin-top: 0.35rem !important;
+  line-height: 1.4;
+  color: #1d1d1f !important;
+  font-weight: 550;
+}
+
 .rent-wiz-side-card {
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
