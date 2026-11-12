@@ -4672,15 +4672,18 @@
 /* Centered over the tapped vehicle — not stuck under wallet chrome / mid-scroll. */
 .rent-sheet-backdrop--over-vehicle {
   place-items: center;
-  padding: max(0.85rem, env(safe-area-inset-top, 0px)) 0.85rem
-    max(0.85rem, env(safe-area-inset-bottom, 0px));
+  padding: max(0.55rem, env(safe-area-inset-top, 0px)) max(0.55rem, env(safe-area-inset-left, 0px))
+    max(0.55rem, env(safe-area-inset-bottom, 0px)) max(0.55rem, env(safe-area-inset-right, 0px));
+  overflow: hidden;
   animation: rent-sheet-backdrop-in 0.22s ease;
 }
 
 .rent-sheet-backdrop--over-vehicle .rent-sheet--detail {
-  width: min(520px, 100%);
-  max-height: min(88dvh, 720px);
+  width: min(420px, calc(100vw - 1.1rem));
+  max-width: 100%;
+  max-height: min(92dvh, calc(100dvh - 1.1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   margin: 0;
+  overflow: hidden;
   animation: rent-sheet-pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
 }
@@ -4713,14 +4716,18 @@
 }
 
 .rent-sheet {
+  box-sizing: border-box;
   width: min(420px, 100%);
+  max-width: 100%;
   max-height: 84vh;
-  overflow: auto;
+  overflow: hidden;
   border-radius: 22px;
   background: #fff;
-  padding: 0.85rem;
-  display: grid;
-  gap: 0.65rem;
+  padding: 0.75rem 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
 }
 
 .rent-sheet-head {
@@ -4728,23 +4735,45 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-shrink: 0;
+  padding-bottom: 0.55rem;
+  min-width: 0;
+}
+
+.rent-sheet-close {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .rent-sheet-head h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rent-sheet-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: 0.35rem;
 }
 
 .rent-sheet-gallery {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .rent-sheet-gallery img {
   width: 100%;
-  height: 7.4rem;
+  max-width: 100%;
+  height: 6.4rem;
   object-fit: cover;
   border-radius: 10px;
 }
@@ -4752,21 +4781,26 @@
 .rent-sheet-body {
   display: grid;
   gap: 0.45rem;
+  min-width: 0;
+  padding-top: 0.55rem;
 }
 
 .rent-sheet-body p {
   margin: 0;
   font-size: 0.82rem;
   color: var(--rent-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rent-sheet--detail {
-  width: min(520px, 100%);
-  max-height: 90vh;
+  width: min(420px, 100%);
+  max-height: min(90dvh, 100%);
 }
 
 .rent-sheet-head-copy {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .rent-sheet-similar {
@@ -4780,7 +4814,8 @@
 }
 
 .rent-sheet-gallery.is-single img {
-  max-height: 220px;
+  height: auto;
+  max-height: 9.5rem;
   object-fit: contain;
   background: #f4f7f6;
 }
@@ -4808,23 +4843,34 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
+  gap: 0.4rem;
+  min-width: 0;
 }
 
 .rent-sheet-facts li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  min-width: 0;
+  font-size: 0.76rem;
+  line-height: 1.3;
   color: #3c3c43;
   background: #f4f7f6;
   border-radius: 12px;
-  padding: 0.45rem 0.55rem;
+  padding: 0.45rem 0.5rem;
+}
+
+.rent-sheet-facts li > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rent-sheet-facts .material-symbols-outlined {
+  flex-shrink: 0;
   font-size: 1.05rem;
   color: var(--rent-teal, #0a7a6c);
+  margin-top: 0.05rem;
 }
 
 .rent-sheet-tags {
@@ -4834,15 +4880,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .rent-sheet-tags li {
+  max-width: 100%;
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--rent-teal, #0a7a6c);
   background: rgba(10, 122, 108, 0.1);
   border-radius: 999px;
   padding: 0.28rem 0.55rem;
+  overflow-wrap: anywhere;
 }
 
 .rent-sheet-terms {
@@ -4851,16 +4900,29 @@
   border-radius: 14px;
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.06);
+  min-width: 0;
 }
 
 .rent-sheet-terms p {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.rent-sheet-footer {
+  flex-shrink: 0;
+  padding: 0.55rem 0 max(0.65rem, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 28%);
 }
 
 .rent-sheet-cta {
-  margin-top: 0.35rem;
+  margin: 0;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  line-height: 1.25;
+  padding-inline: 0.85rem;
 }
 
 .rent-postbook-actions {
