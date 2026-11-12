@@ -1575,15 +1575,15 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         # do not add quote_extras again (that double-counts).
         vehicle_total = float(quote["suggested_total"])
         extras_total = float(quote.get("extras_total") or 0)
-        total = body.get("total_cost")
-        if total is None:
-            total = round(vehicle_total, 2)
-        else:
-            total = round(float(total), 2)
-
         channel = str(body.get("channel") or "DESK").strip().upper() or "DESK"
         if channel not in ("DESK", "WALLET"):
             channel = "DESK"
+
+        # Wallet never trusts client-supplied totals — use server quote only.
+        if channel == "WALLET" or body.get("total_cost") is None:
+            total = round(vehicle_total, 2)
+        else:
+            total = round(float(body.get("total_cost")), 2)
 
         identity = validate_renter_identity(
             body,
@@ -1649,6 +1649,16 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             payment_status = "PAID"
             pending_pay = False
             rental_status = "CONFIRMED"
+        elif channel == "WALLET":
+            # Customer wallet bookings stay reserved until Stripe/office verifies payment.
+            pending_pay = True
+            payment_status = "PENDING"
+            rental_status = "RESERVED"
+            amount_paid = 0.0
+            balance_due = total
+            # Ignore client payment_method / settlement claims without provider proof.
+            if not payment_method:
+                payment_method = "card"
         elif payment_method:
             # Bank / cash / unproven card stay reserved until office or Stripe confirms.
             pending_pay = True

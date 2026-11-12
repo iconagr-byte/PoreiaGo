@@ -79,11 +79,24 @@ async def cancel_ticket(booking_id: str):
 
 
 @router.get("/api/tickets/{booking_id}/qr", response_model=RotatingQrResponse)
-async def get_rotating_qr(booking_id: str, seat: str | None = None):
-    """Issue short-lived JWT for rotating QR display (optional per-seat)."""
+async def get_rotating_qr(
+    booking_id: str,
+    seat: str | None = None,
+    authorization: str | None = Header(default=None),
+):
+    """Issue short-lived JWT for rotating QR — customer must own the booking."""
+    from api.customer_auth import get_current_customer
+
+    account = await get_current_customer(authorization)
     booking = await get_booking_by_id(booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
+    owner = str(booking.get("email") or "").strip().lower()
+    actor = str(account.get("email") or "").strip().lower()
+    if owner and actor and owner != actor:
+        raise HTTPException(status_code=403, detail="Η κράτηση δεν ανήκει σε αυτόν τον λογαριασμό")
+    if not owner:
+        raise HTTPException(status_code=403, detail="Η κράτηση δεν έχει email ιδιοκτήτη")
     if "CANCELLED" in booking["payment_status"].upper():
         raise HTTPException(status_code=410, detail="Booking cancelled")
     from ticketing.scan_service import is_paid

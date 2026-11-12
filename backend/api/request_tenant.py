@@ -41,24 +41,15 @@ def admin_tenant_id(request: "Request") -> str:
 
 
 async def public_tenant_id(request: "Request", *, allow_demo_fallback: bool = True) -> str | None:
-    """Host → tenant for public storefront / wallet. Demo only in local/dev."""
+    """Host → tenant for public storefront / wallet. Demo only in local/dev.
+
+    Never trust X-Wallet-Tenant-Id / ?tenant_id= — those are client-spoofable.
+    Native wallet office scope must come from JWT seal (resolve_sealed_wallet_tenant)
+    or X-Office-Host / real Host resolution.
+    """
     tid = getattr(request.state, "tenant_id", None)
     if tid:
         return str(tid)
-
-    # Explicit sealed wallet office (native Capacitor rent demo).
-    for header in ("x-wallet-tenant-id",):
-        raw = (request.headers.get(header) or "").strip()
-        if raw and len(raw) >= 8:
-            request.state.tenant_id = raw
-            return raw
-    try:
-        q_tid = (request.query_params.get("tenant_id") or "").strip()
-    except Exception:
-        q_tid = ""
-    if q_tid and len(q_tid) >= 8:
-        request.state.tenant_id = q_tid
-        return q_tid
 
     # Host + X-Office-Host (native → iconarent.poreiago.com while WebView is localhost).
     # Never Origin/Referer (client-spoofable office switch).

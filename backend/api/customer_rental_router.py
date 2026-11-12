@@ -491,13 +491,10 @@ async def book_rental(
         "channel": "WALLET",
         "marketing_email": bool(body.marketing_email),
         "marketing_sms": bool(body.marketing_sms),
-        "payment_method": body.payment_method,
+        "payment_method": body.payment_method or "card",
         "payment_plan": body.payment_plan,
         "deposit_percent": body.deposit_percent,
-        "amount_paid": body.amount_paid,
-        "balance_due": body.balance_due,
-        "payment_status": body.payment_status,
-        "total_cost": body.total_cost,
+        # Never accept client settlement / payment_status / total for wallet channel.
     }
     try:
         row = store.create_booking(tid, payload)

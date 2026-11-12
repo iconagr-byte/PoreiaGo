@@ -92,6 +92,16 @@ def collect_production_boot_errors(
     if not ticket or _is_weak_secret(ticket) or len(ticket) < 32:
         errors.append("TICKET_JWT_SECRET missing/weak (min 32 chars)")
 
+    ticket_hmac = (env.get("TICKET_SIGNING_SECRET") or "").strip()
+    if (
+        not ticket_hmac
+        or _is_weak_secret(ticket_hmac)
+        or len(ticket_hmac) < 32
+        or "dev-only" in ticket_hmac.lower()
+        or "aerostride-ticket-secret" in ticket_hmac.lower()
+    ):
+        errors.append("TICKET_SIGNING_SECRET missing/weak (min 32 chars; no client-known default)")
+
     if (env.get("ADMIN_AUTH_DISABLED") or "").strip().lower() in ("1", "true", "yes", "on"):
         errors.append("ADMIN_AUTH_DISABLED must be off in production")
 
@@ -109,6 +119,9 @@ def collect_production_boot_errors(
 
     if (env.get("RENT_DEMO_FLEET") or "").strip().lower() in ("1", "true", "yes", "on"):
         errors.append("RENT_DEMO_FLEET must be false/off in production")
+
+    if (env.get("ALLOW_NATIVE_RENT_DEMO") or "").strip().lower() in ("1", "true", "yes", "on"):
+        errors.append("ALLOW_NATIVE_RENT_DEMO must be off in production")
 
     email_key = (env.get("EMAIL_ENCRYPTION_KEY") or "").strip()
     if (

@@ -57,10 +57,12 @@ class ProductionGuardTests(unittest.TestCase):
             "ENVIRONMENT": "production",
             "AUTH_JWT_SECRET": "x" * 40,
             "TICKET_JWT_SECRET": "y" * 40,
+            "TICKET_SIGNING_SECRET": "ticket-hmac-" + ("s" * 32),
             "TELEMETRY_DEVICE_KEYS": "prod-device-key-abc123",
             "DATABASE_URL": "postgresql+asyncpg://u:real-strong-pass@db/x",
             "ADMIN_AUTH_DISABLED": "0",
             "RENT_DEMO_FLEET": "false",
+            "ALLOW_NATIVE_RENT_DEMO": "0",
             "EMAIL_ENCRYPTION_KEY": "email-enc-key-" + ("z" * 24),
             "BILLING_DEMO_MODE": "false",
         }
