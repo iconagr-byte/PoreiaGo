@@ -856,11 +856,13 @@ export default function RentalCatalogPanel({
 
       <RentVehicleDetailSheet
         vehicle={details}
+        totalPrice={details?.suggested_total}
+        days={details?.suggested_days}
         onClose={() => setDetails(null)}
         selectLabel={
           selected && selectedId === details?.id
-            ? `Συνέχεια στην κράτηση · ${euro(selected.suggested_total || selected.daily_rate_eur)}`
-            : 'Συνέχεια στην κράτηση'
+            ? `Κράτηση τώρα · ${euro(selected.suggested_total || selected.daily_rate_eur)}`
+            : 'Κράτηση τώρα'
         }
         onSelect={(row) => {
           trackFunnel('vehicle_selected_from_detail', { vehicle_id: row.id });
