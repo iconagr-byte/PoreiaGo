@@ -453,19 +453,6 @@ export default function RentalCatalogPanel({
       return Number(b.fit_score || 0) - Number(a.fit_score || 0);
     });
 
-  const nights = (() => {
-    try {
-      const start = new Date(form.start_time);
-      const end = new Date(form.end_time);
-      const diff = Math.max(0, end.getTime() - start.getTime());
-      return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    } catch {
-      return 1;
-    }
-  })();
-  const extrasTotal =
-    (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
-
   const cancelBooking = async (bookingId) => {
     if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
     setBusy(true);
@@ -696,47 +683,6 @@ export default function RentalCatalogPanel({
               <option value="WITH_DRIVER">Με οδηγό</option>
             </select>
           </div>
-          <div className="wallet-field">
-            <label htmlFor="rent-phone">Τηλέφωνο (προαιρετικό)</label>
-            <input
-              id="rent-phone"
-              className="wallet-input"
-              value={form.client_phone}
-              onChange={(e) => setForm((f) => ({ ...f, client_phone: e.target.value }))}
-            />
-          </div>
-          <div className="wallet-field">
-            <label>Extras</label>
-            <div className="rent-extras">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.extra_insurance}
-                  onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
-                />
-                Extra insurance (+€12/ημέρα)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.child_seat}
-                  onChange={(e) => setForm((f) => ({ ...f, child_seat: e.target.checked }))}
-                />
-                Παιδικό κάθισμα (+€7/ημέρα)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.gps_pack}
-                  onChange={(e) => setForm((f) => ({ ...f, gps_pack: e.target.checked }))}
-                />
-                GPS pack (+€5/ημέρα)
-              </label>
-            </div>
-            {extrasTotal > 0 ? (
-              <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
-            ) : null}
-          </div>
           <button type="submit" className="wallet-btn wallet-btn-primary wallet-btn-block" disabled={busy}>
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
@@ -744,51 +690,8 @@ export default function RentalCatalogPanel({
             Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
           </p>
         </form>
-        ) : selectedId ? (
-          <div className="wallet-form wallet-form--bookfirst-extras">
-            <div className="wallet-field">
-              <label htmlFor="rent-phone-bf">Τηλέφωνο (προαιρετικό)</label>
-              <input
-                id="rent-phone-bf"
-                className="wallet-input"
-                value={form.client_phone}
-                onChange={(e) => setForm((f) => ({ ...f, client_phone: e.target.value }))}
-              />
-            </div>
-            <div className="wallet-field">
-              <label>Extras</label>
-              <div className="rent-extras">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.extra_insurance}
-                    onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
-                  />
-                  Extra insurance (+€12/ημέρα)
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.child_seat}
-                    onChange={(e) => setForm((f) => ({ ...f, child_seat: e.target.checked }))}
-                  />
-                  Παιδικό κάθισμα (+€7/ημέρα)
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.gps_pack}
-                    onChange={(e) => setForm((f) => ({ ...f, gps_pack: e.target.checked }))}
-                  />
-                  GPS pack (+€5/ημέρα)
-                </label>
-              </div>
-              {extrasTotal > 0 ? (
-                <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
-              ) : null}
-            </div>
-          </div>
         ) : null}
+        {/* Phone + extras live in the checkout wizard (services/details), not on the fleet list. */}
       </section>
       ) : null}
 
