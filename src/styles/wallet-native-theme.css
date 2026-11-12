@@ -15,13 +15,19 @@ html[data-poreiago-app='wallet'] #root {
   overflow-x: hidden;
 }
 
-/* Room for native bottom tabs (auth screens reset below). */
-html[data-poreiago-app='wallet'] body {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+/* Auth / non-wallet routes: leave room for system gesture bar only.
+ * My Wallet already has an in-app floating dock — do not double-pad body. */
+html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage),
+html[data-poreiago-app='app'] body:has(.wallet-auth-stage) {
+  padding-bottom: 0;
 }
 
-html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
-  padding-bottom: 0;
+html[data-poreiago-app='wallet'] body:has(.wallet-app),
+html[data-poreiago-app='app'] body:has(.wallet-app) {
+  padding-bottom: 0 !important;
+  overflow: hidden;
+  height: 100%;
+  height: 100dvh;
 }
 
 html[data-poreiago-app='wallet'] .wallet-auth-back,
@@ -181,22 +187,101 @@ html[data-poreiago-app='wallet'] .rent-auth-card .relative > .material-symbols-o
   pointer-events: none !important;
 }
 
+/* Full-bleed phone frame — unified app + wallet flavors. */
 html[data-poreiago-app='wallet'] .wallet-phone-stage,
 html[data-poreiago-app='wallet'] .wallet-phone-stage--native,
-html[data-poreiago-app='wallet'] .wallet-phone-stage--phone {
-  width: 100%;
-  padding: 0;
-  background: #f5f5f7;
+html[data-poreiago-app='wallet'] .wallet-phone-stage--phone,
+html[data-poreiago-app='app'] .wallet-phone-stage,
+html[data-poreiago-app='app'] .wallet-phone-stage--native,
+html[data-poreiago-app='app'] .wallet-phone-stage--phone {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  height: 100dvh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  background: #f5f5f7 !important;
+  overflow: hidden;
 }
 
 html[data-poreiago-app='wallet'] .wallet-app,
-html[data-poreiago-app='wallet'] .wallet-app--phone {
-  width: 100%;
-  max-width: none;
-  height: 100dvh;
-  border-radius: 0;
-  border: 0;
-  box-shadow: none;
+html[data-poreiago-app='wallet'] .wallet-app--phone,
+html[data-poreiago-app='wallet'] .wallet-app--native,
+html[data-poreiago-app='app'] .wallet-app,
+html[data-poreiago-app='app'] .wallet-app--phone,
+html[data-poreiago-app='app'] .wallet-app--native {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+html[data-poreiago-app='wallet'] .wallet-body-shell,
+html[data-poreiago-app='app'] .wallet-body-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html[data-poreiago-app='wallet'] .wallet-main,
+html[data-poreiago-app='app'] .wallet-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-poreiago-app='wallet'] .wallet-nav,
+html[data-poreiago-app='app'] .wallet-nav {
+  left: max(0.65rem, env(safe-area-inset-left, 0px));
+  right: max(0.65rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+  width: auto;
+}
+
+/* Rent book-first hero: fit phone first viewport (not 78dvh desktop showcase). */
+html[data-poreiago-app='wallet'] .wallet-rent-bookfirst .rent-hero--bookfirst,
+html[data-poreiago-app='app'] .wallet-rent-bookfirst .rent-hero--bookfirst {
+  min-height: min(52dvh, 420px) !important;
+  padding: max(2.5rem, calc(env(safe-area-inset-top, 0px) + 1.25rem)) 1rem 1.15rem !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-rent-bookfirst,
+html[data-poreiago-app='app'] .wallet-rent-bookfirst {
+  margin-left: calc(-1 * max(0.85rem, env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(0.85rem, env(safe-area-inset-right, 0px)));
+  width: auto;
+}
+
+html[data-poreiago-app='wallet'] .wallet-rent-checkout,
+html[data-poreiago-app='app'] .wallet-rent-checkout {
+  max-width: 100%;
+  border-radius: 18px;
+}
+
+html[data-poreiago-app='wallet'] .rent-offer-list,
+html[data-poreiago-app='app'] .rent-offer-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+html[data-poreiago-app='wallet'] .rent-offer,
+html[data-poreiago-app='app'] .rent-offer {
+  max-width: 100%;
 }
 
 /* Office logo + name in native top bar — keep mobile-friendly (admin header sizes can be 48–96px). */
