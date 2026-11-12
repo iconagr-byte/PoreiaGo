@@ -4381,6 +4381,10 @@ button.rent-offer {
   margin-bottom: 0.85rem;
 }
 
+.rent-results-toolbar--polish {
+  margin-bottom: 0.55rem;
+}
+
 .rent-results-toolbar h2 {
   margin: 0;
   font-size: 1.15rem;
@@ -4392,6 +4396,146 @@ button.rent-offer {
   font-size: 0.88rem;
   font-weight: 650;
   color: var(--rent-blue, #0071e3);
+}
+
+.rent-results-count {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #6e6e73;
+}
+
+.rent-sort-chips {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 0 0.75rem;
+  padding: 0.1rem 0 0.15rem;
+}
+
+.rent-sort-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.rent-sort-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 999px;
+  padding: 0.48rem 0.78rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.rent-sort-chip .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: #0071e3;
+}
+
+.rent-sort-chip.is-active {
+  background: #0071e3;
+  border-color: #0071e3;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.28);
+}
+
+.rent-sort-chip.is-active .material-symbols-outlined {
+  color: #fff;
+}
+
+.rent-results-tools--polish {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f5f7fb 0%, #eef2f8 100%);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rent-price-filter {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-price-filter-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rent-price-filter-head .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #0071e3;
+}
+
+.rent-price-filter-head strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-price-filter input[type='range'] {
+  width: 100%;
+  accent-color: #0071e3;
+  height: 1.35rem;
+}
+
+.rent-filter-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.rent-filter-toggle {
+  flex: 1 1 auto;
+  min-width: 7.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #3a3a3c;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.rent-filter-toggle .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-filter-toggle.is-on {
+  background: rgba(0, 113, 227, 0.12);
+  border-color: rgba(0, 113, 227, 0.35);
+  color: #0058b0;
 }
 
 .wallet-rent-offer-empty {

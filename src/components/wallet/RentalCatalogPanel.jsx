@@ -28,6 +28,16 @@ import {
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
+const SORT_OPTIONS = [
+  { value: 'fit', label: 'Προτεινόμενα', icon: 'auto_awesome' },
+  { value: 'price_asc', label: 'Τιμή ↑', icon: 'trending_down' },
+  { value: 'price_desc', label: 'Τιμή ↓', icon: 'trending_up' },
+  { value: 'seats_desc', label: 'Θέσεις', icon: 'event_seat' },
+];
+
+const PRICE_SLIDER_MAX = 1200;
+const PRICE_UNLIMITED = 9999;
+
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
 }
@@ -155,6 +165,7 @@ export default function RentalCatalogPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sortBy, setSortBy] = useState('fit');
+  /** 9999 = no price filter; slider max 1200 maps to unlimited. */
   const [priceCap, setPriceCap] = useState(9999);
   const [onlyWithPhotos, setOnlyWithPhotos] = useState(false);
   const [onlyTopRated, setOnlyTopRated] = useState(false);
@@ -676,43 +687,95 @@ export default function RentalCatalogPanel({
 
       {showBook && (bookFirst || suggestions.length > 0) ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
-          <div className="rent-results-toolbar">
+          <div className="rent-results-toolbar rent-results-toolbar--polish">
             <div>
               <h2>Οχήματα</h2>
-              <p className="rent-results-loc">{form.pickup_location || 'Γραφείο'}</p>
+              <p className="rent-results-count">
+                {busy
+                  ? 'Αναζήτηση…'
+                  : sortedSuggestions.length
+                    ? `${sortedSuggestions.length} διαθέσιμα`
+                    : suggestions.length
+                      ? 'Κανένα με αυτά τα φίλτρα'
+                      : 'Επιλέξτε ημερομηνίες πάνω'}
+              </p>
             </div>
-            <label className="rent-results-sort">
-              <span className="visually-hidden">Ταξινόμηση</span>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Ταξινόμηση">
-                <option value="fit">Προτεινόμενα</option>
-                <option value="price_asc">Τιμή ↑</option>
-                <option value="price_desc">Τιμή ↓</option>
-                <option value="seats_desc">Θέσεις ↓</option>
-              </select>
-            </label>
           </div>
-          {sortedSuggestions.length ? (
+          {suggestions.length ? (
             <>
-              <div className="rent-results-tools rent-results-tools--compact">
-                <label>
-                  Max €{Math.round(priceCap)}
+              <div
+                className="rent-sort-chips"
+                role="radiogroup"
+                aria-label="Ταξινόμηση"
+              >
+                {SORT_OPTIONS.map((opt) => {
+                  const active = sortBy === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={`rent-sort-chip${active ? ' is-active' : ''}`}
+                      onClick={() => setSortBy(opt.value)}
+                    >
+                      <span className="material-symbols-outlined" aria-hidden>
+                        {opt.icon}
+                      </span>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="rent-results-tools rent-results-tools--polish">
+                <div className="rent-price-filter">
+                  <div className="rent-price-filter-head">
+                    <span className="material-symbols-outlined" aria-hidden>
+                      payments
+                    </span>
+                    <strong>
+                      {Number(priceCap) >= PRICE_SLIDER_MAX
+                        ? 'Χωρίς όριο τιμής'
+                        : `Έως €${Math.round(priceCap)}`}
+                    </strong>
+                  </div>
                   <input
                     type="range"
                     min={50}
-                    max={1200}
+                    max={PRICE_SLIDER_MAX}
                     step={10}
-                    value={priceCap}
-                    onChange={(e) => setPriceCap(Number(e.target.value))}
+                    value={Math.min(Number(priceCap) || PRICE_SLIDER_MAX, PRICE_SLIDER_MAX)}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      setPriceCap(next >= PRICE_SLIDER_MAX ? PRICE_UNLIMITED : next);
+                    }}
+                    aria-label="Μέγιστη τιμή"
                   />
-                </label>
-                <label className="rent-check-inline">
-                  <input
-                    type="checkbox"
-                    checked={onlyWithPhotos}
-                    onChange={(e) => setOnlyWithPhotos(e.target.checked)}
-                  />
-                  Με φωτογραφίες
-                </label>
+                </div>
+                <div className="rent-filter-toggles" role="group" aria-label="Φίλτρα">
+                  <button
+                    type="button"
+                    className={`rent-filter-toggle${onlyWithPhotos ? ' is-on' : ''}`}
+                    aria-pressed={onlyWithPhotos}
+                    onClick={() => setOnlyWithPhotos((v) => !v)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden>
+                      photo_camera
+                    </span>
+                    Φωτογραφίες
+                  </button>
+                  <button
+                    type="button"
+                    className={`rent-filter-toggle${onlyTopRated ? ' is-on' : ''}`}
+                    aria-pressed={onlyTopRated}
+                    onClick={() => setOnlyTopRated((v) => !v)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden>
+                      star
+                    </span>
+                    Top rated
+                  </button>
+                </div>
               </div>
               <div className="rent-offer-list" role="listbox" aria-label="Διαθέσιμα οχήματα">
                 {sortedSuggestions.map((v, idx) => {
@@ -749,6 +812,11 @@ export default function RentalCatalogPanel({
                   );
                 })}
               </div>
+              {!sortedSuggestions.length ? (
+                <p className="wallet-rent-offer-empty">
+                  Κανένα όχημα με αυτά τα φίλτρα — δοκιμάστε άλλο όριο τιμής.
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="wallet-rent-offer-empty">
