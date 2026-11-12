@@ -22,8 +22,10 @@ from api.customer_wallet_seal import jwt_tenant_id, resolve_login_wallet_tenant
 from ticketing.customer_jwt import create_customer_token, decode_customer_token
 from ticketing.wallet_magic import (
     MAGIC_TTL_MINUTES,
-    consume_wallet_magic_token,
     create_wallet_magic_token,
+    ensure_magic_account,
+    mark_wallet_magic_token_used,
+    peek_wallet_magic_token,
 )
 from travel_platform.settings.login_audit_store import record_login_from_request
 
@@ -226,7 +228,24 @@ async def native_rent_demo_session(request: Request):
     """
     Capacitor «Demo ενοικιάσεις»: mint a real customer JWT sealed to IconaRent
     (iconarent) so My Wallet catalog/bookings hit that office — not Achillio.
+
+    Disabled in production unless ALLOW_NATIVE_RENT_DEMO=1 (never default-on).
     """
+    import os
+
+    env = (os.getenv("ENVIRONMENT") or "development").strip().lower()
+    allow = (os.getenv("ALLOW_NATIVE_RENT_DEMO") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if env in ("production", "prod") and not allow:
+        raise HTTPException(
+            status_code=403,
+            detail="Το native rent demo δεν είναι διαθέσιμο σε production.",
+        )
+
     from sqlalchemy import or_, select
 
     from app.core.database import AsyncSessionLocal
@@ -487,23 +506,24 @@ async def issue_wallet_magic(body: WalletMagicIssueRequest):
 async def consume_wallet_magic(request: Request, body: WalletMagicConsumeRequest):
     """Exchange a magic-link token for a customer JWT + focused booking."""
     try:
-        result = await consume_wallet_magic_token(body.token)
+        peeked = await peek_wallet_magic_token(body.token)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    account = result["account"]
+    email = str(peeked["email"] or "").strip().lower()
+    booking_id = peeked["booking_id"]
     booking_tid = None
     try:
         from ticketing.customer_bookings import get_booking
 
-        booking = await get_booking(result["booking_id"], tenant_id=None)
+        booking = await get_booking(booking_id, tenant_id=None)
         if booking:
             booking_tid = str(
                 booking.get("tenant_id") or booking.get("tenantId") or ""
             ).strip() or None
-            # Email must match booking owner when present.
+            # Email must match booking owner when present — before burning the token.
             be = str(booking.get("email") or "").strip().lower()
-            if be and be != account["email"]:
+            if be and be != email:
                 raise HTTPException(
                     status_code=403,
                     detail="Η κράτηση δεν ανήκει σε αυτόν τον λογαριασμό.",
@@ -512,6 +532,13 @@ async def consume_wallet_magic(request: Request, body: WalletMagicConsumeRequest
         raise
     except Exception:
         booking_tid = None
+
+    if not await mark_wallet_magic_token_used(peeked["token"]):
+        raise HTTPException(status_code=400, detail="Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί")
+
+    account = await get_account(email)
+    if not account:
+        account = await ensure_magic_account(email)
 
     access, tid, account = await _issue_customer_token(
         request,
@@ -522,5 +549,5 @@ async def consume_wallet_magic(request: Request, body: WalletMagicConsumeRequest
     )
     profile = _profile_response(account, access, tenant_id=tid)
     profile["provider"] = "magic"
-    profile["highlight_booking"] = result["booking_id"]
+    profile["highlight_booking"] = booking_id
     return profile

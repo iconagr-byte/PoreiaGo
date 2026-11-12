@@ -11,13 +11,26 @@ import time
 from typing import Any
 
 PREFIX = "bt1"
+_DEFAULT_DEV_SECRET = "dev-only-aerostride-ticket-secret-change-in-production"
 
 
-def _secret() -> bytes:
-    raw = os.getenv(
-        "TICKET_SIGNING_SECRET",
-        "dev-only-aerostride-ticket-secret-change-in-production",
-    )
+def _is_production() -> bool:
+    return (os.getenv("ENVIRONMENT") or "").strip().lower() in ("production", "prod")
+
+
+def _secret() -> bytes | None:
+    raw = (os.getenv("TICKET_SIGNING_SECRET") or "").strip()
+    if not raw:
+        if _is_production():
+            return None
+        raw = _DEFAULT_DEV_SECRET
+    if _is_production() and (
+        raw == _DEFAULT_DEV_SECRET
+        or "dev-only" in raw.lower()
+        or "change-in-production" in raw.lower()
+        or len(raw) < 32
+    ):
+        return None
     return raw.encode()
 
 
@@ -32,6 +45,11 @@ def verify_bt1_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
     if len(parts) != 3 or parts[0] != PREFIX:
         return None, "INVALID_FORMAT"
 
+    secret = _secret()
+    if secret is None:
+        # Production without a strong TICKET_SIGNING_SECRET — refuse client HMAC.
+        return None, "INVALID_SIGNATURE"
+
     try:
         payload = json.loads(_b64url_decode(parts[1]).decode())
         sig = _b64url_decode(parts[2])
@@ -45,7 +63,7 @@ def verify_bt1_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
                 str(payload.get("nonce", "")),
             ]
         )
-        expected = hmac.new(_secret(), message.encode(), hashlib.sha256).digest()
+        expected = hmac.new(secret, message.encode(), hashlib.sha256).digest()
         if not hmac.compare_digest(sig, expected):
             return None, "INVALID_SIGNATURE"
         if payload.get("exp") and int(time.time()) > int(payload["exp"]):

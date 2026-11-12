@@ -92,10 +92,8 @@ async def create_wallet_magic_token(
     return token
 
 
-async def consume_wallet_magic_token(token: str) -> dict:
-    """
-    Validate + mark used. Returns {account, booking_id}.
-    """
+async def peek_wallet_magic_token(token: str) -> dict:
+    """Validate token without marking used. Returns {email, booking_id}."""
     raw = (token or "").strip()
     if len(raw) < 10:
         raise ValueError("Μη έγκυρος σύνδεσμος")
@@ -116,20 +114,44 @@ async def consume_wallet_magic_token(token: str) -> dict:
     if not expires or datetime.now(timezone.utc) > expires:
         raise ValueError("Ο σύνδεσμος έχει λήξει — ζητήστε νέο από το email εισιτηρίου")
 
+    return {
+        "token": raw,
+        "email": row["email"],
+        "booking_id": row["booking_id"],
+    }
+
+
+async def mark_wallet_magic_token_used(token: str) -> bool:
+    """Atomic single-use mark. True only if this caller won the race."""
+    raw = (token or "").strip()
     now = _now_iso()
-    await db.execute(
+    db = get_db()
+    cursor = await db.execute(
         "UPDATE wallet_magic_tokens SET used_at = ? WHERE token = ? AND used_at IS NULL",
         (now, raw),
     )
     await db.commit()
+    return int(getattr(cursor, "rowcount", 0) or 0) == 1
 
-    account = await get_account(row["email"])
+
+async def consume_wallet_magic_token(token: str) -> dict:
+    """
+    Validate + mark used. Returns {account, booking_id}.
+
+    Prefer peek + ownership check + mark_wallet_magic_token_used in the API
+    so a failed ownership check does not burn the link. This helper remains
+    for callers that already verified ownership.
+    """
+    peeked = await peek_wallet_magic_token(token)
+    if not await mark_wallet_magic_token_used(peeked["token"]):
+        raise ValueError("Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί")
+
+    account = await get_account(peeked["email"])
     if not account:
-        # Should not happen — recreate soft account.
-        account = await ensure_magic_account(row["email"])
+        account = await ensure_magic_account(peeked["email"])
 
     return {
         "account": account,
-        "booking_id": row["booking_id"],
-        "email": row["email"],
+        "booking_id": peeked["booking_id"],
+        "email": peeked["email"],
     }

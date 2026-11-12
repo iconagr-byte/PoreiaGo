@@ -8,6 +8,28 @@ import { consumeWalletMagic } from '../services/customerAuthApi.js';
 import { walletHomeNavState } from '../lib/wallet/walletClaim.js';
 import '../styles/wallet-pass.css';
 
+/** Share one in-flight consume per token (React StrictMode remount-safe). */
+const magicInflight = new Map();
+
+function consumeMagicOnce(token) {
+  const key = String(token || '').trim();
+  if (!key) return Promise.reject(new Error('Λείπει ο σύνδεσμος εισόδου'));
+  if (magicInflight.has(key)) return magicInflight.get(key);
+  const p = consumeWalletMagic(key).then(
+    (profile) => {
+      // Keep success cached so StrictMode remount reuses the same JWT response.
+      window.setTimeout(() => magicInflight.delete(key), 30_000);
+      return profile;
+    },
+    (err) => {
+      magicInflight.delete(key);
+      throw err;
+    },
+  );
+  magicInflight.set(key, p);
+  return p;
+}
+
 export default function WalletMagicPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -25,7 +47,7 @@ export default function WalletMagicPage() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    consumeWalletMagic(token)
+    consumeMagicOnce(token)
       .then((profile) => {
         if (cancelled) return;
         loginAsCustomer(

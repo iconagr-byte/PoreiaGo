@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../config/api.js';
+import { getCustomerToken } from '../lib/auth.js';
 import { isBookingPaid } from '../lib/ticketing/bookingStore.js';
 import { bookingIdAliases, localIdFromReference } from '../lib/ticketing/bookingIds.js';
 import { issueSignedQrToken } from '../lib/ticketing/qrToken.js';
@@ -90,10 +91,16 @@ export function useRotatingTicketQr(booking) {
         : ids;
 
       let lastDetail = 'QR fetch failed';
+      const customerToken = getCustomerToken();
+      const headers = { Accept: 'application/json' };
+      if (customerToken) headers.Authorization = `Bearer ${customerToken}`;
+
       for (const id of ordered) {
         let res;
         try {
-          res = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}/qr${qs}`);
+          res = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}/qr${qs}`, {
+            headers,
+          });
         } catch {
           continue;
         }
@@ -103,6 +110,10 @@ export function useRotatingTicketQr(booking) {
         }
         const err = await res.json().catch(() => ({}));
         lastDetail = err.detail || lastDetail;
+        // Auth required / forbidden — stop and fall back to local token.
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(lastDetail);
+        }
         // Wrong alias / unknown booking — try next without re-throwing.
         if (res.status === 404 || res.status === 400) continue;
         // Paid/cancel mismatches are authoritative for this id set.
