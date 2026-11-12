@@ -74,6 +74,27 @@ elif grep -q "aerostride-dev-email-key" "$ENV_FILE" 2>/dev/null; then
   replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
   echo "  ~ replaced weak EMAIL_ENCRYPTION_KEY"
 fi
+
+# Boarding-pass HMAC (bt1) — required by production_guard after wallet P0 harden
+# Server-only: do NOT mirror into VITE_TICKET_SIGNING_SECRET (client-known default rejected).
+_tss_val="$(grep "^TICKET_SIGNING_SECRET=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+_tss_weak=0
+if [[ -z "$_tss_val" ]]; then
+  _tss_weak=1
+elif [[ ${#_tss_val} -lt 32 ]]; then
+  _tss_weak=1
+elif [[ "$_tss_val" == *dev-only* || "$_tss_val" == *aerostride-ticket-secret* ]]; then
+  _tss_weak=1
+fi
+if [[ "$_tss_weak" -eq 1 ]]; then
+  _tss="$(openssl rand -base64 32)"
+  replace_kv "TICKET_SIGNING_SECRET" "$_tss"
+  if [[ -z "$_tss_val" ]]; then
+    echo "  + generated TICKET_SIGNING_SECRET"
+  else
+    echo "  ~ replaced weak TICKET_SIGNING_SECRET"
+  fi
+fi
 set_kv "METRICS_PUBLIC" "false"
 set_kv "METRICS_TOKEN" ""
 
