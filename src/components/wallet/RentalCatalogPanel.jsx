@@ -10,21 +10,20 @@ import {
   fetchPublicRentalCatalog,
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
-import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
+import { getCustomerEmail, getCustomerName, getCustomerToken } from '../../lib/auth.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 import {
   defaultPickupDateTime,
   defaultReturnDateTime,
+  readRentBookingPrefs,
+  rentTripSearchReady,
+  writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 import RentOfferCard from '../rental/RentOfferCard.jsx';
 import RentVehicleDetailSheet from '../rental/RentVehicleDetailSheet.jsx';
 import WalletRentCheckout from './WalletRentCheckout.jsx';
 import { rememberRentVehicle } from '../../lib/rental/rentBookingExtras.js';
-import {
-  rentTripSearchReady,
-  writeRentBookingPrefs,
-} from '../../lib/rental/rentBookingSearch.js';
 
 const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
@@ -215,6 +214,22 @@ export default function RentalCatalogPanel({
       }));
       if (raw.sortBy) setSortBy(raw.sortBy);
       if (raw.priceCap) setPriceCap(Number(raw.priceCap));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Resume payment wizard after login wall (wallet embed path).
+  useEffect(() => {
+    try {
+      const prefs = readRentBookingPrefs();
+      if (
+        prefs.wizard_pending_confirm &&
+        prefs.wizard_step === 'payment' &&
+        getCustomerToken()
+      ) {
+        setCheckoutOpen(true);
+      }
     } catch {
       /* ignore */
     }

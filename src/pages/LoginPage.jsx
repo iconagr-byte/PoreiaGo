@@ -564,9 +564,14 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label htmlFor="password">Κωδικός</label>
-                <Link to="/forgot-password" className={`${linkClass} text-xs`}>
+              <div className="flex justify-between items-center gap-2 min-w-0">
+                <label htmlFor="password" className="shrink-0">
+                  Κωδικός
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className={`${linkClass} text-xs shrink min-w-0 text-right`}
+                >
                   Ξέχασα τον κωδικό
                 </Link>
               </div>
@@ -657,12 +662,16 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               onClick={() => {
                 // My Wallet shell + Ενοικιάσεις tab sealed to IconaRent.
                 void (async () => {
-                  await enterNativeRentDemoWallet();
-                  rememberNativeRoleHome(NATIVE_ROLE_WALLET);
-                  navigate('/wallet?tab=rentals', {
-                    replace: true,
-                    state: { walletTab: 'rentals' },
-                  });
+                  try {
+                    await enterNativeRentDemoWallet();
+                    rememberNativeRoleHome(NATIVE_ROLE_WALLET);
+                    navigate('/wallet?tab=rentals', {
+                      replace: true,
+                      state: { walletTab: 'rentals' },
+                    });
+                  } catch (err) {
+                    setError(err?.message || 'Αποτυχία demo σύνδεσης');
+                  }
                 })();
               }}
             >
