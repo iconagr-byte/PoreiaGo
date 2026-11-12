@@ -32,7 +32,7 @@ const SORT_OPTIONS = [
   { value: 'fit', label: 'Προτεινόμενα', icon: 'auto_awesome' },
   { value: 'price_asc', label: 'Τιμή ↑', icon: 'trending_down' },
   { value: 'price_desc', label: 'Τιμή ↓', icon: 'trending_up' },
-  { value: 'seats_desc', label: 'Θέσεις', icon: 'event_seat' },
+  { value: 'seats_desc', label: 'Θέσεις ↓', icon: 'event_seat' },
 ];
 
 const PRICE_SLIDER_MAX = 1200;
