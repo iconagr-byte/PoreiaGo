@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 function vehiclePhotos(v) {
@@ -7,7 +8,8 @@ function vehiclePhotos(v) {
 }
 
 /**
- * Bottom sheet: gallery + rental specs for a fleet pick card.
+ * Vehicle detail overlay — portal to body so fixed positioning stays over the
+ * tapped card (not trapped by wallet transforms / low stacking contexts).
  */
 export default function RentVehicleDetailSheet({
   vehicle,
@@ -33,7 +35,7 @@ export default function RentVehicleDetailSheet({
     };
   }, [vehicle, onClose]);
 
-  if (!vehicle) return null;
+  if (!vehicle || typeof document === 'undefined') return null;
 
   const facts = [
     { icon: 'group', label: v.seats_label || `${v.seating_capacity || '—'} επιβάτες` },
@@ -44,9 +46,9 @@ export default function RentVehicleDetailSheet({
     v.doors ? { icon: 'sensor_door', label: `${v.doors} πόρτες` } : null,
   ].filter(Boolean);
 
-  return (
+  return createPortal(
     <div
-      className="rent-sheet-backdrop"
+      className="rent-sheet-backdrop rent-sheet-backdrop--over-vehicle"
       role="dialog"
       aria-modal="true"
       aria-label={v.model || 'Λεπτομέρειες οχήματος'}
@@ -127,6 +129,7 @@ export default function RentVehicleDetailSheet({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

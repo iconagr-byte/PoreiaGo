@@ -4661,10 +4661,55 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
-  z-index: 100;
+  /* Above wallet chrome (header/nav ~400–420); portal to body avoids transform traps. */
+  z-index: 1200;
   display: grid;
   place-items: end center;
   padding: 0.75rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Centered over the tapped vehicle — not stuck under wallet chrome / mid-scroll. */
+.rent-sheet-backdrop--over-vehicle {
+  place-items: center;
+  padding: max(0.85rem, env(safe-area-inset-top, 0px)) 0.85rem
+    max(0.85rem, env(safe-area-inset-bottom, 0px));
+  animation: rent-sheet-backdrop-in 0.22s ease;
+}
+
+.rent-sheet-backdrop--over-vehicle .rent-sheet--detail {
+  width: min(520px, 100%);
+  max-height: min(88dvh, 720px);
+  margin: 0;
+  animation: rent-sheet-pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+}
+
+@keyframes rent-sheet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rent-sheet-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rent-sheet-backdrop--over-vehicle,
+  .rent-sheet-backdrop--over-vehicle .rent-sheet--detail {
+    animation: none;
+  }
 }
 
 .rent-sheet {
