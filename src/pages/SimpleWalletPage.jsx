@@ -1165,27 +1165,16 @@ function WalletAuthenticatedApp() {
               searchTick={rentSearchTick}
             />
 
-            <section className="wallet-panel wallet-panel--rent-passes">
-              <div className="wallet-panel-head">
-                <span className="wallet-panel-head-icon" aria-hidden>
-                  <span className="material-symbols-outlined">directions_car</span>
-                </span>
-                <div>
-                  <h2>Οι ενοικιάσεις μου</h2>
-                  <p>Κάρτες οχήματος στο My Wallet.</p>
-                </div>
-              </div>
-              <RentalWalletPanel
-                brandLabel={brandLabel}
-                passengerName={profile.name}
-                highlightBookingId={highlightRentalBookingId}
-                onBookVehicle={() => {
-                  document
-                    .getElementById('wallet-rent-fleet')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-              />
-            </section>
+            <RentalWalletPanel
+              brandLabel={brandLabel}
+              passengerName={profile.name}
+              highlightBookingId={highlightRentalBookingId}
+              onBookVehicle={() => {
+                document
+                  .getElementById('wallet-rent-fleet')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            />
           </div>
         ) : null}
 

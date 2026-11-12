@@ -136,54 +136,66 @@ export default function RentalWalletPanel({
     }
   };
 
-  if (loading && !rows.length) {
-    return <p className="rent-panel-lead">Φόρτωση Rent Wallet…</p>;
+  // Empty / still loading: hide the marketing pass — book-first + fleet cover «Βρες όχημα».
+  if (!rows.length) {
+    return null;
   }
 
   return (
-    <div className="rent-wallet">
-      <RentalWalletPass
-        booking={featured}
-        brandLabel={brandLabel}
-        passengerName={passengerName}
-        onBookVehicle={onBookVehicle}
-        onCancel={cancelBooking}
-        cancelling={busyId === featured?.id}
-      />
+    <section className="wallet-panel wallet-panel--rent-passes">
+      <div className="wallet-panel-head">
+        <span className="wallet-panel-head-icon" aria-hidden>
+          <span className="material-symbols-outlined">directions_car</span>
+        </span>
+        <div>
+          <h2>Οι ενοικιάσεις μου</h2>
+          <p>Κάρτες οχήματος στο My Wallet.</p>
+        </div>
+      </div>
+      <div className="rent-wallet">
+        <RentalWalletPass
+          booking={featured}
+          brandLabel={brandLabel}
+          passengerName={passengerName}
+          onBookVehicle={onBookVehicle}
+          onCancel={cancelBooking}
+          cancelling={busyId === featured?.id}
+        />
 
-      {others.length ? (
-        <section className="wallet-home-more rent-wallet-more" aria-label="Άλλες ενοικιάσεις">
-          <h3 className="rent-wallet-more-title">Άλλες κρατήσεις</h3>
-          <div className="wallet-list">
-            {others.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                className="wallet-booking-card rent-wallet-card-btn"
-                onClick={() => setSelectedId(b.id)}
-              >
-                <div className="wallet-booking-body">
-                  <h3>
-                    {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
-                  </h3>
-                  <p>
-                    {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
-                  </p>
-                  <p className="wallet-booking-mono">
-                    {b.pickup_location || 'Γραφείο'}
-                    {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
-                      STATUS_LABEL[b.rental_status] || b.rental_status
-                    }`}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined" aria-hidden>
-                  chevron_right
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-    </div>
+        {others.length ? (
+          <section className="wallet-home-more rent-wallet-more" aria-label="Άλλες ενοικιάσεις">
+            <h3 className="rent-wallet-more-title">Άλλες κρατήσεις</h3>
+            <div className="wallet-list">
+              {others.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className="wallet-booking-card rent-wallet-card-btn"
+                  onClick={() => setSelectedId(b.id)}
+                >
+                  <div className="wallet-booking-body">
+                    <h3>
+                      {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
+                    </h3>
+                    <p>
+                      {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
+                    </p>
+                    <p className="wallet-booking-mono">
+                      {b.pickup_location || 'Γραφείο'}
+                      {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
+                        STATUS_LABEL[b.rental_status] || b.rental_status
+                      }`}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    chevron_right
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </section>
   );
 }
