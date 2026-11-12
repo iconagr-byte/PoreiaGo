@@ -6618,17 +6618,21 @@
   margin: 0.85rem 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.2rem;
   position: relative;
+}
+
+.rent-wiz-steps--compact {
+  margin-top: 0.65rem;
 }
 
 .rent-wiz-steps::before {
   content: '';
   position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 0.72rem;
+  left: 8%;
+  right: 8%;
+  top: 0.68rem;
   height: 2px;
   background: rgba(60, 60, 67, 0.16);
   z-index: 0;
@@ -6639,13 +6643,14 @@
   z-index: 1;
   display: grid;
   justify-items: center;
-  gap: 0.4rem;
+  gap: 0.28rem;
   text-align: center;
+  min-width: 0;
 }
 
 .rent-wiz-step-dot {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.35rem;
+  height: 1.35rem;
   border-radius: 999px;
   background: #d1d1d6;
   display: grid;
@@ -6658,7 +6663,7 @@
 }
 
 .rent-wiz-step.is-done .rent-wiz-step-dot .material-symbols-outlined {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-variation-settings: 'FILL' 1;
 }
 
@@ -6669,30 +6674,101 @@
 }
 
 .rent-wiz-step-pulse {
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 999px;
   background: var(--rent-teal, #0a7a6c);
 }
 
+.rent-wiz-step-num {
+  font-size: 0.62rem;
+  font-weight: 750;
+  color: #636366;
+  line-height: 1;
+}
+
 .rent-wiz-step-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 650;
   color: var(--rent-secondary, #6e6e73);
-  line-height: 1.25;
-  max-width: 12ch;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rent-wiz-step.is-active .rent-wiz-step-label,
 .rent-wiz-step.is-done .rent-wiz-step-label {
   color: var(--rent-ink, #1d1d1f);
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .rent-wiz-trip {
   display: grid;
-  gap: 0.85rem;
-  margin-bottom: 1.75rem;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.rent-wiz-trip--compact {
+  margin-bottom: 0.85rem;
+}
+
+.rent-wiz-trip-strip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  min-width: 0;
+}
+
+.rent-wiz-trip-strip-icon {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.25rem;
+}
+
+.rent-wiz-trip-strip-copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.rent-wiz-trip-strip-copy strong {
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rent-wiz-trip-strip-copy span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rent-wiz-trip-strip-edit {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-deep, #0b3d4a);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  padding: 0.25rem 0.15rem;
+  white-space: nowrap;
 }
 
 .rent-wiz-trip-grid {
@@ -7389,12 +7465,15 @@
 }
 
 .rent-wiz-stage--desktop .rent-wiz-steps {
-  max-width: 720px;
+  max-width: 640px;
 }
 
 .rent-wiz-stage--desktop .rent-wiz-step-label {
-  font-size: 0.78rem;
-  max-width: 16ch;
+  font-size: 0.72rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-trip-strip {
+  max-width: 520px;
 }
 
 .rent-wiz-stage--desktop .rent-wiz-trip-grid {
@@ -7612,9 +7691,25 @@
 
 @media (max-width: 720px) {
   .rent-wiz-step-label {
-    max-width: 8ch;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
+
+  .rent-wiz-trip-strip {
+    padding: 0.62rem 0.7rem;
+  }
+}
+
+/* Wallet checkout: keep chrome tight above the fold */
+.wallet-rent-checkout .rent-wiz-steps {
+  margin-top: 0.45rem;
+}
+
+.wallet-rent-checkout .rent-wiz-trip--compact {
+  margin-bottom: 0.7rem;
+}
+
+.wallet-rent-checkout .rent-wiz-head h1 {
+  font-size: clamp(1.25rem, 5vw, 1.55rem);
 }
 
 /* —— Payment step —— */
