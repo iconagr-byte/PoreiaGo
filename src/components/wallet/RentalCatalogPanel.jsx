@@ -453,19 +453,6 @@ export default function RentalCatalogPanel({
       return Number(b.fit_score || 0) - Number(a.fit_score || 0);
     });
 
-  const nights = (() => {
-    try {
-      const start = new Date(form.start_time);
-      const end = new Date(form.end_time);
-      const diff = Math.max(0, end.getTime() - start.getTime());
-      return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    } catch {
-      return 1;
-    }
-  })();
-  const extrasTotal =
-    (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
-
   const cancelBooking = async (bookingId) => {
     if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
     setBusy(true);
