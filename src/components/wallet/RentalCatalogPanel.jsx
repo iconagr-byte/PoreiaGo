@@ -535,27 +535,6 @@ export default function RentalCatalogPanel({
         </div>
         ) : null}
 
-        {bookFirst && (form.start_time || form.end_time) ? (
-          <div className="wallet-rent-trip-chip" aria-label="Επιλεγμένο ταξίδι">
-            <span className="material-symbols-outlined" aria-hidden>
-              calendar_month
-            </span>
-            <div>
-              <strong>
-                {form.pickup_location || 'Γραφείο'}
-                {form.dropoff_location &&
-                form.dropoff_location !== form.pickup_location
-                  ? ` → ${form.dropoff_location}`
-                  : ''}
-              </strong>
-              <p>
-                {formatWhen(form.start_time)} – {formatWhen(form.end_time)}
-              </p>
-            </div>
-            {busy ? <span className="wallet-rent-trip-chip-busy">Αναζήτηση…</span> : null}
-          </div>
-        ) : null}
-
         {preferredVehicle ? (
           <div className="rent-picked-vehicle">
             <div className="rent-picked-vehicle-media">
