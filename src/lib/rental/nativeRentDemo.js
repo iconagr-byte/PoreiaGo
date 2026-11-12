@@ -110,6 +110,11 @@ export async function enterNativeRentDemoWallet() {
     /* ignore */
   }
 
+  const token = String(profile?.access_token || '').trim();
+  // Never leave a customer role without JWT — payment would bounce to login.
+  if (!token) {
+    throw new Error('Demo rent login returned no access token');
+  }
   loginAsCustomer(
     profile?.email || NATIVE_RENT_DEMO_EMAIL,
     {
@@ -119,7 +124,7 @@ export async function enterNativeRentDemoWallet() {
       customer_id: profile?.customer_id,
       picture: profile?.picture,
     },
-    profile?.access_token || null,
+    token,
   );
 }
 

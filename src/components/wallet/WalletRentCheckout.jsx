@@ -1,5 +1,11 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getCustomerToken } from '../../lib/auth.js';
+import {
+  enterNativeRentDemoWallet,
+  isNativeRentDemo,
+} from '../../lib/rental/nativeRentDemo.js';
+import { readRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
 import RentBookingServicesStep from '../rental/RentBookingServicesStep.jsx';
 import RentBookingDetailsStep from '../rental/RentBookingDetailsStep.jsx';
 import RentBookingPaymentStep from '../rental/RentBookingPaymentStep.jsx';
@@ -56,6 +62,18 @@ export default function WalletRentCheckout({
     return () => window.clearTimeout(t);
   }, [step]);
 
+  // After login return to /wallet?tab=rentals with pending payment — reopen payment step.
+  useLayoutEffect(() => {
+    const prefs = readRentBookingPrefs();
+    if (
+      prefs.wizard_pending_confirm &&
+      prefs.wizard_step === 'payment' &&
+      getCustomerToken()
+    ) {
+      setStep('payment');
+    }
+  }, []);
+
   const onWizardNav = useCallback(
     (to, opts) => {
       const target = parseWizardNavTarget(to);
@@ -68,7 +86,48 @@ export default function WalletRentCheckout({
         return true;
       }
       if (target === 'login') {
-        routerNavigate(to, opts);
+        // Still have a session → stay on payment (avoid false login wall).
+        if (getCustomerToken()) {
+          setStep('payment');
+          return true;
+        }
+        if (isNativeRentDemo()) {
+          void enterNativeRentDemoWallet()
+            .then(() => {
+              if (getCustomerToken()) setStep('payment');
+              else {
+                routerNavigate('/login', {
+                  state: {
+                    from: '/wallet?tab=rentals',
+                    rentContinue: true,
+                    rentBookingPay: true,
+                    resumeRentPayment: true,
+                  },
+                });
+              }
+            })
+            .catch(() => {
+              routerNavigate('/login', {
+                state: {
+                  from: '/wallet?tab=rentals',
+                  rentContinue: true,
+                  rentBookingPay: true,
+                  resumeRentPayment: true,
+                },
+              });
+            });
+          return true;
+        }
+        routerNavigate('/login', {
+          ...(opts || {}),
+          state: {
+            ...(opts?.state || {}),
+            from: '/wallet?tab=rentals',
+            rentContinue: true,
+            rentBookingPay: true,
+            resumeRentPayment: true,
+          },
+        });
         return true;
       }
       return false;

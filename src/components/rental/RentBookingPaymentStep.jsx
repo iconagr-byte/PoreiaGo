@@ -9,6 +9,10 @@ import {
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 import {
+  enterNativeRentDemoWallet,
+  isNativeRentDemo,
+} from '../../lib/rental/nativeRentDemo.js';
+import {
   estimateBookingTotals,
   euroLabel,
   readCoverageCatalog,
@@ -271,6 +275,16 @@ export default function RentBookingPaymentStep({
       return;
     }
 
+    // Wallet / native demo may open the rentals shell without a JWT (demo mint failed).
+    // Remint once before forcing a login wall — user already filled details in-app.
+    if (!getCustomerToken() && isNativeRentDemo()) {
+      try {
+        await enterNativeRentDemoWallet();
+      } catch {
+        /* fall through to login */
+      }
+    }
+
     if (!getCustomerToken()) {
       writeRentBookingPrefs({
         wizard_pending_confirm: true,
@@ -278,9 +292,15 @@ export default function RentBookingPaymentStep({
         payment_plan: effectivePlan,
         payment_method: paymentMethod,
       });
-      // Return to payment after login — never default to Rent Wallet.
-      navigate('/rent/login', {
-        state: { from: '/rent/book/payment', rentContinue: true, rentBookingPay: true },
+      // Embedded My Wallet checkout → return to wallet rentals after login (not bare /rent/book).
+      const resumeInWallet = typeof onWizardNav === 'function';
+      navigate(resumeInWallet ? '/login' : '/rent/login', {
+        state: {
+          from: resumeInWallet ? '/wallet?tab=rentals' : '/rent/book/payment',
+          rentContinue: true,
+          rentBookingPay: true,
+          resumeRentPayment: true,
+        },
       });
       return;
     }
