@@ -28,8 +28,7 @@ import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
 import RentWizardLink from './RentWizardLink.jsx';
 
 /**
- * Services / coverage step after vehicle pick — teal brand, Hertz-like structure.
- * Next step navigates to /rent/book/details (does not book yet).
+ * Services / coverage step — protection-package cards with PoreiaGo hooks.
  * Catalog comes from office site appearance (admin: Ενοικιάσεις → Υπηρεσίες).
  */
 export default function RentBookingServicesStep({ brandLabel = 'Γραφείο', onWizardNav } = {}) {
@@ -71,6 +70,7 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο',
   });
   const selectedLabels = selectedExtrasLabels(selection, catalog);
   const visible = visibleCoverageOptions(catalog);
+  const hasRecommended = visible.some((o) => o.recommended);
 
   const toggle = (formKey) => {
     setSelection((s) => {
@@ -125,10 +125,10 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο',
   }, [navigate]);
 
   return (
-    <div className="rent-wiz">
+    <div className="rent-wiz rent-wiz--protect">
       <header className="rent-wiz-head">
         <p className="rent-wiz-eyebrow">{brandLabel}</p>
-        <h1>Επιλογή υπηρεσιών</h1>
+        <h1>Καλύψεις & extras</h1>
         <RentBookingStepper activeId="services" />
       </header>
 
@@ -148,7 +148,9 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο',
       ) : (
         <div className="rent-wiz-layout">
           <section className="rent-wiz-main" aria-label="Καλύψεις">
-            <h2>Καλύψεις & extras</h2>
+            <p className="rent-protect-hook">
+              Χιλιάδες ταξιδιώτες επιλέγουν προστασία πριν φύγουν από το γραφείο — ξεκίνα ήρεμα.
+            </p>
             <p className="rent-wiz-lead">
               Πρόσθεσε ό,τι χρειάζεσαι για το ταξίδι. Το σύνολο ενημερώνεται ζωντανά δίπλα.
             </p>
@@ -164,46 +166,116 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο',
                 ))}
               </ul>
             ) : null}
-            <div className="rent-wiz-coverages">
-              {visible.map((opt) => {
+            <div className="rent-wiz-coverages rent-protect-grid">
+              {visible.map((opt, idx) => {
                 const on = Boolean(selection[opt.formKey]);
+                const recommended = Boolean(opt.recommended) || (!hasRecommended && idx === 0);
                 return (
-                  <article key={opt.id} className={`rent-wiz-cover${on ? ' is-on' : ''}`}>
-                    <div className="rent-wiz-cover-icon" aria-hidden>
-                      <span className="material-symbols-outlined">{opt.icon}</span>
-                    </div>
-                    <div className="rent-wiz-cover-body">
-                      <h3>{opt.title}</h3>
-                      <p>{opt.blurb}</p>
-                      {opt.includes?.length || opt.excludes?.length ? (
-                        <ul className="rent-wiz-cover-flags">
-                          {(opt.includes || []).map((t) => (
-                            <li key={t} className="is-yes">
-                              <span className="material-symbols-outlined">check</span>
-                              {t}
-                            </li>
-                          ))}
-                          {(opt.excludes || []).map((t) => (
-                            <li key={t} className="is-no">
-                              <span className="material-symbols-outlined">close</span>
-                              {t}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      <div className="rent-wiz-cover-foot">
-                        <strong>
-                          {euroLabel(opt.eurPerDay)} <span>/ ημέρα</span>
-                        </strong>
-                        <button
-                          type="button"
-                          className="rent-wiz-cover-btn"
-                          onClick={() => toggle(opt.formKey)}
-                        >
-                          {on ? 'Επιλεγμένο' : 'Προσθήκη'}
-                        </button>
+                  <article
+                    key={opt.id}
+                    className={`rent-protect-card${on ? ' is-on' : ''}${
+                      recommended ? ' is-recommended' : ''
+                    }`}
+                  >
+                    {recommended ? (
+                      <span className="rent-protect-badge">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          star
+                        </span>
+                        Προτεινόμενο
+                      </span>
+                    ) : null}
+
+                    <div className="rent-protect-top">
+                      <div className="rent-protect-copy">
+                        <h3>{opt.title}</h3>
+                        <p className="rent-protect-coverline">
+                          {opt.coverLine || 'Τι κερδίζεις:'}
+                        </p>
+                      </div>
+                      <div className="rent-protect-visual" aria-hidden>
+                        <span className="material-symbols-outlined">{opt.icon}</span>
                       </div>
                     </div>
+
+                    {opt.blurb ? <p className="rent-protect-blurb">{opt.blurb}</p> : null}
+
+                    {opt.includes?.length || opt.excludes?.length ? (
+                      <ul className="rent-protect-flags">
+                        {(opt.includes || []).map((t) => (
+                          <li key={t} className="is-yes">
+                            <span className="material-symbols-outlined" aria-hidden>
+                              check_circle
+                            </span>
+                            {t}
+                          </li>
+                        ))}
+                        {(opt.excludes || []).map((t) => (
+                          <li key={t} className="is-no">
+                            <span className="material-symbols-outlined" aria-hidden>
+                              cancel
+                            </span>
+                            {t}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    <div className="rent-protect-foot">
+                      <div className="rent-protect-price">
+                        <strong>
+                          {euroLabel(opt.eurPerDay)}
+                          <span>/ ημέρα</span>
+                        </strong>
+                        {opt.socialProof ? (
+                          <p className="rent-protect-proof">
+                            <span className="rent-protect-dot" aria-hidden />
+                            {opt.socialProof}
+                          </p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="rent-protect-btn"
+                        aria-pressed={on}
+                        onClick={() => toggle(opt.formKey)}
+                      >
+                        {on ? (
+                          <>
+                            <span className="material-symbols-outlined" aria-hidden>
+                              check
+                            </span>
+                            Επιλεγμένο
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined" aria-hidden>
+                              add
+                            </span>
+                            Προσθήκη
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {recommended && opt.testimonial?.quote ? (
+                      <blockquote className="rent-protect-quote">
+                        <div className="rent-protect-stars" aria-label="5 αστέρια">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span key={i} className="material-symbols-outlined" aria-hidden>
+                              star
+                            </span>
+                          ))}
+                        </div>
+                        <p>
+                          <strong>{opt.testimonial.name || 'Πελάτης'}</strong>
+                          {opt.testimonial.role ? (
+                            <span className="rent-protect-verified">{opt.testimonial.role}</span>
+                          ) : null}
+                        </p>
+                        <p className="rent-protect-quote-text">«{opt.testimonial.quote}»</p>
+                      </blockquote>
+                    ) : null}
                   </article>
                 );
               })}
