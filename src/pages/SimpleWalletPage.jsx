@@ -212,7 +212,10 @@ function WalletAuthenticatedApp() {
   const isMobile = useRentMobile();
   /** Narrow phones only — full-bleed PWA chrome. */
   const isPhone = useRentPhone();
-  const isDesktop = !isMobile;
+  const nativeWallet = isNativeApp();
+  // Capacitor: always phone chrome — never tablet/desktop side-rail layout.
+  const isDesktop = !nativeWallet && !isMobile;
+  const phoneChrome = Boolean(nativeWallet || isPhone);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -252,7 +255,7 @@ function WalletAuthenticatedApp() {
   );
 
   useEffect(() => {
-    document.documentElement.dataset.walletSurface = isPhone
+    document.documentElement.dataset.walletSurface = phoneChrome
       ? 'phone'
       : isDesktop
         ? 'desktop'
@@ -260,7 +263,7 @@ function WalletAuthenticatedApp() {
     return () => {
       delete document.documentElement.dataset.walletSurface;
     };
-  }, [isPhone, isDesktop]);
+  }, [phoneChrome, isDesktop]);
 
   useEffect(() => setupWalletPwa(), []);
 
@@ -452,7 +455,6 @@ function WalletAuthenticatedApp() {
     };
   }, [sealedTenantId]);
 
-  const nativeWallet = isNativeApp();
   // Rent only with active contract — native localhost must not unlock marketing demo Rent
   // (Achillio Travel stays bus-only even on Capacitor).
   const rentAvailable = shouldShowRentStorefront(officeModules, {
@@ -955,12 +957,12 @@ function WalletAuthenticatedApp() {
   return (
     <div
       className={stageClass}
-      data-wallet-device={nativeWallet || isPhone ? 'phone' : isDesktop ? 'desktop' : 'tablet'}
+      data-wallet-device={phoneChrome ? 'phone' : isDesktop ? 'desktop' : 'tablet'}
     >
       <div
         className={`wallet-app${
-          nativeWallet || isPhone ? ' wallet-app--phone' : isDesktop ? ' wallet-app--desktop' : ''
-        }`}
+          phoneChrome ? ' wallet-app--phone' : isDesktop ? ' wallet-app--desktop' : ''
+        }${nativeWallet ? ' wallet-app--native' : ''}`}
       >
         <header className="wallet-topbar">
           <WalletAccountMenu
@@ -991,7 +993,7 @@ function WalletAuthenticatedApp() {
               asLink={false}
               refreshKey={sealedTenantId}
               tenantId={sealedTenantId}
-              compact={Boolean(nativeWallet || isPhone)}
+              compact={phoneChrome}
             />
           </div>
           <WalletNotificationBell

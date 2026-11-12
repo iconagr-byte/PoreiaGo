@@ -4104,6 +4104,31 @@ button.wallet-account-row--action.is-open {
   border-radius: 22px;
 }
 
+/* Capacitor native: fill the handset frame (no 430px card / desktop rail). */
+.wallet-app--native {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.wallet-phone-stage--native {
+  width: 100%;
+  padding: 0;
+  background: #f5f5f7;
+}
+
+.wallet-app--native .wallet-main {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.wallet-app--native .wallet-rent-bookfirst .rent-hero--bookfirst {
+  min-height: min(52dvh, 420px);
+}
+
 /* Rent bridge inside bus My Wallet */
 .wallet-rent-section .wallet-rent-featured {
   margin: 0 0 0.85rem;
