@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import RentBookingServicesStep from '../rental/RentBookingServicesStep.jsx';
 import RentBookingDetailsStep from '../rental/RentBookingDetailsStep.jsx';
@@ -11,6 +11,29 @@ const STEP_META = {
   payment: { title: 'Πληρωμή', back: 'Στοιχεία' },
 };
 
+function scrollCheckoutToTop(root) {
+  const main = document.querySelector('.wallet-main');
+  if (main) {
+    try {
+      main.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      main.scrollTop = 0;
+    }
+  }
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  } catch {
+    window.scrollTo(0, 0);
+  }
+  if (root && typeof root.scrollIntoView === 'function') {
+    try {
+      root.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 /**
  * In-wallet rent checkout — same desktop wizard steps, mobile-first chrome.
  */
@@ -21,10 +44,16 @@ export default function WalletRentCheckout({
   onBooked,
 } = {}) {
   const routerNavigate = useNavigate();
-  const [step, setStep] = useState(initialStep === 'details' || initialStep === 'payment' ? initialStep : 'services');
+  const rootRef = useRef(null);
+  const [step, setStep] = useState(
+    initialStep === 'details' || initialStep === 'payment' ? initialStep : 'services',
+  );
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Always land at the top of the handset scrollport when a wizard step opens.
+  useLayoutEffect(() => {
+    scrollCheckoutToTop(rootRef.current);
+    const t = window.setTimeout(() => scrollCheckoutToTop(rootRef.current), 40);
+    return () => window.clearTimeout(t);
   }, [step]);
 
   const onWizardNav = useCallback(
@@ -56,7 +85,7 @@ export default function WalletRentCheckout({
   const meta = STEP_META[step] || STEP_META.services;
 
   return (
-    <div className="wallet-rent-checkout" data-step={step}>
+    <div ref={rootRef} className="wallet-rent-checkout" data-step={step}>
       <div className="wallet-rent-checkout-hero" aria-hidden>
         <span className="wallet-rent-checkout-orb wallet-rent-checkout-orb--a" />
         <span className="wallet-rent-checkout-orb wallet-rent-checkout-orb--b" />
