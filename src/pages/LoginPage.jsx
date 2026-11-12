@@ -661,17 +661,19 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               className="wallet-btn wallet-btn-ghost wallet-btn-block mt-4"
               onClick={() => {
                 // My Wallet shell + Ενοικιάσεις tab sealed to IconaRent.
+                // Soft session fallback keeps entry working when prod mint is off.
                 void (async () => {
                   try {
-                    await enterNativeRentDemoWallet();
-                    rememberNativeRoleHome(NATIVE_ROLE_WALLET);
-                    navigate('/wallet?tab=rentals', {
-                      replace: true,
-                      state: { walletTab: 'rentals' },
-                    });
+                    await enterNativeRentDemoWallet({ requireRealJwt: false });
                   } catch (err) {
                     setError(err?.message || 'Αποτυχία demo σύνδεσης');
+                    return;
                   }
+                  rememberNativeRoleHome(NATIVE_ROLE_WALLET);
+                  navigate('/wallet?tab=rentals', {
+                    replace: true,
+                    state: { walletTab: 'rentals' },
+                  });
                 })();
               }}
             >

@@ -11,6 +11,7 @@ import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 import {
   enterNativeRentDemoWallet,
   isNativeRentDemo,
+  isSoftNativeRentDemoToken,
 } from '../../lib/rental/nativeRentDemo.js';
 import {
   estimateBookingTotals,
@@ -275,17 +276,16 @@ export default function RentBookingPaymentStep({
       return;
     }
 
-    // Wallet / native demo may open the rentals shell without a JWT (demo mint failed).
-    // Remint once before forcing a login wall — user already filled details in-app.
-    if (!getCustomerToken() && isNativeRentDemo()) {
+    // Soft / missing demo session: try a real JWT mint once before the login wall.
+    if (isNativeRentDemo() && (!getCustomerToken() || isSoftNativeRentDemoToken())) {
       try {
-        await enterNativeRentDemoWallet();
+        await enterNativeRentDemoWallet({ requireRealJwt: true });
       } catch {
-        /* fall through to login */
+        /* production mint is disabled — fall through */
       }
     }
 
-    if (!getCustomerToken()) {
+    if (!getCustomerToken() || isSoftNativeRentDemoToken()) {
       writeRentBookingPrefs({
         wizard_pending_confirm: true,
         wizard_step: 'payment',

@@ -11,7 +11,7 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName, getCustomerToken } from '../../lib/auth.js';
-import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
+import { isNativeRentDemo, isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
 import {
   defaultPickupDateTime,
   defaultReturnDateTime,
@@ -226,7 +226,8 @@ export default function RentalCatalogPanel({
       if (
         prefs.wizard_pending_confirm &&
         prefs.wizard_step === 'payment' &&
-        getCustomerToken()
+        getCustomerToken() &&
+        !isSoftNativeRentDemoToken()
       ) {
         setCheckoutOpen(true);
       }

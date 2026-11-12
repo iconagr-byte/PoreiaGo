@@ -4,6 +4,7 @@ import { getCustomerToken } from '../../lib/auth.js';
 import {
   enterNativeRentDemoWallet,
   isNativeRentDemo,
+  isSoftNativeRentDemoToken,
 } from '../../lib/rental/nativeRentDemo.js';
 import { readRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
 import RentBookingServicesStep from '../rental/RentBookingServicesStep.jsx';
@@ -68,7 +69,8 @@ export default function WalletRentCheckout({
     if (
       prefs.wizard_pending_confirm &&
       prefs.wizard_step === 'payment' &&
-      getCustomerToken()
+      getCustomerToken() &&
+      !isSoftNativeRentDemoToken()
     ) {
       setStep('payment');
     }
@@ -86,15 +88,15 @@ export default function WalletRentCheckout({
         return true;
       }
       if (target === 'login') {
-        // Still have a session → stay on payment (avoid false login wall).
-        if (getCustomerToken()) {
+        // Real JWT already present → stay on payment.
+        if (getCustomerToken() && !isSoftNativeRentDemoToken()) {
           setStep('payment');
           return true;
         }
         if (isNativeRentDemo()) {
-          void enterNativeRentDemoWallet()
+          void enterNativeRentDemoWallet({ requireRealJwt: true })
             .then(() => {
-              if (getCustomerToken()) setStep('payment');
+              if (getCustomerToken() && !isSoftNativeRentDemoToken()) setStep('payment');
               else {
                 routerNavigate('/login', {
                   state: {

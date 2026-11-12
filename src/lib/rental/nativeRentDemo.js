@@ -1,15 +1,16 @@
 /**
  * Native Capacitor: open My Wallet → Ενοικιάσεις sealed to IconaRent (iconarent).
- * Issues a real customer JWT against that office host so catalog/bookings work.
+ * Prefers a real customer JWT from /api/auth/native-rent-demo; falls back to a
+ * soft local session so demo entry never dead-ends when mint is blocked (prod).
  */
 
-import { loginAsCustomer } from '../auth.js';
+import { getCustomerToken, loginAsCustomer } from '../auth.js';
 import { setWalletTenantId, clearWalletTenantId } from '../wallet/walletTenantSeal.js';
 import { markPreferRentLookup } from './preferRentLookup.js';
 
 export const NATIVE_RENT_DEMO_KEY = 'poreiago_native_rent_demo_v1';
 export const NATIVE_RENT_DEMO_EMAIL = 'demo-rent@poreiago.local';
-/** @deprecated Soft token — prefer real JWT from /api/auth/native-rent-demo */
+/** Soft local token when office mint is unavailable — enough to open Wallet shell. */
 export const NATIVE_RENT_DEMO_TOKEN = 'native-rent-demo';
 
 /** IconaRent office — Ιψονα ρεντ / Dodopoulos… O.E. */
@@ -41,6 +42,11 @@ export function nativeRentDemoApiBase() {
   return NATIVE_RENT_DEMO_API_BASE;
 }
 
+/** Soft placeholder token — not a real JWT (browsing only). */
+export function isSoftNativeRentDemoToken(token = getCustomerToken()) {
+  return String(token || '').trim() === NATIVE_RENT_DEMO_TOKEN;
+}
+
 /**
  * Resolve IconaRent tenant_id from office appearance, else fallback.
  * @returns {Promise<string>}
@@ -63,12 +69,8 @@ export async function resolveNativeRentDemoTenantId() {
   return fallback;
 }
 
-/**
- * Mint real JWT sealed to IconaRent (must hit that office host).
- * @returns {Promise<{access_token: string, tenant_id: string, email: string, name: string}>}
- */
-export async function fetchNativeRentDemoSession() {
-  const res = await fetch(`${NATIVE_RENT_DEMO_API_BASE}/api/auth/native-rent-demo`, {
+async function postNativeRentDemo(url) {
+  const res = await fetch(url, {
     method: 'POST',
     credentials: 'omit',
     headers: {
@@ -88,8 +90,28 @@ export async function fetchNativeRentDemoSession() {
   return data;
 }
 
-/** Enter My Wallet rentals tab sealed to IconaRent with a real customer JWT. */
-export async function enterNativeRentDemoWallet() {
+/**
+ * Mint real JWT sealed to IconaRent (office host, then same-origin fallback).
+ * @returns {Promise<{access_token: string, tenant_id: string, email: string, name: string}>}
+ */
+export async function fetchNativeRentDemoSession() {
+  try {
+    return await postNativeRentDemo(`${NATIVE_RENT_DEMO_API_BASE}/api/auth/native-rent-demo`);
+  } catch (firstErr) {
+    try {
+      // Capacitor / same-origin proxy may allow mint when cross-office CORS fails.
+      return await postNativeRentDemo('/api/auth/native-rent-demo');
+    } catch {
+      throw firstErr;
+    }
+  }
+}
+
+/**
+ * Enter My Wallet rentals tab sealed to IconaRent.
+ * @param {{ requireRealJwt?: boolean }} [opts]
+ */
+export async function enterNativeRentDemoWallet({ requireRealJwt = false } = {}) {
   enableNativeRentDemo();
   let profile = null;
   try {
@@ -110,11 +132,17 @@ export async function enterNativeRentDemoWallet() {
     /* ignore */
   }
 
-  const token = String(profile?.access_token || '').trim();
-  // Never leave a customer role without JWT — payment would bounce to login.
+  let token = String(profile?.access_token || '').trim();
   if (!token) {
-    throw new Error('Demo rent login returned no access token');
+    if (requireRealJwt) {
+      throw new Error(
+        'Το demo ενοικιάσεων χρειάζεται σύνδεση γραφείου — δοκίμασε ξανά ή κάνε κανονική είσοδο.',
+      );
+    }
+    // Soft session: open Wallet shell + demo fleet even when production mint is disabled.
+    token = NATIVE_RENT_DEMO_TOKEN;
   }
+
   loginAsCustomer(
     profile?.email || NATIVE_RENT_DEMO_EMAIL,
     {
