@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { customerRentalCheckIn } from '../../services/customerRentalApi.js';
+import {
+  DEMO_RENT_BOOKING_ID,
+  writeDemoRentCheckinReady,
+} from '../../lib/rental/demoRentBooking.js';
 import { isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
 
 function formatWhen(iso) {
@@ -72,7 +76,8 @@ export default function RentMemberCheckinSheet({
     }
     setBusy(true);
     try {
-      if (isSoftNativeRentDemoToken()) {
+      if (isSoftNativeRentDemoToken() || booking.id === DEMO_RENT_BOOKING_ID) {
+        if (booking.id === DEMO_RENT_BOOKING_ID) writeDemoRentCheckinReady(true);
         const soft = {
           ...booking,
           online_checkin_ready: true,

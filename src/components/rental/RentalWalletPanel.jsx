@@ -8,7 +8,8 @@ import {
   cancelCustomerRentalBooking,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
-import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
+import { withDemoRentBookings } from '../../lib/rental/demoRentBooking.js';
+import { isNativeRentDemo, isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
 import RentMemberCheckinSheet, { canCheckIn } from './RentMemberCheckinSheet.jsx';
 import RentalWalletPass from './RentalWalletPass.jsx';
 
@@ -65,11 +66,9 @@ export default function RentalWalletPanel({
   const [checkinBooking, setCheckinBooking] = useState(null);
   const [reminderShown, setReminderShown] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await fetchMyRentalBookings();
-      const sorted = sortBookings(list || []);
+  const applyRows = useCallback(
+    (list) => {
+      const sorted = sortBookings(withDemoRentBookings(list || [], { brandLabel }));
       setRows(sorted);
       setSelectedId((prev) => {
         const want = String(highlightBookingId || '').trim();
@@ -77,16 +76,27 @@ export default function RentalWalletPanel({
         if (prev && sorted.some((b) => b.id === prev)) return prev;
         return sorted[0]?.id || '';
       });
+    },
+    [brandLabel, highlightBookingId],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await fetchMyRentalBookings();
+      applyRows(list);
     } catch (err) {
-      // Demo wallet session has no real JWT — empty passes, no error toast.
-      if (!isNativeRentDemo()) {
+      // Soft demo: inject local booking so Check-in is visible without JWT.
+      if (isSoftNativeRentDemoToken() || isNativeRentDemo()) {
+        applyRows([]);
+      } else {
         toast.error(err.message || 'Αποτυχία φόρτωσης κρατήσεων');
+        setRows([]);
       }
-      setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [highlightBookingId]);
+  }, [applyRows]);
 
   useEffect(() => {
     load();

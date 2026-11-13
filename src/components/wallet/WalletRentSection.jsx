@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMyRentalBookings } from '../../services/customerRentalApi.js';
+import { withDemoRentBookings } from '../../lib/rental/demoRentBooking.js';
 import RentMemberCheckinSheet, { canCheckIn } from '../rental/RentMemberCheckinSheet.jsx';
 
 const STATUS_LABEL = {
@@ -51,7 +52,8 @@ export default function WalletRentSection({
     fetchMyRentalBookings()
       .then((list) => {
         if (cancelled) return;
-        const sorted = [...(list || [])].sort((a, b) => {
+        const seeded = withDemoRentBookings(list || []);
+        const sorted = [...seeded].sort((a, b) => {
           const rank = rankBooking(a) - rankBooking(b);
           if (rank !== 0) return rank;
           return String(b.start_time || '').localeCompare(String(a.start_time || ''));
@@ -59,7 +61,9 @@ export default function WalletRentSection({
         setRows(sorted);
       })
       .catch(() => {
-        if (!cancelled) setRows([]);
+        if (cancelled) return;
+        const seeded = withDemoRentBookings([]);
+        setRows(seeded);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
