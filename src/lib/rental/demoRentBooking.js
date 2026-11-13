@@ -6,6 +6,7 @@ import { DEMO_RENT_FLEET } from './demoRentFleet.js';
 import { isNativeRentDemo, isSoftNativeRentDemoToken } from './nativeRentDemo.js';
 
 export const DEMO_RENT_BOOKING_ID = 'demo-rent-booking-checkin-1';
+/** Session-only — cold start always shows Check-in again in demo. */
 const CHECKIN_KEY = 'poreiago_demo_rent_checkin_v1';
 
 function daysFromNow(days, hour = 10) {
@@ -15,9 +16,23 @@ function daysFromNow(days, hour = 10) {
   return d.toISOString();
 }
 
+function demoStore() {
+  try {
+    if (typeof sessionStorage !== 'undefined') return sessionStorage;
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function readDemoRentCheckinReady() {
   try {
-    return localStorage.getItem(CHECKIN_KEY) === '1';
+    return demoStore()?.getItem(CHECKIN_KEY) === '1';
   } catch {
     return false;
   }
@@ -25,8 +40,31 @@ export function readDemoRentCheckinReady() {
 
 export function writeDemoRentCheckinReady(ready) {
   try {
-    if (ready) localStorage.setItem(CHECKIN_KEY, '1');
-    else localStorage.removeItem(CHECKIN_KEY);
+    const store = demoStore();
+    if (!store) return;
+    if (ready) store.setItem(CHECKIN_KEY, '1');
+    else store.removeItem(CHECKIN_KEY);
+    // Drop sticky localStorage from older builds so Check-in does not stay hidden.
+    try {
+      localStorage.removeItem(CHECKIN_KEY);
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Clear sticky check-in flag (local + session) so the CTA returns. */
+export function resetDemoRentCheckinReady() {
+  writeDemoRentCheckinReady(false);
+  try {
+    localStorage.removeItem(CHECKIN_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(CHECKIN_KEY);
   } catch {
     /* ignore */
   }
@@ -68,5 +106,13 @@ export function withDemoRentBookings(list, { brandLabel } = {}) {
   const rows = Array.isArray(list) ? list : [];
   if (rows.length) return rows;
   if (!isSoftNativeRentDemoToken() && !isNativeRentDemo()) return rows;
+  // Older builds stuck localStorage=1 → CTA vanished after first check-in.
+  try {
+    if (localStorage.getItem(CHECKIN_KEY) === '1' && !sessionStorage.getItem(CHECKIN_KEY)) {
+      localStorage.removeItem(CHECKIN_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
   return [buildDemoRentBooking({ brandLabel })];
 }

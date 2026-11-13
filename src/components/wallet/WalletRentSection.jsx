@@ -5,7 +5,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMyRentalBookings } from '../../services/customerRentalApi.js';
-import { withDemoRentBookings } from '../../lib/rental/demoRentBooking.js';
+import {
+  DEMO_RENT_BOOKING_ID,
+  resetDemoRentCheckinReady,
+  withDemoRentBookings,
+} from '../../lib/rental/demoRentBooking.js';
 import RentMemberCheckinSheet, { canCheckIn } from '../rental/RentMemberCheckinSheet.jsx';
 
 const STATUS_LABEL = {
@@ -39,6 +43,13 @@ function rankBooking(b) {
   return 4;
 }
 
+/** Keep Check-in entry visible for active rental bookings (start or review). */
+function hasCheckinEntry(booking) {
+  if (!booking) return false;
+  const status = String(booking.rental_status || '').toUpperCase();
+  return status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE';
+}
+
 export default function WalletRentSection({
   compact = false,
   brandLabel = 'Γραφείο',
@@ -50,6 +61,8 @@ export default function WalletRentSection({
 
   useEffect(() => {
     let cancelled = false;
+    // Demo: clear sticky ready flag from older APKs so CTA does not stay hidden.
+    resetDemoRentCheckinReady();
     fetchMyRentalBookings()
       .then((list) => {
         if (cancelled) return;
@@ -78,16 +91,23 @@ export default function WalletRentSection({
   const statusLabel = featured
     ? STATUS_LABEL[featured.rental_status] || featured.rental_status
     : '';
-  const showCheckin = Boolean(featured && canCheckIn(featured));
+  const checkinOpen = Boolean(featured && hasCheckinEntry(featured));
+  const checkinPending = Boolean(featured && canCheckIn(featured));
+  const checkinDone = Boolean(featured?.online_checkin_ready);
 
   const openRentals = () => {
     if (typeof onOpenRentals === 'function') onOpenRentals();
   };
 
+  const openCheckin = () => {
+    if (!featured) return;
+    setCheckinBooking(featured);
+  };
+
   return (
     <section
       className={`wallet-panel wallet-rent-section${compact ? ' wallet-rent-section--compact' : ''}${
-        showCheckin ? ' wallet-rent-section--checkin' : ''
+        checkinOpen ? ' wallet-rent-section--checkin' : ''
       }`}
       aria-label="Ενοικιάσεις"
     >
@@ -110,9 +130,9 @@ export default function WalletRentSection({
       {!loading && featured ? (
         <button
           type="button"
-          className={`wallet-rent-featured${showCheckin ? ' wallet-rent-featured--checkin' : ''}`}
+          className={`wallet-rent-featured${checkinOpen ? ' wallet-rent-featured--checkin' : ''}`}
           onClick={() => {
-            if (showCheckin) setCheckinBooking(featured);
+            if (checkinOpen) openCheckin();
             else if (typeof onOpenRentals === 'function') openRentals();
           }}
         >
@@ -127,13 +147,15 @@ export default function WalletRentSection({
               {statusLabel}
               {' · '}
               {formatWhen(featured.start_time)}
-              {featured.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
+              {checkinDone ? ' · Check-in έτοιμο' : ''}
             </p>
-            {showCheckin ? (
-              <p className="wallet-rent-featured-hook">Online check-in διαθέσιμο</p>
+            {checkinOpen ? (
+              <p className="wallet-rent-featured-hook">
+                {checkinPending ? 'Online check-in διαθέσιμο' : 'Πάτα για το check-in σου'}
+              </p>
             ) : null}
           </div>
-          {showCheckin ? (
+          {checkinOpen ? (
             <span className="wallet-rent-featured-chevron material-symbols-outlined" aria-hidden>
               chevron_right
             </span>
@@ -142,20 +164,20 @@ export default function WalletRentSection({
       ) : null}
 
       <div className="wallet-rent-actions">
-        {showCheckin ? (
+        {checkinOpen ? (
           <button
             type="button"
             className="wallet-btn wallet-btn-primary wallet-btn-block wallet-rent-checkin-cta"
-            onClick={() => setCheckinBooking(featured)}
+            onClick={openCheckin}
           >
-            Check-in τώρα
+            {checkinPending ? 'Check-in τώρα' : 'Δες check-in'}
           </button>
         ) : null}
         {typeof onOpenRentals === 'function' ? (
           <button
             type="button"
             className={`wallet-btn wallet-btn-block${
-              showCheckin ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+              checkinOpen ? ' wallet-btn-ghost' : ' wallet-btn-primary'
             }`}
             onClick={openRentals}
           >
@@ -165,7 +187,7 @@ export default function WalletRentSection({
           <Link
             to="/wallet?tab=rentals"
             className={`wallet-btn wallet-btn-block${
-              showCheckin ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+              checkinOpen ? ' wallet-btn-ghost' : ' wallet-btn-primary'
             }`}
           >
             Οι ενοικιάσεις μου
@@ -184,9 +206,16 @@ export default function WalletRentSection({
         onClose={() => setCheckinBooking(null)}
         onCheckedIn={(row) => {
           setRows((list) =>
-            list.map((item) => (item.id === row.id ? { ...item, ...row } : item)),
+            list.map((item) => {
+              if (item.id !== row.id) return item;
+              return { ...item, ...row };
+            }),
           );
+          // Keep sheet open on success so the CTA does not "vanish" mid-flow.
           setCheckinBooking((cur) => (cur && cur.id === row.id ? { ...cur, ...row } : cur));
+          if (row.id === DEMO_RENT_BOOKING_ID) {
+            /* session flag already written in sheet */
+          }
         }}
       />
     </section>

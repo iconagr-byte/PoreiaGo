@@ -158,15 +158,14 @@ export default function RentalWalletPass({
               Check-in έτοιμο για παραλαβή
             </p>
           ) : null}
-          {!booking.online_checkin_ready &&
-          (status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
+          {(status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
           onCheckIn ? (
             <button
               type="button"
               className="wallet-btn wallet-btn-primary wallet-btn-block"
               onClick={() => onCheckIn(booking)}
             >
-              Check-in τώρα
+              {booking.online_checkin_ready ? 'Δες check-in' : 'Check-in τώρα'}
             </button>
           ) : null}
           {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
