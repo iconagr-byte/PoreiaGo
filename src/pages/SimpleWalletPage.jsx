@@ -415,8 +415,11 @@ function WalletAuthenticatedApp() {
         if (name && name !== 'Γραφείο') setBrandLabel(name);
         else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
         else if (splashName) setBrandLabel(splashName);
+        else if (isNativeRentDemo()) setBrandLabel('Ιψωνα ρεντ');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled && isNativeRentDemo()) setBrandLabel('Ιψωνα ρεντ');
+      });
     return () => {
       cancelled = true;
     };
