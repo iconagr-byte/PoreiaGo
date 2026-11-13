@@ -301,6 +301,12 @@ export default function RentalPaperworkDesk({
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                     {b.rental_status}
                   </span>
+                  {paper.onlineCheckinReady || b.online_checkin_ready ? (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
+                      <span className="material-symbols-outlined text-[12px]">task_alt</span>
+                      Online check-in
+                    </span>
+                  ) : null}
                   {paper.pickupSigned ? (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800">
                       Παραλαβή ✓
@@ -336,13 +342,25 @@ export default function RentalPaperworkDesk({
                   </button>
                 ) : null}
                 {!paper.pickupSigned && onOpenCheckIn ? (
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 rounded-xl border text-xs font-bold"
-                    onClick={() => onOpenCheckIn(b.id, 'PICKUP_CHECK')}
-                  >
-                    Check-in
-                  </button>
+                  paper.onlineCheckinReady || b.online_checkin_ready ? (
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-900 text-xs font-bold inline-flex items-center gap-1"
+                      onClick={() => onOpenCheckIn(b.id, 'PICKUP_CHECK')}
+                      title="Ο πελάτης ολοκλήρωσε online check-in από το app"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                      Έτοιμο
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 rounded-xl border text-xs font-bold"
+                      onClick={() => onOpenCheckIn(b.id, 'PICKUP_CHECK')}
+                    >
+                      Check-in
+                    </button>
+                  )
                 ) : null}
               </div>
             </article>

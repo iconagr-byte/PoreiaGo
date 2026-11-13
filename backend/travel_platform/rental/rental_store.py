@@ -1477,7 +1477,12 @@ def guest_lookup_booking(
             ref = _ensure_reference_code(row)
             if before != ref:
                 dirty = True
-            if ref != code:
+            notes = str(row.get("notes") or "")
+            # Soft Wallet RN-DEMO01 also matches the office demo sample by marker.
+            ref_ok = ref == code or (
+                code == _DEMO_BOOKING_REFERENCE and _DEMO_BOOKING_MARKER in notes
+            )
+            if not ref_ok:
                 continue
             if not _surname_matches(row.get("client_name"), surname):
                 continue

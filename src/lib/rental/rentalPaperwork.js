@@ -27,9 +27,10 @@ export function latestInspectionOfType(inspections, bookingId, type) {
  *   returnCheck: object|null,
  *   pickupSigned: boolean,
  *   returnSigned: boolean,
+ *   onlineCheckinReady: boolean,
  *   agreementReady: boolean,
  *   legal: ReturnType<typeof legalPackProgress>,
- *   statusKey: 'missing'|'pickup_only'|'complete'|'cancelled',
+ *   statusKey: 'missing'|'online_ready'|'pickup_only'|'complete'|'cancelled',
  *   statusLabel: string,
  * }}
  */
@@ -41,6 +42,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       returnCheck: null,
       pickupSigned: false,
       returnSigned: false,
+      onlineCheckinReady: false,
       agreementReady: false,
       legal,
       statusKey: 'missing',
@@ -53,6 +55,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       returnCheck: null,
       pickupSigned: false,
       returnSigned: false,
+      onlineCheckinReady: false,
       agreementReady: false,
       legal,
       statusKey: 'cancelled',
@@ -63,6 +66,7 @@ export function paperworkStatusForBooking(booking, inspections) {
   const returnCheck = latestInspectionOfType(inspections, booking.id, 'RETURN_CHECK');
   const pickupSigned = Boolean(pickup?.signature_url);
   const returnSigned = Boolean(returnCheck?.signature_url);
+  const onlineCheckinReady = Boolean(booking.online_checkin_ready);
   const legalHint = `Νομικά ${legal.signedCount}/${legal.total}`;
 
   if (pickupSigned && returnSigned && legal.packComplete) {
@@ -71,6 +75,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       returnCheck,
       pickupSigned,
       returnSigned,
+      onlineCheckinReady,
       agreementReady: true,
       legal,
       statusKey: 'complete',
@@ -83,6 +88,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       returnCheck,
       pickupSigned,
       returnSigned,
+      onlineCheckinReady,
       agreementReady: true,
       legal,
       statusKey: 'complete',
@@ -95,6 +101,7 @@ export function paperworkStatusForBooking(booking, inspections) {
       returnCheck,
       pickupSigned,
       returnSigned,
+      onlineCheckinReady,
       agreementReady: true,
       legal,
       statusKey: 'pickup_only',
@@ -103,12 +110,27 @@ export function paperworkStatusForBooking(booking, inspections) {
         : `Υπογραφή παραλαβής · ${legalHint}`,
     };
   }
+  // Wallet / guest online check-in landed — desk must show it before Sign-on-Glass.
+  if (onlineCheckinReady) {
+    return {
+      pickup,
+      returnCheck,
+      pickupSigned,
+      returnSigned,
+      onlineCheckinReady: true,
+      agreementReady: Boolean(booking.id),
+      legal,
+      statusKey: 'online_ready',
+      statusLabel: `Επιβεβαιωμένο check-in · ${legalHint}`,
+    };
+  }
   const pendingLegal = legal.pickupSignedCount < legal.pickupTotal;
   return {
     pickup,
     returnCheck,
     pickupSigned,
     returnSigned,
+    onlineCheckinReady,
     agreementReady: Boolean(booking.id),
     legal,
     statusKey: 'missing',
@@ -123,6 +145,8 @@ export function paperworkStatusForBooking(booking, inspections) {
 export function paperworkStatusChipClass(statusKey) {
   switch (statusKey) {
     case 'complete':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'online_ready':
       return 'bg-emerald-100 text-emerald-800';
     case 'pickup_only':
       return 'bg-sky-100 text-sky-800';
