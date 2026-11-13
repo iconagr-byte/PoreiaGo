@@ -202,3 +202,16 @@ export async function guestRentalCheckIn({ surname, referenceCode }) {
   });
   return data.booking || null;
 }
+
+/**
+ * Soft native Wallet → office demo booking check-in
+ * (Δοκιμαστικός Πελάτης / DEMO marker) so desk Κρατήσεις updates.
+ */
+export async function demoOfficeRentalCheckIn(body) {
+  const data = await publicRentalFetch('/public/demo-check-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return data.booking || null;
+}

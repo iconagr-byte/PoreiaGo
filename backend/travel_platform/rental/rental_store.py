@@ -1562,6 +1562,96 @@ def customer_online_checkin(
         return deepcopy(booking)
 
 
+def find_demo_office_booking(tenant_id: str | None) -> dict[str, Any] | None:
+    """Active demo sample booking (Δοκιμαστικός Πελάτης) for office ↔ wallet sync.
+
+    Reads the JSON store directly (not PG list) so the DEMO marker in notes is reliable.
+    """
+    tid = _normalize_tenant(tenant_id)
+    preferred: dict[str, Any] | None = None
+    with _LOCK:
+        rows = [b for b in _read().get("bookings") or [] if b.get("tenant_id") == tid]
+        for booking in rows:
+            notes = str(booking.get("notes") or "")
+            if _DEMO_BOOKING_MARKER not in notes:
+                continue
+            status = str(booking.get("rental_status") or "").upper()
+            if status in ("CANCELLED", "COMPLETED"):
+                continue
+            if status in ("CONFIRMED", "RESERVED") and not booking.get("online_checkin_ready"):
+                return deepcopy(booking)
+            if preferred is None:
+                preferred = booking
+    return deepcopy(preferred) if preferred else None
+
+
+def demo_office_online_checkin(
+    tenant_id: str | None,
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Soft native-wallet check-in → office demo booking (DEMO marker).
+    Creates PICKUP_CHECK inspection so desk list shows ACTIVE + online ready.
+    """
+    tid = _normalize_tenant(tenant_id)
+    # Do NOT call ensure_demo_rental_fleet/sample here — purge_demo_rental_fleet would
+    # wipe DEMO-* vehicles and the office sample booking mid check-in.
+    booking = find_demo_office_booking(tid)
+    if not booking:
+        booking = create_demo_sign_sample(tid)
+    status = str(booking.get("rental_status") or "").upper()
+    if booking.get("online_checkin_ready") and status in ("ACTIVE", "CONFIRMED"):
+        return deepcopy(booking)
+    if status not in ("CONFIRMED", "RESERVED", "ACTIVE"):
+        raise ValueError("Η demo κράτηση δεν δέχεται check-in")
+    # Already ACTIVE from desk — only stamp the online flag (no second pickup protocol).
+    if status == "ACTIVE":
+        with _LOCK:
+            data = _read()
+            row = next(
+                (
+                    b
+                    for b in data.get("bookings") or []
+                    if b.get("tenant_id") == tid and b.get("id") == booking["id"]
+                ),
+                None,
+            )
+            if not row:
+                raise ValueError("Η demo κράτηση δεν βρέθηκε")
+            now = _now()
+            row["online_checkin_ready"] = True
+            row["online_checkin_at"] = now
+            row["updated_at"] = now
+            _write(data)
+            return deepcopy(row)
+    payload = body if isinstance(body, dict) else {}
+    insp_body = {
+        "rental_booking_id": booking["id"],
+        "inspection_type": "PICKUP_CHECK",
+        "fuel_level": payload.get("fuel_level", 100),
+        "mileage": payload.get("mileage", 0),
+        "damage_notes": payload.get("damage_notes"),
+        "photo_urls": list(payload.get("photo_urls") or []),
+        "signature_url": payload.get("signature_url"),
+        "inspector_name": payload.get("inspector_name") or "Online Check-in (Wallet)",
+        "checklist": payload.get("checklist")
+        or {
+            "tires_ok": True,
+            "lights_ok": True,
+            "fluids_ok": True,
+            "documents_ok": True,
+            "spare_wheel_ok": True,
+            "damages_noted": bool(str(payload.get("damage_notes") or "").strip()),
+        },
+        "require_pickup_checklist": True,
+    }
+    create_inspection(tid, insp_body)
+    updated = get_booking(tid, booking["id"])
+    if not updated:
+        raise ValueError("Η demo κράτηση δεν βρέθηκε μετά το check-in")
+    return deepcopy(updated)
+
+
 def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     vehicle_id = str(body.get("vehicle_id") or "").strip()

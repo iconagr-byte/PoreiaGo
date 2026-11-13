@@ -476,6 +476,30 @@ async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
     return {"ok": True, "booking": _guest_booking_view(row)}
 
 
+@router.post("/public/demo-check-in")
+async def demo_office_checkin(body: CustomerInspectionBody, request: Request):
+    """
+    Soft native Wallet check-in → office demo booking (Δοκιμαστικός Πελάτης).
+    Host resolves tenant; creates PICKUP_CHECK so desk Κρατήσεις updates.
+    """
+    try:
+        row = store.demo_office_online_checkin(
+            await _tenant_id(request),
+            {
+                "fuel_level": body.fuel_level,
+                "mileage": body.mileage,
+                "damage_notes": body.damage_notes,
+                "photo_urls": body.photo_urls,
+                "signature_url": body.signature_url,
+                "checklist": body.checklist.model_dump() if body.checklist else None,
+                "inspector_name": "Online Check-in (Wallet)",
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "booking": _guest_booking_view(row)}
+
+
 @router.post("/bookings/{booking_id}/check-in")
 async def customer_rental_checkin(
     booking_id: str,

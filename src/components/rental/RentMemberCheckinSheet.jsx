@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   customerRentalCheckIn,
   customerRentalInspection,
+  demoOfficeRentalCheckIn,
 } from '../../services/customerRentalApi.js';
 import {
   DEMO_RENT_BOOKING_ID,
@@ -170,17 +171,32 @@ export default function RentMemberCheckinSheet({
 
       if (softDemo) {
         if (booking.id === DEMO_RENT_BOOKING_ID) writeDemoRentCheckinReady(true);
+        let officeRow = null;
+        try {
+          // Push the same protocol to the office demo booking so Κρατήσεις updates.
+          officeRow = await demoOfficeRentalCheckIn(payload);
+        } catch {
+          /* offline / CORS — local wallet still completes */
+        }
         const soft = {
           ...booking,
+          ...(officeRow || {}),
+          id: booking.id,
+          reference_code: booking.reference_code || officeRow?.reference_code,
           online_checkin_ready: true,
-          online_checkin_at: new Date().toISOString(),
+          online_checkin_at:
+            officeRow?.online_checkin_at || new Date().toISOString(),
           rental_status: 'ACTIVE',
           checkin_fuel_level: payload.fuel_level,
           checkin_mileage: payload.mileage,
         };
         setDone(true);
         onCheckedIn?.(soft);
-        toast.success('Check-in ολοκληρώθηκε');
+        toast.success(
+          officeRow
+            ? 'Check-in ολοκληρώθηκε — το γραφείο ενημερώθηκε'
+            : 'Check-in ολοκληρώθηκε',
+        );
         return;
       }
 
