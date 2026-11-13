@@ -166,6 +166,17 @@ export async function customerRentalCheckIn(bookingId) {
   });
 }
 
+/**
+ * Customer pickup / return inspection (fuel, km, notes, photos, signature).
+ * PICKUP_CHECK also marks online_checkin_ready on the booking.
+ */
+export async function customerRentalInspection(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/inspections`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 /** Guest online check-in lookup — surname + RN-/RB- code. */
 export async function guestRentalLookup({ surname, referenceCode }) {
   const data = await publicRentalFetch('/public/check-in/lookup', {

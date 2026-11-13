@@ -3123,6 +3123,8 @@ def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, 
             vehicle["updated_at"] = now
         if itype == "PICKUP_CHECK" and booking.get("rental_status") in ("CONFIRMED", "RESERVED"):
             booking["rental_status"] = "ACTIVE"
+            booking["online_checkin_ready"] = True
+            booking["online_checkin_at"] = now
             booking["updated_at"] = now
             if vehicle:
                 vehicle["current_status"] = "RENTED"

@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
-import { customerRentalCheckIn } from '../../services/customerRentalApi.js';
+import {
+  customerRentalCheckIn,
+  customerRentalInspection,
+} from '../../services/customerRentalApi.js';
 import {
   DEMO_RENT_BOOKING_ID,
   writeDemoRentCheckinReady,
 } from '../../lib/rental/demoRentBooking.js';
 import { isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
+import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -29,9 +33,18 @@ function canCheckIn(booking) {
   return status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE';
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Αποτυχία ανάγνωσης αρχείου'));
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
- * Online check-in bottom sheet — from Ενοικιάσεις / rental pass.
- * Apple Wallet sheet language (blue, SF display); not a Hertz clone.
+ * Full online check-in sheet — same fields as desktop desk check-in
+ * (fuel, km, damage notes, photos, signature), Apple Wallet aesthetic.
  */
 export default function RentMemberCheckinSheet({
   booking,
@@ -39,17 +52,34 @@ export default function RentMemberCheckinSheet({
   onClose,
   onCheckedIn,
 }) {
+  const titleId = useId();
+  const sigRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(Boolean(booking?.online_checkin_ready));
+  const [fuelLevel, setFuelLevel] = useState(100);
+  const [mileage, setMileage] = useState(0);
+  const [damageNotes, setDamageNotes] = useState('');
+  const [photoUrls, setPhotoUrls] = useState([]);
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [signaturePadKey, setSignaturePadKey] = useState(0);
+  const [checkedVehicle, setCheckedVehicle] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     setDone(Boolean(booking?.online_checkin_ready));
+    setFuelLevel(100);
+    setMileage(0);
+    setDamageNotes('');
+    setPhotoUrls([]);
+    setSignatureUrl('');
+    setSignaturePadKey((k) => k + 1);
+    setCheckedVehicle(false);
   }, [booking?.id, booking?.online_checkin_ready]);
 
   useEffect(() => {
     if (!booking) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape' && !busy) onClose?.();
     };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -58,39 +88,115 @@ export default function RentMemberCheckinSheet({
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [booking, onClose]);
+  }, [booking, onClose, busy]);
 
   if (!booking || typeof document === 'undefined') return null;
 
   const ref =
     booking.reference_code ||
     (booking.id ? `RB-${String(booking.id).replace(/-/g, '').slice(0, 8).toUpperCase()}` : '—');
-  const pickup = booking.pickup_location || brandLabel || 'Γραφείο';
-  const dropoff = booking.dropoff_location || pickup;
   const vehicleLine = [booking.vehicle_model, booking.vehicle_plate].filter(Boolean).join(' · ');
+  const softDemo = isSoftNativeRentDemoToken() || booking.id === DEMO_RENT_BOOKING_ID;
 
-  const submit = async () => {
+  const onDamagePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (photoUrls.length >= 4) {
+      toast.error('Μέχρι 4 φωτογραφίες');
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const url = await fileToDataUrl(file);
+      if (!url.startsWith('data:image/')) throw new Error('Μη έγκυρη εικόνα');
+      setPhotoUrls((prev) => [...prev, url]);
+      toast.success('Η φωτογραφία προστέθηκε');
+    } catch (err) {
+      toast.error(err?.message || 'Αποτυχία φωτογραφίας');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const saveSignature = async () => {
+    const file = await sigRef.current?.getFile?.();
+    if (!file) {
+      toast.error('Υπογράψτε πρώτα στο πλαίσιο');
+      return;
+    }
+    try {
+      const url = await fileToDataUrl(file);
+      setSignatureUrl(url);
+      toast.success('Η υπογραφή αποθηκεύτηκε');
+    } catch (err) {
+      toast.error(err?.message || 'Αποτυχία υπογραφής');
+    }
+  };
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
     if (done || busy) return;
-    if (!canCheckIn(booking) && !done) {
+    if (!canCheckIn(booking)) {
       toast.error('Το check-in δεν είναι διαθέσιμο για αυτή την κράτηση.');
+      return;
+    }
+    if (!checkedVehicle) {
+      toast.error('Επιβεβαίωσε τον έλεγχο οχήματος');
+      return;
+    }
+    if (!signatureUrl) {
+      toast.error('Αποθήκευσε την υπογραφή σου');
       return;
     }
     setBusy(true);
     try {
-      if (isSoftNativeRentDemoToken() || booking.id === DEMO_RENT_BOOKING_ID) {
+      const payload = {
+        inspection_type: 'PICKUP_CHECK',
+        fuel_level: Number(fuelLevel),
+        mileage: Number(mileage) || 0,
+        damage_notes: String(damageNotes || '').trim() || null,
+        photo_urls: photoUrls,
+        signature_url: signatureUrl,
+        checklist: {
+          tires_ok: true,
+          lights_ok: true,
+          fluids_ok: true,
+          documents_ok: true,
+          spare_wheel_ok: true,
+          damages_noted: Boolean(String(damageNotes || '').trim()),
+        },
+      };
+
+      if (softDemo) {
         if (booking.id === DEMO_RENT_BOOKING_ID) writeDemoRentCheckinReady(true);
         const soft = {
           ...booking,
           online_checkin_ready: true,
           online_checkin_at: new Date().toISOString(),
+          rental_status: 'ACTIVE',
+          checkin_fuel_level: payload.fuel_level,
+          checkin_mileage: payload.mileage,
         };
         setDone(true);
         onCheckedIn?.(soft);
-        toast.success('Check-in ολοκληρώθηκε (demo)');
+        toast.success('Check-in ολοκληρώθηκε');
         return;
       }
-      const data = await customerRentalCheckIn(booking.id);
-      const row = data?.booking || { ...booking, online_checkin_ready: true };
+
+      await customerRentalInspection(booking.id, payload);
+      let row = {
+        ...booking,
+        online_checkin_ready: true,
+        online_checkin_at: new Date().toISOString(),
+        rental_status: 'ACTIVE',
+      };
+      try {
+        const data = await customerRentalCheckIn(booking.id);
+        row = data?.booking || row;
+      } catch {
+        /* inspection already marked ready server-side */
+      }
       setDone(true);
       onCheckedIn?.(row);
       toast.success('Check-in ολοκληρώθηκε');
@@ -106,89 +212,225 @@ export default function RentMemberCheckinSheet({
       className="rent-member-checkin-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="Online check-in"
+      aria-labelledby={titleId}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
+        if (e.target === e.currentTarget && !busy) onClose?.();
       }}
     >
-      <div className="rent-member-checkin-sheet">
-        <div className="rent-member-checkin-wash" aria-hidden />
+      <div className="rent-member-checkin-sheet rent-member-checkin-sheet--form">
         <div className="rent-member-checkin-handle" aria-hidden />
-        <header className="rent-member-checkin-bar">
-          <p className="rent-member-checkin-kicker">Online Check-in</p>
-          <button
-            type="button"
-            className="rent-member-checkin-close"
-            aria-label="Κλείσιμο"
-            onClick={onClose}
-          >
-            <span className="material-symbols-outlined" aria-hidden>
-              close
+        <header className="rent-checkin-form-head">
+          <div className="rent-checkin-form-head-row">
+            <span className="rent-checkin-form-icon" aria-hidden>
+              <span className="material-symbols-outlined">login</span>
             </span>
-          </button>
-        </header>
-
-        <div className="rent-member-checkin-body">
-          <p className="rent-member-checkin-brand">{brandLabel}</p>
-          <h2>
-            {done ? 'Είσαι έτοιμος για παραλαβή.' : 'Check-in πριν φτάσεις.'}
-          </h2>
-          <p className="rent-member-checkin-lead">
-            {done
-              ? `Το ${brandLabel} βλέπει ήδη το online check-in σου. Φέρε άδεια οδήγησης και ταυτότητα ή διαβατήριο.`
-              : 'Ολοκλήρωσε τα στοιχεία τώρα — στην παραλαβή περνάς πιο γρήγορα, χωρίς ουρά στο γκισέ.'}
-          </p>
-
-          <div className="rent-member-checkin-card">
-            <div className="rent-member-checkin-card-top">
-              <span>Κράτηση</span>
-              <strong>{ref}</strong>
+            <div className="rent-checkin-form-head-copy">
+              <p className="rent-checkin-form-eyebrow">
+                Παραλαβή · {brandLabel}
+              </p>
+              <h2 id={titleId}>
+                {done ? 'Check-in έτοιμο' : 'Online Check-in'}
+              </h2>
+              <p className="rent-checkin-form-vehicle">{vehicleLine || 'Όχημα'}</p>
+              <p className="rent-checkin-form-when">
+                {formatWhen(booking.start_time)} → {formatWhen(booking.end_time)}
+              </p>
             </div>
-            {vehicleLine ? (
-              <p className="rent-member-checkin-vehicle">{vehicleLine}</p>
-            ) : null}
-            <ul className="rent-member-checkin-legs">
-              <li>
-                <span className="material-symbols-outlined" aria-hidden>
-                  trip_origin
-                </span>
-                <div>
-                  <em>Παραλαβή</em>
-                  <strong>{pickup}</strong>
-                  <span>{formatWhen(booking.start_time)}</span>
-                </div>
-              </li>
-              <li>
-                <span className="material-symbols-outlined" aria-hidden>
-                  flag
-                </span>
-                <div>
-                  <em>Επιστροφή</em>
-                  <strong>{dropoff}</strong>
-                  <span>{formatWhen(booking.end_time)}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <footer className="rent-member-checkin-foot">
-          {done ? (
-            <button type="button" className="rent-member-checkin-cta" onClick={onClose}>
-              Εντάξει
-            </button>
-          ) : (
             <button
               type="button"
-              className="rent-member-checkin-cta"
-              disabled={busy || !canCheckIn(booking)}
-              onClick={submit}
+              className="rent-member-checkin-close"
+              aria-label="Κλείσιμο"
+              disabled={busy}
+              onClick={onClose}
             >
-              {busy ? 'Ολοκλήρωση…' : 'Ξεκίνα check-in'}
+              <span className="material-symbols-outlined" aria-hidden>
+                close
+              </span>
             </button>
-          )}
-          <p>{done ? 'Καλή διαδρομή' : 'Χωρίς επιπλέον χρέωση · 2–3 λεπτά'}</p>
-        </footer>
+          </div>
+        </header>
+
+        {done ? (
+          <>
+            <div className="rent-member-checkin-body">
+              <p className="rent-member-checkin-brand">{brandLabel}</p>
+              <h3 className="rent-checkin-done-title">Είσαι έτοιμος για παραλαβή.</h3>
+              <p className="rent-member-checkin-lead">
+                Το {brandLabel} βλέπει ήδη το online check-in σου. Φέρε άδεια οδήγησης και ταυτότητα
+                ή διαβατήριο.
+              </p>
+              <div className="rent-member-checkin-card">
+                <div className="rent-member-checkin-card-top">
+                  <span>Κράτηση</span>
+                  <strong>{ref}</strong>
+                </div>
+                {vehicleLine ? (
+                  <p className="rent-member-checkin-vehicle">{vehicleLine}</p>
+                ) : null}
+              </div>
+            </div>
+            <footer className="rent-member-checkin-foot">
+              <button type="button" className="rent-member-checkin-cta" onClick={onClose}>
+                Εντάξει
+              </button>
+            </footer>
+          </>
+        ) : (
+          <form className="rent-checkin-form" onSubmit={submit}>
+            <div className="rent-checkin-form-scroll">
+              <div className="rent-checkin-hook">
+                <p className="rent-checkin-hook-kicker">Πριν φτάσεις στο γραφείο</p>
+                <h3>Κατέγραψε την κατάσταση του οχήματος.</h3>
+                <p>
+                  Ίδια διαδικασία με το desk check-in — καύσιμο, χιλιόμετρα, φωτό και υπογραφή σε
+                  λιγότερο από 2 λεπτά.
+                </p>
+              </div>
+
+              <div className="rent-checkin-ref-chip">
+                <span>Κράτηση</span>
+                <strong>{ref}</strong>
+              </div>
+
+              <div className="rent-checkin-grid-2">
+                <label className="rent-checkin-field">
+                  <span>Καύσιμο %</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    required
+                    inputMode="numeric"
+                    value={fuelLevel}
+                    onChange={(e) => setFuelLevel(e.target.value)}
+                  />
+                </label>
+                <label className="rent-checkin-field">
+                  <span>Χιλιόμετρα</span>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    inputMode="numeric"
+                    value={mileage}
+                    onChange={(e) => setMileage(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="rent-checkin-field rent-checkin-field--block">
+                <span>Σημειώσεις ζημιών</span>
+                <textarea
+                  rows={3}
+                  value={damageNotes}
+                  onChange={(e) => setDamageNotes(e.target.value)}
+                  placeholder="Χωρίς ζημιές / περιγραφή…"
+                />
+              </label>
+
+              <div className="rent-checkin-field rent-checkin-field--block">
+                <div className="rent-checkin-field-row">
+                  <span>Φωτογραφίες</span>
+                  <label className="rent-checkin-add-photo">
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {uploadingPhoto ? 'progress_activity' : 'add_a_photo'}
+                    </span>
+                    {uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="sr-only"
+                      disabled={uploadingPhoto || busy}
+                      onChange={onDamagePhoto}
+                    />
+                  </label>
+                </div>
+                {photoUrls.length ? (
+                  <div className="rent-checkin-photos">
+                    {photoUrls.map((url) => (
+                      <button
+                        key={url.slice(0, 48)}
+                        type="button"
+                        className="rent-checkin-photo"
+                        onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
+                        aria-label="Αφαίρεση φωτογραφίας"
+                      >
+                        <img src={url} alt="" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rent-checkin-hint">
+                    Προαιρετικά — selfie ζημιάς / κατάσταση οχήματος
+                  </p>
+                )}
+              </div>
+
+              <div className="rent-checkin-field rent-checkin-field--block">
+                <RentalSignaturePad
+                  key={signaturePadKey}
+                  ref={sigRef}
+                  embedded
+                  previewUrl={signatureUrl || null}
+                  heightClass="h-32"
+                  disabled={busy}
+                  onClear={() => {
+                    setSignatureUrl('');
+                    setSignaturePadKey((k) => k + 1);
+                  }}
+                />
+                {!signatureUrl ? (
+                  <button
+                    type="button"
+                    className="rent-checkin-sign-save"
+                    disabled={busy}
+                    onClick={saveSignature}
+                  >
+                    Αποθήκευση υπογραφής
+                  </button>
+                ) : (
+                  <p className="rent-checkin-hint is-ok">Η υπογραφή αποθηκεύτηκε</p>
+                )}
+              </div>
+
+              <label className="rent-checkin-confirm">
+                <input
+                  type="checkbox"
+                  checked={checkedVehicle}
+                  onChange={(e) => setCheckedVehicle(e.target.checked)}
+                />
+                <span>
+                  Επιβεβαιώνω έλεγχο ελαστικών, φώτων, υγρών, εγγράφων και ρεζέρβας.
+                </span>
+              </label>
+            </div>
+
+            <footer className="rent-member-checkin-foot rent-checkin-form-foot">
+              <div className="rent-checkin-foot-row">
+                <button
+                  type="button"
+                  className="rent-checkin-cancel"
+                  disabled={busy}
+                  onClick={onClose}
+                >
+                  Άκυρο
+                </button>
+                <button
+                  type="submit"
+                  className="rent-member-checkin-cta rent-checkin-submit"
+                  disabled={busy || uploadingPhoto || !checkedVehicle || !signatureUrl}
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    login
+                  </span>
+                  {busy ? 'Ολοκλήρωση…' : 'Ολοκλήρωση Check-in'}
+                </button>
+              </div>
+              <p>Χωρίς επιπλέον χρέωση · ίδια διαδικασία με το γραφείο</p>
+            </footer>
+          </form>
+        )}
       </div>
     </div>,
     document.body,

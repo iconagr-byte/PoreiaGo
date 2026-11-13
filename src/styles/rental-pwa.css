@@ -7030,10 +7030,14 @@
   display: flex;
   flex-direction: column;
   border-radius: 28px 28px 0 0;
-  background: rgba(255, 255, 255, 0.96);
+  background: #f5f5f7;
   box-shadow: 0 -18px 52px rgba(15, 23, 42, 0.22);
   overflow: hidden;
   animation: rent-sheet-pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-member-checkin-sheet--form {
+  max-height: min(94dvh, 900px);
 }
 
 .rent-member-checkin-wash {
@@ -7272,6 +7276,346 @@
   color: #86868b;
 }
 
+.rent-checkin-form-head {
+  flex-shrink: 0;
+  padding: 0.35rem 1rem 0.85rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.rent-checkin-form-head-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.rent-checkin-form-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.rent-checkin-form-icon .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+.rent-checkin-form-eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #86868b;
+}
+
+.rent-checkin-form-head h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.rent-checkin-form-vehicle {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #6e6e73;
+}
+
+.rent-checkin-form-when {
+  margin: 0.1rem 0 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #86868b;
+}
+
+.rent-checkin-done-title {
+  margin: 0;
+  font-size: clamp(1.45rem, 5vw, 1.8rem);
+  font-weight: 780;
+  letter-spacing: -0.04em;
+  color: #1d1d1f;
+  line-height: 1.12;
+}
+
+.rent-checkin-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.rent-checkin-form-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.85rem 1rem 1rem;
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+}
+
+.rent-checkin-hook {
+  padding: 0.15rem 0.1rem 0.25rem;
+}
+
+.rent-checkin-hook-kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0071e3;
+}
+
+.rent-checkin-hook h3 {
+  margin: 0;
+  font-size: clamp(1.28rem, 4.8vw, 1.55rem);
+  font-weight: 780;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: #1d1d1f;
+}
+
+.rent-checkin-hook p {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #6e6e73;
+  max-width: 36ch;
+}
+
+.rent-checkin-ref-chip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-checkin-ref-chip span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #86868b;
+}
+
+.rent-checkin-ref-chip strong {
+  font-size: 0.95rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-checkin-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.rent-checkin-field {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-checkin-field > span,
+.rent-checkin-field-row > span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: #86868b;
+}
+
+.rent-checkin-field input[type='number'],
+.rent-checkin-field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  outline: none;
+  resize: none;
+}
+
+.rent-checkin-field textarea {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.rent-checkin-field textarea::placeholder {
+  color: #c7c7cc;
+  font-weight: 500;
+}
+
+.rent-checkin-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-checkin-add-photo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: #f5f5f7;
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.rent-checkin-add-photo .material-symbols-outlined {
+  font-size: 0.95rem;
+}
+
+.rent-checkin-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.76rem;
+  font-weight: 550;
+  color: #aeaeb2;
+}
+
+.rent-checkin-hint.is-ok {
+  color: #248a3d;
+  font-weight: 650;
+}
+
+.rent-checkin-photos {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.rent-checkin-photo {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f5f5f7;
+  cursor: pointer;
+}
+
+.rent-checkin-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rent-checkin-sign-save {
+  appearance: none;
+  margin-top: 0.55rem;
+  width: 100%;
+  min-height: 2.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.rent-checkin-confirm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 113, 227, 0.14);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.rent-checkin-confirm input {
+  margin-top: 0.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #0071e3;
+}
+
+.rent-checkin-form-foot {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.rent-checkin-foot-row {
+  display: grid;
+  grid-template-columns: 0.85fr 1.55fr;
+  gap: 0.5rem;
+}
+
+.rent-checkin-cancel {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 3.15rem;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rent-checkin-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: linear-gradient(180deg, #129687 0%, #0a7a6c 100%) !important;
+  box-shadow: 0 12px 26px rgba(10, 122, 108, 0.28) !important;
+}
+
+.rent-checkin-submit .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (min-width: 720px) {
   .rent-member-checkin-backdrop {
     place-items: center;
@@ -7279,8 +7623,12 @@
   }
 
   .rent-member-checkin-sheet {
-    border-radius: 24px;
+    border-radius: 28px;
     max-height: min(860px, 92dvh);
+  }
+
+  .rent-member-checkin-sheet--form {
+    max-height: min(900px, 94dvh);
   }
 }
 
