@@ -5,9 +5,12 @@ import {
   customerRentalCheckIn,
   customerRentalInspection,
   demoOfficeRentalCheckIn,
+  guestRentalCheckIn,
 } from '../../services/customerRentalApi.js';
 import {
   DEMO_RENT_BOOKING_ID,
+  DEMO_RENT_OFFICE_REF,
+  DEMO_RENT_OFFICE_SURNAME,
   writeDemoRentCheckinReady,
 } from '../../lib/rental/demoRentBooking.js';
 import { isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
@@ -172,17 +175,34 @@ export default function RentMemberCheckinSheet({
       if (softDemo) {
         if (booking.id === DEMO_RENT_BOOKING_ID) writeDemoRentCheckinReady(true);
         let officeRow = null;
+        let officeSynced = false;
         try {
-          // Push the same protocol to the office demo booking so Κρατήσεις updates.
+          // Full protocol when API has /public/demo-check-in (ACTIVE + inspection).
           officeRow = await demoOfficeRentalCheckIn(payload);
+          officeSynced = Boolean(officeRow?.online_checkin_ready || officeRow?.id);
         } catch {
-          /* offline / CORS — local wallet still completes */
+          /* older API — fall through to guest check-in */
+        }
+        if (!officeSynced) {
+          try {
+            // Production-safe: same RN-DEMO01 + επώνυμο as office Δοκιμαστικός Πελάτης.
+            officeRow = await guestRentalCheckIn({
+              surname: DEMO_RENT_OFFICE_SURNAME,
+              referenceCode: DEMO_RENT_OFFICE_REF,
+            });
+            officeSynced = Boolean(officeRow?.online_checkin_ready || officeRow?.id);
+          } catch {
+            /* offline / CORS — local wallet still completes */
+          }
         }
         const soft = {
           ...booking,
           ...(officeRow || {}),
           id: booking.id,
-          reference_code: booking.reference_code || officeRow?.reference_code,
+          reference_code:
+            booking.reference_code ||
+            officeRow?.reference_code ||
+            DEMO_RENT_OFFICE_REF,
           online_checkin_ready: true,
           online_checkin_at:
             officeRow?.online_checkin_at || new Date().toISOString(),
@@ -193,9 +213,9 @@ export default function RentMemberCheckinSheet({
         setDone(true);
         onCheckedIn?.(soft);
         toast.success(
-          officeRow
-            ? 'Check-in ολοκληρώθηκε — το γραφείο ενημερώθηκε'
-            : 'Check-in ολοκληρώθηκε',
+          officeSynced
+            ? 'Check-in επιβεβαιώθηκε — το γραφείο ενημερώθηκε'
+            : 'Check-in επιβεβαιώθηκε',
         );
         return;
       }

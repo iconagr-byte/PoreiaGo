@@ -171,6 +171,8 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
 # Demo fleet marker — used only to purge previously seeded showcase vehicles.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
 _DEMO_BOOKING_MARKER = "demo_rent_booking_v1"
+# Shared with soft native Wallet (RN-DEMO01) so guest check-in reaches the office sample.
+_DEMO_BOOKING_REFERENCE = "RN-DEMO01"
 _WM = "https://upload.wikimedia.org/wikipedia/commons/"
 _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
@@ -706,7 +708,8 @@ def create_demo_sign_sample(tenant_id: str | None = None) -> dict[str, Any]:
             continue
         if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
             continue
-        return booking
+        stamped = _stamp_demo_booking_reference(tid, booking["id"])
+        return stamped or booking
 
     start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
     end = start + timedelta(days=2)
@@ -723,9 +726,11 @@ def create_demo_sign_sample(tenant_id: str | None = None) -> dict[str, Any]:
             "dropoff_location": "Γραφείο ενοικιάσεων",
             "channel": "DESK",
             "notes": _DEMO_BOOKING_MARKER,
+            "reference_code": _DEMO_BOOKING_REFERENCE,
         },
     )
-    return update_booking_status(tid, booking["id"], "CONFIRMED")
+    confirmed = update_booking_status(tid, booking["id"], "CONFIRMED")
+    return _stamp_demo_booking_reference(tid, confirmed["id"]) or confirmed
 
 
 def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str, Any] | None:
@@ -1501,7 +1506,12 @@ def guest_online_checkin(
             if row.get("tenant_id") != tid:
                 continue
             ref = _ensure_reference_code(row)
-            if ref != code:
+            notes = str(row.get("notes") or "")
+            # Soft Wallet uses RN-DEMO01 — also match the office demo sample by marker.
+            ref_ok = ref == code or (
+                code == _DEMO_BOOKING_REFERENCE and _DEMO_BOOKING_MARKER in notes
+            )
+            if not ref_ok:
                 continue
             if not _surname_matches(row.get("client_name"), surname):
                 continue
@@ -1518,6 +1528,24 @@ def guest_online_checkin(
         booking["online_checkin_at"] = now
         booking["online_checkin_ready"] = True
         booking["updated_at"] = now
+        notes = str(booking.get("notes") or "")
+        if _DEMO_BOOKING_MARKER in notes:
+            booking["reference_code"] = _DEMO_BOOKING_REFERENCE
+            # Activate so desk Κρατήσεις shows Check-out even on older office UI.
+            if status in ("CONFIRMED", "RESERVED"):
+                booking["rental_status"] = "ACTIVE"
+                vehicle = next(
+                    (
+                        v
+                        for v in data.get("vehicles") or []
+                        if v.get("tenant_id") == tid
+                        and v.get("id") == booking.get("vehicle_id")
+                    ),
+                    None,
+                )
+                if vehicle:
+                    vehicle["current_status"] = "RENTED"
+                    vehicle["updated_at"] = now
         _write(data)
         return deepcopy(booking)
 
@@ -1562,6 +1590,24 @@ def customer_online_checkin(
         return deepcopy(booking)
 
 
+def _stamp_demo_booking_reference(tenant_id: str | None, booking_id: str) -> dict[str, Any] | None:
+    """Force shared RN-DEMO01 on the office demo sample booking."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    if not bid:
+        return None
+    with _LOCK:
+        data = _read()
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid or str(row.get("id") or "") != bid:
+                continue
+            row["reference_code"] = _DEMO_BOOKING_REFERENCE
+            row["updated_at"] = _now()
+            _write(data)
+            return deepcopy(row)
+    return None
+
+
 def find_demo_office_booking(tenant_id: str | None) -> dict[str, Any] | None:
     """Active demo sample booking (Δοκιμαστικός Πελάτης) for office ↔ wallet sync.
 
@@ -1570,18 +1616,27 @@ def find_demo_office_booking(tenant_id: str | None) -> dict[str, Any] | None:
     tid = _normalize_tenant(tenant_id)
     preferred: dict[str, Any] | None = None
     with _LOCK:
-        rows = [b for b in _read().get("bookings") or [] if b.get("tenant_id") == tid]
+        data = _read()
+        rows = [b for b in data.get("bookings") or [] if b.get("tenant_id") == tid]
+        dirty = False
         for booking in rows:
             notes = str(booking.get("notes") or "")
             if _DEMO_BOOKING_MARKER not in notes:
                 continue
+            if _normalize_ref_code(booking.get("reference_code")) != _DEMO_BOOKING_REFERENCE:
+                booking["reference_code"] = _DEMO_BOOKING_REFERENCE
+                dirty = True
             status = str(booking.get("rental_status") or "").upper()
             if status in ("CANCELLED", "COMPLETED"):
                 continue
             if status in ("CONFIRMED", "RESERVED") and not booking.get("online_checkin_ready"):
+                if dirty:
+                    _write(data)
                 return deepcopy(booking)
             if preferred is None:
                 preferred = booking
+        if dirty:
+            _write(data)
     return deepcopy(preferred) if preferred else None
 
 
@@ -1738,7 +1793,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
 
         now = _now()
         booking_id = str(uuid4())
-        ref_code = f"RB-{booking_id.replace('-', '')[:8].upper()}"
+        body_ref = _normalize_ref_code(body.get("reference_code"))
+        ref_code = body_ref or f"RN-{booking_id.replace('-', '')[:8].upper()}"
 
         payment_method = str(body.get("payment_method") or "").strip() or None
         payment_plan = str(body.get("payment_plan") or "").strip() or None
@@ -1818,7 +1874,6 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "client_phone": (str(body.get("client_phone") or "").strip() or None),
             "client_afm": client_afm,
             "channel": channel,
-            "reference_code": f"RN-{uuid4().hex[:8].upper()}",
             "start_time": start.isoformat(),
             "end_time": end.isoformat(),
             "pickup_location": pickup,

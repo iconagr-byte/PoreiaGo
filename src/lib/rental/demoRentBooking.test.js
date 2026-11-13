@@ -46,26 +46,22 @@ describe('demoRentBooking', () => {
     expect(withDemoRentBookings(real)).toEqual(real);
   });
 
-  it('clears sticky localStorage ready flag left by older builds', () => {
-    const mem = new Map();
+  it('keeps confirmed check-in from localStorage across reloads', () => {
+    const mem = new Map([['poreiago_demo_rent_checkin_v1', '1']]);
     const stub = {
       getItem: (k) => (mem.has(k) ? mem.get(k) : null),
       setItem: (k, v) => mem.set(k, String(v)),
       removeItem: (k) => mem.delete(k),
     };
     vi.stubGlobal('localStorage', stub);
-    vi.stubGlobal('sessionStorage', stub);
-    stub.setItem('poreiago_demo_rent_checkin_v1', '1');
-    // Simulate: sticky local only (session empty) — withDemo clears it.
-    const sessionOnly = {
+    vi.stubGlobal('sessionStorage', {
       getItem: () => null,
       setItem: () => {},
       removeItem: () => {},
-    };
-    vi.stubGlobal('sessionStorage', sessionOnly);
+    });
     const rows = withDemoRentBookings([]);
-    expect(stub.getItem('poreiago_demo_rent_checkin_v1')).toBeNull();
-    expect(rows[0].online_checkin_ready).toBe(false);
+    expect(rows[0].online_checkin_ready).toBe(true);
+    expect(rows[0].rental_status).toBe('ACTIVE');
     vi.unstubAllGlobals();
   });
 });

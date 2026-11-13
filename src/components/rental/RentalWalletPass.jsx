@@ -95,7 +95,14 @@ export default function RentalWalletPass({
             <p className="wallet-pass-kicker">Πελάτης</p>
             <p className="wallet-pass-passenger truncate">{passengerName || '—'}</p>
           </div>
-          <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
+          <div className="rent-wallet-status-stack">
+            <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
+            {booking.online_checkin_ready ? (
+              <span className="wallet-pass-status is-ok rent-wallet-checkin-chip">
+                Επιβεβαιωμένο check-in
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="wallet-pass-meta">
@@ -151,21 +158,25 @@ export default function RentalWalletPass({
 
         <div className="wallet-pass-actions">
           {booking.online_checkin_ready ? (
-            <p className="rent-wallet-checkin-ready">
+            <p className="rent-wallet-checkin-ready" role="status">
               <span className="material-symbols-outlined" aria-hidden>
                 task_alt
               </span>
-              Check-in έτοιμο για παραλαβή
+              Επιβεβαιωμένο check-in — το γραφείο το βλέπει
             </p>
           ) : null}
           {(status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
           onCheckIn ? (
             <button
               type="button"
-              className="wallet-btn wallet-btn-primary wallet-btn-block"
+              className={`wallet-btn wallet-btn-block ${
+                booking.online_checkin_ready
+                  ? 'wallet-btn-ghost rent-wallet-checkin-done-btn'
+                  : 'wallet-btn-primary'
+              }`}
               onClick={() => onCheckIn(booking)}
             >
-              {booking.online_checkin_ready ? 'Δες check-in' : 'Check-in τώρα'}
+              {booking.online_checkin_ready ? 'Επιβεβαιωμένο check-in' : 'Check-in τώρα'}
             </button>
           ) : null}
           {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (

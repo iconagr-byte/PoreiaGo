@@ -7,7 +7,6 @@ import { Link } from 'react-router-dom';
 import { fetchMyRentalBookings } from '../../services/customerRentalApi.js';
 import {
   DEMO_RENT_BOOKING_ID,
-  resetDemoRentCheckinReady,
   withDemoRentBookings,
 } from '../../lib/rental/demoRentBooking.js';
 import RentMemberCheckinSheet, { canCheckIn } from '../rental/RentMemberCheckinSheet.jsx';
@@ -71,7 +70,7 @@ export default function WalletRentSection({
 
   useEffect(() => {
     let cancelled = false;
-    resetDemoRentCheckinReady();
+    // Keep confirmed demo check-in — do not reset on mount.
     fetchMyRentalBookings()
       .then((list) => {
         if (cancelled) return;
@@ -177,7 +176,7 @@ export default function WalletRentSection({
                 <span className="material-symbols-outlined" aria-hidden>
                   task_alt
                 </span>
-                Έτοιμο
+                Επιβεβαιωμένο check-in
               </span>
             ) : checkinPending ? (
               <span className="wallet-rent-pass-badge is-pending">
@@ -229,7 +228,7 @@ export default function WalletRentSection({
             className="wallet-btn wallet-btn-primary wallet-btn-block wallet-rent-checkin-cta"
             onClick={openCheckin}
           >
-            {checkinPending ? 'Check-in τώρα' : 'Δες το check-in'}
+            {checkinPending ? 'Check-in τώρα' : 'Επιβεβαιωμένο check-in'}
           </button>
         ) : null}
 
