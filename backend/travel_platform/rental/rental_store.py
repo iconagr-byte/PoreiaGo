@@ -1522,6 +1522,46 @@ def guest_online_checkin(
         return deepcopy(booking)
 
 
+def customer_online_checkin(
+    tenant_id: str | None,
+    *,
+    booking_id: str,
+    email: str,
+) -> dict[str, Any]:
+    """Authenticated wallet check-in — booking must belong to the customer email."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    needle = str(email or "").strip().lower()
+    if not bid or not needle:
+        raise ValueError("Λείπει κράτηση ή λογαριασμός")
+    with _LOCK:
+        data = _read()
+        booking = None
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid:
+                continue
+            if str(row.get("id") or "") != bid:
+                continue
+            if str(row.get("client_email") or "").strip().lower() != needle:
+                continue
+            booking = row
+            break
+        if not booking:
+            raise ValueError("Δεν βρέθηκε η κράτηση")
+        status = str(booking.get("rental_status") or "").upper()
+        if status == "CANCELLED":
+            raise ValueError("Η κράτηση έχει ακυρωθεί")
+        if status == "COMPLETED":
+            raise ValueError("Η ενοικίαση έχει ολοκληρωθεί")
+        now = _now()
+        booking["online_checkin_at"] = now
+        booking["online_checkin_ready"] = True
+        booking["updated_at"] = now
+        _ensure_reference_code(booking)
+        _write(data)
+        return deepcopy(booking)
+
+
 def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     vehicle_id = str(body.get("vehicle_id") or "").strip()

@@ -158,3 +158,36 @@ export async function cancelCustomerRentalBooking(bookingId) {
     method: 'POST',
   });
 }
+
+/** Authenticated wallet member check-in. */
+export async function customerRentalCheckIn(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/check-in`, {
+    method: 'POST',
+  });
+}
+
+/** Guest online check-in lookup — surname + RN-/RB- code. */
+export async function guestRentalLookup({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/check-in/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
+
+/** Guest online check-in confirm. */
+export async function guestRentalCheckIn({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/check-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
