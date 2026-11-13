@@ -160,7 +160,8 @@ class PickupChecklistBody(BaseModel):
 
 
 class CustomerInspectionBody(BaseModel):
-    inspection_type: str
+    # Soft Wallet /public/demo-check-in always means pickup; default keeps older clients working.
+    inspection_type: str = "PICKUP_CHECK"
     fuel_level: float = Field(default=100, ge=0, le=100)
     mileage: int = Field(default=0, ge=0)
     damage_notes: str | None = None
