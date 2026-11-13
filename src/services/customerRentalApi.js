@@ -190,16 +190,42 @@ export async function guestRentalLookup({ surname, referenceCode }) {
   return data.booking || null;
 }
 
-/** Guest online check-in confirm. */
-export async function guestRentalCheckIn({ surname, referenceCode }) {
+/** Guest online check-in confirm (optional signature stamps the 6 pickup legal docs). */
+export async function guestRentalCheckIn({
+  surname,
+  referenceCode,
+  signatureUrl,
+  signerName,
+}) {
   const data = await publicRentalFetch('/public/check-in', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       surname: String(surname || '').trim(),
       reference_code: String(referenceCode || '').trim(),
+      ...(signatureUrl
+        ? {
+            signature_url: signatureUrl,
+            signer_name: signerName || undefined,
+          }
+        : {}),
     }),
   });
+  return data.booking || null;
+}
+
+/** Authenticated Wallet — stamp the 6 pickup legal docs with one signature. */
+export async function customerStampPickupLegalPack(bookingId, { signatureUrl, signerName }) {
+  const data = await customerRentalFetch(
+    `/bookings/${encodeURIComponent(bookingId)}/legal-pack`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        signature_url: signatureUrl,
+        signer_name: signerName || undefined,
+      }),
+    },
+  );
   return data.booking || null;
 }
 

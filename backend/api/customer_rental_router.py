@@ -168,6 +168,13 @@ class CustomerInspectionBody(BaseModel):
     photo_urls: list[str] = Field(default_factory=list)
     signature_url: str | None = None
     checklist: PickupChecklistBody | None = None
+    # When true (Wallet online check-in), stamp the 6 booking legal docs with the same signature.
+    stamp_legal_pack: bool = False
+
+
+class LegalPackStampBody(BaseModel):
+    signature_url: str = Field(min_length=8, max_length=2_000_000)
+    signer_name: str | None = Field(default=None, max_length=120)
 
 
 class SosBody(BaseModel):
@@ -236,6 +243,11 @@ def _public_booking(row: dict) -> dict:
         "modified_at": row.get("modified_at"),
         "online_checkin_ready": bool(row.get("online_checkin_ready")),
         "online_checkin_at": row.get("online_checkin_at"),
+        "legal_doc_signatures": (
+            row.get("legal_doc_signatures")
+            if isinstance(row.get("legal_doc_signatures"), dict)
+            else {}
+        ),
         "free_cancel_eligible": bool(eligible),
         "hours_until_start": hours,
     }
@@ -445,6 +457,9 @@ async def rental_availability(
 class GuestCheckinBody(BaseModel):
     surname: str = Field(min_length=2, max_length=120)
     reference_code: str = Field(min_length=4, max_length=40)
+    # Optional Wallet signature — stamps the 6 pickup legal docs on the office booking.
+    signature_url: str | None = Field(default=None, max_length=2_000_000)
+    signer_name: str | None = Field(default=None, max_length=120)
 
 
 @router.post("/public/check-in/lookup")
@@ -468,6 +483,8 @@ async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
             await _tenant_id(request),
             surname=body.surname,
             reference_code=body.reference_code,
+            signature_url=body.signature_url,
+            signer_name=body.signer_name,
         )
     except ValueError as exc:
         msg = str(exc)
@@ -494,6 +511,7 @@ async def demo_office_checkin(body: CustomerInspectionBody, request: Request):
                 "signature_url": body.signature_url,
                 "checklist": body.checklist.model_dump() if body.checklist else None,
                 "inspector_name": "Online Check-in (Wallet)",
+                "stamp_legal_pack": body.stamp_legal_pack or bool(body.signature_url),
             },
         )
     except ValueError as exc:
@@ -521,6 +539,36 @@ async def customer_rental_checkin(
             raise HTTPException(status_code=404, detail=msg) from exc
         raise HTTPException(status_code=400, detail=msg) from exc
     return {"ok": True, "booking": _public_booking(row)}
+
+
+@router.post("/bookings/{booking_id}/legal-pack")
+async def customer_stamp_legal_pack(
+    booking_id: str,
+    body: LegalPackStampBody,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    """Stamp the 6 pickup legal docs with one Wallet signature (σύμβαση…όροι)."""
+    tid = await _require_rent_module(request, account)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    try:
+        updated = store.stamp_pickup_legal_pack(
+            tid,
+            booking_id,
+            signature_url=body.signature_url,
+            signer_name=body.signer_name or account.get("name"),
+            via="wallet_online_checkin",
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg.lower() else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return {"ok": True, "booking": _public_booking(updated)}
 
 
 @router.get("/bookings")
@@ -775,6 +823,21 @@ async def customer_create_inspection(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if (
+        itype == "PICKUP_CHECK"
+        and body.stamp_legal_pack
+        and str(body.signature_url or "").strip()
+    ):
+        try:
+            store.stamp_pickup_legal_pack(
+                tid,
+                booking_id,
+                signature_url=body.signature_url,
+                signer_name=account.get("name") or account["email"].split("@")[0],
+                via="wallet_online_checkin",
+            )
+        except ValueError:
+            pass
     return insp
 
 
