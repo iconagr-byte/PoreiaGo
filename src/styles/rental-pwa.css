@@ -7439,6 +7439,118 @@
   font-variant-numeric: tabular-nums;
 }
 
+.rent-checkin-legal {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 0.9rem 0.95rem;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-checkin-legal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-checkin-legal-head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.rent-checkin-legal-head span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0071e3;
+  letter-spacing: -0.01em;
+}
+
+.rent-checkin-legal-lead {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.rent-checkin-legal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-checkin-legal-list > li {
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #f5f5f7;
+  overflow: hidden;
+}
+
+.rent-checkin-legal-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.35rem 0.55rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.rent-checkin-legal-title {
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-checkin-legal-meta {
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: #86868b;
+  white-space: nowrap;
+}
+
+.rent-checkin-legal-row .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #86868b;
+}
+
+.rent-checkin-legal-body {
+  padding: 0 0.75rem 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-checkin-legal-body p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.rent-checkin-legal-body ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rent-checkin-legal-body li {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #515154;
+}
+
 .rent-checkin-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

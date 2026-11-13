@@ -11,6 +11,7 @@ export const DEMO_RENT_OFFICE_REF = 'RN-DEMO01';
 export const DEMO_RENT_OFFICE_SURNAME = 'Πελάτης';
 /** Persist confirmed check-in across tab switches (local + session). */
 const CHECKIN_KEY = 'poreiago_demo_rent_checkin_v1';
+const LEGAL_KEY = 'poreiago_demo_rent_legal_v1';
 
 function daysFromNow(days, hour = 10) {
   const d = new Date();
@@ -19,42 +20,69 @@ function daysFromNow(days, hour = 10) {
   return d.toISOString();
 }
 
-export function readDemoRentCheckinReady() {
+function storageFlag(key) {
   try {
-    if (sessionStorage.getItem(CHECKIN_KEY) === '1') return true;
+    if (sessionStorage.getItem(key) === '1') return true;
   } catch {
     /* ignore */
   }
   try {
-    return localStorage.getItem(CHECKIN_KEY) === '1';
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
 
-export function writeDemoRentCheckinReady(ready) {
+function writeStorageFlag(key, ready) {
   try {
     if (ready) {
-      sessionStorage.setItem(CHECKIN_KEY, '1');
-      localStorage.setItem(CHECKIN_KEY, '1');
+      sessionStorage.setItem(key, '1');
+      localStorage.setItem(key, '1');
     } else {
-      sessionStorage.removeItem(CHECKIN_KEY);
-      localStorage.removeItem(CHECKIN_KEY);
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
     }
   } catch {
     /* ignore */
   }
 }
 
+export function readDemoRentCheckinReady() {
+  return storageFlag(CHECKIN_KEY);
+}
+
+export function writeDemoRentCheckinReady(ready) {
+  writeStorageFlag(CHECKIN_KEY, ready);
+}
+
+export function readDemoRentLegalReady() {
+  return storageFlag(LEGAL_KEY);
+}
+
+export function writeDemoRentLegalReady(ready) {
+  writeStorageFlag(LEGAL_KEY, ready);
+}
+
 /** Clear sticky check-in flag (local + session) so the CTA returns. */
 export function resetDemoRentCheckinReady() {
   writeDemoRentCheckinReady(false);
+  writeDemoRentLegalReady(false);
 }
 
 /** One confirmed IconaRent-style booking for soft demo wallets. */
 export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   const car = DEMO_RENT_FLEET[1] || DEMO_RENT_FLEET[0];
   const ready = readDemoRentCheckinReady();
+  const legalReady = readDemoRentLegalReady();
+  const legalIds = [
+    'agreement',
+    'license_decl',
+    'insurance_ack',
+    'deposit',
+    'gdpr',
+    'terms',
+  ];
+  const signedAt = new Date().toISOString();
   return {
     id: DEMO_RENT_BOOKING_ID,
     reference_code: DEMO_RENT_OFFICE_REF,
@@ -74,7 +102,19 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
     amount_paid: Number(car?.daily_rate_eur || 38) * 3,
     balance_due: 0,
     online_checkin_ready: ready,
-    online_checkin_at: ready ? new Date().toISOString() : null,
+    online_checkin_at: ready ? signedAt : null,
+    legal_doc_signatures: legalReady
+      ? Object.fromEntries(
+          legalIds.map((id) => [
+            id,
+            {
+              signature_url: 'data:image/png;base64,demo',
+              signed_at: signedAt,
+              via: 'wallet_online_checkin',
+            },
+          ]),
+        )
+      : {},
     channel: 'native_demo',
   };
 }

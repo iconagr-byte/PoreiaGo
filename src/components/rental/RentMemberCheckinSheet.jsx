@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   customerRentalCheckIn,
   customerRentalInspection,
+  customerStampPickupLegalPack,
   demoOfficeRentalCheckIn,
   guestRentalCheckIn,
 } from '../../services/customerRentalApi.js';
@@ -12,9 +13,15 @@ import {
   DEMO_RENT_OFFICE_REF,
   DEMO_RENT_OFFICE_SURNAME,
   writeDemoRentCheckinReady,
+  writeDemoRentLegalReady,
 } from '../../lib/rental/demoRentBooking.js';
 import { isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
+import { RENTAL_LEGAL_DOCS } from '../../lib/rental/rentalLegalDocs.js';
 import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
+
+/** Pickup legal docs for Wallet check-in (exclude return protocol). */
+const PICKUP_LEGAL_DOCS = RENTAL_LEGAL_DOCS.filter((d) => d.phase === 'pickup');
+const BOOKING_LEGAL_DOCS = PICKUP_LEGAL_DOCS.filter((d) => d.source === 'booking');
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -30,11 +37,19 @@ function formatWhen(iso) {
   }
 }
 
+function needsPickupLegalPack(booking) {
+  const sigs = booking?.legal_doc_signatures;
+  if (!sigs || typeof sigs !== 'object') return true;
+  return BOOKING_LEGAL_DOCS.some((d) => !sigs[d.id]?.signature_url);
+}
+
 function canCheckIn(booking) {
   if (!booking) return false;
-  if (booking.online_checkin_ready) return false;
   const status = String(booking.rental_status || '').toUpperCase();
-  return status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE';
+  if (!['CONFIRMED', 'RESERVED', 'ACTIVE'].includes(status)) return false;
+  // Allow reopen when online check-in landed but legal pack 1–6 is still empty.
+  if (booking.online_checkin_ready && !needsPickupLegalPack(booking)) return false;
+  return true;
 }
 
 function fileToDataUrl(file) {
@@ -59,7 +74,9 @@ export default function RentMemberCheckinSheet({
   const titleId = useId();
   const sigRef = useRef(null);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(Boolean(booking?.online_checkin_ready));
+  const [done, setDone] = useState(
+    Boolean(booking?.online_checkin_ready) && !needsPickupLegalPack(booking),
+  );
   const [fuelLevel, setFuelLevel] = useState(100);
   const [mileage, setMileage] = useState(0);
   const [damageNotes, setDamageNotes] = useState('');
@@ -67,17 +84,26 @@ export default function RentMemberCheckinSheet({
   const [signatureUrl, setSignatureUrl] = useState('');
   const [signaturePadKey, setSignaturePadKey] = useState(0);
   const [checkedVehicle, setCheckedVehicle] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [openLegalId, setOpenLegalId] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  const legalOnly =
+    Boolean(booking?.online_checkin_ready) && needsPickupLegalPack(booking);
+
   useEffect(() => {
-    setDone(Boolean(booking?.online_checkin_ready));
+    setDone(
+      Boolean(booking?.online_checkin_ready) && !needsPickupLegalPack(booking),
+    );
     setFuelLevel(100);
     setMileage(0);
     setDamageNotes('');
     setPhotoUrls([]);
     setSignatureUrl('');
     setSignaturePadKey((k) => k + 1);
-    setCheckedVehicle(false);
+    setCheckedVehicle(Boolean(booking?.online_checkin_ready));
+    setAcceptedLegal(false);
+    setOpenLegalId(null);
   }, [booking?.id, booking?.online_checkin_ready]);
 
   useEffect(() => {
@@ -145,6 +171,10 @@ export default function RentMemberCheckinSheet({
       toast.error('Το check-in δεν είναι διαθέσιμο για αυτή την κράτηση.');
       return;
     }
+    if (!acceptedLegal) {
+      toast.error('Αποδέξου το νομικό πακέτο παραλαβής');
+      return;
+    }
     if (!checkedVehicle) {
       toast.error('Επιβεβαίωσε τον έλεγχο οχήματος');
       return;
@@ -162,6 +192,7 @@ export default function RentMemberCheckinSheet({
         damage_notes: String(damageNotes || '').trim() || null,
         photo_urls: photoUrls,
         signature_url: signatureUrl,
+        stamp_legal_pack: true,
         checklist: {
           tires_ok: true,
           lights_ok: true,
@@ -173,11 +204,14 @@ export default function RentMemberCheckinSheet({
       };
 
       if (softDemo) {
-        if (booking.id === DEMO_RENT_BOOKING_ID) writeDemoRentCheckinReady(true);
+        if (booking.id === DEMO_RENT_BOOKING_ID) {
+          writeDemoRentCheckinReady(true);
+          writeDemoRentLegalReady(true);
+        }
         let officeRow = null;
         let officeSynced = false;
         try {
-          // Full protocol when API has /public/demo-check-in (ACTIVE + inspection).
+          // Full protocol when API has /public/demo-check-in (ACTIVE + inspection + legal).
           officeRow = await demoOfficeRentalCheckIn(payload);
           officeSynced = Boolean(officeRow?.online_checkin_ready || officeRow?.id);
         } catch {
@@ -189,6 +223,8 @@ export default function RentMemberCheckinSheet({
             officeRow = await guestRentalCheckIn({
               surname: DEMO_RENT_OFFICE_SURNAME,
               referenceCode: DEMO_RENT_OFFICE_REF,
+              signatureUrl,
+              signerName: booking.client_name || DEMO_RENT_OFFICE_SURNAME,
             });
             officeSynced = Boolean(officeRow?.online_checkin_ready || officeRow?.id);
           } catch {
@@ -209,18 +245,41 @@ export default function RentMemberCheckinSheet({
           rental_status: 'ACTIVE',
           checkin_fuel_level: payload.fuel_level,
           checkin_mileage: payload.mileage,
+          legal_doc_signatures:
+            officeRow?.legal_doc_signatures ||
+            Object.fromEntries(
+              BOOKING_LEGAL_DOCS.map((d) => [
+                d.id,
+                {
+                  signature_url: signatureUrl,
+                  signed_at: new Date().toISOString(),
+                  via: 'wallet_online_checkin',
+                },
+              ]),
+            ),
         };
         setDone(true);
         onCheckedIn?.(soft);
         toast.success(
           officeSynced
-            ? 'Check-in επιβεβαιώθηκε — το γραφείο ενημερώθηκε'
+            ? 'Check-in + νομικά επιβεβαιώθηκαν — το γραφείο ενημερώθηκε'
             : 'Check-in επιβεβαιώθηκε',
         );
         return;
       }
 
-      await customerRentalInspection(booking.id, payload);
+      await customerRentalInspection(booking.id, {
+        ...payload,
+        stamp_legal_pack: true,
+      });
+      try {
+        await customerStampPickupLegalPack(booking.id, {
+          signatureUrl,
+          signerName: booking.client_name,
+        });
+      } catch {
+        /* inspection may already have stamped when stamp_legal_pack=true */
+      }
       let row = {
         ...booking,
         online_checkin_ready: true,
@@ -235,7 +294,7 @@ export default function RentMemberCheckinSheet({
       }
       setDone(true);
       onCheckedIn?.(row);
-      toast.success('Check-in ολοκληρώθηκε');
+      toast.success('Check-in + νομικό πακέτο ολοκληρώθηκαν');
     } catch (err) {
       toast.error(err?.message || 'Αποτυχία check-in');
     } finally {
@@ -265,7 +324,11 @@ export default function RentMemberCheckinSheet({
                 Παραλαβή · {brandLabel}
               </p>
               <h2 id={titleId}>
-                {done ? 'Check-in έτοιμο' : 'Online Check-in'}
+                {done
+                  ? 'Check-in έτοιμο'
+                  : legalOnly
+                    ? 'Νομικό πακέτο'
+                    : 'Online Check-in'}
               </h2>
               <p className="rent-checkin-form-vehicle">{vehicleLine || 'Όχημα'}</p>
               <p className="rent-checkin-form-when">
@@ -292,8 +355,8 @@ export default function RentMemberCheckinSheet({
               <p className="rent-member-checkin-brand">{brandLabel}</p>
               <h3 className="rent-checkin-done-title">Είσαι έτοιμος για παραλαβή.</h3>
               <p className="rent-member-checkin-lead">
-                Το {brandLabel} βλέπει ήδη το online check-in σου. Φέρε άδεια οδήγησης και ταυτότητα
-                ή διαβατήριο.
+                Το {brandLabel} βλέπει ήδη το online check-in και το νομικό πακέτο παραλαβής. Φέρε
+                άδεια οδήγησης και ταυτότητα ή διαβατήριο.
               </p>
               <div className="rent-member-checkin-card">
                 <div className="rent-member-checkin-card-top">
@@ -316,10 +379,10 @@ export default function RentMemberCheckinSheet({
             <div className="rent-checkin-form-scroll">
               <div className="rent-checkin-hook">
                 <p className="rent-checkin-hook-kicker">Πριν φτάσεις στο γραφείο</p>
-                <h3>Κατέγραψε την κατάσταση του οχήματος.</h3>
+                <h3>Νομικά + κατάσταση οχήματος.</h3>
                 <p>
-                  Ίδια διαδικασία με το desk check-in — καύσιμο, χιλιόμετρα, φωτό και υπογραφή σε
-                  λιγότερο από 2 λεπτά.
+                  Υπόγραψε το πακέτο παραλαβής και κατέγραψε καύσιμο, χιλιόμετρα και φωτό — ίδια
+                  διαδικασία με το desk.
                 </p>
               </div>
 
@@ -328,80 +391,131 @@ export default function RentMemberCheckinSheet({
                 <strong>{ref}</strong>
               </div>
 
-              <div className="rent-checkin-grid-2">
-                <label className="rent-checkin-field">
-                  <span>Καύσιμο %</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    required
-                    inputMode="numeric"
-                    value={fuelLevel}
-                    onChange={(e) => setFuelLevel(e.target.value)}
-                  />
-                </label>
-                <label className="rent-checkin-field">
-                  <span>Χιλιόμετρα</span>
-                  <input
-                    type="number"
-                    min={0}
-                    required
-                    inputMode="numeric"
-                    value={mileage}
-                    onChange={(e) => setMileage(e.target.value)}
-                  />
-                </label>
-              </div>
+              <section className="rent-checkin-legal" aria-label="Νομικό πακέτο παραλαβής">
+                <div className="rent-checkin-legal-head">
+                  <h3>Νομικό πακέτο</h3>
+                  <span>{BOOKING_LEGAL_DOCS.length + 1}/8 παραλαβή</span>
+                </div>
+                <p className="rent-checkin-legal-lead">
+                  Άνοιξε κάθε έντυπο, διάβασε και αποδέξου όλα με μία υπογραφή. Το πρωτόκολλο
+                  επιστροφής υπογράφεται στο check-out.
+                </p>
+                <ul className="rent-checkin-legal-list">
+                  {PICKUP_LEGAL_DOCS.map((doc) => {
+                    const open = openLegalId === doc.id;
+                    const viaInspection = doc.source === 'inspection';
+                    return (
+                      <li key={doc.id} className={open ? 'is-open' : ''}>
+                        <button
+                          type="button"
+                          className="rent-checkin-legal-row"
+                          aria-expanded={open}
+                          onClick={() => setOpenLegalId(open ? null : doc.id)}
+                        >
+                          <span className="rent-checkin-legal-title">{doc.shortTitle}</span>
+                          <span className="rent-checkin-legal-meta">
+                            {viaInspection ? 'Με την υπογραφή check-in' : 'Έτοιμο για υπογραφή'}
+                          </span>
+                          <span className="material-symbols-outlined" aria-hidden>
+                            {open ? 'expand_less' : 'expand_more'}
+                          </span>
+                        </button>
+                        {open ? (
+                          <div className="rent-checkin-legal-body">
+                            <p>{doc.summary}</p>
+                            <ul>
+                              {(doc.clauses || []).slice(0, 4).map((c) => (
+                                <li key={c.slice(0, 48)}>{c}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
 
-              <label className="rent-checkin-field rent-checkin-field--block">
-                <span>Σημειώσεις ζημιών</span>
-                <textarea
-                  rows={3}
-                  value={damageNotes}
-                  onChange={(e) => setDamageNotes(e.target.value)}
-                  placeholder="Χωρίς ζημιές / περιγραφή…"
-                />
-              </label>
+              {!legalOnly ? (
+                <>
+                  <div className="rent-checkin-grid-2">
+                    <label className="rent-checkin-field">
+                      <span>Καύσιμο %</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        required
+                        inputMode="numeric"
+                        value={fuelLevel}
+                        onChange={(e) => setFuelLevel(e.target.value)}
+                      />
+                    </label>
+                    <label className="rent-checkin-field">
+                      <span>Χιλιόμετρα</span>
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        inputMode="numeric"
+                        value={mileage}
+                        onChange={(e) => setMileage(e.target.value)}
+                      />
+                    </label>
+                  </div>
 
-              <div className="rent-checkin-field rent-checkin-field--block">
-                <div className="rent-checkin-field-row">
-                  <span>Φωτογραφίες</span>
-                  <label className="rent-checkin-add-photo">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {uploadingPhoto ? 'progress_activity' : 'add_a_photo'}
-                    </span>
-                    {uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="sr-only"
-                      disabled={uploadingPhoto || busy}
-                      onChange={onDamagePhoto}
+                  <label className="rent-checkin-field rent-checkin-field--block">
+                    <span>Σημειώσεις ζημιών</span>
+                    <textarea
+                      rows={3}
+                      value={damageNotes}
+                      onChange={(e) => setDamageNotes(e.target.value)}
+                      placeholder="Χωρίς ζημιές / περιγραφή…"
                     />
                   </label>
-                </div>
-                {photoUrls.length ? (
-                  <div className="rent-checkin-photos">
-                    {photoUrls.map((url) => (
-                      <button
-                        key={url.slice(0, 48)}
-                        type="button"
-                        className="rent-checkin-photo"
-                        onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
-                        aria-label="Αφαίρεση φωτογραφίας"
-                      >
-                        <img src={url} alt="" />
-                      </button>
-                    ))}
+
+                  <div className="rent-checkin-field rent-checkin-field--block">
+                    <div className="rent-checkin-field-row">
+                      <span>Φωτογραφίες</span>
+                      <label className="rent-checkin-add-photo">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          {uploadingPhoto ? 'progress_activity' : 'add_a_photo'}
+                        </span>
+                        {uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="sr-only"
+                          disabled={uploadingPhoto || busy}
+                          onChange={onDamagePhoto}
+                        />
+                      </label>
+                    </div>
+                    {photoUrls.length ? (
+                      <div className="rent-checkin-photos">
+                        {photoUrls.map((url) => (
+                          <button
+                            key={url.slice(0, 48)}
+                            type="button"
+                            className="rent-checkin-photo"
+                            onClick={() =>
+                              setPhotoUrls((prev) => prev.filter((u) => u !== url))
+                            }
+                            aria-label="Αφαίρεση φωτογραφίας"
+                          >
+                            <img src={url} alt="" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rent-checkin-hint">
+                        Προαιρετικά — selfie ζημιάς / κατάσταση οχήματος
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <p className="rent-checkin-hint">
-                    Προαιρετικά — selfie ζημιάς / κατάσταση οχήματος
-                  </p>
-                )}
-              </div>
+                </>
+              ) : null}
 
               <div className="rent-checkin-field rent-checkin-field--block">
                 <RentalSignaturePad
@@ -436,13 +550,26 @@ export default function RentMemberCheckinSheet({
               <label className="rent-checkin-confirm">
                 <input
                   type="checkbox"
-                  checked={checkedVehicle}
-                  onChange={(e) => setCheckedVehicle(e.target.checked)}
+                  checked={acceptedLegal}
+                  onChange={(e) => setAcceptedLegal(e.target.checked)}
                 />
                 <span>
-                  Επιβεβαιώνω έλεγχο ελαστικών, φώτων, υγρών, εγγράφων και ρεζέρβας.
+                  Αποδέχομαι σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, γενικούς όρους και πρωτόκολλο
+                  παραλαβής.
                 </span>
               </label>
+              {!legalOnly ? (
+                <label className="rent-checkin-confirm">
+                  <input
+                    type="checkbox"
+                    checked={checkedVehicle}
+                    onChange={(e) => setCheckedVehicle(e.target.checked)}
+                  />
+                  <span>
+                    Επιβεβαιώνω έλεγχο ελαστικών, φώτων, υγρών, εγγράφων και ρεζέρβας.
+                  </span>
+                </label>
+              ) : null}
               <div className="rent-checkin-foot-row">
                 <button
                   type="button"
@@ -455,12 +582,18 @@ export default function RentMemberCheckinSheet({
                 <button
                   type="submit"
                   className="rent-member-checkin-cta rent-checkin-submit"
-                  disabled={busy || uploadingPhoto || !checkedVehicle || !signatureUrl}
+                  disabled={
+                    busy ||
+                    uploadingPhoto ||
+                    !acceptedLegal ||
+                    !checkedVehicle ||
+                    !signatureUrl
+                  }
                 >
                   {busy ? 'Check in…' : 'Check in'}
                 </button>
               </div>
-              <p>Χωρίς επιπλέον χρέωση · ίδια διαδικασία με το γραφείο</p>
+              <p>Μία υπογραφή · νομικά + πρωτόκολλο παραλαβής</p>
             </footer>
           </form>
         )}

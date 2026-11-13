@@ -1498,12 +1498,15 @@ def guest_online_checkin(
     *,
     surname: str,
     reference_code: str,
+    signature_url: str | None = None,
+    signer_name: str | None = None,
 ) -> dict[str, Any]:
     """Mark booking ready for pickup (online check-in) after surname+code verify."""
     tid = _normalize_tenant(tenant_id)
     code = _normalize_ref_code(reference_code)
     if not code or not str(surname or "").strip():
         raise ValueError("Συμπληρώστε επώνυμο και κωδικό κράτησης")
+    booking_id = None
     with _LOCK:
         data = _read()
         booking = None
@@ -1551,8 +1554,22 @@ def guest_online_checkin(
                 if vehicle:
                     vehicle["current_status"] = "RENTED"
                     vehicle["updated_at"] = now
+        booking_id = booking.get("id")
         _write(data)
-        return deepcopy(booking)
+    # Stamp νομικό πακέτο (1–6) when Wallet sent a signature with guest check-in.
+    sig = str(signature_url or "").strip()
+    if sig and booking_id:
+        try:
+            return stamp_pickup_legal_pack(
+                tid,
+                booking_id,
+                signature_url=sig,
+                signer_name=signer_name,
+                via="wallet_guest_checkin",
+            )
+        except ValueError:
+            pass
+    return get_booking(tid, booking_id) or {}
 
 
 def customer_online_checkin(
@@ -1660,7 +1677,24 @@ def demo_office_online_checkin(
     if not booking:
         booking = create_demo_sign_sample(tid)
     status = str(booking.get("rental_status") or "").upper()
+    payload_early = body if isinstance(body, dict) else {}
     if booking.get("online_checkin_ready") and status in ("ACTIVE", "CONFIRMED"):
+        # Re-submit from Wallet may still need to stamp the legal pack.
+        sig = str(payload_early.get("signature_url") or "").strip()
+        sigs = booking.get("legal_doc_signatures")
+        missing_pack = not isinstance(sigs, dict) or len(sigs) < len(_LEGAL_DOC_IDS)
+        if sig and missing_pack:
+            try:
+                return stamp_pickup_legal_pack(
+                    tid,
+                    booking["id"],
+                    signature_url=sig,
+                    signer_name=payload_early.get("inspector_name")
+                    or booking.get("client_name"),
+                    via="wallet_demo_checkin",
+                )
+            except ValueError:
+                pass
         return deepcopy(booking)
     if status not in ("CONFIRMED", "RESERVED", "ACTIVE"):
         raise ValueError("Η demo κράτηση δεν δέχεται check-in")
@@ -1706,6 +1740,18 @@ def demo_office_online_checkin(
         "require_pickup_checklist": True,
     }
     create_inspection(tid, insp_body)
+    sig = str(payload.get("signature_url") or "").strip()
+    if sig:
+        try:
+            stamp_pickup_legal_pack(
+                tid,
+                booking["id"],
+                signature_url=sig,
+                signer_name=payload.get("inspector_name") or booking.get("client_name"),
+                via="wallet_demo_checkin",
+            )
+        except ValueError:
+            pass
     updated = get_booking(tid, booking["id"])
     if not updated:
         raise ValueError("Η demo κράτηση δεν βρέθηκε μετά το check-in")
@@ -2338,6 +2384,55 @@ def save_legal_doc_signature(
         }
         booking["legal_doc_signatures"] = sigs
         booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
+def stamp_pickup_legal_pack(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    signature_url: str,
+    signer_name: str | None = None,
+    via: str = "wallet_online_checkin",
+) -> dict[str, Any]:
+    """Stamp all booking-level pickup legal docs with one Wallet / app signature.
+
+    Covers σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, γενικοί όροι (6/8).
+    Delivery protocol (7) comes from PICKUP_CHECK inspection signature.
+    Return protocol (8) stays for check-out.
+    """
+    tid = _normalize_tenant(tenant_id)
+    url = str(signature_url or "").strip()
+    if not url:
+        raise ValueError("Απαιτείται υπογραφή")
+    bid = str(booking_id or "").strip()
+    if not bid:
+        raise ValueError("Λείπει κράτηση")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if booking.get("rental_status") == "CANCELLED":
+            raise ValueError("Η κράτηση είναι ακυρωμένη")
+        now = _now()
+        sigs = booking.get("legal_doc_signatures")
+        if not isinstance(sigs, dict):
+            sigs = {}
+        signer = str(signer_name or "").strip() or booking.get("client_name")
+        for doc in _LEGAL_DOC_IDS:
+            sigs[doc] = {
+                "signature_url": url,
+                "signed_at": now,
+                "signer_name": signer,
+                "via": via,
+            }
+        booking["legal_doc_signatures"] = sigs
+        booking["updated_at"] = now
         _write(data)
         return deepcopy(booking)
 
