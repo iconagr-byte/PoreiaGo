@@ -9,6 +9,7 @@ import {
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
+import RentMemberCheckinSheet, { canCheckIn } from './RentMemberCheckinSheet.jsx';
 import RentalWalletPass from './RentalWalletPass.jsx';
 
 const STATUS_LABEL = {
@@ -61,6 +62,7 @@ export default function RentalWalletPanel({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [checkinBooking, setCheckinBooking] = useState(null);
   const [reminderShown, setReminderShown] = useState(false);
 
   const load = useCallback(async () => {
@@ -159,6 +161,7 @@ export default function RentalWalletPanel({
           passengerName={passengerName}
           onBookVehicle={onBookVehicle}
           onCancel={cancelBooking}
+          onCheckIn={(b) => setCheckinBooking(b)}
           cancelling={busyId === featured?.id}
         />
 
@@ -167,35 +170,58 @@ export default function RentalWalletPanel({
             <h3 className="rent-wallet-more-title">Άλλες κρατήσεις</h3>
             <div className="wallet-list">
               {others.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  className="wallet-booking-card rent-wallet-card-btn"
-                  onClick={() => setSelectedId(b.id)}
-                >
-                  <div className="wallet-booking-body">
-                    <h3>
-                      {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
-                    </h3>
-                    <p>
-                      {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
-                    </p>
-                    <p className="wallet-booking-mono">
-                      {b.pickup_location || 'Γραφείο'}
-                      {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
-                        STATUS_LABEL[b.rental_status] || b.rental_status
-                      }`}
-                    </p>
-                  </div>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    chevron_right
-                  </span>
-                </button>
+                <div key={b.id} className="rent-wallet-card-row">
+                  <button
+                    type="button"
+                    className="wallet-booking-card rent-wallet-card-btn"
+                    onClick={() => setSelectedId(b.id)}
+                  >
+                    <div className="wallet-booking-body">
+                      <h3>
+                        {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
+                      </h3>
+                      <p>
+                        {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
+                      </p>
+                      <p className="wallet-booking-mono">
+                        {b.pickup_location || 'Γραφείο'}
+                        {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
+                          STATUS_LABEL[b.rental_status] || b.rental_status
+                        }`}
+                        {b.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
+                      </p>
+                    </div>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      chevron_right
+                    </span>
+                  </button>
+                  {canCheckIn(b) ? (
+                    <button
+                      type="button"
+                      className="wallet-btn wallet-btn-primary rent-wallet-card-checkin"
+                      onClick={() => setCheckinBooking(b)}
+                    >
+                      Check-in τώρα
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
           </section>
         ) : null}
       </div>
+
+      <RentMemberCheckinSheet
+        booking={checkinBooking}
+        brandLabel={brandLabel}
+        onClose={() => setCheckinBooking(null)}
+        onCheckedIn={(row) => {
+          setRows((list) =>
+            list.map((item) => (item.id === row.id ? { ...item, ...row } : item)),
+          );
+          setCheckinBooking((cur) => (cur && cur.id === row.id ? { ...cur, ...row } : cur));
+        }}
+      />
     </section>
   );
 }
