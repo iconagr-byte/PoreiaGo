@@ -42,6 +42,7 @@ export default function RentalWalletPass({
   passengerName = '',
   onBookVehicle,
   onCancel,
+  onCheckIn,
   cancelling = false,
 }) {
   if (!booking) {
@@ -149,6 +150,25 @@ export default function RentalWalletPass({
         </div>
 
         <div className="wallet-pass-actions">
+          {booking.online_checkin_ready ? (
+            <p className="rent-wallet-checkin-ready">
+              <span className="material-symbols-outlined" aria-hidden>
+                task_alt
+              </span>
+              Check-in έτοιμο για παραλαβή
+            </p>
+          ) : null}
+          {!booking.online_checkin_ready &&
+          (status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
+          onCheckIn ? (
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-primary wallet-btn-block"
+              onClick={() => onCheckIn(booking)}
+            >
+              Check-in τώρα
+            </button>
+          ) : null}
           {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
             <button
               type="button"

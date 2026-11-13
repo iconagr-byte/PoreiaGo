@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMyRentalBookings } from '../../services/customerRentalApi.js';
+import RentMemberCheckinSheet, { canCheckIn } from '../rental/RentMemberCheckinSheet.jsx';
 
 const STATUS_LABEL = {
   RESERVED: 'Εκκρεμεί πληρωμή',
@@ -43,6 +44,7 @@ export default function WalletRentSection({
 } = {}) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkinBooking, setCheckinBooking] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,21 +111,38 @@ export default function WalletRentSection({
             {statusLabel}
             {' · '}
             {formatWhen(featured.start_time)}
+            {featured.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
           </p>
         </div>
       ) : null}
 
       <div className="wallet-rent-actions">
-        {typeof onOpenRentals === 'function' ? (
+        {featured && canCheckIn(featured) ? (
           <button
             type="button"
             className="wallet-btn wallet-btn-primary wallet-btn-block"
+            onClick={() => setCheckinBooking(featured)}
+          >
+            Check-in τώρα
+          </button>
+        ) : null}
+        {typeof onOpenRentals === 'function' ? (
+          <button
+            type="button"
+            className={`wallet-btn wallet-btn-block${
+              featured && canCheckIn(featured) ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+            }`}
             onClick={openRentals}
           >
             Οι ενοικιάσεις μου
           </button>
         ) : (
-          <Link to="/wallet?tab=rentals" className="wallet-btn wallet-btn-primary wallet-btn-block">
+          <Link
+            to="/wallet?tab=rentals"
+            className={`wallet-btn wallet-btn-block${
+              featured && canCheckIn(featured) ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+            }`}
+          >
             Οι ενοικιάσεις μου
           </Link>
         )}
@@ -133,6 +152,18 @@ export default function WalletRentSection({
           </Link>
         ) : null}
       </div>
+
+      <RentMemberCheckinSheet
+        booking={checkinBooking}
+        brandLabel="Γραφείο"
+        onClose={() => setCheckinBooking(null)}
+        onCheckedIn={(row) => {
+          setRows((list) =>
+            list.map((item) => (item.id === row.id ? { ...item, ...row } : item)),
+          );
+          setCheckinBooking((cur) => (cur && cur.id === row.id ? { ...cur, ...row } : cur));
+        }}
+      />
     </section>
   );
 }
