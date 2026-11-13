@@ -4138,11 +4138,33 @@ button.wallet-account-row--action.is-open {
 
 /* Rent bridge inside bus My Wallet */
 .wallet-rent-section .wallet-rent-featured {
+  appearance: none;
+  width: 100%;
   margin: 0 0 0.85rem;
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.035);
   border: 1px solid rgba(0, 0, 0, 0.04);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.wallet-rent-section .wallet-rent-featured--checkin {
+  cursor: pointer;
+  background:
+    linear-gradient(135deg, rgba(232, 246, 244, 0.95), rgba(255, 255, 255, 0.98));
+  border-color: rgba(10, 122, 108, 0.22);
+  box-shadow: 0 8px 22px rgba(11, 61, 74, 0.08);
+}
+
+.wallet-rent-featured-copy {
+  min-width: 0;
 }
 
 .wallet-rent-featured-title {
@@ -4164,6 +4186,30 @@ button.wallet-account-row--action.is-open {
   font-size: 0.8rem;
   letter-spacing: -0.01em;
   color: var(--wallet-muted, #6e6e73);
+}
+
+.wallet-rent-featured-hook {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.wallet-rent-featured-chevron {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.35rem;
+}
+
+.wallet-rent-section--checkin .wallet-rent-checkin-cta {
+  min-height: 2.85rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rent-teal, #0a7a6c) 32%, var(--rent-deep, #0b3d4a)) 0%,
+    var(--rent-deep, #0b3d4a) 100%
+  );
+  box-shadow: 0 10px 22px rgba(11, 61, 74, 0.22);
 }
 
 .wallet-rent-actions {

@@ -5,14 +5,18 @@ import {
   withDemoRentBookings,
   writeDemoRentCheckinReady,
 } from './demoRentBooking.js';
+import { isNativeRentDemo, isSoftNativeRentDemoToken } from './nativeRentDemo.js';
 
 vi.mock('./nativeRentDemo.js', () => ({
   isSoftNativeRentDemoToken: vi.fn(() => true),
+  isNativeRentDemo: vi.fn(() => false),
 }));
 
 describe('demoRentBooking', () => {
   beforeEach(() => {
     writeDemoRentCheckinReady(false);
+    isSoftNativeRentDemoToken.mockReturnValue(true);
+    isNativeRentDemo.mockReturnValue(false);
   });
 
   it('builds a confirmed booking with check-in available', () => {
@@ -24,6 +28,14 @@ describe('demoRentBooking', () => {
   });
 
   it('injects demo booking when soft list is empty', () => {
+    const rows = withDemoRentBookings([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(DEMO_RENT_BOOKING_ID);
+  });
+
+  it('injects demo booking when native rent demo session is on', () => {
+    isSoftNativeRentDemoToken.mockReturnValue(false);
+    isNativeRentDemo.mockReturnValue(true);
     const rows = withDemoRentBookings([]);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(DEMO_RENT_BOOKING_ID);

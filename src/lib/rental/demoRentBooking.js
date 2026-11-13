@@ -3,7 +3,7 @@
  */
 
 import { DEMO_RENT_FLEET } from './demoRentFleet.js';
-import { isSoftNativeRentDemoToken } from './nativeRentDemo.js';
+import { isNativeRentDemo, isSoftNativeRentDemoToken } from './nativeRentDemo.js';
 
 export const DEMO_RENT_BOOKING_ID = 'demo-rent-booking-checkin-1';
 const CHECKIN_KEY = 'poreiago_demo_rent_checkin_v1';
@@ -60,10 +60,13 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   };
 }
 
-/** When soft demo has no API bookings, inject the local pass. */
+/**
+ * When native rent demo (soft token or session flag) has no API bookings,
+ * inject the local pass so Check-in stays visible on Ενοικιάσεις.
+ */
 export function withDemoRentBookings(list, { brandLabel } = {}) {
   const rows = Array.isArray(list) ? list : [];
   if (rows.length) return rows;
-  if (!isSoftNativeRentDemoToken()) return rows;
+  if (!isSoftNativeRentDemoToken() && !isNativeRentDemo()) return rows;
   return [buildDemoRentBooking({ brandLabel })];
 }

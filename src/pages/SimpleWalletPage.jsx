@@ -1033,7 +1033,11 @@ function WalletAuthenticatedApp() {
                 {homeFeed}
                 {rentAvailable ? (
                   <div className="wallet-stack" style={{ marginTop: '1rem' }}>
-                    <WalletRentSection compact onOpenRentals={openRentWallet} />
+                    <WalletRentSection
+                      compact
+                      brandLabel={brandLabel}
+                      onOpenRentals={openRentWallet}
+                    />
                   </div>
                 ) : null}
               </div>
@@ -1044,7 +1048,11 @@ function WalletAuthenticatedApp() {
               {homeFeed}
               {rentAvailable ? (
                 <div className="wallet-stack" style={{ marginTop: '0.85rem' }}>
-                  <WalletRentSection compact onOpenRentals={openRentWallet} />
+                  <WalletRentSection
+                    compact
+                    brandLabel={brandLabel}
+                    onOpenRentals={openRentWallet}
+                  />
                 </div>
               ) : null}
             </>
@@ -1064,7 +1072,9 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'bookings' && (
           <div className="wallet-stack">
-            {rentAvailable ? <WalletRentSection onOpenRentals={openRentWallet} /> : null}
+            {rentAvailable ? (
+              <WalletRentSection brandLabel={brandLabel} onOpenRentals={openRentWallet} />
+            ) : null}
             {!rentOnlyShell ? (
               <div className="wallet-panel">
                 <h2>Κρατήσεις λεωφορείου</h2>

@@ -41,6 +41,7 @@ function rankBooking(b) {
 
 export default function WalletRentSection({
   compact = false,
+  brandLabel = 'Γραφείο',
   onOpenRentals = null,
 } = {}) {
   const [rows, setRows] = useState([]);
@@ -52,7 +53,7 @@ export default function WalletRentSection({
     fetchMyRentalBookings()
       .then((list) => {
         if (cancelled) return;
-        const seeded = withDemoRentBookings(list || []);
+        const seeded = withDemoRentBookings(list || [], { brandLabel });
         const sorted = [...seeded].sort((a, b) => {
           const rank = rankBooking(a) - rankBooking(b);
           if (rank !== 0) return rank;
@@ -62,7 +63,7 @@ export default function WalletRentSection({
       })
       .catch(() => {
         if (cancelled) return;
-        const seeded = withDemoRentBookings([]);
+        const seeded = withDemoRentBookings([], { brandLabel });
         setRows(seeded);
       })
       .finally(() => {
@@ -71,12 +72,13 @@ export default function WalletRentSection({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [brandLabel]);
 
   const featured = rows[0] || null;
   const statusLabel = featured
     ? STATUS_LABEL[featured.rental_status] || featured.rental_status
     : '';
+  const showCheckin = Boolean(featured && canCheckIn(featured));
 
   const openRentals = () => {
     if (typeof onOpenRentals === 'function') onOpenRentals();
@@ -84,7 +86,9 @@ export default function WalletRentSection({
 
   return (
     <section
-      className={`wallet-panel wallet-rent-section${compact ? ' wallet-rent-section--compact' : ''}`}
+      className={`wallet-panel wallet-rent-section${compact ? ' wallet-rent-section--compact' : ''}${
+        showCheckin ? ' wallet-rent-section--checkin' : ''
+      }`}
       aria-label="Ενοικιάσεις"
     >
       <div className="wallet-panel-head">
@@ -104,27 +108,44 @@ export default function WalletRentSection({
       </div>
 
       {!loading && featured ? (
-        <div className="wallet-rent-featured">
-          <p className="wallet-rent-featured-title">
-            {featured.vehicle_model || 'Όχημα'}
-            {featured.vehicle_plate ? (
-              <span className="wallet-rent-featured-plate"> · {featured.vehicle_plate}</span>
+        <button
+          type="button"
+          className={`wallet-rent-featured${showCheckin ? ' wallet-rent-featured--checkin' : ''}`}
+          onClick={() => {
+            if (showCheckin) setCheckinBooking(featured);
+            else if (typeof onOpenRentals === 'function') openRentals();
+          }}
+        >
+          <div className="wallet-rent-featured-copy">
+            <p className="wallet-rent-featured-title">
+              {featured.vehicle_model || 'Όχημα'}
+              {featured.vehicle_plate ? (
+                <span className="wallet-rent-featured-plate"> · {featured.vehicle_plate}</span>
+              ) : null}
+            </p>
+            <p className="wallet-rent-featured-meta">
+              {statusLabel}
+              {' · '}
+              {formatWhen(featured.start_time)}
+              {featured.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
+            </p>
+            {showCheckin ? (
+              <p className="wallet-rent-featured-hook">Online check-in διαθέσιμο</p>
             ) : null}
-          </p>
-          <p className="wallet-rent-featured-meta">
-            {statusLabel}
-            {' · '}
-            {formatWhen(featured.start_time)}
-            {featured.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
-          </p>
-        </div>
+          </div>
+          {showCheckin ? (
+            <span className="wallet-rent-featured-chevron material-symbols-outlined" aria-hidden>
+              chevron_right
+            </span>
+          ) : null}
+        </button>
       ) : null}
 
       <div className="wallet-rent-actions">
-        {featured && canCheckIn(featured) ? (
+        {showCheckin ? (
           <button
             type="button"
-            className="wallet-btn wallet-btn-primary wallet-btn-block"
+            className="wallet-btn wallet-btn-primary wallet-btn-block wallet-rent-checkin-cta"
             onClick={() => setCheckinBooking(featured)}
           >
             Check-in τώρα
@@ -134,7 +155,7 @@ export default function WalletRentSection({
           <button
             type="button"
             className={`wallet-btn wallet-btn-block${
-              featured && canCheckIn(featured) ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+              showCheckin ? ' wallet-btn-ghost' : ' wallet-btn-primary'
             }`}
             onClick={openRentals}
           >
@@ -144,7 +165,7 @@ export default function WalletRentSection({
           <Link
             to="/wallet?tab=rentals"
             className={`wallet-btn wallet-btn-block${
-              featured && canCheckIn(featured) ? ' wallet-btn-ghost' : ' wallet-btn-primary'
+              showCheckin ? ' wallet-btn-ghost' : ' wallet-btn-primary'
             }`}
           >
             Οι ενοικιάσεις μου
@@ -159,7 +180,7 @@ export default function WalletRentSection({
 
       <RentMemberCheckinSheet
         booking={checkinBooking}
-        brandLabel="Γραφείο"
+        brandLabel={brandLabel}
         onClose={() => setCheckinBooking(null)}
         onCheckedIn={(row) => {
           setRows((list) =>

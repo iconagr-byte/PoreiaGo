@@ -30,8 +30,9 @@ function canCheckIn(booking) {
 }
 
 /**
- * Member check-in bottom sheet — from a rental booking card (not a tab).
- * PoreiaGo teal/deep palette; layout inspired by clean rental check-in sheets.
+ * Online check-in bottom sheet — opened from a rental booking / Ενοικιάσεις card.
+ * Structure inspired by clean member check-in sheets; PoreiaGo teal/deep only
+ * (no Hertz yellow / brand copy).
  */
 export default function RentMemberCheckinSheet({
   booking,
@@ -67,6 +68,7 @@ export default function RentMemberCheckinSheet({
     (booking.id ? `RB-${String(booking.id).replace(/-/g, '').slice(0, 8).toUpperCase()}` : '—');
   const pickup = booking.pickup_location || brandLabel || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
+  const vehicleLine = [booking.vehicle_model, booking.vehicle_plate].filter(Boolean).join(' · ');
 
   const submit = async () => {
     if (done || busy) return;
@@ -111,9 +113,10 @@ export default function RentMemberCheckinSheet({
       }}
     >
       <div className="rent-member-checkin-sheet">
+        <div className="rent-member-checkin-wash" aria-hidden />
         <div className="rent-member-checkin-handle" aria-hidden />
         <header className="rent-member-checkin-bar">
-          <h2>Online Check-in</h2>
+          <p className="rent-member-checkin-kicker">Online Check-in</p>
           <button
             type="button"
             className="rent-member-checkin-close"
@@ -127,27 +130,31 @@ export default function RentMemberCheckinSheet({
         </header>
 
         <div className="rent-member-checkin-body">
-          <h3>{done ? 'Είσαι έτοιμος για παραλαβή.' : 'Check-in, και φεύγεις.'}</h3>
-          <p>
+          <p className="rent-member-checkin-brand">{brandLabel}</p>
+          <h2>
+            {done ? 'Είσαι έτοιμος για παραλαβή.' : 'Check-in πριν φτάσεις.'}
+          </h2>
+          <p className="rent-member-checkin-lead">
             {done
               ? `Το ${brandLabel} βλέπει ήδη το online check-in σου. Φέρε άδεια οδήγησης και ταυτότητα ή διαβατήριο.`
-              : 'Η άφιξή σου είναι προτεραιότητα. Κάνε check-in τώρα για πιο γρήγορη παραλαβή — λίγα λεπτά αρκούν.'}
+              : 'Ολοκλήρωσε τα στοιχεία τώρα — στην παραλαβή περνάς πιο γρήγορα, χωρίς ουρά στο γκισέ.'}
           </p>
 
           <div className="rent-member-checkin-card">
-            <p className="rent-member-checkin-ref">
-              Κωδικός κράτησης: <strong>{ref}</strong>
-            </p>
-            <p className="rent-member-checkin-vehicle">
-              {booking.vehicle_model || 'Όχημα'}
-              {booking.vehicle_plate ? ` · ${booking.vehicle_plate}` : ''}
-            </p>
+            <div className="rent-member-checkin-card-top">
+              <span>Κράτηση</span>
+              <strong>{ref}</strong>
+            </div>
+            {vehicleLine ? (
+              <p className="rent-member-checkin-vehicle">{vehicleLine}</p>
+            ) : null}
             <ul className="rent-member-checkin-legs">
               <li>
                 <span className="material-symbols-outlined" aria-hidden>
-                  location_on
+                  trip_origin
                 </span>
                 <div>
+                  <em>Παραλαβή</em>
                   <strong>{pickup}</strong>
                   <span>{formatWhen(booking.start_time)}</span>
                 </div>
@@ -157,6 +164,7 @@ export default function RentMemberCheckinSheet({
                   flag
                 </span>
                 <div>
+                  <em>Επιστροφή</em>
                   <strong>{dropoff}</strong>
                   <span>{formatWhen(booking.end_time)}</span>
                 </div>
@@ -177,10 +185,10 @@ export default function RentMemberCheckinSheet({
               disabled={busy || !canCheckIn(booking)}
               onClick={submit}
             >
-              {busy ? 'Ολοκλήρωση…' : 'Check-in τώρα'}
+              {busy ? 'Ολοκλήρωση…' : 'Ξεκίνα check-in'}
             </button>
           )}
-          <p>{done ? 'Καλή διαδρομή' : 'Σε περιμένουμε στην παραλαβή'}</p>
+          <p>{done ? 'Καλή διαδρομή' : 'Χωρίς επιπλέον χρέωση · 2–3 λεπτά'}</p>
         </footer>
       </div>
     </div>,
