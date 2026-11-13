@@ -20,6 +20,20 @@ console.assert(
   paperworkStatusForBooking(booking, []).legal?.total >= 8,
   'legal pack attached',
 );
+const onlineReady = paperworkStatusForBooking(
+  { ...booking, online_checkin_ready: true },
+  [],
+);
+console.assert(onlineReady.statusKey === 'online_ready', 'wallet online check-in');
+console.assert(onlineReady.onlineCheckinReady === true, 'onlineCheckinReady flag');
+console.assert(
+  String(onlineReady.statusLabel || '').includes('Επιβεβαιωμένο check-in'),
+  'confirmed check-in label',
+);
+console.assert(
+  typeof paperworkStatusChipClass('online_ready') === 'string',
+  'online_ready chip',
+);
 
 const pickupOnly = paperworkStatusForBooking(booking, [
   {
