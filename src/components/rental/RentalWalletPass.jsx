@@ -54,8 +54,8 @@ export default function RentalWalletPass({
           </span>
           <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα ενοικίαση</h2>
           <p className="wallet-pass-empty-copy">
-            Κλείστε όχημα από την εφαρμογή ενοικίασης — η κράτηση εμφανίζεται εδώ στο Rent Wallet,
-            χωριστά από τα εισιτήρια λεωφορείου.
+            Κλείστε όχημα από Ενοικιάσεις — η κάρτα εμφανίζεται εδώ στις Κρατήσεις, δίπλα στα
+            εισιτήρια λεωφορείου.
           </p>
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
             Βρες όχημα
@@ -70,10 +70,10 @@ export default function RentalWalletPass({
 
   const status = booking.rental_status || 'CONFIRMED';
   const label = STATUS_LABEL[status] || status;
-  const code = booking.id || '—';
+  const code = booking.reference_code || booking.id || '—';
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
-  const qrValue = `RENT:${code}`;
+  const qrValue = `RENT:${booking.id || code}`;
 
   return (
     <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">

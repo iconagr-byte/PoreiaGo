@@ -239,7 +239,7 @@ export default function WalletRentSection({
               Οι ενοικιάσεις μου
             </button>
           ) : (
-            <Link to="/wallet?tab=rentals" className="wallet-rent-link">
+            <Link to="/wallet?tab=bookings" className="wallet-rent-link">
               Οι ενοικιάσεις μου
             </Link>
           )}
