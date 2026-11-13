@@ -30,9 +30,8 @@ function canCheckIn(booking) {
 }
 
 /**
- * Online check-in bottom sheet — opened from a rental booking / Ενοικιάσεις card.
- * Structure inspired by clean member check-in sheets; PoreiaGo teal/deep only
- * (no Hertz yellow / brand copy).
+ * Online check-in bottom sheet — from Ενοικιάσεις / rental pass.
+ * Apple Wallet sheet language (blue, SF display); not a Hertz clone.
  */
 export default function RentMemberCheckinSheet({
   booking,
