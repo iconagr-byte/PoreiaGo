@@ -22,6 +22,7 @@ import {
 import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 import RentOfferCard from '../rental/RentOfferCard.jsx';
 import RentVehicleDetailSheet from '../rental/RentVehicleDetailSheet.jsx';
+import RentMemberCheckinSheet, { canCheckIn } from '../rental/RentMemberCheckinSheet.jsx';
 import WalletRentCheckout from './WalletRentCheckout.jsx';
 import { rememberRentVehicle } from '../../lib/rental/rentBookingExtras.js';
 
@@ -169,6 +170,7 @@ export default function RentalCatalogPanel({
   const [onlyWithPhotos, setOnlyWithPhotos] = useState(false);
   const [onlyTopRated, setOnlyTopRated] = useState(false);
   const [details, setDetails] = useState(null);
+  const [checkinBooking, setCheckinBooking] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [recentBooked, setRecentBooked] = useState(null);
 
@@ -906,6 +908,21 @@ export default function RentalCatalogPanel({
                     >
                       {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
                     </span>
+                    {canCheckIn(b) ? (
+                      <button
+                        type="button"
+                        className="wallet-btn wallet-btn-primary"
+                        onClick={() => {
+                          setCheckinBooking(b);
+                          trackFunnel('open_member_checkin', { booking_id: b.id });
+                        }}
+                      >
+                        Check-in τώρα
+                      </button>
+                    ) : null}
+                    {b.online_checkin_ready ? (
+                      <span className="wallet-chip wallet-chip-ok">Check-in έτοιμο</span>
+                    ) : null}
                     {b.rental_status === 'CONFIRMED' ? (
                       <button
                         type="button"
@@ -924,6 +941,19 @@ export default function RentalCatalogPanel({
         ) : null}
       </section>
       ) : null}
+
+      <RentMemberCheckinSheet
+        booking={checkinBooking}
+        brandLabel={brandLabel}
+        onClose={() => setCheckinBooking(null)}
+        onCheckedIn={(row) => {
+          setMine((list) =>
+            list.map((item) => (item.id === row.id ? { ...item, ...row } : item)),
+          );
+          setCheckinBooking((cur) => (cur && cur.id === row.id ? { ...cur, ...row } : cur));
+          trackFunnel('member_checkin_done', { booking_id: row.id });
+        }}
+      />
 
       {recentBooked ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>

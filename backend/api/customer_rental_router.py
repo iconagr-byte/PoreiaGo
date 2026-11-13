@@ -182,6 +182,21 @@ class LocationBody(BaseModel):
     accuracy: float | None = Field(default=None, ge=0)
 
 
+def _guest_booking_view(row: dict) -> dict:
+    """Masked booking payload for guest surname check-in lookup/confirm."""
+    base = _public_booking(row)
+    name = str(row.get("client_name") or "").strip()
+    if name:
+        parts = name.split()
+        masked = " ".join(
+            (p[0] + "…" if len(p) > 1 else p) for p in parts[:2]
+        )
+        base["client_name_masked"] = masked
+    else:
+        base["client_name_masked"] = "—"
+    return base
+
+
 def _public_booking(row: dict) -> dict:
     eligible = store.free_cancel_eligible(row)
     hours = None
@@ -218,6 +233,10 @@ def _public_booking(row: dict) -> dict:
         "payment_status": row.get("payment_status"),
         "created_at": row.get("created_at"),
         "modified_at": row.get("modified_at"),
+        "online_checkin_ready": bool(row.get("online_checkin_ready")),
+        "online_checkin_at": row.get("online_checkin_at"),
+        "free_cancel_eligible": bool(eligible),
+        "hours_until_start": hours,
     }
 
 
@@ -427,8 +446,8 @@ class GuestCheckinBody(BaseModel):
     reference_code: str = Field(min_length=4, max_length=40)
 
 
-@router.post("/public/lookup")
-async def guest_rental_lookup(body: GuestCheckinBody, request: Request):
+@router.post("/public/check-in/lookup")
+async def guest_rental_checkin_lookup(body: GuestCheckinBody, request: Request):
     """Guest online check-in lookup — surname + RN- code, office tenant from Host."""
     row = store.guest_lookup_booking(
         await _tenant_id(request),
@@ -455,6 +474,28 @@ async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
             raise HTTPException(status_code=404, detail=msg) from exc
         raise HTTPException(status_code=400, detail=msg) from exc
     return {"ok": True, "booking": _guest_booking_view(row)}
+
+
+@router.post("/bookings/{booking_id}/check-in")
+async def customer_rental_checkin(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    """Wallet member check-in for an owned rental booking."""
+    tid = await _require_rent_module(request, account)
+    try:
+        row = store.customer_online_checkin(
+            tid,
+            booking_id=booking_id,
+            email=account["email"],
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "booking": _public_booking(row)}
 
 
 @router.get("/bookings")

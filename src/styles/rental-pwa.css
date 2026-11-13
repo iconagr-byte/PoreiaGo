@@ -6983,6 +6983,213 @@
   color: #fff;
 }
 
+/* —— Member check-in sheet (wallet booking CTA) —— */
+.rent-member-checkin-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.48);
+  animation: rent-sheet-backdrop-in 0.2s ease;
+}
+
+.rent-member-checkin-sheet {
+  width: min(440px, 100%);
+  max-height: min(92dvh, 100%);
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px 22px 0 0;
+  background: #fff;
+  box-shadow: 0 -16px 48px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+  animation: rent-sheet-pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-member-checkin-handle {
+  width: 2.4rem;
+  height: 0.28rem;
+  margin: 0.55rem auto 0.15rem;
+  border-radius: 999px;
+  background: rgba(60, 60, 67, 0.22);
+}
+
+.rent-member-checkin-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem 0.55rem;
+}
+
+.rent-member-checkin-bar h2 {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  padding-left: 2.25rem;
+}
+
+.rent-member-checkin-close {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f4f7;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.rent-member-checkin-close .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-member-checkin-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.35rem 1.15rem 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-member-checkin-body h3 {
+  margin: 0;
+  font-size: clamp(1.45rem, 5vw, 1.75rem);
+  font-weight: 850;
+  letter-spacing: -0.04em;
+  color: var(--rent-deep, #0b3d4a);
+  line-height: 1.15;
+}
+
+.rent-member-checkin-body > p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-member-checkin-card {
+  margin-top: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-member-checkin-ref {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #636366;
+}
+
+.rent-member-checkin-ref strong {
+  color: #1d1d1f;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rent-member-checkin-vehicle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-member-checkin-legs {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-member-checkin-legs li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.rent-member-checkin-legs .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.25rem;
+  margin-top: 0.1rem;
+}
+
+.rent-member-checkin-legs strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-member-checkin-legs span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #86868b;
+}
+
+.rent-member-checkin-foot {
+  flex-shrink: 0;
+  padding: 0.65rem 1.15rem max(1rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 0.45rem;
+  background: #fff;
+}
+
+.rent-member-checkin-cta {
+  appearance: none;
+  width: 100%;
+  min-height: 3.15rem;
+  border: 0;
+  border-radius: 14px;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(11, 61, 74, 0.22);
+}
+
+.rent-member-checkin-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rent-member-checkin-foot > p {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #86868b;
+}
+
+@media (min-width: 720px) {
+  .rent-member-checkin-backdrop {
+    place-items: center;
+    padding: 1rem;
+  }
+
+  .rent-member-checkin-sheet {
+    border-radius: 22px;
+    max-height: min(860px, 92dvh);
+  }
+}
+
 /* —— Protection package cards (services step) —— */
 .rent-protect-hook {
   margin: 0 0 0.55rem;
