@@ -3,9 +3,13 @@
  */
 
 import { DEMO_RENT_FLEET } from './demoRentFleet.js';
-import { isSoftNativeRentDemoToken } from './nativeRentDemo.js';
+import { isNativeRentDemo, isSoftNativeRentDemoToken } from './nativeRentDemo.js';
 
 export const DEMO_RENT_BOOKING_ID = 'demo-rent-booking-checkin-1';
+/** Shared with office Δοκιμαστικός Πελάτης sample (guest + desk sync). */
+export const DEMO_RENT_OFFICE_REF = 'RN-DEMO01';
+export const DEMO_RENT_OFFICE_SURNAME = 'Πελάτης';
+/** Persist confirmed check-in across tab switches (local + session). */
 const CHECKIN_KEY = 'poreiago_demo_rent_checkin_v1';
 
 function daysFromNow(days, hour = 10) {
@@ -17,6 +21,11 @@ function daysFromNow(days, hour = 10) {
 
 export function readDemoRentCheckinReady() {
   try {
+    if (sessionStorage.getItem(CHECKIN_KEY) === '1') return true;
+  } catch {
+    /* ignore */
+  }
+  try {
     return localStorage.getItem(CHECKIN_KEY) === '1';
   } catch {
     return false;
@@ -25,11 +34,21 @@ export function readDemoRentCheckinReady() {
 
 export function writeDemoRentCheckinReady(ready) {
   try {
-    if (ready) localStorage.setItem(CHECKIN_KEY, '1');
-    else localStorage.removeItem(CHECKIN_KEY);
+    if (ready) {
+      sessionStorage.setItem(CHECKIN_KEY, '1');
+      localStorage.setItem(CHECKIN_KEY, '1');
+    } else {
+      sessionStorage.removeItem(CHECKIN_KEY);
+      localStorage.removeItem(CHECKIN_KEY);
+    }
   } catch {
     /* ignore */
   }
+}
+
+/** Clear sticky check-in flag (local + session) so the CTA returns. */
+export function resetDemoRentCheckinReady() {
+  writeDemoRentCheckinReady(false);
 }
 
 /** One confirmed IconaRent-style booking for soft demo wallets. */
@@ -38,7 +57,7 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   const ready = readDemoRentCheckinReady();
   return {
     id: DEMO_RENT_BOOKING_ID,
-    reference_code: 'RN-DEMO01',
+    reference_code: DEMO_RENT_OFFICE_REF,
     vehicle_id: car?.id || 'demo-rent-car',
     vehicle_model: car?.model || 'Peugeot 208',
     vehicle_plate: 'ΙΨΝ-2026',
@@ -48,7 +67,7 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
     pickup_location: brandLabel || 'Γραφείο',
     dropoff_location: brandLabel || 'Γραφείο',
     total_cost: Number(car?.daily_rate_eur || 38) * 3,
-    rental_status: 'CONFIRMED',
+    rental_status: ready ? 'ACTIVE' : 'CONFIRMED',
     driver_mode: 'SELF_DRIVE',
     payment_status: 'PAID',
     payment_method: 'card',
@@ -60,10 +79,13 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   };
 }
 
-/** When soft demo has no API bookings, inject the local pass. */
+/**
+ * When native rent demo (soft token or session flag) has no API bookings,
+ * inject the local pass so Check-in stays visible on Ενοικιάσεις.
+ */
 export function withDemoRentBookings(list, { brandLabel } = {}) {
   const rows = Array.isArray(list) ? list : [];
   if (rows.length) return rows;
-  if (!isSoftNativeRentDemoToken()) return rows;
+  if (!isSoftNativeRentDemoToken() && !isNativeRentDemo()) return rows;
   return [buildDemoRentBooking({ brandLabel })];
 }

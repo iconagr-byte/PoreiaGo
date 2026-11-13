@@ -54,8 +54,8 @@ export default function RentalWalletPass({
           </span>
           <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα ενοικίαση</h2>
           <p className="wallet-pass-empty-copy">
-            Κλείστε όχημα από την εφαρμογή ενοικίασης — η κράτηση εμφανίζεται εδώ στο Rent Wallet,
-            χωριστά από τα εισιτήρια λεωφορείου.
+            Κλείστε όχημα από Ενοικιάσεις — η κάρτα εμφανίζεται εδώ στις Κρατήσεις, δίπλα στα
+            εισιτήρια λεωφορείου.
           </p>
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
             Βρες όχημα
@@ -70,10 +70,10 @@ export default function RentalWalletPass({
 
   const status = booking.rental_status || 'CONFIRMED';
   const label = STATUS_LABEL[status] || status;
-  const code = booking.id || '—';
+  const code = booking.reference_code || booking.id || '—';
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
-  const qrValue = `RENT:${code}`;
+  const qrValue = `RENT:${booking.id || code}`;
 
   return (
     <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">
@@ -95,7 +95,14 @@ export default function RentalWalletPass({
             <p className="wallet-pass-kicker">Πελάτης</p>
             <p className="wallet-pass-passenger truncate">{passengerName || '—'}</p>
           </div>
-          <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
+          <div className="rent-wallet-status-stack">
+            <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
+            {booking.online_checkin_ready ? (
+              <span className="wallet-pass-status is-ok rent-wallet-checkin-chip">
+                Επιβεβαιωμένο check-in
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="wallet-pass-meta">
@@ -151,22 +158,25 @@ export default function RentalWalletPass({
 
         <div className="wallet-pass-actions">
           {booking.online_checkin_ready ? (
-            <p className="rent-wallet-checkin-ready">
+            <p className="rent-wallet-checkin-ready" role="status">
               <span className="material-symbols-outlined" aria-hidden>
                 task_alt
               </span>
-              Check-in έτοιμο για παραλαβή
+              Επιβεβαιωμένο check-in — το γραφείο το βλέπει
             </p>
           ) : null}
-          {!booking.online_checkin_ready &&
-          (status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
+          {(status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
           onCheckIn ? (
             <button
               type="button"
-              className="wallet-btn wallet-btn-primary wallet-btn-block"
+              className={`wallet-btn wallet-btn-block ${
+                booking.online_checkin_ready
+                  ? 'wallet-btn-ghost rent-wallet-checkin-done-btn'
+                  : 'wallet-btn-primary'
+              }`}
               onClick={() => onCheckIn(booking)}
             >
-              Check-in τώρα
+              {booking.online_checkin_ready ? 'Επιβεβαιωμένο check-in' : 'Check-in τώρα'}
             </button>
           ) : null}
           {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (

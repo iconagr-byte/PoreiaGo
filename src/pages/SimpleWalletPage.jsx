@@ -95,7 +95,7 @@ import '../styles/rental-pwa.css';
 
 /** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · [Ενοικιάσεις] · Περισσότερα.
  * Desktop → left sidebar; phone → bottom dock.
- * Rent passes live in the same shell (tab rentals) — not a second /rent/wallet app.
+ * Rent passes live in Κρατήσεις (bookings); tab rentals = browse/book fleet.
  * Account / Lost & Found / logout live in the header person menu. */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
@@ -415,8 +415,11 @@ function WalletAuthenticatedApp() {
         if (name && name !== 'Γραφείο') setBrandLabel(name);
         else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
         else if (splashName) setBrandLabel(splashName);
+        else if (isNativeRentDemo()) setBrandLabel('Ιψωνα ρεντ');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled && isNativeRentDemo()) setBrandLabel('Ιψωνα ρεντ');
+      });
     return () => {
       cancelled = true;
     };
@@ -469,7 +472,8 @@ function WalletAuthenticatedApp() {
   useEffect(() => {
     if (rentOnlyShell) {
       const allowed = new Set(['rentals', 'bookings', 'account', 'lost_found']);
-      if (!allowed.has(activeTab)) setActiveTab('rentals');
+      // Default to Κρατήσεις so rental passes are the first thing you see.
+      if (!allowed.has(activeTab)) setActiveTab('bookings');
       return;
     }
     if (!rentAvailable && activeTab === 'rentals') {
@@ -489,14 +493,27 @@ function WalletAuthenticatedApp() {
     navigate('/login', { replace: true, state: { from: '/wallet' } });
   };
 
+  /** Browse / book fleet (Ενοικιάσεις tab). */
   const openRentWallet = () => {
     setActiveTab('rentals');
+    setSelectedBookingId(null);
+  };
+
+  /** View rental pass cards inside Κρατήσεις. */
+  const openMyRentals = () => {
+    setActiveTab('bookings');
     setSelectedBookingId(null);
   };
 
   const highlightRentalBookingId = String(
     location.state?.highlightRentalBooking || '',
   ).trim();
+
+  useEffect(() => {
+    if (!highlightRentalBookingId || !rentAvailable) return;
+    setActiveTab('bookings');
+    setSelectedBookingId(null);
+  }, [highlightRentalBookingId, rentAvailable]);
 
   const tripCatalog = useMemo(() => {
     let local = [];
@@ -1033,7 +1050,11 @@ function WalletAuthenticatedApp() {
                 {homeFeed}
                 {rentAvailable ? (
                   <div className="wallet-stack" style={{ marginTop: '1rem' }}>
-                    <WalletRentSection compact onOpenRentals={openRentWallet} />
+                    <WalletRentSection
+                      compact
+                      brandLabel={brandLabel}
+                      onOpenRentals={openMyRentals}
+                    />
                   </div>
                 ) : null}
               </div>
@@ -1044,7 +1065,11 @@ function WalletAuthenticatedApp() {
               {homeFeed}
               {rentAvailable ? (
                 <div className="wallet-stack" style={{ marginTop: '0.85rem' }}>
-                  <WalletRentSection compact onOpenRentals={openRentWallet} />
+                  <WalletRentSection
+                    compact
+                    brandLabel={brandLabel}
+                    onOpenRentals={openMyRentals}
+                  />
                 </div>
               ) : null}
             </>
@@ -1064,7 +1089,22 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'bookings' && (
           <div className="wallet-stack">
-            {rentAvailable ? <WalletRentSection onOpenRentals={openRentWallet} /> : null}
+            {rentAvailable ? (
+              <RentalWalletPanel
+                brandLabel={brandLabel}
+                passengerName={profile.name}
+                refreshKey={rentSearchTick}
+                highlightBookingId={highlightRentalBookingId}
+                onBookVehicle={() => {
+                  openRentWallet();
+                  window.setTimeout(() => {
+                    document
+                      .getElementById('wallet-rent-fleet')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 120);
+                }}
+              />
+            ) : null}
             {!rentOnlyShell ? (
               <div className="wallet-panel">
                 <h2>Κρατήσεις λεωφορείου</h2>
@@ -1167,22 +1207,7 @@ function WalletAuthenticatedApp() {
               />
             ) : null}
 
-            {/* Pass + Check-in first — above fleet so it is visible without scrolling past cars. */}
-            {!rentCheckoutOpen ? (
-              <RentalWalletPanel
-                brandLabel={brandLabel}
-                passengerName={profile.name}
-                refreshKey={rentSearchTick}
-                highlightBookingId={highlightRentalBookingId}
-                onBookVehicle={() => {
-                  document
-                    .getElementById('wallet-rent-fleet')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-              />
-            ) : null}
-
-            {/* Offer cards / embedded services→details→payment wizard. */}
+            {/* Fleet browse/book only — rental passes live under Κρατήσεις. */}
             <RentalCatalogPanel
               mode="full"
               bookFirst
@@ -1276,20 +1301,24 @@ function WalletAuthenticatedApp() {
                   </span>
                   <div>
                     <h2>Ενοικιάσεις</h2>
-                    <p>Κάρτες οχήματος και κατάλογος στο ίδιο My Wallet.</p>
+                    <p>Κάρτες οχήματος στις Κρατήσεις · κατάλογος στο tab Ενοικιάσεις.</p>
                   </div>
                 </div>
                 <div className="wallet-rent-actions">
                   <button
                     type="button"
                     className="wallet-btn wallet-btn-primary wallet-btn-block"
-                    onClick={openRentWallet}
+                    onClick={openMyRentals}
                   >
                     Οι ενοικιάσεις μου
                   </button>
-                  <Link to="/rent" className="wallet-btn wallet-btn-ghost wallet-btn-block">
+                  <button
+                    type="button"
+                    className="wallet-btn wallet-btn-ghost wallet-btn-block"
+                    onClick={openRentWallet}
+                  >
                     Βρες όχημα
-                  </Link>
+                  </button>
                 </div>
               </section>
             ) : null}

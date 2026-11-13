@@ -249,10 +249,16 @@ export default function FleetRentalPanel({
     reload();
   }, [reload]);
 
-  // Soft live refresh on paperwork / inspections — signatures from tablet or remote
-  // must appear without a full page reload.
+  // Soft live refresh — paperwork, inspections, and bookings (online check-in from Wallet).
   useEffect(() => {
-    if (tab !== 'paperwork' && tab !== 'inspections' && !focusedInspection) return undefined;
+    if (
+      tab !== 'paperwork' &&
+      tab !== 'inspections' &&
+      tab !== 'bookings' &&
+      !focusedInspection
+    ) {
+      return undefined;
+    }
     let cancelled = false;
     const softReload = async () => {
       try {
@@ -1236,6 +1242,14 @@ export default function FleetRentalPanel({
                             >
                               {b.rental_status}
                             </span>
+                            {b.online_checkin_ready ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#34c759]/15 px-2.5 py-0.5 text-[10px] font-bold tracking-tight text-[#248a3d]">
+                                <span className="material-symbols-outlined text-[12px]">
+                                  task_alt
+                                </span>
+                                Online check-in
+                              </span>
+                            ) : null}
                             {b.pricing?.is_one_way ? (
                               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-tight text-amber-800">
                                 One-way
@@ -1308,14 +1322,28 @@ export default function FleetRentalPanel({
                         ) : null}
                         {b.rental_status === 'CONFIRMED' ? (
                           <>
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0a7a6c] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#08665b]"
-                              onClick={() => openFocusedInspection(b.id, 'PICKUP_CHECK')}
-                            >
-                              <span className="material-symbols-outlined text-[15px]">login</span>
-                              Check-in
-                            </button>
+                            {b.online_checkin_ready ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center gap-1 rounded-full border border-[#34c759]/35 bg-[#34c759]/12 px-3 py-2 text-[11px] font-semibold tracking-tight text-[#248a3d] transition hover:bg-[#34c759]/18"
+                                onClick={() => openFocusedInspection(b.id, 'PICKUP_CHECK')}
+                                title="Ο πελάτης ολοκλήρωσε online check-in"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">
+                                  task_alt
+                                </span>
+                                Έτοιμο
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center gap-1 rounded-full bg-[#0a7a6c] px-3 py-2 text-[11px] font-semibold tracking-tight text-white transition hover:bg-[#08665b]"
+                                onClick={() => openFocusedInspection(b.id, 'PICKUP_CHECK')}
+                              >
+                                <span className="material-symbols-outlined text-[15px]">login</span>
+                                Check-in
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-semibold tracking-tight text-rose-600 transition hover:bg-rose-50 disabled:opacity-45"

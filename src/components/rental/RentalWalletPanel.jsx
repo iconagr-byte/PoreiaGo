@@ -1,6 +1,6 @@
 /**
  * Rent passes — featured rental pass + stack of other vehicle bookings.
- * Lives inside unified My Wallet (/wallet?tab=rentals).
+ * Lives inside Κρατήσεις (/wallet?tab=bookings).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -148,8 +148,8 @@ export default function RentalWalletPanel({
     }
   };
 
-  // Empty / still loading: hide the marketing pass — book-first + fleet cover «Βρες όχημα».
-  if (!rows.length) {
+  // While loading with no rows yet, keep quiet (seed/API will fill).
+  if (loading && !rows.length) {
     return null;
   }
 
@@ -160,8 +160,8 @@ export default function RentalWalletPanel({
           <span className="material-symbols-outlined">directions_car</span>
         </span>
         <div>
-          <h2>Οι ενοικιάσεις μου</h2>
-          <p>Κάρτες οχήματος στο My Wallet.</p>
+          <h2>Ενοικιάσεις</h2>
+          <p>Κάρτες οχήματος στις Κρατήσεις.</p>
         </div>
       </div>
       <div className="rent-wallet">
@@ -170,9 +170,9 @@ export default function RentalWalletPanel({
           brandLabel={brandLabel}
           passengerName={passengerName}
           onBookVehicle={onBookVehicle}
-          onCancel={cancelBooking}
-          onCheckIn={(b) => setCheckinBooking(b)}
-          cancelling={busyId === featured?.id}
+          onCancel={featured ? cancelBooking : undefined}
+          onCheckIn={featured ? (b) => setCheckinBooking(b) : undefined}
+          cancelling={featured ? busyId === featured?.id : false}
         />
 
         {others.length ? (
