@@ -394,6 +394,9 @@ export default function RentMemberCheckinSheet({
                 )}
               </div>
 
+            </div>
+
+            <footer className="rent-member-checkin-foot rent-checkin-form-foot">
               <label className="rent-checkin-confirm">
                 <input
                   type="checkbox"
@@ -404,9 +407,6 @@ export default function RentMemberCheckinSheet({
                   Επιβεβαιώνω έλεγχο ελαστικών, φώτων, υγρών, εγγράφων και ρεζέρβας.
                 </span>
               </label>
-            </div>
-
-            <footer className="rent-member-checkin-foot rent-checkin-form-foot">
               <div className="rent-checkin-foot-row">
                 <button
                   type="button"
@@ -421,10 +421,7 @@ export default function RentMemberCheckinSheet({
                   className="rent-member-checkin-cta rent-checkin-submit"
                   disabled={busy || uploadingPhoto || !checkedVehicle || !signatureUrl}
                 >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    login
-                  </span>
-                  {busy ? 'Ολοκλήρωση…' : 'Ολοκλήρωση Check-in'}
+                  {busy ? 'Check in…' : 'Check in'}
                 </button>
               </div>
               <p>Χωρίς επιπλέον χρέωση · ίδια διαδικασία με το γραφείο</p>
