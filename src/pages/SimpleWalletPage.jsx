@@ -1167,6 +1167,21 @@ function WalletAuthenticatedApp() {
               />
             ) : null}
 
+            {/* Pass + Check-in first — above fleet so it is visible without scrolling past cars. */}
+            {!rentCheckoutOpen ? (
+              <RentalWalletPanel
+                brandLabel={brandLabel}
+                passengerName={profile.name}
+                refreshKey={rentSearchTick}
+                highlightBookingId={highlightRentalBookingId}
+                onBookVehicle={() => {
+                  document
+                    .getElementById('wallet-rent-fleet')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              />
+            ) : null}
+
             {/* Offer cards / embedded services→details→payment wizard. */}
             <RentalCatalogPanel
               mode="full"
@@ -1178,19 +1193,6 @@ function WalletAuthenticatedApp() {
                 setRentSearchTick((n) => n + 1);
               }}
             />
-
-            {!rentCheckoutOpen ? (
-              <RentalWalletPanel
-                brandLabel={brandLabel}
-                passengerName={profile.name}
-                highlightBookingId={highlightRentalBookingId}
-                onBookVehicle={() => {
-                  document
-                    .getElementById('wallet-rent-fleet')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-              />
-            ) : null}
           </div>
         ) : null}
 
