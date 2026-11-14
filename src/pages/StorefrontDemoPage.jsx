@@ -257,19 +257,9 @@ export default function StorefrontDemoPage() {
       onSubmit={handleSearch}
       className="sf-hero-search mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
     >
-      <div className="sf-preview-trip-program-head">
-        <p className="text-xs font-bold uppercase tracking-wider text-white/70 min-w-0">
-          {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
-        </p>
-        {/* Edit this hero search card — not Καρτέλες (that jumps the preview down). */}
-        <PreviewBuilderControl
-          sectionId="hero"
-          label="Hero"
-          variant="inline"
-          instanceId="hero-search-program"
-          studioTab="copy"
-        />
-      </div>
+      <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+        {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
+      </p>
       <div className="sf-hero-search__chips flex flex-wrap gap-2">
         {[
           { id: MARKET_FILTER_ALL, label: 'Όλες' },
