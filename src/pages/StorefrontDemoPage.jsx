@@ -261,12 +261,13 @@ export default function StorefrontDemoPage() {
         <p className="text-xs font-bold uppercase tracking-wider text-white/70 min-w-0">
           {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
         </p>
-        {/* Divi-like: Builder sits top-right of ΠΡΟΓΡΑΜΜΑ ΕΚΔΡΟΜΩΝ (Καρτέλες). */}
+        {/* Edit this hero search card — not Καρτέλες (that jumps the preview down). */}
         <PreviewBuilderControl
-          sectionId="trips"
-          label="Καρτέλες"
+          sectionId="hero"
+          label="Hero"
           variant="inline"
-          instanceId="trips-header"
+          instanceId="hero-search-program"
+          studioTab="copy"
         />
       </div>
       <div className="sf-hero-search__chips flex flex-wrap gap-2">

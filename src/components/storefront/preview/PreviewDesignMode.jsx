@@ -192,6 +192,8 @@ export function PreviewBuilderControl({
   instanceId = null,
   /** Button caption. Defaults to section title in dock, else «Επεξεργασία». */
   buttonLabel,
+  /** Optional Builder tab to open (e.g. hero → «copy» for search label). */
+  studioTab = null,
 }) {
   const ctx = usePreviewDesignMode();
   const wrapRef = useRef(null);
@@ -249,6 +251,7 @@ export function PreviewBuilderControl({
           onClose={ctx.closeBuilder}
           onSelectThemes={ctx.requestThemes}
           anchorRef={wrapRef}
+          initialTab={studioTab}
         />
       ) : null}
     </div>
@@ -292,6 +295,7 @@ function PreviewBuilderStudio({
   onClose,
   onSelectThemes,
   anchorRef,
+  initialTab = null,
 }) {
   const panelRef = useRef(null);
   const closeBtnRef = useRef(null);
@@ -381,6 +385,7 @@ function PreviewBuilderStudio({
             onSelectThemes={onSelectThemes}
             onClose={onClose}
             studio
+            initialTab={initialTab}
           />
         </div>
         <footer className="sf-studio__footer">
