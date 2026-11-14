@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import TripCard from './TripCard.jsx';
 import { tripsGridClass, tripCardWrapperClass } from '../../lib/homepage/homepageTemplates.js';
-import { PreviewBuilderControl } from './preview/PreviewDesignMode.jsx';
+import { PreviewBuilderControl, usePreviewDesignMode } from './preview/PreviewDesignMode.jsx';
 
 export default function TripsSection({
   id,
@@ -15,11 +16,51 @@ export default function TripsSection({
   sectionClassName = '',
   /** Tighter padding — for strips inserted between hero blocks (e.g. abroad before fleet). */
   compact = false,
+  /** Use intl_* appearance keys when set (abroad strip). */
+  international = false,
 }) {
+  const previewCtx = usePreviewDesignMode();
+  // Live Page Studio draft wins over the last-fetched appearance so layout/card
+  // clicks paint the preview in the same tick (no save / remount required).
+  const live = previewCtx?.enabled && previewCtx.form ? previewCtx.form : null;
+  const appearance = live || siteAppearance || {};
+
+  const layoutId =
+    (international
+      ? appearance.intl_trips_layout_template || appearance.trips_layout_template
+      : appearance.trips_layout_template) || 'grid_three';
+  const cardId =
+    (international
+      ? appearance.intl_trip_card_template || appearance.trip_card_template
+      : appearance.trip_card_template) || 'premium';
+
+  const liveEyebrow = international
+    ? live?.intl_section_eyebrow
+    : live?.trips_section_eyebrow;
+  const liveTitle = international
+    ? live?.intl_section_title
+    : live?.trips_section_title;
+  const liveSubtitle = international
+    ? live?.intl_section_subtitle
+    : live?.trips_section_subtitle;
+
+  const resolvedEyebrow = liveEyebrow != null ? liveEyebrow : eyebrow;
+  const resolvedTitle = liveTitle != null ? liveTitle : title;
+  const resolvedSubtitle = liveSubtitle != null ? liveSubtitle : subtitle;
+
+  const [layoutFlash, setLayoutFlash] = useState(false);
+  const prevLayoutRef = useRef(layoutId);
+
+  useEffect(() => {
+    if (prevLayoutRef.current === layoutId) return undefined;
+    prevLayoutRef.current = layoutId;
+    setLayoutFlash(true);
+    const t = window.setTimeout(() => setLayoutFlash(false), 480);
+    return () => window.clearTimeout(t);
+  }, [layoutId]);
+
   if (hidden) return null;
 
-  const layoutId = siteAppearance.trips_layout_template || 'grid_three';
-  const cardId = siteAppearance.trip_card_template || 'premium';
   const tripCount = trips.length;
   const solo = tripCount === 1;
   const dense = compact || solo;
@@ -31,11 +72,13 @@ export default function TripsSection({
     <section
       id={id}
       className={`sf-trips-section ${dense ? 'py-10 md:py-12' : 'py-16 md:py-24'} px-4 sm:px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
+      data-trips-layout={layoutId}
+      data-trip-card={cardId}
     >
       <div className={`text-center ${dense ? (abroadStrip ? 'mb-8' : 'mb-6') : 'mb-16'}`}>
-        {eyebrow && (
+        {resolvedEyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
-            {eyebrow}
+            {resolvedEyebrow}
           </span>
         )}
         {/* One Builder for the whole card template (Καρτέλες) — not per trip card. */}
@@ -49,7 +92,7 @@ export default function TripsSection({
                   : 'font-headline-lg text-4xl md:text-5xl'
             }`}
           >
-            {title}
+            {resolvedTitle}
           </h2>
           <PreviewBuilderControl
             sectionId="trips"
@@ -59,7 +102,7 @@ export default function TripsSection({
             className="sf-preview-trips-section-head__builder"
           />
         </div>
-        {subtitle && (
+        {resolvedSubtitle && (
           <p
             className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
               abroadStrip
@@ -69,7 +112,7 @@ export default function TripsSection({
                   : 'max-w-xl'
             }`}
           >
-            {subtitle}
+            {resolvedSubtitle}
           </p>
         )}
       </div>
@@ -77,7 +120,10 @@ export default function TripsSection({
       {trips.length === 0 ? (
         <p className="text-center text-on-surface-variant py-12 font-body-md">{emptyMessage}</p>
       ) : (
-        <div className={`sf-trips-grid ${gridClass}`}>
+        <div
+          key={`${layoutId}:${cardId}`}
+          className={`sf-trips-grid ${gridClass}${layoutFlash ? ' is-layout-flash' : ''}`}
+        >
           {trips.map((trip, index) => (
             <div
               key={String(trip.id ?? index)}

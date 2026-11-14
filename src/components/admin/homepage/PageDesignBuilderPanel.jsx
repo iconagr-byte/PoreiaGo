@@ -13,7 +13,19 @@ import {
 } from '../../../lib/homepage/homepageTemplates.js';
 import { getHomepageThemeById } from '../../../lib/homepage/homepageThemes.js';
 import { pageSliderPatch } from '../../../lib/homepage/pageSlider.js';
+import { scrollPreviewToSection } from '../../../lib/homepage/pageDesignBridge.js';
 import { DEFAULT_SITE_APPEARANCE } from '../../../services/siteAppearanceApi.js';
+
+/** Keep the trips strip in view when picking layout/card from Page Studio. */
+function revealTripsPreview() {
+  if (typeof window === 'undefined') return;
+  // Double rAF: wait for form → TripsSection layout paint, then scroll.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollPreviewToSection('trips', { behavior: 'smooth', block: 'start' });
+    });
+  });
+}
 
 const HERO_TEXT_DEFAULTS = {
   hero_badge: DEFAULT_SITE_APPEARANCE.hero_badge,
@@ -429,7 +441,7 @@ export default function PageDesignBuilderPanel({
                 category="trips_layout"
                 templates={TRIPS_LAYOUT_TEMPLATES}
                 value={form.trips_layout_template}
-                onChange={(id) =>
+                onChange={(id) => {
                   setForm((p) => ({
                     ...p,
                     trips_layout_template: id,
@@ -440,8 +452,10 @@ export default function PageDesignBuilderPanel({
                           intl_trip_card_template: 'destination_poster',
                         }
                       : {}),
-                  }))
-                }
+                  }));
+                  // Live preview: paint new grid in the iframe canvas immediately.
+                  revealTripsPreview();
+                }}
                 columns={2}
                 compact
               />
@@ -451,13 +465,14 @@ export default function PageDesignBuilderPanel({
                 category="trip_card"
                 templates={TRIP_CARD_TEMPLATES}
                 value={form.trip_card_template}
-                onChange={(id) =>
+                onChange={(id) => {
                   setForm((p) => ({
                     ...p,
                     trip_card_template: id,
                     intl_trip_card_template: id,
-                  }))
-                }
+                  }));
+                  revealTripsPreview();
+                }}
                 columns={2}
                 compact
               />
