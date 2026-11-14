@@ -1,4 +1,4 @@
-"""Purge legacy demo rental fleet (no longer seeded)."""
+"""Purge legacy demo rental fleet (no longer seeded via ensure_demo)."""
 
 from __future__ import annotations
 
@@ -77,3 +77,31 @@ def test_public_catalog_does_not_seed_demo(rental_store_file):
     rows = store.public_catalog(tid)
     assert rows == []
     assert store.list_vehicles(tid) == []
+
+
+def test_ensure_demo_never_purges_starter_fleet(rental_store_file, monkeypatch):
+    """Regression: ensure_demo must not wipe IconaRent DEMO-* after starter seed."""
+    monkeypatch.setenv("RENT_DEMO_FLEET", "true")
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("RENT_STARTER_FLEET_SLUGS", "iconarent")
+    tid = "0b0f6982-aaaa-bbbb-cccc-dddddddddddd"
+    assert store.ensure_starter_rent_fleet(tid, slug="iconarent") >= 1
+    before = len(store.list_vehicles(tid))
+    assert before >= 1
+    assert store.ensure_demo_rental_fleet(tid) == 0
+    store.ensure_demo_rental_sample_booking(tid)
+    assert len(store.list_vehicles(tid)) == before
+
+
+def test_starter_fleet_seeds_iconarent_when_empty(rental_store_file, monkeypatch):
+    monkeypatch.setenv("RENT_STARTER_FLEET_SLUGS", "iconarent")
+    rental_store_file.write_text(
+        json.dumps({"vehicles": [], "bookings": [], "inspections": [], "clients": []}),
+        encoding="utf-8",
+    )
+    tid = "0b0f6982-1111-2222-3333-444444444444"
+    n = store.ensure_starter_rent_fleet(tid, slug="iconarent")
+    assert n >= 1
+    rows = store.public_catalog(tid, slug="iconarent")
+    assert len(rows) >= 1
+    assert any("Peugeot" in str(r.get("model") or "") or r.get("model") for r in rows)

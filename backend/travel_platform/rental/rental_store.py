@@ -570,11 +570,14 @@ def starter_rent_fleet_slugs() -> frozenset[str]:
 
 
 def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
-    """Deprecated — no global demo seed. Starter fleets use ensure_starter_rent_fleet."""
-    if not demo_rental_fleet_allowed():
-        return 0
-    # Keep purge behaviour for leftover showcase rows when the old flag is on.
-    purge_demo_rental_fleet(tenant_id)
+    """Deprecated no-op.
+
+    Never purge here — admin ``GET /vehicles`` used to call this *after*
+    ``ensure_starter_rent_fleet``, which wiped IconaRent's DEMO-* cars and left
+    the office Στόλος empty while ``/public/catalog`` still looked fine.
+    Use ``purge_demo_rental_fleet`` explicitly when removing leftovers, and
+    ``ensure_starter_rent_fleet`` to seed allowlisted empty offices.
+    """
     return 0
 
 
@@ -671,7 +674,6 @@ async def seed_starter_rent_fleets_from_db() -> dict[str, Any]:
 def _ensure_demo_sign_vehicle(tenant_id: str) -> dict[str, Any]:
     """Pick an available vehicle, or create a compact demo car for signature trials."""
     tid = _normalize_tenant(tenant_id)
-    ensure_demo_rental_fleet(tid)
     vehicles = list_vehicles(tid)
     if vehicles:
         return next(
@@ -739,7 +741,6 @@ def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str,
     one vehicle (or demo fleet can be created). Used by list endpoints.
     """
     tid = _normalize_tenant(tenant_id)
-    ensure_demo_rental_fleet(tid)
     with _LOCK:
         data = _read()
         if any(b.get("tenant_id") == tid for b in data["bookings"]):
@@ -3880,8 +3881,7 @@ def public_catalog(
     category: str | None = None,
     slug: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards for this office. Demo seed only when allowed."""
-    ensure_demo_rental_fleet(tenant_id)
+    """Customer-facing vehicle cards for this office. Starter seed when allowlisted."""
     ensure_starter_rent_fleet(tenant_id, slug=slug)
     rows = list_vehicles(tenant_id, category=category)
     out = []

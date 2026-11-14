@@ -153,7 +153,6 @@ async def list_vehicles(
     payload: dict = Depends(_require_admin),
 ):
     tid = _tid(tenant_id)
-    store.ensure_demo_rental_fleet(tid)
     slug = str(payload.get("tenant_slug") or payload.get("slug") or "").strip().lower()
     if not slug:
         try:
@@ -170,6 +169,7 @@ async def list_vehicles(
                     slug = str(tenant.slug or tenant.subdomain or "").strip().lower()
         except Exception:
             slug = ""
+    # Seed IconaRent-style empty offices — never purge DEMO-* here.
     store.ensure_starter_rent_fleet(tid, slug=slug or None)
     store.ensure_demo_rental_sample_booking(tid)
     return {"vehicles": store.list_vehicles(tid, category=category)}
