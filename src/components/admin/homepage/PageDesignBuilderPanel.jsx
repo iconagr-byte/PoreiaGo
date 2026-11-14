@@ -245,10 +245,18 @@ export default function PageDesignBuilderPanel({
   onClose,
   /** Studio drawer chrome already shows title — use quieter in-panel header. */
   studio = false,
+  /** Optional starting tab (hero: photo|template|copy, trips: layout|card|copy). */
+  initialTab = null,
 }) {
-  const [tripsTab, setTripsTab] = useState('layout');
-  const [heroTab, setHeroTab] = useState('photo');
-  const [footerTab, setFooterTab] = useState('template');
+  const [tripsTab, setTripsTab] = useState(
+    section === 'trips' && initialTab ? initialTab : 'layout',
+  );
+  const [heroTab, setHeroTab] = useState(
+    section === 'hero' && initialTab ? initialTab : 'photo',
+  );
+  const [footerTab, setFooterTab] = useState(
+    section === 'footer' && initialTab ? initialTab : 'template',
+  );
   const meta = SECTION_META[section] || SECTION_META.general;
   const theme = getHomepageThemeById(form.homepage_theme_id);
 
