@@ -161,7 +161,15 @@ export default function StorefrontDemoPage() {
       if (!applyPreviewAppearance()) {
         fetchSiteAppearance().then(setSiteAppearance).catch(() => {});
       }
-      const unsub = subscribeHomepagePreviewDraft(() => {
+      const unsub = subscribeHomepagePreviewDraft((draft) => {
+        // Prefer the event payload so layout clicks update without a storage race.
+        if (draft && typeof draft === 'object') {
+          setSiteAppearance({
+            ...DEFAULT_SITE_APPEARANCE,
+            ...draft,
+          });
+          return;
+        }
         applyPreviewAppearance();
       });
       loadCommon();
@@ -465,6 +473,7 @@ export default function StorefrontDemoPage() {
               siteAppearance={siteAppearance}
               pricingSettings={pricingSettings}
               compact
+              international
               hidden={!showInternational || filteredInternational.length === 0}
             />
           </>

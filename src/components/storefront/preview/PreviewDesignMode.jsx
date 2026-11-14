@@ -99,9 +99,14 @@ export function PreviewDesignModeProvider({ children, appearance }) {
   const setForm = useCallback((updater) => {
     setFormState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
+      // Publish after this updater returns so Strict Mode double-invoke does not
+      // race; TripsSection already re-renders from ctx.form in the same commit.
       if (!syncingFromParent.current) {
-        pushHomepagePreviewDraft(next);
-        postPdwBridge({ type: PDW_BRIDGE.APPEARANCE_SYNC, appearance: next });
+        queueMicrotask(() => {
+          pushHomepagePreviewDraft(next);
+          postPdwBridge({ type: PDW_BRIDGE.APPEARANCE_SYNC, appearance: next });
+        });
       }
       return next;
     });
