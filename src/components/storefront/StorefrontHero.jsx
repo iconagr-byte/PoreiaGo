@@ -7,6 +7,7 @@ import {
   heroOverlayStrength,
 } from '../../lib/homepage/heroPhoto.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
+import { usePreviewDesignMode } from './preview/PreviewDesignMode.jsx';
 
 function HeroMedia({ siteAppearance, heroUrl }) {
   const slider = readPageSlider(siteAppearance, 'home');
@@ -81,42 +82,49 @@ export default function StorefrontHero({
   /** Override bus demo fallback (rent-only offices use coastal sea hero). */
   imageFallback = '/images/hero-bus-achillio.png',
 }) {
+  const previewCtx = usePreviewDesignMode();
+  // Page Studio draft wins so photo/carousel edits paint live in ?preview=1.
+  const appearance =
+    previewCtx?.enabled && previewCtx.form
+      ? { ...siteAppearance, ...previewCtx.form }
+      : siteAppearance;
+
   const heroUrl =
-    resolveSiteAssetUrl(siteAppearance.hero_image_url) || imageFallback;
-  const sliderOn = readPageSlider(siteAppearance, 'home').enabled;
-  const overlayStrength = heroOverlayStrength(siteAppearance);
-  const minHeight = heroMinHeightCss(siteAppearance, 820);
+    resolveSiteAssetUrl(appearance.hero_image_url) || imageFallback;
+  const sliderOn = readPageSlider(appearance, 'home').enabled;
+  const overlayStrength = heroOverlayStrength(appearance);
+  const minHeight = heroMinHeightCss(appearance, 820);
   const compactMinHeight = heroMinHeightCss(
     {
-      ...siteAppearance,
-      hero_height_vh: Math.min(70, siteAppearance?.hero_height_vh ?? 70),
+      ...appearance,
+      hero_height_vh: Math.min(70, appearance?.hero_height_vh ?? 70),
     },
     640,
   );
-  const focal = heroFocalCss(siteAppearance?.hero_image_focal || 'center');
-  const fit = heroBackgroundSize(siteAppearance);
+  const focal = heroFocalCss(appearance?.hero_image_focal || 'center');
+  const fit = heroBackgroundSize(appearance);
 
-  const badge = siteAppearance.hero_badge ? (
+  const badge = appearance.hero_badge ? (
     <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 text-white/95 font-bold text-[11px] uppercase tracking-[0.2em] rounded-full mb-6 border border-white/20 backdrop-blur-md">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-      {siteAppearance.hero_badge}
+      {appearance.hero_badge}
     </span>
   ) : null;
 
   const titleBlock = (
     <>
       <h1 className="text-[1.75rem] sm:text-3xl md:text-[2rem] lg:text-[2.25rem] font-display-md font-bold text-white mb-5 leading-snug tracking-tight">
-        {siteAppearance.hero_title}
-        {siteAppearance.hero_title_accent && (
+        {appearance.hero_title}
+        {appearance.hero_title_accent && (
           <>
             {' '}
-            <span className="text-sky-300">{siteAppearance.hero_title_accent}</span>
+            <span className="text-sky-300">{appearance.hero_title_accent}</span>
           </>
         )}
       </h1>
-      {siteAppearance.hero_subtitle && (
+      {appearance.hero_subtitle && (
         <p className="text-base md:text-lg text-white/80 font-body-md mb-8 max-w-xl leading-relaxed">
-          {siteAppearance.hero_subtitle}
+          {appearance.hero_subtitle}
         </p>
       )}
     </>
@@ -134,7 +142,7 @@ export default function StorefrontHero({
         </div>
         <div className="relative min-h-[40vh] md:min-h-full order-1 md:order-2 overflow-hidden">
           {sliderOn ? (
-            <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+            <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
           ) : (
             <div
               className="absolute inset-0 bg-no-repeat"
@@ -157,20 +165,20 @@ export default function StorefrontHero({
         style={{ minHeight: compactMinHeight }}
       >
         <div className="absolute inset-0 opacity-40">
-          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+          <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
         </div>
         <HeroOverlays strength={overlayStrength} variant="centered" />
         <div className="relative z-10 w-full max-w-3xl mx-auto text-center py-32 pt-40">
           <div className="flex flex-col items-center">
             {badge}
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">
-              {siteAppearance.hero_title}
-              {siteAppearance.hero_title_accent && (
-                <span className="block text-sky-300 mt-2">{siteAppearance.hero_title_accent}</span>
+              {appearance.hero_title}
+              {appearance.hero_title_accent && (
+                <span className="block text-sky-300 mt-2">{appearance.hero_title_accent}</span>
               )}
             </h1>
-            {siteAppearance.hero_subtitle && (
-              <p className="text-white/75 mb-8 max-w-lg">{siteAppearance.hero_subtitle}</p>
+            {appearance.hero_subtitle && (
+              <p className="text-white/75 mb-8 max-w-lg">{appearance.hero_subtitle}</p>
             )}
           </div>
           <div className="text-left">{searchForm}</div>
@@ -183,9 +191,9 @@ export default function StorefrontHero({
     return (
       <section
         className="relative flex flex-col justify-end px-margin-desktop overflow-hidden"
-        style={{ minHeight: heroMinHeightCss(siteAppearance, 880) }}
+        style={{ minHeight: heroMinHeightCss(appearance, 880) }}
       >
-        <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+        <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
         <HeroOverlays strength={overlayStrength} variant="bottom" />
         <div className="relative z-10 w-full max-w-container-max mx-auto pb-12 pt-36">
           <div className="max-w-2xl mb-8">
@@ -202,10 +210,10 @@ export default function StorefrontHero({
     return (
       <section
         className="relative flex items-center px-margin-desktop overflow-hidden bg-gradient-to-br from-indigo-950 via-violet-900 to-sky-900"
-        style={{ minHeight: heroMinHeightCss(siteAppearance, 760) }}
+        style={{ minHeight: heroMinHeightCss(appearance, 760) }}
       >
         <div className="absolute inset-0 opacity-20 mix-blend-overlay">
-          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+          <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
         </div>
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-sky-400/30 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-[28rem] h-[28rem] bg-violet-500/25 rounded-full blur-3xl" />
@@ -225,9 +233,9 @@ export default function StorefrontHero({
       <section className="relative px-margin-desktop py-28 lg:py-32 pt-36 bg-slate-100">
         <div
           className="max-w-container-max mx-auto rounded-[40px] overflow-hidden shadow-2xl border border-black/[0.06] flex items-center relative"
-          style={{ minHeight: heroMinHeightCss(siteAppearance, 680) }}
+          style={{ minHeight: heroMinHeightCss(appearance, 680) }}
         >
-          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+          <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
           <HeroOverlays strength={overlayStrength} variant="card" />
           <div className="relative z-10 p-8 md:p-14 max-w-2xl">
             {badge}
@@ -246,7 +254,7 @@ export default function StorefrontHero({
       className="sf-hero-fullscreen relative w-full flex items-center justify-center px-4 sm:px-margin-desktop overflow-x-clip"
       style={{ minHeight }}
     >
-      <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+      <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
       <HeroOverlays strength={overlayStrength} variant="fullscreen" />
       <div className="sf-hero-copy relative z-10 w-full max-w-container-max mx-auto py-16 sm:py-28 lg:py-32 pt-28 sm:pt-36">
         <div className="max-w-2xl min-w-0">
