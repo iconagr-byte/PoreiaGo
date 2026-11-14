@@ -1,6 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { TRIP_COVER_ACCEPT, fileToTripCoverDataUrl } from '../../../lib/trips/tripImage.js';
+import {
+  TRIP_COVER_ACCEPT,
+  fileToTripCoverDataUrl,
+  isTripCoverImageFile,
+} from '../../../lib/trips/tripImage.js';
 import { HERO_FOCAL_OPTIONS, heroFocalCss } from '../../../lib/homepage/heroFocal.js';
 import {
   HERO_FIT_OPTIONS,
@@ -138,7 +142,15 @@ export default function CompactHeroPhoto({ form, setForm }) {
   const autoplay = form.home_slider_autoplay !== false;
   const intervalSec = clampSliderIntervalSec(form.home_slider_interval_sec);
   const transition = sliderOpts.transition || 'fade';
-  const room = Math.max(0, MAX_PHOTOS - photos.filter((p) => p.role !== 'fallback').length);
+  const realPhotoCount = photos.filter((p) => p.role !== 'fallback').length;
+  const room = Math.max(0, MAX_PHOTOS - realPhotoCount);
+  const badgeLabel = carouselOn
+    ? 'Καρουζέλ'
+    : selected?.role === 'primary'
+      ? 'Κύρια'
+      : selected?.role === 'fallback'
+        ? 'Προεπιλογή'
+        : 'Επιπλέον';
 
   const patch = (next) => setForm((p) => ({ ...p, ...next }));
 
@@ -156,9 +168,18 @@ export default function CompactHeroPhoto({ form, setForm }) {
   };
 
   const ingestFiles = async (fileList) => {
-    const images = [...(fileList || [])].filter((f) => f?.type?.startsWith('image/'));
+    const raw = [...(fileList || [])].filter(Boolean);
+    // Cancelled file picker → empty list; stay quiet.
+    if (!raw.length) return;
+
+    const images = raw.filter(isTripCoverImageFile);
     if (!images.length) {
-      toast.error('Σύρε ή διάλεξε εικόνες (JPG / PNG / WebP)');
+      const looksHeic = raw.some((f) => /heic|heif/i.test(f.type || '') || /\.(heic|heif)$/i.test(f.name || ''));
+      toast.error(
+        looksHeic
+          ? 'Τα HEIC δεν υποστηρίζονται — αποθήκευσε ως JPG ή PNG'
+          : 'Μόνο JPG, PNG ή WebP',
+      );
       return;
     }
 
@@ -174,7 +195,13 @@ export default function CompactHeroPhoto({ form, setForm }) {
     try {
       for (let i = 0; i < batch.length; i += 1) {
         const file = batch[i];
-        const dataUrl = await fileToTripCoverDataUrl(file);
+        let dataUrl;
+        try {
+          dataUrl = await fileToTripCoverDataUrl(file);
+        } catch (err) {
+          toast.error(err?.message || 'Αποτυχία ανάγνωσης εικόνας');
+          continue;
+        }
 
         if (!next.length) {
           try {
@@ -218,8 +245,9 @@ export default function CompactHeroPhoto({ form, setForm }) {
 
   const onFileChange = (e) => {
     const files = e?.target?.files;
-    if (e?.target) e.target.value = '';
     ingestFiles(files);
+    // Reset after read so the same file can be chosen again.
+    if (e?.target) e.target.value = '';
   };
 
   const onClearPrimary = async () => {
@@ -373,11 +401,9 @@ export default function CompactHeroPhoto({ form, setForm }) {
           aria-hidden
         />
         <div className="pdw-hero-photo__preview-meta">
-          <span className="pdw-hero-photo__badge">
-            {carouselOn ? 'Καρουζέλ' : selected?.role === 'primary' ? 'Κύρια' : 'Επιπλέον'}
-          </span>
+          <span className="pdw-hero-photo__badge">{badgeLabel}</span>
           <span className="pdw-hero-photo__count">
-            {photos.filter((p) => p.role !== 'fallback').length || 0}/{MAX_PHOTOS}
+            {realPhotoCount}/{MAX_PHOTOS}
           </span>
         </div>
         {dragOver ? (

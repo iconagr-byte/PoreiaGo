@@ -2,14 +2,29 @@ const MAX_BYTES = 900_000;
 const MAX_WIDTH = 1280;
 const JPEG_QUALITY = 0.82;
 
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif)$/i;
+
+/** MIME can be empty on some OS/browsers — fall back to file extension. */
+export function isTripCoverImageFile(file) {
+  if (!file) return false;
+  if (String(file.type || '').startsWith('image/')) {
+    // Block HEIC/HEIF early — canvas decode is unreliable.
+    if (/heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name || '')) {
+      return false;
+    }
+    return true;
+  }
+  return IMAGE_EXT_RE.test(file.name || '');
+}
+
 /**
  * Resize & compress an image file for localStorage-backed trip covers.
  * Returns a JPEG data URL (or original data URL if already small enough).
  */
 export function fileToTripCoverDataUrl(file) {
   return new Promise((resolve, reject) => {
-    if (!file?.type?.startsWith('image/')) {
-      reject(new Error('Invalid image type'));
+    if (!isTripCoverImageFile(file)) {
+      reject(new Error('Μόνο JPG, PNG ή WebP'));
       return;
     }
     const reader = new FileReader();
@@ -52,4 +67,5 @@ export function fileToTripCoverDataUrl(file) {
   });
 }
 
-export const TRIP_COVER_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
+export const TRIP_COVER_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif';
