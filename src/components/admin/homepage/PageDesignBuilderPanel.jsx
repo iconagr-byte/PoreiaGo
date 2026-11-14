@@ -48,7 +48,7 @@ const SECTION_META = {
   },
   hero: {
     title: 'Hero',
-    blurb: 'Φωτογραφία φόντου, διάταξη και κείμενα.',
+    blurb: 'Πολλές φωτογραφίες, καρουζέλ, διάταξη και κείμενα.',
     icon: 'panorama',
   },
   slider: {
