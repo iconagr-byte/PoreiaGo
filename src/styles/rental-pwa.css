@@ -399,7 +399,7 @@
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo-wrap {
-  max-width: min(var(--rent-logo-max-w, 15rem), 15rem);
+  max-width: min(var(--rent-logo-max-w, 15rem), 90vw);
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo {
@@ -745,6 +745,14 @@
   border: 0;
   box-shadow: var(--rent-logo-shadow, none);
   box-sizing: content-box;
+  /* Clip the image to radius / background plate — without this, Στρογγύλεμα looked broken. */
+  overflow: hidden;
+  transition:
+    max-width 160ms ease,
+    padding 160ms ease,
+    border-radius 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .rent-topbar--compact .rent-topbar-row {
@@ -766,6 +774,8 @@
   width: auto;
   max-width: 100%;
   object-fit: contain;
+  border-radius: inherit;
+  transition: height 160ms ease;
 }
 
 .rent-brand-mark-copy {
@@ -853,12 +863,14 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
-/* Soft white plate on dark headers only when no custom logo background is set. */
+/* Soft white plate on dark headers only when no custom logo background is set.
+   Do not read --rent-logo-bg here — when mode is "none" that var is intentionally unset. */
 .rent-brand-mark--on-dark:not(.rent-brand-mark--bg-white):not(.rent-brand-mark--bg-soft):not(
     .rent-brand-mark--bg-dark
   )
   .rent-brand-mark-logo-wrap {
-  background: var(--rent-logo-bg, rgba(255, 255, 255, 0.96));
+  background: rgba(255, 255, 255, 0.96);
+  padding: max(var(--rent-logo-pad, 0px), 4px);
 }
 
 .rent-brand-mark--on-dark.rent-brand-mark--bg-white .rent-brand-mark-logo-wrap,
@@ -10462,11 +10474,13 @@
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo-wrap {
-  max-width: min(52vw, 14rem);
+  /* Honor studio max-width; only cap against the viewport so wide marks don't overflow. */
+  max-width: min(var(--rent-logo-max-w, 15rem), 72vw);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 4rem) * 1.15);
+  /* Use the exact studio height — the old 1.15× scale made the slider feel wrong. */
+  height: var(--rent-logo-h, 4rem);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-name {
@@ -10480,7 +10494,7 @@
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 4rem) * 1.08);
+  height: calc(var(--rent-logo-h, 4rem) * 0.92);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-name {
