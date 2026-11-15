@@ -29,7 +29,7 @@ export default function RentBrandDesigner({
   const [previewTone, setPreviewTone] = useState('light');
   const [dragOver, setDragOver] = useState(false);
 
-  const height = clampLogoHeight(form.rent_logo_height_px ?? form.logo_height_px ?? 40);
+  const height = clampLogoHeight(form.rent_logo_height_px ?? form.logo_height_px ?? 64);
   const maxWidth = clampLogoMaxWidth(form.rent_logo_max_width_px ?? 160);
   const radius = clampLogoRadius(form.rent_logo_radius_px ?? 0);
   const padding = clampLogoPadding(form.rent_logo_padding_px ?? 0);
