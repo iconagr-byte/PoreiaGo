@@ -1091,7 +1091,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                       rent_office_name: brandName,
                       rent_logo_show_name: form.rent_logo_show_name !== false,
                       rent_logo_height_px: clampLogoHeight(
-                        form.rent_logo_height_px ?? 40,
+                        form.rent_logo_height_px ?? 64,
                       ),
                       rent_logo_max_width_px: clampLogoMaxWidth(
                         form.rent_logo_max_width_px ?? 160,

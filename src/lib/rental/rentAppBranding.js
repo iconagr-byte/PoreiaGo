@@ -130,10 +130,17 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       ? appearance.rent_logo_show_name !== false
       : appearance.logo_show_name !== false;
 
+  // Prefer a readable default — 40px made wordmarks (e.g. RentalGo) illegible in the header.
+  // Legacy saved 40 / 160 were the old platform defaults; bump them so existing offices
+  // get a visible mark without reopening brand settings.
+  const rawHeight = appearance.rent_logo_height_px ?? appearance.logo_height_px;
+  const rawMaxW = appearance.rent_logo_max_width_px;
   const logoHeightPx = clampLogoHeight(
-    appearance.rent_logo_height_px ?? appearance.logo_height_px ?? 40,
+    rawHeight == null || rawHeight === '' || Number(rawHeight) <= 40 ? 64 : rawHeight,
   );
-  const logoMaxWidthPx = clampLogoMaxWidth(appearance.rent_logo_max_width_px ?? 160);
+  const logoMaxWidthPx = clampLogoMaxWidth(
+    rawMaxW == null || rawMaxW === '' || Number(rawMaxW) <= 160 ? 240 : rawMaxW,
+  );
   const logoRadiusPx = clampLogoRadius(appearance.rent_logo_radius_px ?? 0);
   const logoPaddingPx = clampLogoPadding(appearance.rent_logo_padding_px ?? 0);
   const logoBgMode = normalizeLogoBgMode(appearance.rent_logo_bg_mode ?? 'none');
@@ -187,9 +194,9 @@ function rentLogoBgColor(mode) {
  * @param {ReturnType<typeof resolveRentAppBranding> | object} branding
  */
 export function rentBrandMarkStyleVars(branding = {}) {
-  const height = clampLogoHeight(branding.logoHeightPx ?? branding.rent_logo_height_px ?? 40);
+  const height = clampLogoHeight(branding.logoHeightPx ?? branding.rent_logo_height_px ?? 64);
   const maxWidth = clampLogoMaxWidth(
-    branding.logoMaxWidthPx ?? branding.rent_logo_max_width_px ?? 160,
+    branding.logoMaxWidthPx ?? branding.rent_logo_max_width_px ?? 240,
   );
   const radius = clampLogoRadius(branding.logoRadiusPx ?? branding.rent_logo_radius_px ?? 0);
   const padding = clampLogoPadding(

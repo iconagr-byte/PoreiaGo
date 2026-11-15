@@ -399,11 +399,11 @@
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo-wrap {
-  max-width: min(var(--rent-logo-max-w, 10.5rem), 10.5rem);
+  max-width: min(var(--rent-logo-max-w, 15rem), 15rem);
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo {
-  height: var(--rent-logo-h, 3.35rem);
+  height: var(--rent-logo-h, 4rem);
 }
 
 .rent-hero-title {
@@ -735,7 +735,7 @@
 
 .rent-brand-mark-logo-wrap {
   flex-shrink: 0;
-  max-width: var(--rent-logo-max-w, 8.5rem);
+  max-width: var(--rent-logo-max-w, 15rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -748,21 +748,21 @@
 }
 
 .rent-topbar--compact .rent-topbar-row {
-  min-height: 2.75rem;
-  padding-block: 0.35rem;
+  min-height: 3.15rem;
+  padding-block: 0.4rem;
 }
 
 .rent-topbar--compact .rent-brand-mark-badge {
-  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
+  height: var(--rent-logo-h, 4rem);
 }
 
 .rent-topbar--compact .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
+  height: var(--rent-logo-h, 4rem);
 }
 
 .rent-brand-mark-logo {
   display: block;
-  height: var(--rent-logo-h, 2.55rem);
+  height: var(--rent-logo-h, 4rem);
   width: auto;
   max-width: 100%;
   object-fit: contain;
@@ -819,7 +819,7 @@
 }
 
 .rent-brand-mark--compact .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
+  height: calc(var(--rent-logo-h, 4rem) * 0.92);
 }
 
 .rent-brand-mark--compact .rent-brand-mark-icon {
@@ -10462,11 +10462,11 @@
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo-wrap {
-  max-width: min(46vw, 11.5rem);
+  max-width: min(52vw, 14rem);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 2.55rem) * 1.42);
+  height: calc(var(--rent-logo-h, 4rem) * 1.15);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark-name {
@@ -10480,7 +10480,7 @@
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-logo {
-  height: calc(var(--rent-logo-h, 2.55rem) * 1.32);
+  height: calc(var(--rent-logo-h, 4rem) * 1.08);
 }
 
 .rent-phone-stage:not(.rent-phone-stage--desktop) .rent-brand-mark--compact .rent-brand-mark-name {
