@@ -1094,7 +1094,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                         form.rent_logo_height_px ?? 64,
                       ),
                       rent_logo_max_width_px: clampLogoMaxWidth(
-                        form.rent_logo_max_width_px ?? 160,
+                        form.rent_logo_max_width_px ?? 240,
                       ),
                       rent_logo_radius_px: clampLogoRadius(
                         form.rent_logo_radius_px ?? 0,

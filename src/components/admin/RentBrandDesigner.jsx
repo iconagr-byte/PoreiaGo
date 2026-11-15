@@ -11,6 +11,42 @@ import {
 import { resolveRentAppBranding } from '../../lib/rental/rentAppBranding.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
+const SIZE_PRESETS = [
+  { id: 's', label: 'S', height: 40, maxWidth: 140 },
+  { id: 'm', label: 'M', height: 52, maxWidth: 180 },
+  { id: 'l', label: 'L', height: 64, maxWidth: 240 },
+  { id: 'xl', label: 'XL', height: 80, maxWidth: 300 },
+];
+
+const RADIUS_PRESETS = [
+  { label: 'Ορθό', value: 0 },
+  { label: 'Ήπιο', value: 8 },
+  { label: 'Στρογγυλό', value: 16 },
+  { label: 'Χάπι', value: 48 },
+];
+
+const BG_OPTIONS = [
+  { id: 'none', label: 'Κανένα', swatch: 'transparent', border: true },
+  { id: 'white', label: 'Λευκό', swatch: '#ffffff', border: true },
+  { id: 'soft', label: 'Απαλό', swatch: 'rgba(15, 23, 42, 0.08)', border: false },
+  { id: 'dark', label: 'Σκούρο', swatch: 'rgba(15, 23, 42, 0.92)', border: false },
+];
+
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif)$/i;
+
+function isLogoImageFile(file) {
+  if (!file) return false;
+  const type = String(file.type || '').toLowerCase();
+  if (type.startsWith('image/') && !type.includes('heic') && !type.includes('heif')) {
+    return true;
+  }
+  return IMAGE_EXT_RE.test(String(file.name || ''));
+}
+
+function matchSizePreset(height, maxWidth) {
+  return SIZE_PRESETS.find((p) => p.height === height && p.maxWidth === maxWidth)?.id || null;
+}
+
 /**
  * Apple-clean rent brand studio — live header preview + logo/name controls.
  * Stored on site_appearance (rent_* fields), independent from buses branding.
@@ -30,13 +66,14 @@ export default function RentBrandDesigner({
   const [dragOver, setDragOver] = useState(false);
 
   const height = clampLogoHeight(form.rent_logo_height_px ?? form.logo_height_px ?? 64);
-  const maxWidth = clampLogoMaxWidth(form.rent_logo_max_width_px ?? 160);
+  const maxWidth = clampLogoMaxWidth(form.rent_logo_max_width_px ?? 240);
   const radius = clampLogoRadius(form.rent_logo_radius_px ?? 0);
   const padding = clampLogoPadding(form.rent_logo_padding_px ?? 0);
   const bgMode = normalizeLogoBgMode(form.rent_logo_bg_mode ?? 'none');
   const shadowOn = form.rent_logo_shadow === true;
   const compact = form.rent_header_compact === true;
   const showName = form.rent_logo_show_name !== false;
+  const sizePreset = matchSizePreset(height, maxWidth);
 
   const preview = useMemo(
     () =>
@@ -62,17 +99,25 @@ export default function RentBrandDesigner({
     fileRef.current?.click();
   };
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (uploading || saving) return;
-    const file = e.dataTransfer?.files?.[0];
+  const ingestFile = (file) => {
     if (!file) return;
-    if (!String(file.type || '').startsWith('image/')) {
+    const name = String(file.name || '').toLowerCase();
+    if (name.endsWith('.heic') || name.endsWith('.heif') || String(file.type || '').includes('heic')) {
+      toast.error('HEIC δεν υποστηρίζεται — αποθηκεύστε ως JPG / PNG');
+      return;
+    }
+    if (!isLogoImageFile(file)) {
       toast.error('Μόνο εικόνες (PNG / JPG / WebP)');
       return;
     }
     onUpload?.({ target: { files: [file], value: '' } });
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (uploading || saving) return;
+    ingestFile(e.dataTransfer?.files?.[0]);
   };
 
   const copyOfficeLogo = () => {
@@ -89,16 +134,37 @@ export default function RentBrandDesigner({
     toast.success('Αντιγράφηκε το logo γραφείου — πατήστε Αποθήκευση');
   };
 
+  const applySizePreset = (preset) => {
+    setForm((p) => ({
+      ...p,
+      rent_logo_height_px: preset.height,
+      rent_logo_max_width_px: preset.maxWidth,
+    }));
+  };
+
+  const setBgMode = (id) => {
+    setForm((p) => {
+      const next = { ...p, rent_logo_bg_mode: id };
+      // Background needs a little padding to read — auto-bump from 0.
+      if (id !== 'none' && clampLogoPadding(p.rent_logo_padding_px ?? 0) === 0) {
+        next.rent_logo_padding_px = 8;
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="rent-brand-studio space-y-5">
-      {/* Live header preview */}
-      <section className="overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.04] bg-slate-50/80 px-5 py-3.5">
+      {/* Sticky live header preview */}
+      <section className="sticky top-2 z-20 overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.04] bg-slate-50/90 px-5 py-3 backdrop-blur-md">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700/80">
               Live preview
             </p>
-            <p className="text-sm font-bold text-slate-900">Header /rent</p>
+            <p className="text-sm font-bold text-slate-900">
+              Header /rent · {height}×{maxWidth}px
+            </p>
           </div>
           <div className="inline-flex rounded-full bg-slate-200/70 p-0.5 text-[11px] font-bold">
             {[
@@ -186,7 +252,7 @@ export default function RentBrandDesigner({
             {usingOfficeFallback
               ? 'Προεπισκόπηση με logo γραφείου (fallback) — ανεβάστε ξεχωριστό για /rent'
               : hasCustomLogo
-                ? 'Προσαρμοσμένο λογότυπο /rent'
+                ? 'Οι αλλαγές εμφανίζονται αμέσως — πατήστε Αποθήκευση για το live /rent'
                 : 'Χωρίς εικόνα — εμφανίζεται το teal badge + όνομα'}
           </p>
         </div>
@@ -221,7 +287,7 @@ export default function RentBrandDesigner({
         />
       </section>
 
-      {/* Logo upload */}
+      {/* Logo upload + size */}
       <section className="overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
         <div className="border-b border-black/[0.04] bg-slate-50/80 px-5 py-4">
           <h5 className="font-bold text-slate-900">Λογότυπο /rent</h5>
@@ -229,7 +295,7 @@ export default function RentBrandDesigner({
             PNG με διαφάνεια προτιμότερο · JPG / WebP επίσης
           </p>
         </div>
-        <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.1fr]">
+        <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.15fr]">
           <button
             type="button"
             onClick={pickFile}
@@ -240,7 +306,7 @@ export default function RentBrandDesigner({
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
             disabled={uploading || saving}
-            className={`relative flex min-h-[9.5rem] flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed px-4 py-6 text-center transition ${
+            className={`relative flex min-h-[10rem] flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed px-4 py-6 text-center transition ${
               dragOver
                 ? 'border-teal-400 bg-teal-50'
                 : logoSrc
@@ -252,8 +318,11 @@ export default function RentBrandDesigner({
               <img
                 src={logoSrc}
                 alt="Λογότυπο rent"
-                className="max-h-16 max-w-[180px] object-contain"
-                style={{ height: `${Math.min(height, 64)}px` }}
+                className="max-w-[220px] object-contain"
+                style={{
+                  height: `${Math.min(Math.max(height, 36), 88)}px`,
+                  borderRadius: `${Math.min(radius, 16)}px`,
+                }}
               />
             ) : (
               <span className="material-symbols-outlined text-[40px] text-slate-300">
@@ -263,14 +332,17 @@ export default function RentBrandDesigner({
             <span className="text-sm font-bold text-slate-800">
               {uploading ? 'Ανέβασμα…' : 'Σύρετε ή πατήστε για ανέβασμα'}
             </span>
-            <span className="text-[11px] text-slate-500">Μέγ. 4 MB</span>
+            <span className="text-[11px] text-slate-500">Μέγ. 4 MB · PNG / JPG / WebP</span>
             <input
               ref={fileRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
               className="hidden"
               disabled={uploading || saving}
-              onChange={(e) => onUpload?.(e)}
+              onChange={(e) => {
+                ingestFile(e.target?.files?.[0]);
+                e.target.value = '';
+              }}
             />
           </button>
 
@@ -301,7 +373,7 @@ export default function RentBrandDesigner({
                   onClick={copyOfficeLogo}
                   disabled={uploading || saving}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2.5 text-sm font-bold text-teal-900 hover:bg-teal-100"
-                  title="Αντιγραφή του κοινόυ logo γραφείου ως rent logo"
+                  title="Αντιγραφή του κοινού logo γραφείου ως rent logo"
                 >
                   <span className="material-symbols-outlined text-[18px]">content_copy</span>
                   Από γραφείο
@@ -310,14 +382,37 @@ export default function RentBrandDesigner({
             </div>
 
             <div>
+              <p className="mb-2 text-xs font-bold text-slate-500">Γρήγορο μέγεθος</p>
+              <div className="flex flex-wrap gap-1.5">
+                {SIZE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applySizePreset(preset)}
+                    className={`min-w-[3rem] rounded-xl border px-3 py-2 text-sm font-bold transition ${
+                      sizePreset === preset.id
+                        ? 'border-teal-700 bg-teal-700 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-teal-300'
+                    }`}
+                    title={`${preset.height}×${preset.maxWidth}px`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
                 <span>Ύψος λογοτύπου</span>
-                <span className="tabular-nums text-slate-800">{height}px</span>
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 tabular-nums text-slate-800">
+                  {height}px
+                </span>
               </div>
               <input
                 type="range"
                 min={24}
-                max={72}
+                max={96}
                 step={1}
                 value={height}
                 onChange={(e) =>
@@ -327,18 +422,25 @@ export default function RentBrandDesigner({
                   }))
                 }
                 className="w-full accent-teal-700"
+                aria-label="Ύψος λογοτύπου"
               />
+              <div className="mt-1 flex justify-between text-[10px] font-medium text-slate-400">
+                <span>24</span>
+                <span>96</span>
+              </div>
             </div>
 
             <div>
               <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
                 <span>Μέγ. πλάτος</span>
-                <span className="tabular-nums text-slate-800">{maxWidth}px</span>
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 tabular-nums text-slate-800">
+                  {maxWidth}px
+                </span>
               </div>
               <input
                 type="range"
                 min={80}
-                max={280}
+                max={360}
                 step={4}
                 value={maxWidth}
                 onChange={(e) =>
@@ -348,7 +450,12 @@ export default function RentBrandDesigner({
                   }))
                 }
                 className="w-full accent-teal-700"
+                aria-label="Μέγιστο πλάτος λογοτύπου"
               />
+              <div className="mt-1 flex justify-between text-[10px] font-medium text-slate-400">
+                <span>80</span>
+                <span>360</span>
+              </div>
             </div>
           </div>
         </div>
@@ -358,20 +465,22 @@ export default function RentBrandDesigner({
       <section className="rounded-[22px] border border-black/[0.06] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
         <h5 className="font-bold text-slate-900">Σχεδιασμός λογοτύπου</h5>
         <p className="mt-0.5 mb-4 text-xs text-slate-500">
-          Στρογγύλεμα, φόντο και σκιά — μόνο στο header /rent
+          Στρογγύλεμα, φόντο και σκιά — εφαρμόζονται στο header /rent
         </p>
 
         <div className="space-y-5">
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
               <span>Στρογγύλεμα</span>
-              <span className="tabular-nums text-slate-800">{radius}px</span>
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 tabular-nums text-slate-800">
+                {radius}px
+              </span>
             </div>
             <input
               type="range"
               min={0}
               max={48}
-              step={2}
+              step={1}
               value={radius}
               onChange={(e) =>
                 setForm((p) => ({
@@ -380,14 +489,10 @@ export default function RentBrandDesigner({
                 }))
               }
               className="w-full accent-teal-700"
+              aria-label="Στρογγύλεμα λογοτύπου"
             />
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {[
-                { label: 'Ορθό', value: 0 },
-                { label: 'Ήπιο', value: 8 },
-                { label: 'Στρογγυλό', value: 16 },
-                { label: 'Κύκλος', value: 48 },
-              ].map((preset) => (
+              {RADIUS_PRESETS.map((preset) => (
                 <button
                   key={preset.value}
                   type="button"
@@ -409,13 +514,15 @@ export default function RentBrandDesigner({
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
               <span>Εσωτερικό κενό</span>
-              <span className="tabular-nums text-slate-800">{padding}px</span>
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 tabular-nums text-slate-800">
+                {padding}px
+              </span>
             </div>
             <input
               type="range"
               min={0}
               max={24}
-              step={2}
+              step={1}
               value={padding}
               onChange={(e) =>
                 setForm((p) => ({
@@ -424,29 +531,44 @@ export default function RentBrandDesigner({
                 }))
               }
               className="w-full accent-teal-700"
+              aria-label="Εσωτερικό κενό λογοτύπου"
             />
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Χρήσιμο μαζί με φόντο — δίνει «πλαίσιο» γύρω από το λογότυπο
+            </p>
           </div>
 
           <div>
             <p className="mb-2 text-xs font-bold text-slate-500">Φόντο</p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { id: 'none', label: 'Κανένα' },
-                { id: 'white', label: 'Λευκό' },
-                { id: 'soft', label: 'Απαλό' },
-                { id: 'dark', label: 'Σκούρο' },
-              ].map((opt) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {BG_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setForm((p) => ({ ...p, rent_logo_bg_mode: opt.id }))}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                  onClick={() => setBgMode(opt.id)}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-center transition ${
                     bgMode === opt.id
-                      ? 'border-teal-700 bg-teal-700 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300'
+                      ? 'border-teal-700 bg-teal-50 shadow-sm ring-2 ring-teal-700/20'
+                      : 'border-slate-200 bg-white hover:border-teal-300'
                   }`}
                 >
-                  {opt.label}
+                  <span
+                    className="h-8 w-8 rounded-xl shadow-inner"
+                    style={{
+                      background: opt.swatch,
+                      boxShadow: opt.border
+                        ? 'inset 0 0 0 1px rgba(15,23,42,0.12)'
+                        : undefined,
+                    }}
+                    aria-hidden
+                  />
+                  <span
+                    className={`text-[11px] font-bold ${
+                      bgMode === opt.id ? 'text-teal-900' : 'text-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -531,9 +653,7 @@ export default function RentBrandDesigner({
                 : 'border-black/[0.06] bg-slate-50/80 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-[22px] text-teal-700">
-              expand
-            </span>
+            <span className="material-symbols-outlined text-[22px] text-teal-700">expand</span>
             <span className="mt-2 block text-sm font-bold text-slate-900">Άνετο header</span>
             <span className="mt-0.5 block text-[11px] text-slate-500">Περισσότερο ύψος / padding</span>
           </button>

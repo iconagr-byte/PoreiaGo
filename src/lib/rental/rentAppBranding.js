@@ -130,16 +130,15 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       ? appearance.rent_logo_show_name !== false
       : appearance.logo_show_name !== false;
 
-  // Prefer a readable default — 40px made wordmarks (e.g. RentalGo) illegible in the header.
-  // Legacy saved 40 / 160 were the old platform defaults; bump them so existing offices
-  // get a visible mark without reopening brand settings.
+  // Defaults when unset: 64×240 (readable wordmarks). Honor any explicit slider value —
+  // never force ≥ thresholds (that made max-width=160 appear stuck at 240 in the studio).
   const rawHeight = appearance.rent_logo_height_px ?? appearance.logo_height_px;
   const rawMaxW = appearance.rent_logo_max_width_px;
   const logoHeightPx = clampLogoHeight(
-    rawHeight == null || rawHeight === '' || Number(rawHeight) <= 40 ? 64 : rawHeight,
+    rawHeight == null || rawHeight === '' ? 64 : rawHeight,
   );
   const logoMaxWidthPx = clampLogoMaxWidth(
-    rawMaxW == null || rawMaxW === '' || Number(rawMaxW) <= 160 ? 240 : rawMaxW,
+    rawMaxW == null || rawMaxW === '' ? 240 : rawMaxW,
   );
   const logoRadiusPx = clampLogoRadius(appearance.rent_logo_radius_px ?? 0);
   const logoPaddingPx = clampLogoPadding(appearance.rent_logo_padding_px ?? 0);
@@ -205,13 +204,17 @@ export function rentBrandMarkStyleVars(branding = {}) {
   const bgMode = normalizeLogoBgMode(branding.logoBgMode ?? branding.rent_logo_bg_mode ?? 'none');
   const shadow =
     branding.logoShadow === true || branding.rent_logo_shadow === true;
-  return {
+  // Omit --rent-logo-bg when "none" so CSS fallbacks (e.g. soft plate on dark headers) work.
+  const vars = {
     ['--rent-logo-h']: `${height}px`,
     ['--rent-logo-max-w']: `${maxWidth}px`,
     ['--rent-logo-radius']: `${radius}px`,
     ['--rent-logo-pad']: `${padding}px`,
-    ['--rent-logo-bg']: rentLogoBgColor(bgMode),
     ['--rent-logo-shadow']: shadow ? '0 4px 14px rgba(15, 23, 42, 0.14)' : 'none',
     ['--rent-logo-bg-mode']: bgMode,
   };
+  if (bgMode !== 'none') {
+    vars['--rent-logo-bg'] = rentLogoBgColor(bgMode);
+  }
+  return vars;
 }

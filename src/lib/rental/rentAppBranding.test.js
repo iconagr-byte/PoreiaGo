@@ -66,6 +66,18 @@ console.assert(sized.logoBgMode === 'white', 'rent logo bg');
 console.assert(sized.logoShadow === true, 'rent logo shadow');
 console.assert(sized.headerCompact === true, 'compact header');
 
+const defaults = resolveRentAppBranding({});
+console.assert(defaults.logoHeightPx === 64, 'default height 64');
+console.assert(defaults.logoMaxWidthPx === 240, 'default max width 240');
+
+// Explicit small sizes must stick (studio sliders) — never auto-bump past thresholds.
+const explicitSmall = resolveRentAppBranding({
+  rent_logo_height_px: 40,
+  rent_logo_max_width_px: 160,
+});
+console.assert(explicitSmall.logoHeightPx === 40, 'honor height 40');
+console.assert(explicitSmall.logoMaxWidthPx === 160, 'honor max width 160');
+
 const guest = resolveRentAppBranding(
   { rent_guest_hero_title: 'Δες στόλο' },
   { guest: true },
