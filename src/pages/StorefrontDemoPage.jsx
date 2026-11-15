@@ -281,29 +281,6 @@ export default function StorefrontDemoPage() {
         ))}
       </div>
 
-      {pickerTrips.length > 0 && (
-        <div className="sf-hero-search__trip-picks flex flex-wrap gap-2">
-          {pickerTrips.slice(0, 4).map((trip) => {
-            const active = String(searchFilters.tripId) === String(trip.id);
-            return (
-              <button
-                key={trip.id}
-                type="button"
-                onClick={() => handleTripPick(active ? '' : trip.id)}
-                className={`text-left px-3 py-2 rounded-2xl text-xs font-semibold border transition-all max-w-full ${
-                  active
-                    ? 'bg-white text-slate-900 border-white'
-                    : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
-                }`}
-              >
-                <span className="block opacity-80">{formatTripDepartureLabel(trip)}</span>
-                <span className="block truncate">{trip.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block sm:col-span-2">
           <span className="text-xs font-semibold text-white/80 mb-1.5 block">Εκδρομή</span>
