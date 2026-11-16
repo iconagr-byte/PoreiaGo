@@ -519,6 +519,22 @@ async def demo_office_checkin(body: CustomerInspectionBody, request: Request):
     return {"ok": True, "booking": _guest_booking_view(row)}
 
 
+@router.post("/public/demo-cancel")
+async def demo_office_cancel(request: Request):
+    """
+    Soft native Wallet cancel → office demo booking (Δοκιμαστικός / RN-DEMO01).
+    Keeps desk Κρατήσεις in sync with wallet «Ακύρωση κράτησης».
+    """
+    try:
+        row = store.demo_office_cancel(await _tenant_id(request))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "booking": _guest_booking_view(row) if row else None,
+    }
+
+
 @router.post("/bookings/{booking_id}/check-in")
 async def customer_rental_checkin(
     booking_id: str,

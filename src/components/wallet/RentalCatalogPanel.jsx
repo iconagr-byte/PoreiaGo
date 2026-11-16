@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
   createCustomerRentalBooking,
+  demoOfficeRentalCancel,
   fetchCustomerRentalAvailability,
   fetchCustomerRentalCatalog,
   fetchMyRentalBookings,
@@ -492,6 +493,11 @@ export default function RentalCatalogPanel({
     try {
       if (isDemoRentBookingId(bookingId)) {
         cancelDemoRentBooking(bookingId);
+        try {
+          await demoOfficeRentalCancel();
+        } catch {
+          /* office sync best-effort */
+        }
         toast.success('Η κράτηση ακυρώθηκε');
         await loadMine();
         return;

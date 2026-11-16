@@ -241,3 +241,16 @@ export async function demoOfficeRentalCheckIn(body) {
   });
   return data.booking || null;
 }
+
+/**
+ * Soft native Wallet → office demo booking cancel
+ * (Δοκιμαστικός Πελάτης / RN-DEMO01) so desk Κρατήσεις leaves active.
+ */
+export async function demoOfficeRentalCancel() {
+  const data = await publicRentalFetch('/public/demo-cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  return data.booking || null;
+}
