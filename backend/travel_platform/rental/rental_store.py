@@ -1663,6 +1663,24 @@ def find_demo_office_booking(tenant_id: str | None) -> dict[str, Any] | None:
     return deepcopy(preferred) if preferred else None
 
 
+def demo_office_cancel(tenant_id: str | None = None) -> dict[str, Any] | None:
+    """
+    Soft native-wallet cancel → office demo booking (Δοκιμαστικός / RN-DEMO01).
+    Mirrors demo_office_online_checkin so desk Κρατήσεις leave «Ενεργή».
+    Returns None when there is no active demo sample (already cancelled / missing).
+    """
+    tid = _normalize_tenant(tenant_id)
+    booking = find_demo_office_booking(tid)
+    if not booking:
+        return None
+    status = str(booking.get("rental_status") or "").upper()
+    if status == "CANCELLED":
+        return deepcopy(booking)
+    if status not in ("CONFIRMED", "RESERVED", "ACTIVE"):
+        raise ValueError("Η demo κράτηση δεν δέχεται ακύρωση")
+    return update_booking_status(tid, booking["id"], "CANCELLED")
+
+
 def demo_office_online_checkin(
     tenant_id: str | None,
     body: dict[str, Any] | None = None,

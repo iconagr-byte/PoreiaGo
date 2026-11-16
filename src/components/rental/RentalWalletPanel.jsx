@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
+  demoOfficeRentalCancel,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
 import {
@@ -146,9 +147,14 @@ export default function RentalWalletPanel({
     if (!window.confirm('Να ακυρωθεί αυτή η κράτηση;')) return;
     setBusyId(booking.id);
     try {
-      // Local-only demo pass — never hit the API (404 → re-seed felt like cancel failed).
+      // Soft demo pass: clear local card + cancel office Δοκιμαστικός / RN-DEMO01.
       if (isDemoRentBookingId(booking.id)) {
         cancelDemoRentBooking(booking.id, { brandLabel });
+        try {
+          await demoOfficeRentalCancel();
+        } catch {
+          /* office sync best-effort — local cancel already applied */
+        }
         toast.success('Η κράτηση ακυρώθηκε');
         applyRows([]);
         return;

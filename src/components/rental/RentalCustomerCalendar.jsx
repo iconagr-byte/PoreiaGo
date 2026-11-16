@@ -5,7 +5,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { fetchMyRentalBookings, cancelCustomerRentalBooking } from '../../services/customerRentalApi.js';
+import {
+  cancelCustomerRentalBooking,
+  demoOfficeRentalCancel,
+  fetchMyRentalBookings,
+} from '../../services/customerRentalApi.js';
 import {
   cancelDemoRentBooking,
   isDemoRentBookingId,
@@ -207,6 +211,11 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
     try {
       if (isDemoRentBookingId(id)) {
         cancelDemoRentBooking(id);
+        try {
+          await demoOfficeRentalCancel();
+        } catch {
+          /* office sync best-effort */
+        }
         toast.success('Ακυρώθηκε');
         setBookings((rows) => rows.filter((b) => b.id !== id));
         return;
