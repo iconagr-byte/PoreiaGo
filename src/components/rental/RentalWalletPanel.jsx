@@ -23,6 +23,7 @@ import {
   isFreeCancelEligible,
 } from '../../lib/rental/rentalCancel.js';
 import RentMemberCheckinSheet, { canCheckIn } from './RentMemberCheckinSheet.jsx';
+import RentalWalletDetail from './RentalWalletDetail.jsx';
 import RentalWalletPass from './RentalWalletPass.jsx';
 
 const STATUS_LABEL = {
@@ -74,8 +75,8 @@ export default function RentalWalletPanel({
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
-  const [deletingId, setDeletingId] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
   const [checkinBooking, setCheckinBooking] = useState(null);
   const [reminderShown, setReminderShown] = useState(false);
 
@@ -177,33 +178,23 @@ export default function RentalWalletPanel({
     }
   };
 
-  const deleteBooking = async (booking) => {
-    if (!booking?.id || deletingId) return;
-    const ok = window.confirm(
-      'Διαγραφή κράτησης οριστικά;\n\nΘα φύγει από το Wallet και από τις κρατήσεις του γραφείου (όλες οι συσκευές). Δεν αναιρείται.',
-    );
-    if (!ok) return;
-    setDeletingId(booking.id);
-    try {
-      if (isDemoRentBookingId(booking.id)) {
-        deleteDemoRentBooking(booking.id, { brandLabel });
-        try {
-          await demoOfficeRentalDelete();
-        } catch {
-          /* office sync best-effort — local delete already applied */
-        }
-        toast.success('Η κράτηση διαγράφηκε από παντού');
-        applyRows([]);
-        return;
+  /** Called from detail after confirm — no second prompt / toast here. */
+  const removeBooking = async (booking) => {
+    if (!booking?.id) return;
+    if (isDemoRentBookingId(booking.id)) {
+      deleteDemoRentBooking(booking.id, { brandLabel });
+      try {
+        await demoOfficeRentalDelete();
+      } catch {
+        /* office sync best-effort — local delete already applied */
       }
-      await deleteCustomerRentalBooking(booking.id);
-      toast.success('Η κράτηση διαγράφηκε από παντού');
-      await load();
-    } catch (err) {
-      toast.error(err?.message || 'Αποτυχία διαγραφής κράτησης');
-    } finally {
-      setDeletingId('');
+      setDetailOpen(false);
+      applyRows([]);
+      return;
     }
+    await deleteCustomerRentalBooking(booking.id);
+    setDetailOpen(false);
+    await load();
   };
 
   // While loading with no rows yet, keep quiet (seed/API will fill).
@@ -214,6 +205,20 @@ export default function RentalWalletPanel({
   const countLabel = rows.length
     ? `${rows.length} ${rows.length === 1 ? 'κάρτα οχήματος' : 'κάρτες οχήματος'}`
     : 'Κάρτες οχήματος στο Wallet';
+
+  if (detailOpen && featured) {
+    return (
+      <section className="wallet-panel wallet-panel--rent-passes">
+        <RentalWalletDetail
+          booking={featured}
+          brandLabel={brandLabel}
+          passengerName={passengerName}
+          onBack={() => setDetailOpen(false)}
+          onRemovePass={removeBooking}
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="wallet-panel wallet-panel--rent-passes">
@@ -233,10 +238,9 @@ export default function RentalWalletPanel({
           passengerName={passengerName}
           onBookVehicle={onBookVehicle}
           onCancel={featured ? cancelBooking : undefined}
-          onDelete={featured ? deleteBooking : undefined}
+          onOpenDetails={featured ? () => setDetailOpen(true) : undefined}
           onCheckIn={featured ? (b) => setCheckinBooking(b) : undefined}
           cancelling={featured ? busyId === featured?.id : false}
-          deleting={featured ? deletingId === featured?.id : false}
         />
 
         {others.length ? (

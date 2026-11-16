@@ -758,6 +758,38 @@ async def remind_my_rental(
     return result
 
 
+@router.post("/bookings/{booking_id}/email")
+async def email_my_rental(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    """Wallet detail — resend booking confirmation email (like bus ticket email)."""
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            resend_rental_customer_email,
+        )
+
+        result = await resend_rental_customer_email(row)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if not result.get("ok"):
+        reason = result.get("reason") or "send_failed"
+        if reason == "no_email":
+            raise HTTPException(status_code=400, detail="Δεν υπάρχει email σε αυτή την κράτηση")
+        if reason == "email_disabled":
+            raise HTTPException(status_code=400, detail="Το email κρατήσεων είναι απενεργοποιημένο")
+        raise HTTPException(status_code=400, detail="Αποτυχία αποστολής email")
+    return result
+
+
 @router.post("/reminders/scan")
 async def scan_rental_reminders(
     within_hours: float = Query(default=24, ge=1, le=168),
