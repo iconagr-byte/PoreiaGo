@@ -701,6 +701,8 @@ def create_demo_sign_sample(tenant_id: str | None = None) -> dict[str, Any]:
     Reuses an existing unsigned demo booking when present.
     """
     tid = _normalize_tenant(tenant_id)
+    # Explicit desk/admin recreate clears a prior wallet hard-delete purge.
+    mark_demo_sample_purged(tid, False)
     vehicle = _ensure_demo_sign_vehicle(tid)
     for booking in list_bookings(tid):
         notes = str(booking.get("notes") or "")
@@ -735,14 +737,51 @@ def create_demo_sign_sample(tenant_id: str | None = None) -> dict[str, Any]:
     return _stamp_demo_booking_reference(tid, confirmed["id"]) or confirmed
 
 
+def _demo_sample_purged_ids(data: dict[str, Any]) -> list[str]:
+    meta = data.get("meta")
+    if not isinstance(meta, dict):
+        return []
+    rows = meta.get("demo_sample_purged")
+    return [str(x) for x in rows] if isinstance(rows, list) else []
+
+
+def is_demo_sample_purged(tenant_id: str | None) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        return tid in _demo_sample_purged_ids(_read())
+
+
+def mark_demo_sample_purged(tenant_id: str | None, purged: bool = True) -> None:
+    """Prevent ensure_demo from re-seeding after wallet hard-delete of the sample."""
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        meta = data.setdefault("meta", {})
+        if not isinstance(meta, dict):
+            meta = {}
+            data["meta"] = meta
+        rows = meta.get("demo_sample_purged")
+        if not isinstance(rows, list):
+            rows = []
+        if purged and tid not in rows:
+            rows.append(tid)
+        elif not purged:
+            rows = [x for x in rows if str(x) != tid]
+        meta["demo_sample_purged"] = rows
+        _write(data)
+
+
 def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str, Any] | None:
     """
     Auto-seed one sample booking when the tenant has zero bookings and at least
     one vehicle (or demo fleet can be created). Used by list endpoints.
+    Skips when Wallet permanently deleted the demo sample for this office.
     """
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
+        if tid in _demo_sample_purged_ids(data):
+            return None
         if any(b.get("tenant_id") == tid for b in data["bookings"]):
             return None
         vehicles = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
@@ -1679,6 +1718,118 @@ def demo_office_cancel(tenant_id: str | None = None) -> dict[str, Any] | None:
     if status not in ("CONFIRMED", "RESERVED", "ACTIVE"):
         raise ValueError("Η demo κράτηση δεν δέχεται ακύρωση")
     return update_booking_status(tid, booking["id"], "CANCELLED")
+
+
+def find_demo_office_booking_any(tenant_id: str | None) -> dict[str, Any] | None:
+    """Any DEMO-marker booking for the tenant (including CANCELLED) — for hard delete."""
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        for booking in data.get("bookings") or []:
+            if booking.get("tenant_id") != tid:
+                continue
+            if _DEMO_BOOKING_MARKER not in str(booking.get("notes") or ""):
+                continue
+            return deepcopy(booking)
+    return None
+
+
+def hard_delete_booking(tenant_id: str | None, booking_id: str) -> dict[str, Any]:
+    """Permanently remove a booking (+ its inspections) and free the vehicle if idle."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    if not bid:
+        raise ValueError("Απαιτείται κράτηση")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data.get("bookings") or [] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        removed = deepcopy(booking)
+        data["bookings"] = [
+            b for b in (data.get("bookings") or []) if not (b.get("tenant_id") == tid and b.get("id") == bid)
+        ]
+        data["inspections"] = [
+            i
+            for i in (data.get("inspections") or [])
+            if not (
+                i.get("tenant_id") == tid
+                and str(i.get("rental_booking_id") or i.get("booking_id") or "") == bid
+            )
+        ]
+        vehicle = next(
+            (
+                v
+                for v in data.get("vehicles") or []
+                if v.get("tenant_id") == tid and v.get("id") == removed.get("vehicle_id")
+            ),
+            None,
+        )
+        if vehicle:
+            still = [
+                b
+                for b in data["bookings"]
+                if b.get("tenant_id") == tid
+                and b.get("vehicle_id") == vehicle["id"]
+                and b.get("rental_status") in ACTIVE_BOOKING_STATUSES
+            ]
+            vehicle["current_status"] = "RENTED" if still else "AVAILABLE"
+            vehicle["updated_at"] = _now()
+        if _DEMO_BOOKING_MARKER in str(removed.get("notes") or ""):
+            meta = data.setdefault("meta", {})
+            if not isinstance(meta, dict):
+                meta = {}
+                data["meta"] = meta
+            purged = meta.get("demo_sample_purged")
+            if not isinstance(purged, list):
+                purged = []
+            if tid not in purged:
+                purged.append(tid)
+            meta["demo_sample_purged"] = purged
+        _write(data)
+        return removed
+
+
+def delete_booking_for_customer(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str,
+) -> dict[str, Any]:
+    """Customer hard-delete — owned booking only (any status). Removes from desk list."""
+    tid = _normalize_tenant(tenant_id)
+    needle = str(email or "").strip().lower()
+    bid = str(booking_id or "").strip()
+    if not needle or not bid:
+        raise ValueError("Απαιτείται κράτηση και email")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data.get("bookings") or [] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        owner = str(booking.get("client_email") or "").strip().lower()
+        if owner != needle:
+            raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    return hard_delete_booking(tid, bid)
+
+
+def demo_office_delete(tenant_id: str | None = None) -> dict[str, Any] | None:
+    """
+    Soft native-wallet hard-delete → office demo booking gone from desk.
+    Marks tenant purged so ensure_demo does not immediately re-seed.
+    """
+    tid = _normalize_tenant(tenant_id)
+    booking = find_demo_office_booking_any(tid)
+    if not booking:
+        mark_demo_sample_purged(tid, True)
+        return None
+    return hard_delete_booking(tid, booking["id"])
 
 
 def demo_office_online_checkin(

@@ -6243,6 +6243,11 @@
   margin-top: 0.35rem;
 }
 
+.rent-wallet-remove {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+}
+
 .rent-wallet-pass .wallet-pass-status.is-ok {
   background: rgba(10, 122, 108, 0.14);
   color: #0b3d4a;

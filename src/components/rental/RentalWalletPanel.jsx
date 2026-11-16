@@ -6,11 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
+  deleteCustomerRentalBooking,
   demoOfficeRentalCancel,
+  demoOfficeRentalDelete,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
 import {
   cancelDemoRentBooking,
+  deleteDemoRentBooking,
   isDemoRentBookingId,
   withDemoRentBookings,
 } from '../../lib/rental/demoRentBooking.js';
@@ -71,6 +74,7 @@ export default function RentalWalletPanel({
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [checkinBooking, setCheckinBooking] = useState(null);
   const [reminderShown, setReminderShown] = useState(false);
@@ -173,6 +177,35 @@ export default function RentalWalletPanel({
     }
   };
 
+  const deleteBooking = async (booking) => {
+    if (!booking?.id || deletingId) return;
+    const ok = window.confirm(
+      'Διαγραφή κράτησης οριστικά;\n\nΘα φύγει από το Wallet και από τις κρατήσεις του γραφείου (όλες οι συσκευές). Δεν αναιρείται.',
+    );
+    if (!ok) return;
+    setDeletingId(booking.id);
+    try {
+      if (isDemoRentBookingId(booking.id)) {
+        deleteDemoRentBooking(booking.id, { brandLabel });
+        try {
+          await demoOfficeRentalDelete();
+        } catch {
+          /* office sync best-effort — local delete already applied */
+        }
+        toast.success('Η κράτηση διαγράφηκε από παντού');
+        applyRows([]);
+        return;
+      }
+      await deleteCustomerRentalBooking(booking.id);
+      toast.success('Η κράτηση διαγράφηκε από παντού');
+      await load();
+    } catch (err) {
+      toast.error(err?.message || 'Αποτυχία διαγραφής κράτησης');
+    } finally {
+      setDeletingId('');
+    }
+  };
+
   // While loading with no rows yet, keep quiet (seed/API will fill).
   if (loading && !rows.length) {
     return null;
@@ -200,8 +233,10 @@ export default function RentalWalletPanel({
           passengerName={passengerName}
           onBookVehicle={onBookVehicle}
           onCancel={featured ? cancelBooking : undefined}
+          onDelete={featured ? deleteBooking : undefined}
           onCheckIn={featured ? (b) => setCheckinBooking(b) : undefined}
           cancelling={featured ? busyId === featured?.id : false}
+          deleting={featured ? deletingId === featured?.id : false}
         />
 
         {others.length ? (

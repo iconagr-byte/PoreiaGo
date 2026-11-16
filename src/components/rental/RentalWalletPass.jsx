@@ -60,8 +60,10 @@ export default function RentalWalletPass({
   passengerName = '',
   onBookVehicle,
   onCancel,
+  onDelete,
   onCheckIn,
   cancelling = false,
+  deleting = false,
 }) {
   if (!booking) {
     return (
@@ -259,7 +261,7 @@ export default function RentalWalletPass({
               <button
                 type="button"
                 className="rent-wallet-link-btn is-danger"
-                disabled={cancelling}
+                disabled={cancelling || deleting}
                 onClick={() => onCancel(booking)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
@@ -270,6 +272,23 @@ export default function RentalWalletPass({
             ) : null}
           </div>
         </div>
+
+        {onDelete ? (
+          <section className="wallet-ticket-remove rent-wallet-remove" aria-label="Διαγραφή κράτησης">
+            <button
+              type="button"
+              className="wallet-ticket-remove-btn"
+              onClick={() => onDelete(booking)}
+              disabled={deleting || cancelling}
+            >
+              {deleting ? 'Αφαίρεση…' : 'Διαγραφή κράτησης'}
+            </button>
+            <p className="wallet-ticket-remove-hint">
+              Όπως στο Apple Wallet — φεύγει από το Wallet και από τις κρατήσεις του γραφείου.
+              Δεν αναιρείται.
+            </p>
+          </section>
+        ) : null}
       </div>
     </section>
   );

@@ -535,6 +535,23 @@ async def demo_office_cancel(request: Request):
     }
 
 
+@router.post("/public/demo-delete")
+async def demo_office_delete(request: Request):
+    """
+    Soft native Wallet hard-delete → office demo booking removed from desk
+    (Δοκιμαστικός / RN-DEMO01), same idea as bus «Διαγραφή εισιτηρίου».
+    """
+    try:
+        row = store.demo_office_delete(await _tenant_id(request))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "deleted": True,
+        "booking": _guest_booking_view(row) if row else None,
+    }
+
+
 @router.post("/bookings/{booking_id}/check-in")
 async def customer_rental_checkin(
     booking_id: str,
@@ -678,6 +695,29 @@ async def cancel_my_rental(
     except Exception:
         pass
     return _public_booking(row)
+
+
+@router.delete("/bookings/{booking_id}")
+async def delete_my_rental(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    """Permanent delete — Wallet + office desk (like bus ticket delete)."""
+    try:
+        row = store.delete_booking_for_customer(
+            await _require_rent_module(request, account),
+            booking_id,
+            email=account["email"],
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        if "δικαίωμα" in msg:
+            raise HTTPException(status_code=403, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "deleted": True, "id": row.get("id")}
 
 
 @router.get("/bookings/{booking_id}/contract", response_class=HTMLResponse)

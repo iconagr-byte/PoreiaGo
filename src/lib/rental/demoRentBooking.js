@@ -106,6 +106,14 @@ export function resetDemoRentCancelled() {
   writeDemoRentCancelled(false);
 }
 
+/**
+ * Soft-delete the local demo pass (same sticky flag as cancel — no re-seed).
+ * Office hard-delete is handled separately via demo-delete API.
+ */
+export function deleteDemoRentBooking(bookingId, opts = {}) {
+  return cancelDemoRentBooking(bookingId, opts);
+}
+
 /** One confirmed IconaRent-style booking for soft demo wallets. */
 export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   const car = DEMO_RENT_FLEET[1] || DEMO_RENT_FLEET[0];
