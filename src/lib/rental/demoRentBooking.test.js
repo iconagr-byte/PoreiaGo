@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEMO_RENT_BOOKING_ID,
   buildDemoRentBooking,
+  cancelDemoRentBooking,
+  resetDemoRentCancelled,
   withDemoRentBookings,
   writeDemoRentCheckinReady,
 } from './demoRentBooking.js';
@@ -15,6 +17,7 @@ vi.mock('./nativeRentDemo.js', () => ({
 describe('demoRentBooking', () => {
   beforeEach(() => {
     writeDemoRentCheckinReady(false);
+    resetDemoRentCancelled();
     isSoftNativeRentDemoToken.mockReturnValue(true);
     isNativeRentDemo.mockReturnValue(false);
   });
@@ -62,6 +65,22 @@ describe('demoRentBooking', () => {
     const rows = withDemoRentBookings([]);
     expect(rows[0].online_checkin_ready).toBe(true);
     expect(rows[0].rental_status).toBe('ACTIVE');
+    vi.unstubAllGlobals();
+  });
+
+  it('soft-cancels demo booking and stops re-seeding', () => {
+    const mem = new Map();
+    const stub = {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k),
+    };
+    vi.stubGlobal('localStorage', stub);
+    vi.stubGlobal('sessionStorage', stub);
+    expect(withDemoRentBookings([])).toHaveLength(1);
+    const cancelled = cancelDemoRentBooking(DEMO_RENT_BOOKING_ID);
+    expect(cancelled.rental_status).toBe('CANCELLED');
+    expect(withDemoRentBookings([])).toEqual([]);
     vi.unstubAllGlobals();
   });
 });

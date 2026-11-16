@@ -7,6 +7,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchMyRentalBookings, cancelCustomerRentalBooking } from '../../services/customerRentalApi.js';
 import {
+  cancelDemoRentBooking,
+  isDemoRentBookingId,
+} from '../../lib/rental/demoRentBooking.js';
+import {
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,
@@ -201,6 +205,12 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
     if (!window.confirm('Ακύρωση κράτησης;')) return;
     setBusy(true);
     try {
+      if (isDemoRentBookingId(id)) {
+        cancelDemoRentBooking(id);
+        toast.success('Ακυρώθηκε');
+        setBookings((rows) => rows.filter((b) => b.id !== id));
+        return;
+      }
       await cancelCustomerRentalBooking(id);
       toast.success('Ακυρώθηκε');
       setBookings((rows) => rows.filter((b) => b.id !== id));

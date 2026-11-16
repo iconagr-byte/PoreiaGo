@@ -12,6 +12,12 @@ export const DEMO_RENT_OFFICE_SURNAME = 'Πελάτης';
 /** Persist confirmed check-in across tab switches (local + session). */
 const CHECKIN_KEY = 'poreiago_demo_rent_checkin_v1';
 const LEGAL_KEY = 'poreiago_demo_rent_legal_v1';
+/** Persist demo cancel so «Ακύρωση κράτησης» does not re-seed the local pass. */
+const CANCEL_KEY = 'poreiago_demo_rent_cancelled_v1';
+
+export function isDemoRentBookingId(id) {
+  return String(id || '').trim() === DEMO_RENT_BOOKING_ID;
+}
 
 function daysFromNow(days, hour = 10) {
   const d = new Date();
@@ -69,6 +75,37 @@ export function resetDemoRentCheckinReady() {
   writeDemoRentLegalReady(false);
 }
 
+export function readDemoRentCancelled() {
+  return storageFlag(CANCEL_KEY);
+}
+
+export function writeDemoRentCancelled(cancelled) {
+  writeStorageFlag(CANCEL_KEY, cancelled);
+}
+
+/**
+ * Soft-cancel the local demo pass (no API). Returns a CANCELLED booking shape
+ * for optimistic UI, or null if the id is not the demo booking.
+ */
+export function cancelDemoRentBooking(bookingId, { brandLabel } = {}) {
+  if (!isDemoRentBookingId(bookingId)) return null;
+  writeDemoRentCancelled(true);
+  writeDemoRentCheckinReady(false);
+  writeDemoRentLegalReady(false);
+  return {
+    ...buildDemoRentBooking({ brandLabel }),
+    rental_status: 'CANCELLED',
+    online_checkin_ready: false,
+    online_checkin_at: null,
+    legal_doc_signatures: {},
+  };
+}
+
+/** Re-show the demo pass after a soft cancel (tests / reset). */
+export function resetDemoRentCancelled() {
+  writeDemoRentCancelled(false);
+}
+
 /** One confirmed IconaRent-style booking for soft demo wallets. */
 export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
   const car = DEMO_RENT_FLEET[1] || DEMO_RENT_FLEET[0];
@@ -122,10 +159,12 @@ export function buildDemoRentBooking({ brandLabel = 'Γραφείο' } = {}) {
 /**
  * When native rent demo (soft token or session flag) has no API bookings,
  * inject the local pass so Check-in stays visible on Ενοικιάσεις.
+ * Skips injection after a soft cancel so «Ακύρωση κράτησης» sticks.
  */
 export function withDemoRentBookings(list, { brandLabel } = {}) {
   const rows = Array.isArray(list) ? list : [];
   if (rows.length) return rows;
   if (!isSoftNativeRentDemoToken() && !isNativeRentDemo()) return rows;
+  if (readDemoRentCancelled()) return [];
   return [buildDemoRentBooking({ brandLabel })];
 }
