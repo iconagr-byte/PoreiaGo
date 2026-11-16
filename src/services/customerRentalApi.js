@@ -159,6 +159,13 @@ export async function cancelCustomerRentalBooking(bookingId) {
   });
 }
 
+/** Permanent delete — Wallet + office desk (like bus ticket delete). */
+export async function deleteCustomerRentalBooking(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}`, {
+    method: 'DELETE',
+  });
+}
+
 /** Authenticated wallet member check-in. */
 export async function customerRentalCheckIn(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/check-in`, {
@@ -253,4 +260,17 @@ export async function demoOfficeRentalCancel() {
     body: '{}',
   });
   return data.booking || null;
+}
+
+/**
+ * Soft native Wallet → office demo booking hard-delete
+ * (Δοκιμαστικός / RN-DEMO01 removed from desk, like bus ticket delete).
+ */
+export async function demoOfficeRentalDelete() {
+  const data = await publicRentalFetch('/public/demo-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  return data;
 }
