@@ -2,14 +2,10 @@
  * Rent Wallet hero pass — vehicle rental booking (Apple-clean, separate from bus).
  */
 import { QRCode } from 'react-qr-code';
-
-const STATUS_LABEL = {
-  RESERVED: 'Εκκρεμεί πληρωμή',
-  CONFIRMED: 'Επιβεβαιωμένη',
-  ACTIVE: 'Σε εξέλιξη',
-  COMPLETED: 'Ολοκληρωμένη',
-  CANCELLED: 'Ακυρωμένη',
-};
+import {
+  isRentBookingExpired,
+  rentBookingStatusLabel,
+} from '../../lib/rental/rentBookingExpiry.js';
 
 function formatDay(iso) {
   if (!iso) return '—';
@@ -87,7 +83,13 @@ export default function RentalWalletPass({
   }
 
   const status = booking.rental_status || 'CONFIRMED';
-  const label = STATUS_LABEL[status] || status;
+  const expired = isRentBookingExpired(booking);
+  const cancelled = status === 'CANCELLED';
+  const inactive = expired || cancelled;
+  const label = rentBookingStatusLabel(booking);
+  const chipClass = expired
+    ? 'is-muted'
+    : statusClass(status);
   const code = booking.reference_code || booking.id || '—';
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
@@ -98,17 +100,20 @@ export default function RentalWalletPass({
       .toUpperCase()
       .includes('PAID') || Number(booking.balance_due || 0) <= 0;
   const selfDrive = booking.driver_mode !== 'WITH_DRIVER';
-  const checkinReady = Boolean(booking.online_checkin_ready);
+  const checkinReady = Boolean(booking.online_checkin_ready) && !inactive;
 
   return (
-    <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">
+    <section
+      className={`wallet-pass rent-wallet-pass${inactive ? ' wallet-pass--expired' : ''}`}
+      aria-label={`Κάρτα ενοικίασης${expired ? ' · ληγμένη' : ''}`}
+    >
       <div className="wallet-pass-hero rent-wallet-hero">
         <div className="wallet-pass-hero-shade rent-wallet-hero-shade" aria-hidden />
         <div className="rent-wallet-hero-glow" aria-hidden />
         <div className="wallet-pass-hero-copy rent-wallet-hero-copy">
           <div className="rent-wallet-hero-top">
             <p className="wallet-pass-brand">{brandLabel}</p>
-            <span className={`rent-wallet-hero-chip ${statusClass(status)}`}>{label}</span>
+            <span className={`rent-wallet-hero-chip ${chipClass}`}>{label}</span>
           </div>
           <h1 className="wallet-pass-title rent-wallet-hero-title">
             {booking.vehicle_model || 'Όχημα'}
@@ -139,7 +144,9 @@ export default function RentalWalletPass({
         ) : null}
       </div>
 
-      <div className="wallet-pass-card wallet-pass-card-enter rent-wallet-card">
+      <div
+        className={`wallet-pass-card wallet-pass-card-enter rent-wallet-card${inactive ? ' is-expired' : ''}`}
+      >
         <div className="rent-wallet-legs" aria-label="Παραλαβή και επιστροφή">
           <div className="rent-wallet-leg">
             <em>Παραλαβή</em>
@@ -226,15 +233,33 @@ export default function RentalWalletPass({
           <span />
         </div>
 
-        <div className="wallet-pass-qr-wrap is-live rent-wallet-qr">
-          <div className="rent-wallet-qr-frame">
-            <QRCode value={qrValue} size={152} bgColor="#ffffff" fgColor="#0b3d4a" level="M" />
-          </div>
-          <p className="wallet-pass-qr-hint">Δείξε το QR στο γραφείο κατά την παραλαβή</p>
+        <div
+          className={`wallet-pass-qr-wrap rent-wallet-qr${paid && !inactive ? ' is-live' : ''}${inactive ? ' is-expired' : ''}`}
+        >
+          {inactive ? (
+            <div className="wallet-pass-expired-panel" role="status">
+              <span className="material-symbols-outlined" aria-hidden>
+                event_busy
+              </span>
+              <p>{cancelled ? 'Η κράτηση ακυρώθηκε' : 'Η ενοικίαση έχει λήξει'}</p>
+              <p className="wallet-pass-expired-sub">
+                {cancelled
+                  ? 'Δεν είναι πλέον ενεργή για παραλαβή'
+                  : 'Η κάρτα δεν είναι πλέον ενεργή για παραλαβή'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="rent-wallet-qr-frame">
+                <QRCode value={qrValue} size={152} bgColor="#ffffff" fgColor="#0b3d4a" level="M" />
+              </div>
+              <p className="wallet-pass-qr-hint">Δείξε το QR στο γραφείο κατά την παραλαβή</p>
+            </>
+          )}
         </div>
 
         <div className="wallet-pass-actions rent-wallet-actions">
-          {checkinReady ? (
+          {!inactive && checkinReady ? (
             <p className="rent-wallet-checkin-ready" role="status">
               <span className="material-symbols-outlined" aria-hidden>
                 task_alt
@@ -242,7 +267,8 @@ export default function RentalWalletPass({
               Επιβεβαιωμένο check-in — το γραφείο το βλέπει
             </p>
           ) : null}
-          {(status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
+          {!inactive &&
+          (status === 'CONFIRMED' || status === 'RESERVED' || status === 'ACTIVE') &&
           onCheckIn ? (
             <button
               type="button"
@@ -266,7 +292,7 @@ export default function RentalWalletPass({
               </span>
               Νέα κράτηση
             </button>
-            {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
+            {!inactive && (status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
               <button
                 type="button"
                 className="rent-wallet-link-btn is-danger"

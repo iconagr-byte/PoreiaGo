@@ -6249,6 +6249,14 @@
   z-index: 4;
 }
 
+.rent-wallet-mini.is-expired {
+  opacity: 0.88;
+}
+
+.rent-wallet-mini.is-expired .rent-wallet-mini-icon {
+  filter: grayscale(0.35);
+}
+
 .rent-wallet-ticket .rent-wallet-hero {
   min-height: 10.5rem;
 }

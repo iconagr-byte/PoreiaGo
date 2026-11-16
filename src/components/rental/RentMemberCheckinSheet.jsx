@@ -16,6 +16,7 @@ import {
   writeDemoRentLegalReady,
 } from '../../lib/rental/demoRentBooking.js';
 import { isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
+import { isRentBookingExpired } from '../../lib/rental/rentBookingExpiry.js';
 import { RENTAL_LEGAL_DOCS } from '../../lib/rental/rentalLegalDocs.js';
 import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
 
@@ -47,6 +48,8 @@ function canCheckIn(booking) {
   if (!booking) return false;
   const status = String(booking.rental_status || '').toUpperCase();
   if (!['CONFIRMED', 'RESERVED', 'ACTIVE'].includes(status)) return false;
+  // Past return (+ grace) — same as bus ληγμένη: no check-in.
+  if (isRentBookingExpired(booking)) return false;
   // Allow reopen when online check-in landed but legal pack 1–6 is still empty.
   if (booking.online_checkin_ready && !needsPickupLegalPack(booking)) return false;
   return true;
