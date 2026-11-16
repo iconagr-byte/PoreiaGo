@@ -166,6 +166,46 @@ export async function deleteCustomerRentalBooking(bookingId) {
   });
 }
 
+/** Open rental contract HTML in a new tab (print / PDF). */
+export async function openCustomerRentalContract(bookingId) {
+  const id = String(bookingId || '').trim();
+  if (!id) throw new Error('Λείπει το id κράτησης');
+  const officeHeaders = await sealedOfficeHeaders();
+  const res = await fetch(
+    `${getApiBase()}/api/customer/rentals${withTenantQuery(`/bookings/${encodeURIComponent(id)}/contract`)}`,
+    {
+      headers: {
+        ...customerAuthHeaders(),
+        ...officeHeaders,
+      },
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const detail = data?.detail;
+    throw new Error(
+      typeof detail === 'string' ? detail : `Αποτυχία ανοίγματος σύμβασης (${res.status})`,
+    );
+  }
+  const html = await res.text();
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const href = URL.createObjectURL(blob);
+  const win = window.open(href, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    URL.revokeObjectURL(href);
+    throw new Error('Το παράθυρο μπλοκαρίστηκε — επέτρεψε pop-ups');
+  }
+  window.setTimeout(() => URL.revokeObjectURL(href), 120_000);
+  return true;
+}
+
+/** Resend booking confirmation email from Wallet detail. */
+export async function emailCustomerRentalBooking(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/email`, {
+    method: 'POST',
+  });
+}
+
 /** Authenticated wallet member check-in. */
 export async function customerRentalCheckIn(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/check-in`, {

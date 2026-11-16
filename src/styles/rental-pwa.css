@@ -5655,6 +5655,8 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.55rem;
+  /* Room for ⓘ info button (absolute top-right), like bus passes */
+  padding-right: 2.4rem;
 }
 
 .rent-wallet-hero-top .wallet-pass-brand {
@@ -6243,9 +6245,12 @@
   margin-top: 0.35rem;
 }
 
-.rent-wallet-remove {
-  margin-top: 0.85rem;
-  padding-top: 0.85rem;
+.rent-wallet-hero .wallet-pass-info-btn {
+  z-index: 4;
+}
+
+.rent-wallet-ticket .rent-wallet-hero {
+  min-height: 10.5rem;
 }
 
 .rent-wallet-pass .wallet-pass-status.is-ok {

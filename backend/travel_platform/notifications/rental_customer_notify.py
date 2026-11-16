@@ -162,3 +162,20 @@ async def notify_rental_customer_status(booking: dict[str, Any]) -> dict[str, An
     except Exception:
         logger.exception("rent status sms failed")
         return {"skipped": True, "reason": "send_failed"}
+
+
+async def resend_rental_customer_email(booking: dict[str, Any]) -> dict[str, Any]:
+    """Customer-initiated resend of booking confirmation email (Wallet detail)."""
+    from travel_platform.notifications.dispatcher import send_email
+
+    appearance = _read_office_appearance()
+    settings = read_rent_notify_settings(appearance)
+    email = str(booking.get("client_email") or "").strip().lower()
+    if not email:
+        return {"ok": False, "reason": "no_email"}
+    if not settings["rent_notify_email_enabled"]:
+        return {"ok": False, "reason": "email_disabled", "email": email}
+    subject = _render(settings["rent_notify_email_subject"], booking, appearance)
+    body = _render(settings["rent_notify_email_body"], booking, appearance)
+    result = await send_email(email, subject, body)
+    return {"ok": True, "email": email, "result": result}
