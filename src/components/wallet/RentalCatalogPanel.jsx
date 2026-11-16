@@ -11,6 +11,10 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName, getCustomerToken } from '../../lib/auth.js';
+import {
+  cancelDemoRentBooking,
+  isDemoRentBookingId,
+} from '../../lib/rental/demoRentBooking.js';
 import { isNativeRentDemo, isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
 import {
   defaultPickupDateTime,
@@ -486,6 +490,12 @@ export default function RentalCatalogPanel({
     if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
     setBusy(true);
     try {
+      if (isDemoRentBookingId(bookingId)) {
+        cancelDemoRentBooking(bookingId);
+        toast.success('Η κράτηση ακυρώθηκε');
+        await loadMine();
+        return;
+      }
       await cancelCustomerRentalBooking(bookingId);
       toast.success('Η κράτηση ακυρώθηκε');
       await loadMine();

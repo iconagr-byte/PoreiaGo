@@ -8,8 +8,16 @@ import {
   cancelCustomerRentalBooking,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
-import { withDemoRentBookings } from '../../lib/rental/demoRentBooking.js';
+import {
+  cancelDemoRentBooking,
+  isDemoRentBookingId,
+  withDemoRentBookings,
+} from '../../lib/rental/demoRentBooking.js';
 import { isNativeRentDemo, isSoftNativeRentDemoToken } from '../../lib/rental/nativeRentDemo.js';
+import {
+  cancelBlockedMessage,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
 import RentMemberCheckinSheet, { canCheckIn } from './RentMemberCheckinSheet.jsx';
 import RentalWalletPass from './RentalWalletPass.jsx';
 
@@ -138,6 +146,17 @@ export default function RentalWalletPanel({
     if (!window.confirm('Να ακυρωθεί αυτή η κράτηση;')) return;
     setBusyId(booking.id);
     try {
+      // Local-only demo pass — never hit the API (404 → re-seed felt like cancel failed).
+      if (isDemoRentBookingId(booking.id)) {
+        cancelDemoRentBooking(booking.id, { brandLabel });
+        toast.success('Η κράτηση ακυρώθηκε');
+        applyRows([]);
+        return;
+      }
+      if (!isFreeCancelEligible(booking)) {
+        toast.error(cancelBlockedMessage(booking));
+        return;
+      }
       await cancelCustomerRentalBooking(booking.id);
       toast.success('Η κράτηση ακυρώθηκε');
       await load();

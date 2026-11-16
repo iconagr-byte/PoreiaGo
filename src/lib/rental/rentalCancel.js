@@ -9,7 +9,8 @@ export function hoursUntilStart(startTime, now = Date.now()) {
 }
 
 export function isFreeCancelEligible(booking, now = Date.now()) {
-  if (!booking || booking.rental_status !== 'CONFIRMED') return false;
+  const status = String(booking?.rental_status || '').toUpperCase();
+  if (!booking || (status !== 'CONFIRMED' && status !== 'RESERVED')) return false;
   if (typeof booking.free_cancel_eligible === 'boolean') return booking.free_cancel_eligible;
   const hours = hoursUntilStart(booking.start_time, now);
   if (hours == null) return false;
