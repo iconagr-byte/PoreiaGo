@@ -1,5 +1,5 @@
 /**
- * Rent Wallet hero pass — vehicle rental booking (separate from bus My Wallet).
+ * Rent Wallet hero pass — vehicle rental booking (Apple-clean, separate from bus).
  */
 import { QRCode } from 'react-qr-code';
 
@@ -11,29 +11,47 @@ const STATUS_LABEL = {
   CANCELLED: 'Ακυρωμένη',
 };
 
-function formatWhen(iso) {
+function formatDay(iso) {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('el-GR', {
+    return new Date(iso).toLocaleDateString('el-GR', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   } catch {
     return iso;
   }
 }
 
-function formatRange(start, end) {
-  return `${formatWhen(start)} → ${formatWhen(end)}`;
+function formatClock(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('el-GR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
 }
 
 function statusClass(status) {
   if (status === 'ACTIVE' || status === 'CONFIRMED') return 'is-ok';
   if (status === 'CANCELLED') return 'is-muted';
+  if (status === 'COMPLETED') return 'is-done';
   return 'is-warn';
+}
+
+function nightsBetween(start, end) {
+  try {
+    const a = new Date(start).getTime();
+    const b = new Date(end).getTime();
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return 0;
+    return Math.max(1, Math.round((b - a) / (1000 * 60 * 60 * 24)));
+  } catch {
+    return 0;
+  }
 }
 
 export default function RentalWalletPass({
@@ -48,16 +66,15 @@ export default function RentalWalletPass({
   if (!booking) {
     return (
       <section className="wallet-pass-empty rent-wallet-empty" aria-label="Rent Wallet">
-        <div className="wallet-pass-empty-inner">
-          <span className="material-symbols-outlined wallet-pass-empty-icon" aria-hidden>
-            directions_car
+        <div className="wallet-pass-empty-inner rent-wallet-empty-inner">
+          <span className="rent-wallet-empty-orb" aria-hidden>
+            <span className="material-symbols-outlined">directions_car</span>
           </span>
-          <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα ενοικίαση</h2>
+          <h2 className="wallet-pass-empty-title">Καμία ενοικίαση ακόμη</h2>
           <p className="wallet-pass-empty-copy">
-            Κλείστε όχημα από Ενοικιάσεις — η κάρτα εμφανίζεται εδώ στις Κρατήσεις, δίπλα στα
-            εισιτήρια λεωφορείου.
+            Κλείσε όχημα από το στόλο — η κάρτα παραλαβής εμφανίζεται εδώ, δίπλα στα εισιτήρια.
           </p>
-          <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
+          <button type="button" className="wallet-pass-cta rent-wallet-empty-cta" onClick={onBookVehicle}>
             Βρες όχημα
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
@@ -74,90 +91,139 @@ export default function RentalWalletPass({
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
   const qrValue = `RENT:${booking.id || code}`;
+  const nights = nightsBetween(booking.start_time, booking.end_time);
+  const paid =
+    String(booking.payment_status || '')
+      .toUpperCase()
+      .includes('PAID') || Number(booking.balance_due || 0) <= 0;
+  const selfDrive = booking.driver_mode !== 'WITH_DRIVER';
+  const checkinReady = Boolean(booking.online_checkin_ready);
 
   return (
     <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">
       <div className="wallet-pass-hero rent-wallet-hero">
-        <div className="wallet-pass-hero-shade" aria-hidden />
-        <div className="wallet-pass-hero-copy">
-          <p className="wallet-pass-brand">{brandLabel}</p>
-          <h1 className="wallet-pass-title">
+        <div className="wallet-pass-hero-shade rent-wallet-hero-shade" aria-hidden />
+        <div className="rent-wallet-hero-glow" aria-hidden />
+        <div className="wallet-pass-hero-copy rent-wallet-hero-copy">
+          <div className="rent-wallet-hero-top">
+            <p className="wallet-pass-brand">{brandLabel}</p>
+            <span className={`rent-wallet-hero-chip ${statusClass(status)}`}>{label}</span>
+          </div>
+          <h1 className="wallet-pass-title rent-wallet-hero-title">
             {booking.vehicle_model || 'Όχημα'}
-            {booking.vehicle_plate ? ` · ${booking.vehicle_plate}` : ''}
           </h1>
-          <p className="wallet-pass-when">{formatRange(booking.start_time, booking.end_time)}</p>
+          {booking.vehicle_plate ? (
+            <p className="rent-wallet-hero-plate">
+              <span className="material-symbols-outlined" aria-hidden>
+                directions_car
+              </span>
+              {booking.vehicle_plate}
+            </p>
+          ) : null}
+          {nights > 0 ? (
+            <p className="rent-wallet-hero-nights">
+              {nights} {nights === 1 ? 'ημέρα' : 'ημέρες'} ενοικίασης
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <div className="wallet-pass-card wallet-pass-card-enter">
-        <div className="wallet-pass-card-top">
+      <div className="wallet-pass-card wallet-pass-card-enter rent-wallet-card">
+        <div className="rent-wallet-legs" aria-label="Παραλαβή και επιστροφή">
+          <div className="rent-wallet-leg">
+            <em>Παραλαβή</em>
+            <strong>{formatDay(booking.start_time)}</strong>
+            <span>{formatClock(booking.start_time)}</span>
+          </div>
+          <span className="rent-wallet-leg-sep" aria-hidden>
+            <span className="rent-wallet-leg-line" />
+            <span className="material-symbols-outlined">arrow_forward</span>
+            <span className="rent-wallet-leg-line" />
+          </span>
+          <div className="rent-wallet-leg rent-wallet-leg--end">
+            <em>Επιστροφή</em>
+            <strong>{formatDay(booking.end_time)}</strong>
+            <span>{formatClock(booking.end_time)}</span>
+          </div>
+        </div>
+
+        <div className="rent-wallet-card-top">
           <div className="min-w-0">
             <p className="wallet-pass-kicker">Πελάτης</p>
             <p className="wallet-pass-passenger truncate">{passengerName || '—'}</p>
           </div>
           <div className="rent-wallet-status-stack">
-            <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
-            {booking.online_checkin_ready ? (
+            {checkinReady ? (
               <span className="wallet-pass-status is-ok rent-wallet-checkin-chip">
-                Επιβεβαιωμένο check-in
+                <span className="material-symbols-outlined" aria-hidden>
+                  task_alt
+                </span>
+                Check-in
               </span>
             ) : null}
+            <span className={`rent-wallet-mode-pill ${selfDrive ? 'is-self' : 'is-driver'}`}>
+              {selfDrive ? 'Self-drive' : 'Με οδηγό'}
+            </span>
           </div>
         </div>
 
-        <div className="wallet-pass-meta">
-          <div>
-            <p className="wallet-pass-kicker">Παραλαβή</p>
-            <p className="wallet-pass-meta-value">{pickup}</p>
-          </div>
-          <div>
-            <p className="wallet-pass-kicker">Κωδικός</p>
-            <p className="wallet-pass-meta-value wallet-pass-mono">{code}</p>
-          </div>
-          <div>
-            <p className="wallet-pass-kicker">Ποσό</p>
-            <p className="wallet-pass-meta-value">€{Number(booking.total_cost || 0).toFixed(2)}</p>
-          </div>
-          {booking.payment_status || booking.payment_method ? (
+        <div className="rent-wallet-facts">
+          <div className="rent-wallet-fact">
+            <span className="material-symbols-outlined" aria-hidden>
+              location_on
+            </span>
             <div>
-              <p className="wallet-pass-kicker">Πληρωμή</p>
-              <p className="wallet-pass-meta-value">
-                {booking.payment_status || booking.payment_method}
-                {Number(booking.balance_due) > 0
-                  ? ` · υπόλοιπο €${Number(booking.balance_due).toFixed(2)}`
-                  : ''}
-              </p>
+              <p className="wallet-pass-kicker">Παραλαβή</p>
+              <p className="wallet-pass-meta-value">{pickup}</p>
+              {dropoff !== pickup ? (
+                <p className="rent-wallet-fact-sub">Επιστροφή · {dropoff}</p>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-
-        <div className="rent-wallet-route">
-          <span className="material-symbols-outlined" aria-hidden>
-            trip_origin
-          </span>
-          <span>
-            {pickup}
-            {dropoff !== pickup ? ` → ${dropoff}` : ''}
-          </span>
-          <span className="rent-wallet-mode">
-            {booking.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
-          </span>
-        </div>
-
-        <div className="wallet-pass-perforation" aria-hidden>
-          <span />
-          <span />
-        </div>
-
-        <div className="wallet-pass-qr-wrap is-live">
-          <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
-            <QRCode value={qrValue} size={168} bgColor="#ffffff" fgColor="#0b3d4a" level="M" />
           </div>
-          <p className="wallet-pass-qr-hint">Δείξτε το QR στο γραφείο κατά την παραλαβή</p>
+          <div className="rent-wallet-fact">
+            <span className="material-symbols-outlined" aria-hidden>
+              confirmation_number
+            </span>
+            <div>
+              <p className="wallet-pass-kicker">Κωδικός</p>
+              <p className="wallet-pass-meta-value wallet-pass-mono">{code}</p>
+            </div>
+          </div>
+          <div className="rent-wallet-fact">
+            <span className="material-symbols-outlined" aria-hidden>
+              payments
+            </span>
+            <div>
+              <p className="wallet-pass-kicker">Σύνολο</p>
+              <p className="wallet-pass-meta-value">
+                €{Number(booking.total_cost || 0).toFixed(2)}
+                <span className={`rent-wallet-pay-tag ${paid ? 'is-paid' : 'is-due'}`}>
+                  {paid ? 'Πληρωμένο' : 'Υπόλοιπο'}
+                </span>
+              </p>
+              {Number(booking.balance_due) > 0 ? (
+                <p className="rent-wallet-fact-sub">
+                  Υπόλοιπο €{Number(booking.balance_due).toFixed(2)}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
 
-        <div className="wallet-pass-actions">
-          {booking.online_checkin_ready ? (
+        <div className="wallet-pass-perforation rent-wallet-perf" aria-hidden>
+          <span />
+          <span />
+        </div>
+
+        <div className="wallet-pass-qr-wrap is-live rent-wallet-qr">
+          <div className="rent-wallet-qr-frame">
+            <QRCode value={qrValue} size={152} bgColor="#ffffff" fgColor="#0b3d4a" level="M" />
+          </div>
+          <p className="wallet-pass-qr-hint">Δείξε το QR στο γραφείο κατά την παραλαβή</p>
+        </div>
+
+        <div className="wallet-pass-actions rent-wallet-actions">
+          {checkinReady ? (
             <p className="rent-wallet-checkin-ready" role="status">
               <span className="material-symbols-outlined" aria-hidden>
                 task_alt
@@ -170,28 +236,39 @@ export default function RentalWalletPass({
             <button
               type="button"
               className={`wallet-btn wallet-btn-block ${
-                booking.online_checkin_ready
+                checkinReady
                   ? 'wallet-btn-ghost rent-wallet-checkin-done-btn'
-                  : 'wallet-btn-primary'
+                  : 'wallet-btn-primary rent-wallet-checkin-cta'
               }`}
               onClick={() => onCheckIn(booking)}
             >
-              {booking.online_checkin_ready ? 'Επιβεβαιωμένο check-in' : 'Check-in τώρα'}
+              <span className="material-symbols-outlined" aria-hidden>
+                {checkinReady ? 'verified' : 'bolt'}
+              </span>
+              {checkinReady ? 'Επιβεβαιωμένο check-in' : 'Check-in τώρα'}
             </button>
           ) : null}
-          {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
-            <button
-              type="button"
-              className="wallet-btn wallet-btn-danger wallet-btn-block"
-              disabled={cancelling}
-              onClick={() => onCancel(booking)}
-            >
-              {cancelling ? 'Ακύρωση…' : 'Ακύρωση κράτησης'}
+          <div className="rent-wallet-action-row">
+            <button type="button" className="rent-wallet-link-btn" onClick={onBookVehicle}>
+              <span className="material-symbols-outlined" aria-hidden>
+                add_circle
+              </span>
+              Νέα κράτηση
             </button>
-          ) : null}
-          <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
-            Νέα κράτηση
-          </button>
+            {(status === 'CONFIRMED' || status === 'RESERVED') && onCancel ? (
+              <button
+                type="button"
+                className="rent-wallet-link-btn is-danger"
+                disabled={cancelling}
+                onClick={() => onCancel(booking)}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  event_busy
+                </span>
+                {cancelling ? 'Ακύρωση…' : 'Ακύρωση'}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </section>

@@ -172,15 +172,19 @@ export default function RentalWalletPanel({
     return null;
   }
 
+  const countLabel = rows.length
+    ? `${rows.length} ${rows.length === 1 ? 'κάρτα οχήματος' : 'κάρτες οχήματος'}`
+    : 'Κάρτες οχήματος στο Wallet';
+
   return (
     <section className="wallet-panel wallet-panel--rent-passes">
-      <div className="wallet-panel-head">
-        <span className="wallet-panel-head-icon" aria-hidden>
+      <div className="wallet-panel-head rent-wallet-panel-head">
+        <span className="wallet-panel-head-icon is-mint" aria-hidden>
           <span className="material-symbols-outlined">directions_car</span>
         </span>
         <div>
-          <h2>Ενοικιάσεις</h2>
-          <p>Κάρτες οχήματος στις Κρατήσεις.</p>
+          <h2>Οι ενοικιάσεις μου</h2>
+          <p>{loading ? 'Φόρτωση…' : countLabel}</p>
         </div>
       </div>
       <div className="rent-wallet">
@@ -195,46 +199,69 @@ export default function RentalWalletPanel({
         />
 
         {others.length ? (
-          <section className="wallet-home-more rent-wallet-more" aria-label="Άλλες ενοικιάσεις">
-            <h3 className="rent-wallet-more-title">Άλλες κρατήσεις</h3>
-            <div className="wallet-list">
-              {others.map((b) => (
-                <div key={b.id} className="rent-wallet-card-row">
-                  <button
-                    type="button"
-                    className="wallet-booking-card rent-wallet-card-btn"
-                    onClick={() => setSelectedId(b.id)}
-                  >
-                    <div className="wallet-booking-body">
-                      <h3>
-                        {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
-                      </h3>
-                      <p>
-                        {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
-                      </p>
-                      <p className="wallet-booking-mono">
-                        {b.pickup_location || 'Γραφείο'}
-                        {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
-                          STATUS_LABEL[b.rental_status] || b.rental_status
-                        }`}
-                        {b.online_checkin_ready ? ' · Check-in έτοιμο' : ''}
-                      </p>
-                    </div>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      chevron_right
-                    </span>
-                  </button>
-                  {canCheckIn(b) ? (
+          <section className="rent-wallet-more" aria-label="Άλλες ενοικιάσεις">
+            <div className="rent-wallet-more-head">
+              <h3 className="rent-wallet-more-title">Άλλες κρατήσεις</h3>
+              <span className="rent-wallet-more-count">{others.length}</span>
+            </div>
+            <div className="rent-wallet-mini-list">
+              {others.map((b) => {
+                const st = b.rental_status || '';
+                const stLabel = STATUS_LABEL[st] || st;
+                const ready = Boolean(b.online_checkin_ready);
+                return (
+                  <div key={b.id} className="rent-wallet-mini">
                     <button
                       type="button"
-                      className="wallet-btn wallet-btn-primary rent-wallet-card-checkin"
-                      onClick={() => setCheckinBooking(b)}
+                      className="rent-wallet-mini-btn"
+                      onClick={() => setSelectedId(b.id)}
                     >
-                      Check-in τώρα
+                      <span className="rent-wallet-mini-icon" aria-hidden>
+                        <span className="material-symbols-outlined">directions_car</span>
+                      </span>
+                      <span className="rent-wallet-mini-body">
+                        <span className="rent-wallet-mini-top">
+                          <strong>{b.vehicle_model || 'Όχημα'}</strong>
+                          <span
+                            className={`rent-wallet-mini-chip ${
+                              st === 'CONFIRMED' || st === 'ACTIVE'
+                                ? 'is-ok'
+                                : st === 'CANCELLED'
+                                  ? 'is-muted'
+                                  : 'is-warn'
+                            }`}
+                          >
+                            {stLabel}
+                          </span>
+                        </span>
+                        <span className="rent-wallet-mini-plate">
+                          {b.vehicle_plate || '—'}
+                          {ready ? ' · Check-in έτοιμο' : ''}
+                        </span>
+                        <span className="rent-wallet-mini-when">
+                          {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
+                        </span>
+                        <span className="rent-wallet-mini-meta">
+                          {b.pickup_location || 'Γραφείο'} · €
+                          {Number(b.total_cost || 0).toFixed(2)}
+                        </span>
+                      </span>
+                      <span className="material-symbols-outlined rent-wallet-mini-chevron" aria-hidden>
+                        chevron_right
+                      </span>
                     </button>
-                  ) : null}
-                </div>
-              ))}
+                    {canCheckIn(b) ? (
+                      <button
+                        type="button"
+                        className="wallet-btn wallet-btn-primary rent-wallet-card-checkin"
+                        onClick={() => setCheckinBooking(b)}
+                      >
+                        Check-in τώρα
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </section>
         ) : null}

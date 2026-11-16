@@ -5603,14 +5603,644 @@
 
 .rent-wallet {
   display: grid;
-  gap: 1rem;
+  gap: 1.15rem;
+}
+
+.wallet-panel--rent-passes .rent-wallet-panel-head {
+  margin-bottom: 1.15rem;
 }
 
 .rent-wallet-hero {
+  position: relative;
+  min-height: 11.5rem;
   background:
-    radial-gradient(90% 70% at 88% 8%, rgba(255, 159, 10, 0.22), transparent 52%),
-    radial-gradient(110% 85% at 8% 100%, rgba(10, 122, 108, 0.5), transparent 52%),
-    linear-gradient(165deg, #102a32 0%, #0b4a4a 46%, #071c22 100%) !important;
+    radial-gradient(90% 70% at 88% 8%, rgba(94, 234, 212, 0.28), transparent 52%),
+    radial-gradient(110% 85% at 8% 100%, rgba(10, 122, 108, 0.55), transparent 52%),
+    linear-gradient(165deg, #0c242c 0%, #0a5c56 48%, #06161c 100%) !important;
+}
+
+.rent-wallet-hero-shade {
+  background:
+    linear-gradient(180deg, rgba(6, 22, 28, 0.05) 0%, rgba(6, 22, 28, 0.45) 55%, rgba(6, 22, 28, 0.78) 100%) !important;
+}
+
+.rent-wallet-hero-glow {
+  position: absolute;
+  inset: auto -20% -40% auto;
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.22), transparent 68%);
+  pointer-events: none;
+  animation: rent-wallet-glow 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes rent-wallet-glow {
+  from {
+    opacity: 0.55;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-6%, -4%, 0) scale(1.08);
+  }
+}
+
+.rent-wallet-hero-copy {
+  padding-bottom: 1.55rem !important;
+}
+
+.rent-wallet-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.rent-wallet-hero-top .wallet-pass-brand {
+  margin: 0;
+}
+
+.rent-wallet-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.rent-wallet-hero-chip.is-ok {
+  background: rgba(52, 199, 89, 0.28);
+  border-color: rgba(52, 199, 89, 0.35);
+}
+
+.rent-wallet-hero-chip.is-warn {
+  background: rgba(255, 159, 10, 0.3);
+  border-color: rgba(255, 159, 10, 0.4);
+}
+
+.rent-wallet-hero-chip.is-muted,
+.rent-wallet-hero-chip.is-done {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.rent-wallet-hero-title {
+  max-width: 16ch;
+}
+
+.rent-wallet-hero-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0.28rem 0.65rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.rent-wallet-hero-plate .material-symbols-outlined {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+.rent-wallet-hero-nights {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.rent-wallet-card {
+  animation: rent-wallet-card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rent-wallet-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rent-wallet-legs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 1.05rem;
+  padding: 0.85rem 0.7rem;
+  border-radius: 1.05rem;
+  background:
+    linear-gradient(180deg, rgba(10, 122, 108, 0.06), rgba(10, 122, 108, 0.02));
+  border: 1px solid rgba(10, 122, 108, 0.1);
+}
+
+.rent-wallet-leg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.rent-wallet-leg--end {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.rent-wallet-leg em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #86868b;
+}
+
+.rent-wallet-leg strong {
+  font-family: var(--wallet-display, inherit);
+  font-size: 0.98rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+  line-height: 1.15;
+}
+
+.rent-wallet-leg span {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #0a7a6c;
+}
+
+.rent-wallet-leg-sep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: #0a7a6c;
+}
+
+.rent-wallet-leg-sep .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-wallet-leg-line {
+  width: 0.55rem;
+  height: 1px;
+  background: rgba(10, 122, 108, 0.35);
+}
+
+.rent-wallet-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.rent-wallet-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.rent-wallet-checkin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.rent-wallet-checkin-chip .material-symbols-outlined {
+  font-size: 0.95rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wallet-mode-pill {
+  display: inline-flex;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.rent-wallet-mode-pill.is-self {
+  background: rgba(10, 122, 108, 0.1);
+  color: #0b3d4a;
+}
+
+.rent-wallet-mode-pill.is-driver {
+  background: rgba(0, 122, 255, 0.1);
+  color: #0051a8;
+}
+
+.rent-wallet-facts {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.rent-wallet-fact {
+  display: grid;
+  grid-template-columns: 1.65rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.rent-wallet-fact > .material-symbols-outlined {
+  margin-top: 0.15rem;
+  font-size: 1.15rem;
+  color: #0a7a6c;
+}
+
+.rent-wallet-fact .wallet-pass-kicker {
+  margin-bottom: 0.1rem;
+}
+
+.rent-wallet-fact .wallet-pass-meta-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.rent-wallet-fact-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #86868b;
+}
+
+.rent-wallet-pay-tag {
+  display: inline-flex;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rent-wallet-pay-tag.is-paid {
+  background: rgba(52, 199, 89, 0.14);
+  color: #248a3d;
+}
+
+.rent-wallet-pay-tag.is-due {
+  background: rgba(255, 159, 10, 0.16);
+  color: #9a6700;
+}
+
+.rent-wallet-perf {
+  margin: 1.05rem 0 0.95rem;
+}
+
+.rent-wallet-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.rent-wallet-qr-frame {
+  padding: 0.85rem;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(10, 122, 108, 0.08),
+    0 14px 28px rgba(15, 23, 42, 0.08);
+  animation: rent-wallet-qr-in 0.55s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rent-wallet-qr-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rent-wallet-actions {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-wallet-checkin-cta {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: linear-gradient(180deg, #12a393, #0a7a6c) !important;
+  box-shadow: 0 10px 22px rgba(10, 122, 108, 0.28);
+}
+
+.rent-wallet-checkin-cta .material-symbols-outlined {
+  font-size: 1.15rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wallet-checkin-ready {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: rgba(52, 199, 89, 0.12);
+  font-size: 0.86rem;
+  font-weight: 750;
+  color: #248a3d;
+}
+
+.rent-wallet-checkin-ready .material-symbols-outlined {
+  font-size: 1.15rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wallet-checkin-done-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(52, 199, 89, 0.35) !important;
+  color: #248a3d !important;
+  font-weight: 750 !important;
+}
+
+.rent-wallet-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.rent-wallet-action-row:has(> :only-child) {
+  grid-template-columns: 1fr;
+}
+
+.rent-wallet-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.9);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1d1d1f;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 120ms ease;
+}
+
+.rent-wallet-link-btn:hover {
+  background: #fff;
+  border-color: rgba(10, 122, 108, 0.25);
+}
+
+.rent-wallet-link-btn:active {
+  transform: scale(0.985);
+}
+
+.rent-wallet-link-btn .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: #0a7a6c;
+}
+
+.rent-wallet-link-btn.is-danger {
+  color: #c0392b;
+}
+
+.rent-wallet-link-btn.is-danger .material-symbols-outlined {
+  color: #c0392b;
+}
+
+.rent-wallet-link-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rent-wallet-more {
+  margin-top: 0.15rem;
+}
+
+.rent-wallet-more-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.rent-wallet-more-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-wallet-more-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  color: #0b3d4a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.rent-wallet-mini-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-wallet-mini {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-wallet-mini-btn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  background:
+    linear-gradient(180deg, #fff, #f7fbfa);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  transition:
+    transform 140ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.rent-wallet-mini-btn:hover {
+  border-color: rgba(10, 122, 108, 0.22);
+  box-shadow: 0 12px 26px rgba(10, 122, 108, 0.08);
+}
+
+.rent-wallet-mini-btn:active {
+  transform: scale(0.99);
+}
+
+.rent-wallet-mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(160deg, rgba(10, 122, 108, 0.18), rgba(13, 148, 136, 0.08));
+  color: #0a7a6c;
+}
+
+.rent-wallet-mini-icon .material-symbols-outlined {
+  font-size: 1.25rem;
+}
+
+.rent-wallet-mini-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.rent-wallet-mini-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.rent-wallet-mini-top strong {
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rent-wallet-mini-chip {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.rent-wallet-mini-chip.is-ok {
+  background: rgba(10, 122, 108, 0.12);
+  color: #0b3d4a;
+}
+
+.rent-wallet-mini-chip.is-warn {
+  background: rgba(255, 159, 10, 0.16);
+  color: #9a6700;
+}
+
+.rent-wallet-mini-chip.is-muted {
+  background: rgba(120, 120, 128, 0.14);
+  color: #6e6e73;
+}
+
+.rent-wallet-mini-plate {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0a7a6c;
+}
+
+.rent-wallet-mini-when,
+.rent-wallet-mini-meta {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #86868b;
+}
+
+.rent-wallet-mini-chevron {
+  color: #86868b;
+  flex-shrink: 0;
+}
+
+.rent-wallet-card-checkin {
+  width: 100%;
+}
+
+.rent-wallet-empty-inner {
+  text-align: center;
+}
+
+.rent-wallet-empty-orb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-bottom: 0.85rem;
+  border-radius: 1.35rem;
+  background:
+    radial-gradient(120% 100% at 20% 15%, rgba(255, 255, 255, 0.35), transparent 45%),
+    linear-gradient(160deg, #14b8a6, #0a7a6c 55%, #0b3d4a);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(10, 122, 108, 0.28);
+  animation: rent-wallet-orb 2.8s ease-in-out infinite;
+}
+
+.rent-wallet-empty-orb .material-symbols-outlined {
+  font-size: 1.85rem;
+}
+
+@keyframes rent-wallet-orb {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.rent-wallet-empty-cta {
+  margin-top: 0.35rem;
 }
 
 .rent-wallet-pass .wallet-pass-status.is-ok {
@@ -5628,109 +6258,13 @@
   color: #6e6e73;
 }
 
-.rent-wallet-route {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--rent-secondary);
-}
-
-.rent-wallet-route .material-symbols-outlined {
-  font-size: 1.05rem;
-  color: var(--rent-teal);
-}
-
-.rent-wallet-mode {
-  margin-left: auto;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(10, 122, 108, 0.1);
-  color: var(--rent-deep);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.rent-wallet-checkin-ready {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  margin: 0 0 0.35rem;
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  border-radius: 14px;
-  background: rgba(52, 199, 89, 0.12);
-  font-size: 0.88rem;
-  font-weight: 750;
-  color: #248a3d;
-}
-
-.rent-wallet-checkin-ready .material-symbols-outlined {
-  font-size: 1.15rem;
-  font-variation-settings: 'FILL' 1;
-}
-
-.rent-wallet-status-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.3rem;
-}
-
-.rent-wallet-checkin-chip {
-  white-space: nowrap;
-}
-
-.rent-wallet-checkin-done-btn {
-  border: 1px solid rgba(52, 199, 89, 0.35) !important;
-  color: #248a3d !important;
-  font-weight: 750 !important;
-}
-
-.rent-wallet-card-row {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.rent-wallet-card-checkin {
-  width: 100%;
-}
-
-.rent-wallet-more {
-  margin-top: 0.25rem;
-}
-
-.rent-wallet-more-title {
-  margin: 0 0 0.55rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--rent-ink);
-}
-
-.rent-wallet-card-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  font: inherit;
-  color: inherit;
-}
-
-.rent-wallet-card-btn .material-symbols-outlined {
-  color: var(--rent-secondary);
-  flex-shrink: 0;
-}
-
-.rent-wallet-empty .wallet-pass-empty-icon {
-  color: var(--rent-teal);
+@media (prefers-reduced-motion: reduce) {
+  .rent-wallet-hero-glow,
+  .rent-wallet-card,
+  .rent-wallet-qr-frame,
+  .rent-wallet-empty-orb {
+    animation: none !important;
+  }
 }
 
 /* Teal Apple auth (login/register) — Rent app, distinct from blue My Wallet */
