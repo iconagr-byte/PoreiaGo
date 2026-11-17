@@ -9,9 +9,11 @@ from uuid import uuid4
 
 from app.models.tenant import TenantPlan
 from app.services.tenant_modules import (
+    ACHILLIO_TRAVEL_BUS_HERO,
     ACHILLIO_TRAVEL_CANONICAL_DOMAIN,
     ACHILLIO_TRAVEL_CANONICAL_SLUG,
     ensure_achillio_travel_office,
+    restore_achillio_travel_bus_hero,
 )
 
 
@@ -83,6 +85,63 @@ class EnsureAchillioTravelOfficeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["poison_cleared"], 1)
         self.assertIsNone(poison.custom_domain)
         self.assertEqual(office.custom_domain, ACHILLIO_TRAVEL_CANONICAL_DOMAIN)
+
+    async def test_restores_bus_hero_when_mistaken_upload(self):
+        import json
+
+        office = SimpleNamespace(
+            id=uuid4(),
+            slug=ACHILLIO_TRAVEL_CANONICAL_SLUG,
+            subdomain=ACHILLIO_TRAVEL_CANONICAL_SLUG,
+            custom_domain=ACHILLIO_TRAVEL_CANONICAL_DOMAIN,
+            legal_name="Achillio Travel",
+            settings_json=json.dumps(
+                {
+                    "site_appearance": {
+                        "hero_image_url": (
+                            "/api/site/office-assets/97798681/hero/hero.jpg"
+                        ),
+                        "footer_brand_name": "Achillio Travel",
+                    }
+                }
+            ),
+            plan=TenantPlan.PROFESSIONAL,
+        )
+        poison_scan = MagicMock()
+        poison_scan.scalars.return_value.all.return_value = [office]
+        hit = MagicMock()
+        hit.scalar_one_or_none.return_value = office
+
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=[None, None, poison_scan, hit])
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+
+        with patch(
+            "app.services.tenant_modules.apply_known_office_rent_policy",
+            return_value=None,
+        ), patch("middleware.domain_tenant.clear_host_resolve_cache"):
+            result = await ensure_achillio_travel_office(session)
+
+        self.assertTrue(result["hero_restored"])
+        saved = json.loads(office.settings_json)
+        self.assertEqual(
+            saved["site_appearance"]["hero_image_url"],
+            ACHILLIO_TRAVEL_BUS_HERO,
+        )
+
+    def test_restore_helper_is_idempotent(self):
+        already = {
+            "site_appearance": {"hero_image_url": ACHILLIO_TRAVEL_BUS_HERO}
+        }
+        self.assertIsNone(restore_achillio_travel_bus_hero(already))
+        swapped = restore_achillio_travel_bus_hero(
+            {"site_appearance": {"hero_image_url": "/api/site/office-assets/x/hero.jpg"}}
+        )
+        self.assertEqual(
+            swapped["site_appearance"]["hero_image_url"],
+            ACHILLIO_TRAVEL_BUS_HERO,
+        )
 
 
 if __name__ == "__main__":
