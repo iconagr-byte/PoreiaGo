@@ -254,40 +254,20 @@
 
   /* Why-us */
   .sf-why-us {
-    padding-top: 2.5rem !important;
-    padding-bottom: 2.5rem !important;
-    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
     overflow-x: clip;
   }
 
-  .sf-why-us .mb-16 {
-    margin-bottom: 1.35rem !important;
+  .sf-why-us__inner {
+    width: calc(100% - max(1.5rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)));
   }
 
-  .sf-why-us .gap-8 {
-    gap: 0.85rem !important;
-  }
-
-  .sf-why-us .sf-why-us-card {
-    padding: 1.1rem 0.95rem !important;
-    border-radius: 1.2rem !important;
-    max-width: 100%;
-  }
-
-  .sf-why-us .sf-why-us-card h3,
-  .sf-why-us .sf-why-us-card p {
+  .sf-why-us__title {
     overflow-wrap: anywhere;
   }
 
-  .sf-why-us .sf-why-us-card .w-16 {
-    width: 3.25rem !important;
-    height: 3.25rem !important;
-    margin-bottom: 0.85rem !important;
-  }
-
-  .sf-why-us .sf-why-us-card .material-symbols-outlined {
-    font-size: 26px !important;
+  .sf-why-us__item-title,
+  .sf-why-us__item-body {
+    overflow-wrap: anywhere;
   }
 
   /* Header brand — wrap instead of hard ellipsis mid-name */
