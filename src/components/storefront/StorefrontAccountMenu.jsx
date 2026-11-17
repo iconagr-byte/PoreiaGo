@@ -1,6 +1,7 @@
 /**
- * Header account control — Log in when guest; avatar + name dropdown when signed in
- * (My Wallet / account / logout), like large consumer sites.
+ * Header account control for signed-in customers (avatar + My Wallet / account / logout).
+ * Guest "Log in" is omitted on office storefronts — offices already have discreet
+ * «Είσοδος γραφείου» in the footer; customers enter via Wallet / booking flows.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -37,7 +38,6 @@ function initials(name) {
 export default function StorefrontAccountMenu({
   isDark = true,
   compact = false,
-  onOpenLogin,
   onSessionChange,
 }) {
   const navigate = useNavigate();
@@ -101,21 +101,9 @@ export default function StorefrontAccountMenu({
     ? 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-300 hover:bg-rose-500/15 text-left'
     : 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 text-left';
 
+  // No guest Log in pill on office headers — «Είσοδος γραφείου» covers staff entry.
   if (!ready) {
-    return (
-      <button
-        type="button"
-        className={`${pill} ${pad}`}
-        title="Είσοδος στον λογαριασμό"
-        aria-label="Είσοδος στον λογαριασμό"
-        onClick={() => onOpenLogin?.()}
-      >
-        <span className="material-symbols-outlined sf-header-login__icon text-[18px]" aria-hidden>
-          login
-        </span>
-        <span className="sf-header-login__label">{compact ? 'Είσοδος' : 'Log in'}</span>
-      </button>
-    );
+    return null;
   }
 
   const displayName = compact
