@@ -14,23 +14,25 @@ import {
   normalizeHeroImageFit,
 } from '../../../lib/homepage/heroPhoto.js';
 import {
-  PAGE_SLIDER_MAX_SLIDES,
   SLIDER_TRANSITIONS,
   clampSliderIntervalSec,
-  createSliderSlide,
   normalizeSliderOptions,
-  normalizeSliderSlides,
   pageSliderPatch,
 } from '../../../lib/homepage/pageSlider.js';
 import {
-  DEFAULT_SITE_APPEARANCE,
+  HERO_GALLERY_FALLBACK,
+  HERO_GALLERY_MAX,
+  readHeroGallery,
+  writeHeroGalleryPatch,
+} from '../../../lib/homepage/heroGallery.js';
+import {
   clearSiteAsset,
   resolveSiteAssetUrl,
   uploadSiteAsset,
 } from '../../../services/siteAppearanceApi.js';
 
-const FALLBACK_HERO = '/images/hero-bus-achillio.png';
-const MAX_PHOTOS = PAGE_SLIDER_MAX_SLIDES;
+const FALLBACK_HERO = HERO_GALLERY_FALLBACK;
+const MAX_PHOTOS = HERO_GALLERY_MAX;
 
 const OVERLAY_PRESETS = [
   { id: 'none', label: 'Καθόλου', value: 0 },
@@ -45,67 +47,12 @@ function sameUrl(a, b) {
   return Boolean(left) && left === right;
 }
 
-/** Gallery = primary hero + extra slider slides (deduped). */
 function readGallery(form) {
-  const primaryRaw = String(form?.hero_image_url || '').trim();
-  const slides = normalizeSliderSlides(form?.home_slider_slides, { respectSchedule: false });
-  const items = [];
-  const seen = new Set();
-
-  const push = (id, url, role) => {
-    const raw = String(url || '').trim();
-    if (!raw) return;
-    const key = resolveSiteAssetUrl(raw) || raw;
-    if (seen.has(key)) return;
-    seen.add(key);
-    items.push({ id, url: raw, role });
-  };
-
-  if (primaryRaw) {
-    push('hero-primary', primaryRaw, 'primary');
-  }
-
-  for (const slide of slides) {
-    push(slide.id, slide.image_url, 'extra');
-  }
-
-  if (!items.length) {
-    items.push({ id: 'hero-fallback', url: FALLBACK_HERO, role: 'fallback' });
-  }
-
-  return items.slice(0, MAX_PHOTOS);
+  return readHeroGallery(form, { resolveSiteAssetUrl, fallbackUrl: FALLBACK_HERO });
 }
 
-function writeGalleryPatch(photos, { carousel, autoplay, intervalSec, options }) {
-  const list = photos.filter((p) => p.role !== 'fallback' && p.url && p.url !== FALLBACK_HERO);
-  const primary = list[0]?.url || '';
-  const extras = list.slice(1).map((p) =>
-    createSliderSlide({
-      id: p.role === 'extra' && !String(p.id).startsWith('hero-') ? p.id : undefined,
-      image_url: p.url,
-    }),
-  );
-
-  // When carousel is on, include primary in slides so the live hero rotates all photos.
-  const slidesForCarousel = list.map((p) =>
-    createSliderSlide({
-      id: p.role === 'extra' && !String(p.id).startsWith('hero-') ? p.id : undefined,
-      image_url: p.url,
-    }),
-  );
-
-  const enableCarousel = Boolean(carousel) && list.length >= 2;
-
-  return {
-    hero_image_url: primary,
-    ...pageSliderPatch('home', {
-      enabled: enableCarousel,
-      autoplay: autoplay !== false,
-      interval_sec: intervalSec,
-      options,
-      slides: enableCarousel ? slidesForCarousel : extras,
-    }),
-  };
+function writeGalleryPatch(photos, opts) {
+  return writeHeroGalleryPatch(photos, opts);
 }
 
 /**
@@ -124,10 +71,9 @@ export default function CompactHeroPhoto({ form, setForm }) {
   const selected = photos.find((p) => p.id === selectedId) || photos[0];
   const previewUrl = resolveSiteAssetUrl(selected?.url) || FALLBACK_HERO;
 
-  const hasCustom =
-    Boolean(form.hero_image_url) &&
-    form.hero_image_url !== DEFAULT_SITE_APPEARANCE.hero_image_url &&
-    form.hero_image_url !== FALLBACK_HERO;
+  // Any explicit gallery photo counts — including the Achillio bus asset URL.
+  // (Previously that path was treated as "no custom" and got wiped on add.)
+  const hasCustom = photos.some((p) => p.role !== 'fallback');
 
   const focal = form.hero_image_focal || 'center';
   const overlay = clampHeroOverlayOpacity(
@@ -552,7 +498,11 @@ export default function CompactHeroPhoto({ form, setForm }) {
             <p id="pdw-hero-carousel" className="pdw-builder__subhead" style={{ margin: 0 }}>
               Καρουζέλ
             </p>
-            <p className="pdw-hero-photo__hint">Περισσότερες φωτογραφίες → live εναλλαγή στο hero</p>
+            <p className="pdw-hero-photo__hint">
+              {realPhotoCount < 2
+                ? 'Πρόσθεσε 2η / 3η φωτο (+ Νέα) και άνοιξε το καρουζέλ για εναλλαγές'
+                : 'Live εναλλαγή στο hero μεταξύ των φωτογραφιών της συλλογής'}
+            </p>
           </div>
           <button
             type="button"
