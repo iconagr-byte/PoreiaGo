@@ -409,6 +409,31 @@ def apply_known_office_rent_policy(tenant: Any) -> dict[str, Any] | None:
 
 ACHILLIO_TRAVEL_CANONICAL_SLUG = "admin-achillio-gr"
 ACHILLIO_TRAVEL_CANONICAL_DOMAIN = "achilliotravel.com"
+# Canonical Achillio Travel homepage hero — branded coach (not trip gallery uploads).
+ACHILLIO_TRAVEL_BUS_HERO = "/images/hero-bus-achillio.png"
+
+
+def restore_achillio_travel_bus_hero(settings: dict[str, Any] | None) -> dict[str, Any] | None:
+    """
+    Ensure Achillio Travel homepage uses the branded bus hero photo.
+
+    Accidental Page Studio / trip uploads (festival, destinations) must not
+    replace the office identity image on www.achilliotravel.com.
+    Returns updated settings dict when a write is needed, else None.
+    """
+    current = dict(settings or {})
+    appearance = current.get("site_appearance")
+    appearance = dict(appearance) if isinstance(appearance, dict) else {}
+    hero = str(appearance.get("hero_image_url") or "").strip()
+    if hero == ACHILLIO_TRAVEL_BUS_HERO:
+        return None
+    appearance["hero_image_url"] = ACHILLIO_TRAVEL_BUS_HERO
+    # Keep a soft wash so white hero copy stays readable on the sunset bus photo.
+    # Live storefront may ignore paint when overlay is disabled in CSS/JS.
+    if appearance.get("hero_overlay_opacity") in (None, "", 0, "0"):
+        appearance["hero_overlay_opacity"] = 40
+    current["site_appearance"] = appearance
+    return current
 
 
 async def _heal_subscription_plan_column(session: Any) -> None:
@@ -786,6 +811,7 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     domain_set = False
     poison_cleared = 0
     admin_upserted = False
+    hero_restored = False
 
     await _heal_subscription_plan_column(session)
     await _heal_legacy_tenant_name_column(session)
@@ -879,6 +905,25 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
         if updated is not None:
             office.settings_json = json.dumps(updated, ensure_ascii=False)
 
+        # Homepage hero = branded Achillio bus (undo accidental Page Studio swaps).
+        hero_base = parse_tenant_settings(getattr(office, "settings_json", None))
+        hero_updated = restore_achillio_travel_bus_hero(hero_base)
+        if hero_updated is not None:
+            office.settings_json = json.dumps(hero_updated, ensure_ascii=False)
+            hero_restored = True
+            logger.info(
+                "Restored Achillio Travel bus hero on slug=%s",
+                _tenant_slug(office),
+            )
+
+    # New office create path: seed bus hero into appearance when missing.
+    if created:
+        seed_base = parse_tenant_settings(getattr(office, "settings_json", None))
+        seed_updated = restore_achillio_travel_bus_hero(seed_base)
+        if seed_updated is not None:
+            office.settings_json = json.dumps(seed_updated, ensure_ascii=False)
+            hero_restored = True
+
     admin_email = (os.getenv("ACHILLIO_ADMIN_EMAIL") or "").strip().lower()
     admin_password = os.getenv("ACHILLIO_ADMIN_PASSWORD") or ""
     if admin_email and admin_password and len(admin_password) >= 8:
@@ -958,6 +1003,7 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
         "domain_set": domain_set,
         "poison_cleared": poison_cleared,
         "admin_upserted": admin_upserted,
+        "hero_restored": hero_restored,
         "trips_seeded": trips_seeded,
         "bookings_healed": bookings_healed,
         "slug": _tenant_slug(office),
