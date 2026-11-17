@@ -1,4 +1,4 @@
-﻿﻿# ONE paste in PowerShell. Sets Java/SDK, builds APK, installs if emulator is up.
+﻿# ONE paste in PowerShell. Sets Java/SDK, builds APK, installs if emulator is up.
 $ErrorActionPreference = "Stop"
 
 $repo = "C:\Users\User\poreiago"
@@ -76,11 +76,15 @@ function Find-Sdk {
   return $null
 }
 
-Write-Host "==> fetch latest branch" -ForegroundColor Cyan
-git fetch origin cursor/wallet-android-capacitor-5ffb
-git checkout cursor/wallet-android-capacitor-5ffb
-git reset --hard origin/cursor/wallet-android-capacitor-5ffb
+Write-Host "==> fetch latest main" -ForegroundColor Cyan
+git fetch origin main
+if ($LASTEXITCODE -ne 0) { throw "git fetch origin main failed" }
+git checkout -B main origin/main
+if ($LASTEXITCODE -ne 0) { throw "git checkout main failed" }
+git reset --hard origin/main
+if ($LASTEXITCODE -ne 0) { throw "git reset --hard origin/main failed" }
 git log -1 --oneline
+Write-Host "OK: building from origin/main" -ForegroundColor Green
 
 Write-Host "==> resolve Java / SDK" -ForegroundColor Cyan
 $jbr = Find-Jbr
