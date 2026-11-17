@@ -22,17 +22,14 @@ import {
   cancelBlockedMessage,
   isFreeCancelEligible,
 } from '../../lib/rental/rentalCancel.js';
+import {
+  isRentBookingExpired,
+  rentBookingStatusLabel,
+  sortRentWalletBookings,
+} from '../../lib/rental/rentBookingExpiry.js';
 import RentMemberCheckinSheet, { canCheckIn } from './RentMemberCheckinSheet.jsx';
 import RentalWalletDetail from './RentalWalletDetail.jsx';
 import RentalWalletPass from './RentalWalletPass.jsx';
-
-const STATUS_LABEL = {
-  RESERVED: 'Εκκρεμεί πληρωμή',
-  CONFIRMED: 'Επιβεβαιωμένη',
-  ACTIVE: 'Σε εξέλιξη',
-  COMPLETED: 'Ολοκληρωμένη',
-  CANCELLED: 'Ακυρωμένη',
-};
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -48,21 +45,8 @@ function formatWhen(iso) {
   }
 }
 
-function rankBooking(b) {
-  const status = b.rental_status || '';
-  if (status === 'ACTIVE') return 0;
-  if (status === 'CONFIRMED') return 1;
-  if (status === 'RESERVED') return 2;
-  if (status === 'COMPLETED') return 3;
-  return 4;
-}
-
 function sortBookings(rows) {
-  return [...rows].sort((a, b) => {
-    const rank = rankBooking(a) - rankBooking(b);
-    if (rank !== 0) return rank;
-    return String(b.start_time || '').localeCompare(String(a.start_time || ''));
-  });
+  return sortRentWalletBookings(rows);
 }
 
 export default function RentalWalletPanel({
@@ -252,10 +236,11 @@ export default function RentalWalletPanel({
             <div className="rent-wallet-mini-list">
               {others.map((b) => {
                 const st = b.rental_status || '';
-                const stLabel = STATUS_LABEL[st] || st;
-                const ready = Boolean(b.online_checkin_ready);
+                const expired = isRentBookingExpired(b);
+                const stLabel = rentBookingStatusLabel(b);
+                const ready = Boolean(b.online_checkin_ready) && !expired && st !== 'CANCELLED';
                 return (
-                  <div key={b.id} className="rent-wallet-mini">
+                  <div key={b.id} className={`rent-wallet-mini${expired ? ' is-expired' : ''}`}>
                     <button
                       type="button"
                       className="rent-wallet-mini-btn"
@@ -269,10 +254,10 @@ export default function RentalWalletPanel({
                           <strong>{b.vehicle_model || 'Όχημα'}</strong>
                           <span
                             className={`rent-wallet-mini-chip ${
-                              st === 'CONFIRMED' || st === 'ACTIVE'
-                                ? 'is-ok'
-                                : st === 'CANCELLED'
-                                  ? 'is-muted'
+                              expired || st === 'CANCELLED' || st === 'COMPLETED'
+                                ? 'is-muted'
+                                : st === 'CONFIRMED' || st === 'ACTIVE'
+                                  ? 'is-ok'
                                   : 'is-warn'
                             }`}
                           >
@@ -295,7 +280,7 @@ export default function RentalWalletPanel({
                         chevron_right
                       </span>
                     </button>
-                    {canCheckIn(b) ? (
+                    {!expired && canCheckIn(b) ? (
                       <button
                         type="button"
                         className="wallet-btn wallet-btn-primary rent-wallet-card-checkin"

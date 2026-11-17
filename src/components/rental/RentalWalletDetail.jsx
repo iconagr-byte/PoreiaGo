@@ -10,14 +10,10 @@ import {
   openCustomerRentalContract,
 } from '../../services/customerRentalApi.js';
 import { isDemoRentBookingId } from '../../lib/rental/demoRentBooking.js';
-
-const STATUS_LABEL = {
-  RESERVED: 'Εκκρεμεί πληρωμή',
-  CONFIRMED: 'Επιβεβαιωμένη',
-  ACTIVE: 'Σε εξέλιξη',
-  COMPLETED: 'Ολοκληρωμένη',
-  CANCELLED: 'Ακυρωμένη',
-};
+import {
+  isRentBookingExpired,
+  rentBookingStatusLabel,
+} from '../../lib/rental/rentBookingExpiry.js';
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -55,7 +51,13 @@ export default function RentalWalletDetail({
   if (!booking) return null;
 
   const status = booking.rental_status || 'CONFIRMED';
-  const label = STATUS_LABEL[status] || status;
+  const expired = isRentBookingExpired(booking);
+  const cancelled = status === 'CANCELLED';
+  const inactive = expired || cancelled;
+  const label = rentBookingStatusLabel(booking);
+  const statusUiClass = expired
+    ? 'wallet-pass-status--expired'
+    : statusClass(status);
   const code = booking.reference_code || booking.id || '—';
   const pickup = booking.pickup_location || 'Γραφείο';
   const dropoff = booking.dropoff_location || pickup;
@@ -73,7 +75,6 @@ export default function RentalWalletDetail({
     '—';
   const email = String(booking.client_email || booking.email || '').trim();
   const phone = String(booking.client_phone || booking.phone || '').trim();
-  const cancelled = status === 'CANCELLED';
 
   const handlePrint = async () => {
     if (printing) return;
@@ -157,8 +158,8 @@ export default function RentalWalletDetail({
       </button>
 
       <section
-        className={`wallet-pass rent-wallet-pass${cancelled ? ' wallet-pass--expired' : ''}`}
-        aria-label="Λεπτομέρειες κράτησης ενοικίασης"
+        className={`wallet-pass rent-wallet-pass${inactive ? ' wallet-pass--expired' : ''}`}
+        aria-label={`Λεπτομέρειες κράτησης ενοικίασης${expired ? ' · ληγμένη' : ''}`}
       >
         <div className="wallet-pass-hero rent-wallet-hero">
           <div className="wallet-pass-hero-shade rent-wallet-hero-shade" aria-hidden />
@@ -172,13 +173,13 @@ export default function RentalWalletDetail({
           </div>
         </div>
 
-        <div className={`wallet-pass-card wallet-pass-card-enter rent-wallet-card${cancelled ? ' is-expired' : ''}`}>
+        <div className={`wallet-pass-card wallet-pass-card-enter rent-wallet-card${inactive ? ' is-expired' : ''}`}>
           <div className="wallet-pass-card-top">
             <div className="min-w-0">
               <p className="wallet-pass-kicker">Πελάτης</p>
               <p className="wallet-pass-passenger truncate">{name}</p>
             </div>
-            <span className={`wallet-pass-status ${statusClass(status)}`}>{label}</span>
+            <span className={`wallet-pass-status ${statusUiClass}`}>{label}</span>
           </div>
 
           <div className="wallet-pass-meta">
@@ -201,13 +202,20 @@ export default function RentalWalletDetail({
             <span />
           </div>
 
-          <div className={`wallet-pass-qr-wrap rent-wallet-qr${paid && !cancelled ? ' is-live' : ''}`}>
-            {cancelled ? (
+          <div
+            className={`wallet-pass-qr-wrap rent-wallet-qr${paid && !inactive ? ' is-live' : ''}${inactive ? ' is-expired' : ''}`}
+          >
+            {inactive ? (
               <div className="wallet-pass-expired-panel" role="status">
                 <span className="material-symbols-outlined" aria-hidden>
                   event_busy
                 </span>
-                <p>Η κράτηση ακυρώθηκε</p>
+                <p>{cancelled ? 'Η κράτηση ακυρώθηκε' : 'Η ενοικίαση έχει λήξει'}</p>
+                <p className="wallet-pass-expired-sub">
+                  {cancelled
+                    ? 'Δεν είναι πλέον ενεργή για παραλαβή'
+                    : 'Η κάρτα δεν είναι πλέον ενεργή για παραλαβή'}
+                </p>
               </div>
             ) : (
               <>
