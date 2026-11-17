@@ -284,10 +284,10 @@ html[data-poreiago-app='app'] .rent-offer {
   max-width: 100%;
 }
 
-/* Office logo + name in native top bar — keep mobile-friendly (admin header sizes can be 48–96px). */
+/* Office logo + name in native top bar — readable seal + wordmark (admin sizes can be 48–96px). */
 html[data-poreiago-app='wallet'] .wallet-topbar-brand,
 html[data-poreiago-app='app'] .wallet-topbar-brand {
-  max-width: min(14.5rem, 56vw);
+  max-width: min(17rem, 62vw);
   justify-content: center;
 }
 
@@ -295,9 +295,9 @@ html[data-poreiago-app='wallet'] .wallet-topbar-brand img,
 html[data-poreiago-app='app'] .wallet-topbar-brand img,
 html[data-poreiago-app='wallet'] .office-brand-mark__logo--compact,
 html[data-poreiago-app='app'] .office-brand-mark__logo--compact {
-  max-height: 36px !important;
-  height: 36px !important;
-  max-width: min(140px, 44vw) !important;
+  max-height: 40px !important;
+  height: 40px !important;
+  max-width: min(150px, 46vw) !important;
   width: auto !important;
   padding: 0 !important;
   box-shadow: none !important;
@@ -305,9 +305,16 @@ html[data-poreiago-app='app'] .office-brand-mark__logo--compact {
 
 html[data-poreiago-app='wallet'] .wallet-topbar-brand img.office-brand-mark__logo--with-name,
 html[data-poreiago-app='app'] .wallet-topbar-brand img.office-brand-mark__logo--with-name {
-  max-height: 28px !important;
-  height: 28px !important;
-  max-width: min(72px, 28vw) !important;
+  max-height: 34px !important;
+  height: 34px !important;
+  max-width: min(90px, 32vw) !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-topbar-brand .office-brand-mark__name,
+html[data-poreiago-app='app'] .wallet-topbar-brand .office-brand-mark__name {
+  font-size: 0.9375rem !important;
+  line-height: 1.15 !important;
+  max-width: min(11.5rem, 42vw) !important;
 }
 
 /* Vehicle detail sheet: stay inside the handset frame. */

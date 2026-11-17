@@ -184,15 +184,15 @@ export default function OfficeBrandMark({
     useCompact && showName
       ? {
           ...logoStyle,
-          height: '28px',
-          maxHeight: '28px',
-          maxWidth: '72px',
+          height: '34px',
+          maxHeight: '34px',
+          maxWidth: '90px',
         }
       : logoStyle;
 
   const inner = logoSrc ? (
     <span
-      className={`inline-flex items-center min-w-0 ${useCompact ? 'gap-1.5' : 'gap-2'} ${className}`}
+      className={`inline-flex items-center min-w-0 gap-2 ${className}`}
     >
       <img
         src={logoSrc}
@@ -205,8 +205,8 @@ export default function OfficeBrandMark({
       />
       {showName && (
         <span
-          className={`font-bold tracking-tight truncate min-w-0 ${
-            useCompact ? 'text-[0.8125rem] leading-tight max-w-[9.5rem]' : 'text-base'
+          className={`office-brand-mark__name font-bold tracking-tight truncate min-w-0 ${
+            useCompact ? 'text-[0.9375rem] leading-tight max-w-[11rem]' : 'text-base'
           } ${isDark ? 'text-white' : 'text-slate-900'}`}
         >
           {label}
@@ -222,7 +222,7 @@ export default function OfficeBrandMark({
       <span
         className={`flex items-center justify-center rounded-lg text-xs font-bold ${
           useCompact
-            ? 'h-7 w-7 text-[11px]'
+            ? 'h-8 w-8 text-[12px]'
             : minHeightPx != null
               ? 'h-11 w-11 text-sm'
               : 'h-8 w-8'
@@ -231,9 +231,13 @@ export default function OfficeBrandMark({
         {(label || 'Γ').charAt(0).toUpperCase()}
       </span>
       <span
-        className={
-          useCompact ? 'text-sm truncate max-w-[9rem]' : minHeightPx != null ? 'text-lg' : 'text-base'
-        }
+        className={`office-brand-mark__name ${
+          useCompact
+            ? 'text-[0.9375rem] truncate max-w-[11rem]'
+            : minHeightPx != null
+              ? 'text-lg'
+              : 'text-base'
+        }`}
       >
         {label}
       </span>

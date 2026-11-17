@@ -1000,7 +1000,7 @@ function WalletAuthenticatedApp() {
           />
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-7 max-w-[14.5rem]"
+              className="h-9 max-w-[17rem]"
               variant="light"
               officeName={
                 officeBrand.displayName ||
