@@ -33,6 +33,7 @@ const FALLBACK_HERO = '/images/hero-bus-achillio.png';
 const MAX_PHOTOS = PAGE_SLIDER_MAX_SLIDES;
 
 const OVERLAY_PRESETS = [
+  { id: 'none', label: 'Καθόλου', value: 0 },
   { id: 'soft', label: 'Απαλό', value: 40 },
   { id: 'mid', label: 'Μέτριο', value: 70 },
   { id: 'strong', label: 'Έντονο', value: 100 },

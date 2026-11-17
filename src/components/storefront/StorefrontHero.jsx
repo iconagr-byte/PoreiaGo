@@ -4,7 +4,6 @@ import { heroFocalCss } from '../../lib/homepage/heroFocal.js';
 import {
   heroBackgroundSize,
   heroMinHeightCss,
-  heroOverlayStrength,
 } from '../../lib/homepage/heroPhoto.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
 import { usePreviewDesignMode } from './preview/PreviewDesignMode.jsx';
@@ -39,40 +38,13 @@ function HeroMedia({ siteAppearance, heroUrl }) {
   );
 }
 
-function HeroOverlays({ strength, variant = 'fullscreen' }) {
-  const opacity = strength;
-  if (variant === 'centered') {
-    return <div className="absolute inset-0 bg-slate-950/70" style={{ opacity }} />;
-  }
-  if (variant === 'bottom') {
-    return (
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-900/30"
-        style={{ opacity }}
-      />
-    );
-  }
-  if (variant === 'card') {
-    return (
-      <div
-        className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/70 to-transparent"
-        style={{ opacity }}
-      />
-    );
-  }
-  // fullscreen (default)
-  return (
-    <>
-      <div
-        className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-slate-900/75 to-slate-900/40 pointer-events-none"
-        style={{ opacity }}
-      />
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-900/30 pointer-events-none"
-        style={{ opacity }}
-      />
-    </>
-  );
+/**
+ * Fade-to-black hero wash removed — photo shows clean edge-to-edge.
+ * Overlay strength is kept in appearance for Page Studio, but no black
+ * gradient is painted on the live storefront.
+ */
+function HeroOverlays() {
+  return null;
 }
 
 export default function StorefrontHero({
@@ -92,7 +64,6 @@ export default function StorefrontHero({
   const heroUrl =
     resolveSiteAssetUrl(appearance.hero_image_url) || imageFallback;
   const sliderOn = readPageSlider(appearance, 'home').enabled;
-  const overlayStrength = heroOverlayStrength(appearance);
   const minHeight = heroMinHeightCss(appearance, 820);
   const compactMinHeight = heroMinHeightCss(
     {
@@ -167,7 +138,7 @@ export default function StorefrontHero({
         <div className="absolute inset-0 opacity-40">
           <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
         </div>
-        <HeroOverlays strength={overlayStrength} variant="centered" />
+        <HeroOverlays />
         <div className="relative z-10 w-full max-w-3xl mx-auto text-center py-32 pt-40">
           <div className="flex flex-col items-center">
             {badge}
@@ -194,7 +165,7 @@ export default function StorefrontHero({
         style={{ minHeight: heroMinHeightCss(appearance, 880) }}
       >
         <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
-        <HeroOverlays strength={overlayStrength} variant="bottom" />
+        <HeroOverlays />
         <div className="relative z-10 w-full max-w-container-max mx-auto pb-12 pt-36">
           <div className="max-w-2xl mb-8">
             {badge}
@@ -236,7 +207,7 @@ export default function StorefrontHero({
           style={{ minHeight: heroMinHeightCss(appearance, 680) }}
         >
           <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
-          <HeroOverlays strength={overlayStrength} variant="card" />
+          <HeroOverlays />
           <div className="relative z-10 p-8 md:p-14 max-w-2xl">
             {badge}
             {titleBlock}
@@ -255,7 +226,7 @@ export default function StorefrontHero({
       style={{ minHeight }}
     >
       <HeroMedia siteAppearance={appearance} heroUrl={heroUrl} />
-      <HeroOverlays strength={overlayStrength} variant="fullscreen" />
+      <HeroOverlays />
       <div className="sf-hero-copy relative z-10 w-full max-w-container-max mx-auto py-16 sm:py-28 lg:py-32 pt-28 sm:pt-36">
         <div className="max-w-2xl min-w-0">
           {badge}

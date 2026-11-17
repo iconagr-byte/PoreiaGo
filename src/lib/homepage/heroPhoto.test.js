@@ -7,7 +7,7 @@ import {
   normalizeHeroImageFit,
 } from './heroPhoto.js';
 
-console.assert(clampHeroOverlayOpacity(null) === 100, 'overlay default');
+console.assert(clampHeroOverlayOpacity(null) === 0, 'overlay default');
 console.assert(clampHeroOverlayOpacity(-10) === 0, 'overlay floor');
 console.assert(clampHeroOverlayOpacity(140) === 100, 'overlay ceil');
 console.assert(clampHeroHeightVh(40) === 50, 'height floor');
