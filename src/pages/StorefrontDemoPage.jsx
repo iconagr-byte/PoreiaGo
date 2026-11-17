@@ -464,12 +464,12 @@ export default function StorefrontDemoPage() {
         />
 
         {siteAppearance.show_why_us_section !== false && (
-        <section className="sf-why-us py-24 border-y border-sky-200/60">
-          <div className="max-w-container-max mx-auto px-4 sm:px-margin-desktop">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              {/* One Builder for the whole why-us card template — not per card. */}
-              <div className="sf-preview-trips-section-head mb-6">
-                <h2 className="font-headline-lg font-bold text-on-surface">
+        <section className="sf-why-us" aria-labelledby="sf-why-us-title">
+          <div className="sf-why-us__inner">
+            <header className="sf-why-us__intro">
+              <p className="sf-why-us__eyebrow">Πλεονεκτήματα</p>
+              <div className="sf-preview-trips-section-head sf-why-us__title-row">
+                <h2 id="sf-why-us-title" className="sf-why-us__title">
                   Γιατί να μας επιλέξετε
                 </h2>
                 <PreviewBuilderControl
@@ -480,57 +480,58 @@ export default function StorefrontDemoPage() {
                   className="sf-preview-trips-section-head__builder"
                 />
               </div>
-              <p className="font-body-lg text-on-surface-variant">
+              <p className="sf-why-us__lede">
                 {rentOnly
                   ? 'Online κράτηση ενοικίασης, ξεκάθαροι όροι και υποστήριξη πριν και κατά τη διαδρομή.'
-                  : 'Όλες οι premium υπηρεσίες μας με μια ματιά. Από πανεύκολες κρατήσεις μέχρι ασφάλεια και εγγύηση κάθε στιγμή.'}
+                  : 'Από την κράτηση μέχρι την άφιξη — καθαρή ροή, άνετα οχήματα και ασφάλεια σε κάθε διαδρομή.'}
               </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            </header>
+
+            <ol className="sf-why-us__rail">
               {[
                 {
                   id: 'booking',
+                  step: '01',
                   icon: rentOnly ? 'smartphone' : 'event_available',
-                  iconWrap: 'bg-primary/10 text-primary',
-                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη Κράτηση',
+                  tone: 'sky',
+                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη κράτηση',
                   body: rentOnly
                     ? 'Διάλεξε όχημα και ημερομηνίες στο Rent app — χωρίς τηλεφωνική αναμονή.'
-                    : 'Διαλέξτε ημερομηνία και κλείστε τη θέση σας με λίγα μόνο κλικ.',
+                    : 'Διάλεξε ημερομηνία και κλείσε θέση σε λίγα κλικ, με επιβεβαίωση αμέσως.',
                 },
                 {
                   id: 'comfort',
+                  step: '02',
                   icon: rentOnly ? 'directions_car' : 'airline_seat_recline_extra',
-                  iconWrap: 'bg-blue-50 text-blue-600',
-                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση & Πολυτέλεια',
+                  tone: 'blue',
+                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση στο ταξίδι',
                   body: rentOnly
                     ? 'Οχήματα συντηρημένα και έτοιμα για παραλαβή με καθαρό ιστορικό.'
-                    : 'Ταξιδέψτε με υπερσύγχρονα οχήματα και αναπαυτικά καθίσματα.',
+                    : 'Σύγχρονα λεωφορεία, αναπαυτικά καθίσματα και παροχές που κάνουν τη διαδρομή ξεκούραστη.',
                 },
                 {
                   id: 'safety',
+                  step: '03',
                   icon: 'shield_person',
-                  iconWrap: 'bg-emerald-50 text-emerald-600',
-                  title: 'Απόλυτη Ασφάλεια',
+                  tone: 'mint',
+                  title: 'Ασφάλεια σε κάθε χιλιόμετρο',
                   body: rentOnly
                     ? 'Υποστήριξη διαδρομής, όροι ενοικίασης και βοήθεια όταν τη χρειάζεσαι.'
-                    : 'Έμπειροι οδηγοί και αυστηρά μέτρα προστασίας σε κάθε διαδρομή.',
+                    : 'Έμπειροι οδηγοί και μέτρα προστασίας από την αναχώρηση μέχρι τον προορισμό.',
                 },
-              ].map((card) => (
-                <div
-                  key={card.id}
-                  className="sf-why-us-card p-8 rounded-3xl flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
-                >
-                  <div
-                    className={`w-16 h-16 rounded-full ${card.iconWrap} flex items-center justify-center mb-6`}
-                  >
-                    <span className="material-symbols-outlined text-[32px]">{card.icon}</span>
-                  </div>
-                  <h3 className="font-headline-sm font-bold text-on-surface mb-3">{card.title}</h3>
-                  <p className="text-on-surface-variant font-body-md">{card.body}</p>
-                </div>
+              ].map((item) => (
+                <li key={item.id} className={`sf-why-us__item sf-why-us__item--${item.tone}`}>
+                  <span className="sf-why-us__step" aria-hidden>
+                    {item.step}
+                  </span>
+                  <span className="sf-why-us__icon" aria-hidden>
+                    <span className="material-symbols-outlined">{item.icon}</span>
+                  </span>
+                  <h3 className="sf-why-us__item-title">{item.title}</h3>
+                  <p className="sf-why-us__item-body">{item.body}</p>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </section>
         )}
