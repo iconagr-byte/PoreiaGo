@@ -34,7 +34,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   logo_show_name: true,
   hero_image_url: '',
   hero_image_focal: 'center',
-  hero_overlay_opacity: 100,
+  hero_overlay_opacity: 0,
   hero_image_fit: 'cover',
   hero_height_vh: 88,
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',

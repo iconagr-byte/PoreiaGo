@@ -6,7 +6,8 @@ export const HERO_FIT_OPTIONS = [
 ];
 
 export const HERO_PHOTO_DEFAULTS = {
-  hero_overlay_opacity: 100,
+  // 0 = clean photo, no fade-to-black wash on the storefront hero.
+  hero_overlay_opacity: 0,
   hero_image_fit: 'cover',
   hero_height_vh: 88,
 };
