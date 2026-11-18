@@ -465,12 +465,20 @@ export default function StorefrontDemoPage() {
 
         {siteAppearance.show_why_us_section !== false && (
         <section className="sf-why-us" aria-labelledby="sf-why-us-title">
+          <div className="sf-why-us__glow sf-why-us__glow--sun" aria-hidden />
+          <div className="sf-why-us__glow sf-why-us__glow--sea" aria-hidden />
+          <svg className="sf-why-us__coast" viewBox="0 0 1200 180" preserveAspectRatio="none" aria-hidden>
+            <path
+              className="sf-why-us__coast-wave"
+              d="M0 110 C180 40 320 160 480 90 C640 20 780 140 960 70 C1080 30 1140 90 1200 60 L1200 180 L0 180 Z"
+            />
+          </svg>
           <div className="sf-why-us__inner">
             <header className="sf-why-us__intro">
-              <p className="sf-why-us__eyebrow">Πλεονεκτήματα</p>
+              <p className="sf-why-us__eyebrow">Από το click μέχρι τον προορισμό</p>
               <div className="sf-preview-trips-section-head sf-why-us__title-row">
                 <h2 id="sf-why-us-title" className="sf-why-us__title">
-                  Γιατί να μας επιλέξετε
+                  {rentOnly ? 'Κλείνεις όχημα. Εμείς κρατάμε τη διαδρομή.' : 'Κλείνεις θέση. Εμείς κρατάμε τον δρόμο.'}
                 </h2>
                 <PreviewBuilderControl
                   sectionId="general"
@@ -482,53 +490,55 @@ export default function StorefrontDemoPage() {
               </div>
               <p className="sf-why-us__lede">
                 {rentOnly
-                  ? 'Online κράτηση ενοικίασης, ξεκάθαροι όροι και υποστήριξη πριν και κατά τη διαδρομή.'
-                  : 'Από την κράτηση μέχρι την άφιξη — καθαρή ροή, άνετα οχήματα και ασφάλεια σε κάθε διαδρομή.'}
+                  ? 'Γρήγορη online κράτηση, καθαροί όροι και στήριξη πριν και κατά τη διαδρομή — χωρίς τηλέφωνα και χωρίς αβεβαιότητα.'
+                  : 'Καθαρή κράτηση, άνετα λεωφορεία και οδηγοί που ξέρουν κάθε χιλιόμετρο — χωρίς άγχος, χωρίς εκπλήξεις.'}
               </p>
             </header>
 
-            <ol className="sf-why-us__rail">
+            <ol className="sf-why-us__route">
               {[
                 {
                   id: 'booking',
                   step: '01',
-                  icon: rentOnly ? 'smartphone' : 'event_available',
-                  tone: 'sky',
-                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη κράτηση',
+                  icon: rentOnly ? 'smartphone' : 'confirmation_number',
+                  tone: 'amber',
+                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Θέση σε δευτερόλεπτα',
                   body: rentOnly
-                    ? 'Διάλεξε όχημα και ημερομηνίες στο Rent app — χωρίς τηλεφωνική αναμονή.'
-                    : 'Διάλεξε ημερομηνία και κλείσε θέση σε λίγα κλικ, με επιβεβαίωση αμέσως.',
+                    ? 'Διάλεξε όχημα και ημερομηνίες στο Rent — επιβεβαίωση αμέσως, χωρίς αναμονή στο τηλέφωνο.'
+                    : 'Διάλεξε εκδρομή, κράτα θέση online και πάρε το εισιτήριο στο Wallet πριν καν φύγεις από τον καναπέ.',
                 },
                 {
                   id: 'comfort',
                   step: '02',
-                  icon: rentOnly ? 'directions_car' : 'airline_seat_recline_extra',
-                  tone: 'blue',
-                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση στο ταξίδι',
+                  icon: rentOnly ? 'directions_car' : 'directions_bus',
+                  tone: 'cyan',
+                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση που φαίνεται στον δρόμο',
                   body: rentOnly
-                    ? 'Οχήματα συντηρημένα και έτοιμα για παραλαβή με καθαρό ιστορικό.'
-                    : 'Σύγχρονα λεωφορεία, αναπαυτικά καθίσματα και παροχές που κάνουν τη διαδρομή ξεκούραστη.',
+                    ? 'Οχήματα συντηρημένα, καθαρά και έτοιμα για παραλαβή — με ιστορικό που μπορείς να εμπιστευτείς.'
+                    : 'Σύγχρονα λεωφορεία και αναπαυτικά καθίσματα για ξεκούραστη διαδρομή, όχι απλώς «μεταφορά από Α σε Β».',
                 },
                 {
                   id: 'safety',
                   step: '03',
-                  icon: 'shield_person',
+                  icon: 'verified_user',
                   tone: 'mint',
-                  title: 'Ασφάλεια σε κάθε χιλιόμετρο',
+                  title: rentOnly ? 'Στήριξη σε κάθε χιλιόμετρο' : 'Ασφάλεια χωρίς συμβιβασμούς',
                   body: rentOnly
-                    ? 'Υποστήριξη διαδρομής, όροι ενοικίασης και βοήθεια όταν τη χρειάζεσαι.'
-                    : 'Έμπειροι οδηγοί και μέτρα προστασίας από την αναχώρηση μέχρι τον προορισμό.',
+                    ? 'Όροι ενοικίασης ξεκάθαροι και βοήθεια όταν τη χρειάζεσαι — πριν, κατά και μετά την παραλαβή.'
+                    : 'Έμπειροι οδηγοί και σταθερή υποστήριξη από την αναχώρηση μέχρι την άφιξη — σε κάθε στάση της διαδρομής.',
                 },
               ].map((item) => (
-                <li key={item.id} className={`sf-why-us__item sf-why-us__item--${item.tone}`}>
-                  <span className="sf-why-us__step" aria-hidden>
-                    {item.step}
-                  </span>
-                  <span className="sf-why-us__icon" aria-hidden>
-                    <span className="material-symbols-outlined">{item.icon}</span>
-                  </span>
-                  <h3 className="sf-why-us__item-title">{item.title}</h3>
-                  <p className="sf-why-us__item-body">{item.body}</p>
+                <li key={item.id} className={`sf-why-us__stop sf-why-us__stop--${item.tone}`}>
+                  <div className="sf-why-us__marker" aria-hidden>
+                    <span className="sf-why-us__step">{item.step}</span>
+                    <span className="sf-why-us__icon">
+                      <span className="material-symbols-outlined">{item.icon}</span>
+                    </span>
+                  </div>
+                  <div className="sf-why-us__copy">
+                    <h3 className="sf-why-us__item-title">{item.title}</h3>
+                    <p className="sf-why-us__item-body">{item.body}</p>
+                  </div>
                 </li>
               ))}
             </ol>
