@@ -266,7 +266,13 @@
   }
 
   .sf-why-us__item-title,
-  .sf-why-us__item-body {
+  .sf-why-us__item-body,
+  .sf-why-us__lede {
+    overflow-wrap: anywhere;
+  }
+
+  .sf-footer__hook-kicker,
+  .sf-footer__hook-text {
     overflow-wrap: anywhere;
   }
 

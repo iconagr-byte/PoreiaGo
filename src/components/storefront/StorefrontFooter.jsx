@@ -181,7 +181,9 @@ export default function StorefrontFooter({
   const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
   const tagline =
     String(siteAppearance.footer_tagline || '').trim() ||
-    'Κράτηση θέσης, εισιτήρια και υποστήριξη γραφείου — σε μία σύγχρονη εμπειρία.';
+    (tripsEnabled
+      ? 'Η εκδρομή σου — εισιτήριο στο κινητό, θέση που διάλεξες εσύ.'
+      : 'Κράτηση, υποστήριξη και το γραφείο σου — σε μία καθαρή εμπειρία.');
 
   // Prefer the modern multi-column layout for classic + contact-forward templates.
   if (
@@ -191,10 +193,30 @@ export default function StorefrontFooter({
   ) {
     return (
       <footer id="contact" className="sf-footer">
+        <div className="sf-footer__aurora" aria-hidden />
         <div className="sf-footer__inner">
+          <div className="sf-footer__hook">
+            <p className="sf-footer__hook-kicker">Έτοιμοι για την επόμενη διαδρομή;</p>
+            <p className="sf-footer__hook-text">
+              {tripsEnabled
+                ? 'Δες εκδρομές, κράτα θέση online και φύλαξε το εισιτήριο στο My Wallet.'
+                : 'Μίλησε μαζί μας για την κράτησή σου — είμαστε εδώ για κάθε χιλιόμετρο.'}
+            </p>
+            <div className="sf-footer__hook-actions">
+              {tripsEnabled ? (
+                <a href="#search-results" className="sf-footer__hook-cta">
+                  Δες εκδρομές
+                </a>
+              ) : null}
+              <Link to="/contact" className="sf-footer__hook-link">
+                Επικοινωνία
+              </Link>
+            </div>
+          </div>
+
           <div className="sf-footer__grid">
-            <div>
-              <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
+            <div className="sf-footer__brand-col">
+              <FooterBrandBlock siteAppearance={siteAppearance} tone="dark" tagline={tagline} />
               <SocialRow contact={contact} />
             </div>
 
@@ -209,7 +231,7 @@ export default function StorefrontFooter({
 
             <div>
               <p className="sf-footer__heading">Επικοινωνία</p>
-              <ContactLines contact={contact} />
+              <ContactLines contact={contact} tone="dark" />
             </div>
 
             <div>
@@ -224,7 +246,7 @@ export default function StorefrontFooter({
             </p>
             <div className="sf-footer__bottom-links">
               <Link to="/contact">Φόρμα επικοινωνίας</Link>
-              <FooterOfficeLogin />
+              <FooterOfficeLogin tone="dark" />
             </div>
           </div>
         </div>
