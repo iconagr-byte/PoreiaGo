@@ -216,7 +216,7 @@ export default function StorefrontFooter({
 
           <div className="sf-footer__grid">
             <div className="sf-footer__brand-col">
-              <FooterBrandBlock siteAppearance={siteAppearance} tone="dark" tagline={tagline} />
+              <FooterBrandBlock siteAppearance={siteAppearance} tagline={tagline} />
               <SocialRow contact={contact} />
             </div>
 
@@ -231,7 +231,7 @@ export default function StorefrontFooter({
 
             <div>
               <p className="sf-footer__heading">Επικοινωνία</p>
-              <ContactLines contact={contact} tone="dark" />
+              <ContactLines contact={contact} />
             </div>
 
             <div>
@@ -246,7 +246,7 @@ export default function StorefrontFooter({
             </p>
             <div className="sf-footer__bottom-links">
               <Link to="/contact">Φόρμα επικοινωνίας</Link>
-              <FooterOfficeLogin tone="dark" />
+              <FooterOfficeLogin />
             </div>
           </div>
         </div>
