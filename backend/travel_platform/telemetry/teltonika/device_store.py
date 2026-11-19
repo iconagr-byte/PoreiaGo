@@ -358,6 +358,32 @@ def hardware_last_fix(device: dict | None) -> tuple[float, float] | None:
         return None
 
 
+def live_map_fix(device: dict | None) -> tuple[float, float] | None:
+    """Coords for the office live map.
+
+    Prefer Codec ``last_hw_*``. If the store predates that field, use
+    ``last_lat/lng`` unless they were explicitly stamped by browser
+    «Η θέση μου» (``last_fix_source=manual``) — otherwise Achillio ΕΕΧ5670
+    vanishes after a hydrate that required last_hw.
+    """
+    hw = hardware_last_fix(device)
+    if hw:
+        return hw
+    if not isinstance(device, dict):
+        return None
+    src = str(device.get("last_fix_source") or "").strip().lower()
+    if src == "manual":
+        return None
+    lat = device.get("last_lat")
+    lng = device.get("last_lng")
+    if lat is None or lng is None:
+        return None
+    try:
+        return float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+
+
 def live_teltonika_fix(
     tenant_id: str,
     *,

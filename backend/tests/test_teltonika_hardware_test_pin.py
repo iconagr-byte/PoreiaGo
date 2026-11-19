@@ -95,6 +95,41 @@ class HardwareLastFixTests(unittest.TestCase):
             (40.8, 22.8),
         )
 
+    def test_live_map_fix_uses_legacy_last_lat_without_hw(self):
+        from travel_platform.telemetry.teltonika.device_store import live_map_fix
+
+        self.assertEqual(
+            live_map_fix(
+                {
+                    "last_lat": 40.8,
+                    "last_lng": 22.8,
+                    "last_fix_source": None,
+                }
+            ),
+            (40.8, 22.8),
+        )
+        self.assertIsNone(
+            live_map_fix(
+                {
+                    "last_lat": 37.9,
+                    "last_lng": 23.7,
+                    "last_fix_source": "manual",
+                }
+            )
+        )
+        self.assertEqual(
+            live_map_fix(
+                {
+                    "last_lat": 37.9,
+                    "last_lng": 23.7,
+                    "last_fix_source": "manual",
+                    "last_hw_lat": 40.8,
+                    "last_hw_lng": 22.8,
+                }
+            ),
+            (40.8, 22.8),
+        )
+
     def test_resolve_falls_back_to_live_fleet_teltonika(self):
         from travel_platform.telemetry.teltonika.device_store import (
             resolve_hardware_fix,
