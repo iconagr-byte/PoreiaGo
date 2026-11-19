@@ -172,7 +172,12 @@ async def hydrate_tenant_live_from_devices(
     for device in list_devices(tid):
         if not device.get("enabled"):
             continue
-        if device.get("last_lat") is None or device.get("last_lng") is None:
+        has_fix = device.get("last_lat") is not None and device.get("last_lng") is not None
+        if not has_fix:
+            has_fix = (
+                device.get("last_hw_lat") is not None and device.get("last_hw_lng") is not None
+            )
+        if not has_fix:
             continue
 
         plate = str(device.get("vehicle_code") or device.get("imei") or "").strip()
@@ -220,9 +225,20 @@ async def hydrate_tenant_live_from_devices(
                 or not is_tracker_source(existing_meta.get("source"))
             )
         )
+        # Fresh Codec / open TCP → open badge. Parked last-fix → hydrate stamp only.
+        seen_age = age_seconds(device.get("last_seen_at"))
+        try:
+            from travel_platform.telemetry.teltonika.tcp_server import is_imei_tcp_connected
+
+            tcp_open = is_imei_tcp_connected(device.get("imei"))
+        except Exception:
+            tcp_open = False
+        open_channel = bool(tcp_open) or (
+            seen_age is not None and seen_age <= max(1, int(alive_sec))
+        )
         ok = await paint_live_pin_from_device(
             device,
-            open_channel=True,
+            open_channel=open_channel,
             reason="hydrate_force" if force else "hydrate",
             move_coords=reclaim_from_app or not existing_meta,
         )

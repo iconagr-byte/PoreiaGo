@@ -33,7 +33,12 @@ async def paint_live_pin_from_device(
     Returns True when a pin was written.
     """
     device = device or {}
-    if device.get("last_lat") is None or device.get("last_lng") is None:
+    lat_raw = device.get("last_lat")
+    lng_raw = device.get("last_lng")
+    if lat_raw is None or lng_raw is None:
+        lat_raw = device.get("last_hw_lat")
+        lng_raw = device.get("last_hw_lng")
+    if lat_raw is None or lng_raw is None:
         return False
     tid = str(device.get("tenant_id") or "").strip()
     plate = str(device.get("vehicle_code") or device.get("imei") or "").strip()
@@ -63,8 +68,8 @@ async def paint_live_pin_from_device(
         except Exception:
             pass
 
-    lat = float(device["last_lat"])
-    lng = float(device["last_lng"])
+    lat = float(lat_raw)
+    lng = float(lng_raw)
     speed = float(device.get("last_speed_kmh") or 0)
     heading_deg = None
     altitude_m = None

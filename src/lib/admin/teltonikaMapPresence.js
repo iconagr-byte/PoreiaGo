@@ -3,7 +3,15 @@
  * Production lock: empty map must not look like a software bug when IMEI is quiet.
  */
 
+/** Live Codec / open-session window (matches backend DEFAULT_TRACKER_ALIVE). */
 const ONLINE_WINDOW_MS = 90_000;
+/**
+ * Parked Teltonika often reports every few minutes with TCP closed between
+ * bursts. Keep map presence aligned with backend TELTONIKA_PARKED_ALIVE (600s)
+ * when a durable last fix exists — otherwise empty-map says offline while the
+ * unit is still up (e.g. ΕΕΧ5670 last signal 3–5 min).
+ */
+const PARKED_WINDOW_MS = 600_000;
 
 export function ageMsFromIso(raw) {
   if (!raw) return null;
@@ -12,11 +20,19 @@ export function ageMsFromIso(raw) {
   return Math.max(0, Date.now() - t);
 }
 
+function deviceHasFix(device) {
+  const lat = device?.last_lat ?? device?.lastLat;
+  const lng = device?.last_lng ?? device?.lastLng;
+  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
 export function isTeltonikaDeviceOnline(device, nowMs = Date.now()) {
   if (!device || device.enabled === false) return false;
   const age = ageMsFromIso(device.last_seen_at || device.lastSeenAt);
   if (age == null) return false;
-  return age <= ONLINE_WINDOW_MS;
+  if (age <= ONLINE_WINDOW_MS) return true;
+  // Parked / intermittent Codec with last known fix.
+  return age <= PARKED_WINDOW_MS && deviceHasFix(device);
 }
 
 /**
