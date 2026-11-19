@@ -92,7 +92,7 @@ export default function FleetShowcaseSection({
   return (
     <section
       id="our-fleet"
-      className={`sf-fleet-section py-24 px-margin-desktop max-w-container-max mx-auto bg-surface-container-lowest border-y border-black/[0.04] ${sectionClassName}`.trim()}
+      className={`sf-fleet-section py-24 px-margin-desktop max-w-container-max mx-auto border-y border-white/60 ${sectionClassName}`.trim()}
     >
       <div className="sf-fleet-section__intro text-center mb-14 max-w-2xl mx-auto">
         <div className="sf-preview-trips-section-head mb-3">

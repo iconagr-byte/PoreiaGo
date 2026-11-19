@@ -196,16 +196,16 @@ export default function StorefrontFooter({
         <div className="sf-footer__aurora" aria-hidden />
         <div className="sf-footer__inner">
           <div className="sf-footer__hook">
-            <p className="sf-footer__hook-kicker">Έτοιμοι για την επόμενη διαδρομή;</p>
+            <p className="sf-footer__hook-kicker">Η επόμενη εκδρομή ξεκινά με ένα tap.</p>
             <p className="sf-footer__hook-text">
               {tripsEnabled
-                ? 'Δες εκδρομές, κράτα θέση online και φύλαξε το εισιτήριο στο My Wallet.'
+                ? 'Διάλεξε ημερομηνία, κράτα θέση και φύλαξέ την στο Wallet — πριν καν σηκωθείς από τον καναπέ.'
                 : 'Μίλησε μαζί μας για την κράτησή σου — είμαστε εδώ για κάθε χιλιόμετρο.'}
             </p>
             <div className="sf-footer__hook-actions">
               {tripsEnabled ? (
                 <a href="#search-results" className="sf-footer__hook-cta">
-                  Δες εκδρομές
+                  Κλείσε θέση
                 </a>
               ) : null}
               <Link to="/contact" className="sf-footer__hook-link">
