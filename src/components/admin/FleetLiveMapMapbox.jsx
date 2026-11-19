@@ -34,6 +34,13 @@ import {
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
+import {
+  boundsBoxFromMapbox,
+  haversineMeters,
+  lngLatInPaddedBounds,
+  pickFollowTarget,
+  shouldPanToFollowTarget,
+} from '../../lib/admin/fleetMapFollow.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -194,28 +201,35 @@ function MapboxAnimatedMarkers({ vehicles, onVehicleHistory }) {
   ));
 }
 
-function FitBounds({ vehicles, fitNonce = 0 }) {
+function FitBounds({ vehicles, fitNonce = 0, followId = null }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
-  const userMovedRef = useRef(false);
   const programmaticRef = useRef(false);
+  const draggingRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
+  const [recapture, setRecapture] = useState(0);
 
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance?.on) return undefined;
-    const markMoved = () => {
-      if (programmaticRef.current) {
-        programmaticRef.current = false;
-        return;
-      }
-      userMovedRef.current = true;
+    const onDragStart = () => {
+      if (programmaticRef.current) return;
+      draggingRef.current = true;
     };
-    mapInstance.on('dragstart', markMoved);
-    mapInstance.on('zoomstart', markMoved);
+    const onDragEnd = () => {
+      draggingRef.current = false;
+      setRecapture((n) => n + 1);
+    };
+    const onMoveEnd = () => {
+      programmaticRef.current = false;
+    };
+    mapInstance.on('dragstart', onDragStart);
+    mapInstance.on('dragend', onDragEnd);
+    mapInstance.on('moveend', onMoveEnd);
     return () => {
-      mapInstance.off('dragstart', markMoved);
-      mapInstance.off('zoomstart', markMoved);
+      mapInstance.off('dragstart', onDragStart);
+      mapInstance.off('dragend', onDragEnd);
+      mapInstance.off('moveend', onMoveEnd);
     };
   }, [map]);
 
@@ -231,33 +245,78 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       .sort()
       .join('|');
     const force = fitNonce !== lastNonceRef.current;
-    if (force) {
-      userMovedRef.current = false;
+    const pinSetChanged = ids !== fittedIdsRef.current;
+    if (force || pinSetChanged) {
       lastNonceRef.current = fitNonce;
-    } else if (userMovedRef.current) {
-      return;
-    } else if (ids === fittedIdsRef.current) {
+      fittedIdsRef.current = ids;
+      const count = pts.length;
+      const maxZoom = resolveFleetFitMaxZoom(count);
+      const pad = resolveFleetFitPadding(count);
+      programmaticRef.current = true;
+      if (count === 1) {
+        mapInstance.flyTo({
+          center: [pts[0].lng, pts[0].lat],
+          zoom: maxZoom,
+          duration: 700,
+        });
+        return;
+      }
+      const bounds = new LngLatBounds();
+      pts.forEach((v) => bounds.extend([v.lng, v.lat]));
+      if (bounds.isEmpty()) return;
+      mapInstance.fitBounds(bounds, { padding: pad, maxZoom, duration: 700 });
       return;
     }
-    fittedIdsRef.current = ids;
-    const count = pts.length;
-    const maxZoom = resolveFleetFitMaxZoom(count);
-    const pad = resolveFleetFitPadding(count);
-    const duration = force ? 700 : 500;
-    programmaticRef.current = true;
-    if (count === 1) {
-      mapInstance.flyTo({
-        center: [pts[0].lng, pts[0].lat],
-        zoom: maxZoom,
-        duration,
+
+    const follow = pickFollowTarget(
+      pts.filter((v) => !String(v.id || '').startsWith('sos-')),
+      followId,
+    );
+    if (follow) {
+      const center = mapInstance.getCenter?.();
+      const cLng = center?.lng ?? center?.lon;
+      const cLat = center?.lat;
+      const dist = haversineMeters(cLat, cLng, follow.lat, follow.lng);
+      const pinInView = lngLatInPaddedBounds(
+        follow.lng,
+        follow.lat,
+        boundsBoxFromMapbox(mapInstance.getBounds?.()),
+        0.1,
+      );
+      if (
+        !shouldPanToFollowTarget({
+          speedKmh: follow.speed ?? follow.speed_kmh,
+          distanceFromCenterM: dist,
+          pinInView,
+          dragging: draggingRef.current,
+        })
+      ) {
+        return;
+      }
+      programmaticRef.current = true;
+      mapInstance.easeTo({
+        center: [follow.lng, follow.lat],
+        duration: 700,
+        essential: true,
       });
       return;
     }
+
+    if (draggingRef.current) return;
+    const box = boundsBoxFromMapbox(mapInstance.getBounds?.());
+    const left = pts.some((p) => !lngLatInPaddedBounds(p.lng, p.lat, box, 0.1));
+    if (!left) return;
+    const pad = resolveFleetFitPadding(pts.length);
     const bounds = new LngLatBounds();
     pts.forEach((v) => bounds.extend([v.lng, v.lat]));
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: pad, maxZoom, duration });
-  }, [vehicles, map, fitNonce]);
+    programmaticRef.current = true;
+    mapInstance.fitBounds(bounds, {
+      padding: pad,
+      maxZoom: mapInstance.getZoom?.(),
+      duration: 600,
+    });
+  }, [vehicles, map, fitNonce, followId, recapture]);
 
   return null;
 }
@@ -277,6 +336,7 @@ export default function FleetLiveMapMapbox({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
+  followId = null,
   onVehicleHistory,
   onClearSos = null,
 }) {
@@ -317,7 +377,7 @@ export default function FleetLiveMapMapbox({
     >
       <NavigationControl position="bottom-right" showCompass={false} />
       <GreecePlacesMapboxLayer visible={showPlaces} />
-      <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
+      <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} followId={followId} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />

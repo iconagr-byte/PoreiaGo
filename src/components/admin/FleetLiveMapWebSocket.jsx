@@ -212,6 +212,7 @@ export default function FleetLiveMapWebSocket() {
               showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
+              followId={selectedId}
               onVehicleHistory={setHistoryVehicle}
               onClearSos={clearAlert}
             />
@@ -231,6 +232,7 @@ export default function FleetLiveMapWebSocket() {
               showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
+              followId={selectedId}
               onVehicleHistory={setHistoryVehicle}
               onClearSos={clearAlert}
             />
