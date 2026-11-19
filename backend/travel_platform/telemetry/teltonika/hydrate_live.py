@@ -172,7 +172,12 @@ async def hydrate_tenant_live_from_devices(
     for device in list_devices(tid):
         if not device.get("enabled"):
             continue
-        has_fix = device.get("last_lat") is not None and device.get("last_lng") is not None
+        try:
+            from travel_platform.telemetry.teltonika.device_store import hardware_last_fix
+
+            has_fix = hardware_last_fix(device) is not None
+        except Exception:
+            has_fix = device.get("last_lat") is not None and device.get("last_lng") is not None
         if not has_fix:
             has_fix = (
                 device.get("last_hw_lat") is not None and device.get("last_hw_lng") is not None

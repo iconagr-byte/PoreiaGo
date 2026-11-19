@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_tenant_db, get_tenant_id
@@ -113,6 +113,7 @@ admin_router = APIRouter(prefix="/telemetry", tags=["telemetry-admin"])
 @admin_router.get("/fleet/live", response_model=list[LiveVehicleResponse])
 async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    response: Response,
 ):
     """Latest GPS pins for the admin map.
 
@@ -129,6 +130,8 @@ async def fleet_live(
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
     log = logging.getLogger(__name__)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
     try:
         # If Teltonika has a recent fix in the device store but the live fleet
         # is empty (restart / stream lag), re-paint pins before listing.

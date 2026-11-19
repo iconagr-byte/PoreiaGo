@@ -28,7 +28,14 @@ class TeltonikaPaintLiveTests(unittest.TestCase):
             },
             tenant_id=self.tenant,
         )
-        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        ds.touch_device(
+            "861076085468260",
+            lat=40.8,
+            lng=22.05,
+            speed_kmh=0,
+            points=1,
+            from_hardware=True,
+        )
         self.device = ds.get_device_by_imei("861076085468260")
 
     def tearDown(self):
@@ -53,8 +60,36 @@ class TeltonikaPaintLiveTests(unittest.TestCase):
         self.assertEqual(payload["vehicle_code"], "EEX5670")
         self.assertAlmostEqual(float(payload["latitude"]), 40.8, places=4)
 
+    def test_prefers_hardware_fix_over_browser_my_location(self):
+        """«Η θέση μου» on a laptop must not yank the live pin off the Codec fix."""
+        polluted = {
+            **self.device,
+            "last_lat": 37.98,
+            "last_lng": 23.73,
+            "last_fix_source": "manual",
+            "last_hw_lat": 40.8,
+            "last_hw_lng": 22.05,
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(
+                paint_live_pin_from_device(polluted, open_channel=True, reason="hydrate")
+            )
+        self.assertTrue(ok)
+        payload = process.await_args.args[0]
+        self.assertAlmostEqual(float(payload["latitude"]), 40.8, places=4)
+        self.assertAlmostEqual(float(payload["longitude"]), 22.05, places=4)
+
     def test_skips_without_coordinates(self):
-        bare = {**self.device, "last_lat": None, "last_lng": None}
+        bare = {
+            **self.device,
+            "last_lat": None,
+            "last_lng": None,
+            "last_hw_lat": None,
+            "last_hw_lng": None,
+        }
         with patch(
             "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
             new_callable=AsyncMock,
