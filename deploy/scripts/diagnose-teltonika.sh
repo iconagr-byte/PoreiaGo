@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Diagnose Teltonika Codec 8 TCP ingest + Achillio Travel device bindings.
 # Safe to run via Actions from /tmp — pass REPO_ROOT=/opt/poreiago.
-# Bump: 2026-11-01 21:21 EET check IMEI 861076085468260 live pin.
+# Bump: 2026-11-19 11:52 EET dump last_hw / last_fix_source / live_map_fix.
 set -euo pipefail
 
 ROOT="${REPO_ROOT:-}"
@@ -74,6 +74,8 @@ import json
 rows = list_devices()
 print("device_count=", len(rows))
 for r in rows:
+    from travel_platform.telemetry.teltonika.device_store import live_map_fix
+
     print(
         "device",
         "imei=", r.get("imei"),
@@ -83,6 +85,10 @@ for r in rows:
         "last_seen=", r.get("last_seen_at"),
         "lat=", r.get("last_lat"),
         "lng=", r.get("last_lng"),
+        "hw_lat=", r.get("last_hw_lat"),
+        "hw_lng=", r.get("last_hw_lng"),
+        "fix_src=", r.get("last_fix_source"),
+        "map_fix=", live_map_fix(r),
         "speed=", r.get("last_speed_kmh"),
         "points=", r.get("points_accepted"),
         "label=", r.get("label"),

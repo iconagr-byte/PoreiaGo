@@ -33,25 +33,15 @@ async def paint_live_pin_from_device(
     Returns True when a pin was written.
     """
     device = device or {}
-    lat_raw = None
-    lng_raw = None
     try:
-        from travel_platform.telemetry.teltonika.device_store import hardware_last_fix
+        from travel_platform.telemetry.teltonika.device_store import live_map_fix
 
-        hw = hardware_last_fix(device)
-        if hw:
-            lat_raw, lng_raw = hw
+        coords = live_map_fix(device)
     except Exception:
-        lat_raw = None
-        lng_raw = None
-    if lat_raw is None or lng_raw is None:
-        # Codec last_lat only — skip browser «Η θέση μου» (last_fix_source=manual).
-        src = str(device.get("last_fix_source") or "").strip().lower()
-        if src in ("teltonika", "tracker", "hardware", ""):
-            lat_raw = device.get("last_lat")
-            lng_raw = device.get("last_lng")
-    if lat_raw is None or lng_raw is None:
+        coords = None
+    if not coords:
         return False
+    lat_raw, lng_raw = coords
     tid = str(device.get("tenant_id") or "").strip()
     plate = str(device.get("vehicle_code") or device.get("imei") or "").strip()
     if not tid or not plate:

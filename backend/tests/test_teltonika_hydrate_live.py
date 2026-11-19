@@ -240,6 +240,30 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         delete_mock.assert_awaited()
         self.assertNotIn(vid, LiveFleetService._vehicles)
 
+    def test_hydrates_legacy_last_lat_without_hw(self):
+        """Old device-store rows have last_lat but no last_hw_* — still paint."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row.pop("last_hw_lat", None)
+                    row.pop("last_hw_lng", None)
+                    row["last_fix_source"] = None
+                    row["last_lat"] = 39.16
+                    row["last_lng"] = 26.50
+            ds._write(data)  # noqa: SLF001
+
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        self.assertAlmostEqual(float(payload["latitude"]), 39.16, places=4)
+
     def test_force_repaints_online_when_map_empty(self):
         """Empty Achillio map + online IMEI → force hydrate paints immediately."""
         from travel_platform.telemetry.teltonika import hydrate_live as hl
