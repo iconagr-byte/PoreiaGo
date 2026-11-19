@@ -8,11 +8,7 @@ import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
 import TripPhotoBento from '../components/storefront/TripPhotoBento.jsx';
 import TripItineraryNarrative from '../components/storefront/TripItineraryNarrative.jsx';
 import toast from 'react-hot-toast';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
-import { LEAFLET_BASEMAP } from '../lib/maps/appleMapTheme.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import {
   isWalletBookFlow,
@@ -22,50 +18,12 @@ import {
 } from '../lib/wallet/walletBookTrip.js';
 import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
-// Custom Red Pin Marker (Google Maps Style)
-const redIcon = L.divIcon({
-  className: 'custom-red-pin',
-  html: `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 drop-shadow-lg" style="margin-top:-20px; margin-left:-8px;">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="white"></circle>
-    </svg>
-  `,
-  iconSize: [24, 24],
-  iconAnchor: [12, 24],
-  popupAnchor: [0, -24]
-});
-L.Marker.prototype.options.icon = redIcon;
-
-// Live Bus Marker (Pulsing Blue)
-const liveBusIcon = L.divIcon({
-  className: 'custom-live-bus',
-  html: `
-    <div class="relative w-12 h-12 flex items-center justify-center">
-      <div class="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-50"></div>
-      <div class="relative w-10 h-10 bg-blue-600 rounded-full shadow-lg border-2 border-white flex items-center justify-center text-white">
-        <span class="material-symbols-outlined text-[20px]">directions_bus</span>
-      </div>
-    </div>
-  `,
-  iconSize: [48, 48],
-  iconAnchor: [24, 24],
-  popupAnchor: [0, -24]
-});
-
 export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const fromWallet = isWalletBookFlow(location.state);
   const [trip, setTrip] = useState(() => officeTripFromWalletState(location.state, id));
-  
-  // Live Tracking State
-  const [isLiveTracking, setIsLiveTracking] = useState(false);
-  const [busLocation, setBusLocation] = useState(null);
-  const [currentSegment, setCurrentSegment] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [nextStopName, setNextStopName] = useState("");
 
   const goBack = () => {
     if (fromWallet) navigate('/wallet');
@@ -102,57 +60,6 @@ export default function TripDetails() {
       cancelled = true;
     };
   }, [id, location.state]);
-
-  // Generate coordinates for polyline
-  const positions = trip?.stops?.map(stop => [stop.lat, stop.lng]) || [];
-  const mapCenter = positions.length > 0 ? positions[Math.floor(positions.length / 2)] : [38.0, 23.0];
-
-  // Live Tracking Animation Logic
-  useEffect(() => {
-    if (!isLiveTracking || positions.length < 2) return;
-
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        let newProgress = prev + 0.003; // speed of simulation
-        if (newProgress >= 1) {
-          // Move to next segment
-          setCurrentSegment(curr => {
-            if (curr >= positions.length - 2) {
-              return 0; // Loop back for simulation purposes
-            }
-            return curr + 1;
-          });
-          return 0;
-        }
-        return newProgress;
-      });
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [isLiveTracking, positions.length]);
-
-  useEffect(() => {
-    if (!isLiveTracking || positions.length < 2) return;
-    
-    const startPos = positions[currentSegment];
-    const endPos = positions[currentSegment + 1];
-    
-    if (startPos && endPos) {
-      const lat = startPos[0] + (endPos[0] - startPos[0]) * progress;
-      const lng = startPos[1] + (endPos[1] - startPos[1]) * progress;
-      setBusLocation([lat, lng]);
-      setNextStopName(trip.stops[currentSegment + 1]?.name || "");
-    }
-  }, [progress, currentSegment, isLiveTracking, positions, trip]);
-
-  useEffect(() => {
-    if (isLiveTracking && positions.length > 0 && !busLocation) {
-      setBusLocation(positions[0]);
-      setCurrentSegment(0);
-      setProgress(0);
-      setNextStopName(trip?.stops?.[1]?.name || "");
-    }
-  }, [isLiveTracking, positions, busLocation, trip]);
 
   if (!trip) {
     return (
@@ -235,10 +142,8 @@ export default function TripDetails() {
         </div>
       </div>
 
-      {/* Main Content: Split Layout */}
-      <div className="flex-1 max-w-container-max mx-auto w-full px-4 sm:px-6 md:px-margin-desktop py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 min-w-0">
-        
-        {/* Left Column: Details & Timeline */}
+      {/* Main Content */}
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 md:px-margin-desktop py-8 sm:py-12 min-w-0">
         <div className="flex flex-col min-w-0">
           <div className="bg-surface-container-lowest rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 shadow-level-2 mb-6 sm:mb-8 overflow-hidden relative">
             <div
@@ -426,83 +331,6 @@ export default function TripDetails() {
               {isPlatformSeatBookingDemo() ? 'Δοκιμή επιλογής θέσης' : 'Επιλογή Θέσης'}{' '}
               <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
-          </div>
-        </div>
-
-        {/* Right Column: Interactive Map with Controls Above */}
-        <div className="flex flex-col w-full h-[500px] lg:h-auto lg:min-h-[600px] gap-4 relative z-0">
-          
-          {/* Live Tracking Header Controls */}
-          <div className="flex flex-wrap items-center justify-between bg-surface-container-lowest px-5 py-3 rounded-2xl shadow-sm border border-black/[0.05]">
-            <div className="font-label-lg font-bold text-on-surface flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[20px]">route</span>
-              Διαδρομή
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {isLiveTracking && busLocation && (
-                <div className="text-[11px] font-bold uppercase tracking-widest text-blue-600 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px] animate-pulse">sensors</span> 
-                  Καθ' οδον: <span className="text-on-surface">{nextStopName}</span>
-                </div>
-              )}
-              <button 
-                onClick={() => setIsLiveTracking(!isLiveTracking)}
-                className={`px-4 py-2 rounded-full font-label-sm font-bold shadow-sm flex items-center gap-2 transition-all border ${isLiveTracking ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 'bg-surface text-on-surface-variant border-surface-variant hover:bg-surface-container'}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${isLiveTracking ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                {isLiveTracking ? 'Live: On' : 'Live Tracking'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 rounded-[32px] overflow-hidden shadow-level-2 border border-black/[0.05] relative z-0">
-          
-          {positions.length > 0 ? (
-            <MapContainer center={mapCenter} zoom={7} className="h-full w-full">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url={LEAFLET_BASEMAP.url}
-              subdomains={LEAFLET_BASEMAP.subdomains}
-              maxZoom={LEAFLET_BASEMAP.maxZoom}
-            />
-              {trip.stops?.map(stop => (
-                <Marker key={stop.id} position={[stop.lat, stop.lng]}>
-                  <Popup>
-                    <div className="flex flex-col gap-2 min-w-[200px]">
-                      {stop.image && (
-                        <div className="w-full h-28 rounded-lg overflow-hidden shadow-sm">
-                          <img src={stop.image} alt={stop.name} className="w-full h-full object-cover" />
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-label-md font-bold text-gray-800 leading-tight">{stop.name}</div>
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">schedule</span>
-                          Άφιξη: {stop.time}
-                        </div>
-                        {stop.description && (
-                          <div className="text-[11px] text-gray-600 mt-2 leading-relaxed border-t border-gray-100 pt-2">
-                            {stop.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-              <Polyline positions={positions} color="#2563eb" weight={4} opacity={0.8} />
-              
-              {/* Live Bus Marker */}
-              {isLiveTracking && busLocation && (
-                <Marker position={busLocation} icon={liveBusIcon} zIndexOffset={1000} />
-              )}
-            </MapContainer>
-          ) : (
-            <div className="h-full w-full bg-surface-container flex items-center justify-center text-on-surface-variant font-label-md">
-              Χωρίς δεδομένα χάρτη
-            </div>
-          )}
           </div>
         </div>
       </div>
