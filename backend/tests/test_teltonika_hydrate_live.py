@@ -240,14 +240,36 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(n, 1)
         process.assert_awaited()
 
-    def test_drops_parked_offline_pin(self):
-        """Power cut / sparse silent AVL — offline pin is removed, not re-hydrated."""
+    def test_keeps_parked_pin_within_window(self):
+        """Ignition-off Codec that last reported ~5 min ago still hydrates the pin."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
                 if row.get("imei") == "861076085468260":
                     row["last_seen_at"] = (
                         datetime.now(timezone.utc) - timedelta(minutes=5)
+                    ).isoformat()
+            ds._write(data)  # noqa: SLF001
+
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        self.assertTrue(payload.get("hydrated_from_store"))
+
+    def test_drops_parked_offline_pin(self):
+        """Power cut / silent AVL older than the parked window — pin is removed."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row["last_seen_at"] = (
+                        datetime.now(timezone.utc) - timedelta(minutes=20)
                     ).isoformat()
             ds._write(data)  # noqa: SLF001
 
