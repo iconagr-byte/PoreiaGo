@@ -467,6 +467,8 @@ export default function StorefrontDemoPage() {
         <section className="sf-why-us" aria-labelledby="sf-why-us-title">
           <div className="sf-why-us__glow sf-why-us__glow--sun" aria-hidden />
           <div className="sf-why-us__glow sf-why-us__glow--sea" aria-hidden />
+          <div className="sf-why-us__glow sf-why-us__glow--core" aria-hidden />
+          <div className="sf-why-us__noise" aria-hidden />
           <svg className="sf-why-us__coast" viewBox="0 0 1200 180" preserveAspectRatio="none" aria-hidden>
             <path
               className="sf-why-us__coast-wave"
@@ -475,10 +477,20 @@ export default function StorefrontDemoPage() {
           </svg>
           <div className="sf-why-us__inner">
             <header className="sf-why-us__intro">
-              <p className="sf-why-us__eyebrow">Από το click μέχρι τον προορισμό</p>
+              <p className="sf-why-us__eyebrow">Το ταξίδι, σε ένα tap</p>
               <div className="sf-preview-trips-section-head sf-why-us__title-row">
                 <h2 id="sf-why-us-title" className="sf-why-us__title">
-                  {rentOnly ? 'Κλείνεις όχημα. Εμείς κρατάμε τη διαδρομή.' : 'Κλείνεις θέση. Εμείς κρατάμε τον δρόμο.'}
+                  {rentOnly ? (
+                    <>
+                      Κλείνεις όχημα.{' '}
+                      <span className="sf-why-us__title-accent">Φεύγεις ήσυχος.</span>
+                    </>
+                  ) : (
+                    <>
+                      Κλείνεις θέση.{' '}
+                      <span className="sf-why-us__title-accent">Φεύγεις ήσυχος.</span>
+                    </>
+                  )}
                 </h2>
                 <PreviewBuilderControl
                   sectionId="general"
@@ -490,8 +502,8 @@ export default function StorefrontDemoPage() {
               </div>
               <p className="sf-why-us__lede">
                 {rentOnly
-                  ? 'Γρήγορη online κράτηση, καθαροί όροι και στήριξη πριν και κατά τη διαδρομή — χωρίς τηλέφωνα και χωρίς αβεβαιότητα.'
-                  : 'Καθαρή κράτηση, άνετα λεωφορεία και οδηγοί που ξέρουν κάθε χιλιόμετρο — χωρίς άγχος, χωρίς εκπλήξεις.'}
+                  ? 'Online κράτηση. Καθαροί όροι. Στήριξη σε κάθε χιλιόμετρο — χωρίς τηλέφωνα, χωρίς εκπλήξεις.'
+                  : 'Online κράτηση. Εισιτήριο στο Wallet. Οδηγοί που ξέρουν κάθε χιλιόμετρο — χωρίς τηλέφωνα, χωρίς εκπλήξεις.'}
               </p>
             </header>
 
@@ -542,6 +554,28 @@ export default function StorefrontDemoPage() {
                 </li>
               ))}
             </ol>
+            <div className="sf-why-us__hook">
+              {rentOnly ? (
+                <Link to="/rent" className="sf-why-us__cta">
+                  Δες οχήματα
+                  <span className="material-symbols-outlined" aria-hidden>
+                    arrow_forward
+                  </span>
+                </Link>
+              ) : (
+                <a href="#search-results" className="sf-why-us__cta">
+                  Δες εκδρομές
+                  <span className="material-symbols-outlined" aria-hidden>
+                    arrow_forward
+                  </span>
+                </a>
+              )}
+              <p className="sf-why-us__hook-note">
+                {rentOnly
+                  ? 'Κράτηση σε δευτερόλεπτα · επιβεβαίωση στο κινητό.'
+                  : 'Θέση σε δευτερόλεπτα · εισιτήριο στο κινητό.'}
+              </p>
+            </div>
           </div>
         </section>
         )}
