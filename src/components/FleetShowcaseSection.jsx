@@ -108,11 +108,11 @@ export default function FleetShowcaseSection({
           />
         </div>
         <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight mb-4">
-          Premium λεωφορεία & παροχές
+          Ο στόλος που σας ταξιδεύει
         </h2>
         <p className="text-on-surface-variant font-body-md">
-          Τα οχήματά μας συγχρονίζονται από τον πίνακα ελέγχου — άνεση, ασφάλεια και σύγχρονες
-          παροχές σε κάθε διαδρομή.
+          Σύγχρονα, καθαρά λεωφορεία για κάθε εκδρομή του γραφείου — άνεση και ασφάλεια σε όλη τη
+          διαδρομή.
         </p>
       </div>
 
