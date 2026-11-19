@@ -182,8 +182,12 @@ export default function StorefrontFooter({
   const tagline =
     String(siteAppearance.footer_tagline || '').trim() ||
     (tripsEnabled
-      ? 'Η εκδρομή σου — εισιτήριο στο κινητό, θέση που διάλεξες εσύ.'
-      : 'Κράτηση, υποστήριξη και το γραφείο σου — σε μία καθαρή εμπειρία.');
+      ? brand.displayName
+        ? `${brand.displayName} — οργανωμένες εκδρομές με λεωφορείο.`
+        : 'Οργανωμένες εκδρομές με λεωφορείο — από το γραφείο σας, στον προορισμό.'
+      : brand.displayName
+        ? `${brand.displayName} — το γραφείο σας, δίπλα σας σε κάθε διαδρομή.`
+        : 'Το γραφείο σας — δίπλα σας σε κάθε διαδρομή.');
 
   // Prefer the modern multi-column layout for classic + contact-forward templates.
   if (
@@ -196,16 +200,16 @@ export default function StorefrontFooter({
         <div className="sf-footer__aurora" aria-hidden />
         <div className="sf-footer__inner">
           <div className="sf-footer__hook">
-            <p className="sf-footer__hook-kicker">Η επόμενη εκδρομή ξεκινά με ένα tap.</p>
+            <p className="sf-footer__hook-kicker">Έτοιμοι για την επόμενη εκδρομή;</p>
             <p className="sf-footer__hook-text">
               {tripsEnabled
-                ? 'Διάλεξε ημερομηνία, κράτα θέση και φύλαξέ την στο Wallet — πριν καν σηκωθείς από τον καναπέ.'
-                : 'Μίλησε μαζί μας για την κράτησή σου — είμαστε εδώ για κάθε χιλιόμετρο.'}
+                ? 'Δείτε το πρόγραμμα του γραφείου, διαλέξτε ημερομηνία και ταξιδέψτε μαζί μας.'
+                : 'Μιλήστε μαζί μας για την εκδρομή σας — το γραφείο είναι δίπλα σας σε κάθε χιλιόμετρο.'}
             </p>
             <div className="sf-footer__hook-actions">
               {tripsEnabled ? (
                 <a href="#search-results" className="sf-footer__hook-cta">
-                  Κλείσε θέση
+                  Δείτε εκδρομές
                 </a>
               ) : null}
               <Link to="/contact" className="sf-footer__hook-link">

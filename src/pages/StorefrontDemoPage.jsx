@@ -434,7 +434,7 @@ export default function StorefrontDemoPage() {
               title={siteAppearance.intl_section_title || 'Εκδρομές εξωτερικού'}
               subtitle={
                 siteAppearance.intl_section_subtitle ||
-                'Διεθνείς εκδρομές με λεωφορείο — ίδια εμφάνιση κάρτας με τις εγχώριες.'
+                'Οργανωμένες εκδρομές στο εξωτερικό με λεωφορείο — ίδια φροντίδα, νέοι προορισμοί.'
               }
               trips={filteredInternational}
               emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
@@ -477,18 +477,18 @@ export default function StorefrontDemoPage() {
           </svg>
           <div className="sf-why-us__inner">
             <header className="sf-why-us__intro">
-              <p className="sf-why-us__eyebrow">Το ταξίδι, σε ένα tap</p>
+              <p className="sf-why-us__eyebrow">{brandName || 'Το γραφείο μας'}</p>
               <div className="sf-preview-trips-section-head sf-why-us__title-row">
                 <h2 id="sf-why-us-title" className="sf-why-us__title">
                   {rentOnly ? (
                     <>
-                      Κλείνεις όχημα.{' '}
-                      <span className="sf-why-us__title-accent">Φεύγεις ήσυχος.</span>
+                      Το όχημα που χρειάζεστε.{' '}
+                      <span className="sf-why-us__title-accent">Η φροντίδα του γραφείου.</span>
                     </>
                   ) : (
                     <>
-                      Κλείνεις θέση.{' '}
-                      <span className="sf-why-us__title-accent">Φεύγεις ήσυχος.</span>
+                      Η εκδρομή σας.{' '}
+                      <span className="sf-why-us__title-accent">Η φροντίδα μας.</span>
                     </>
                   )}
                 </h2>
@@ -502,8 +502,8 @@ export default function StorefrontDemoPage() {
               </div>
               <p className="sf-why-us__lede">
                 {rentOnly
-                  ? 'Online κράτηση. Καθαροί όροι. Στήριξη σε κάθε χιλιόμετρο — χωρίς τηλέφωνα, χωρίς εκπλήξεις.'
-                  : 'Online κράτηση. Εισιτήριο στο Wallet. Οδηγοί που ξέρουν κάθε χιλιόμετρο — χωρίς τηλέφωνα, χωρίς εκπλήξεις.'}
+                  ? 'Ενοικίαση από το γραφείο μας — καθαρά οχήματα, ξεκάθαροι όροι και άνθρωποι δίπλα σας στην παραλαβή.'
+                  : 'Οργανωμένες εκδρομές με λεωφορείο: έμπειροι οδηγοί, άνετα καθίσματα και στάσεις που αξίζουν, από την αναχώρηση μέχρι την επιστροφή.'}
               </p>
             </header>
 
@@ -512,32 +512,32 @@ export default function StorefrontDemoPage() {
                 {
                   id: 'booking',
                   step: '01',
-                  icon: rentOnly ? 'smartphone' : 'confirmation_number',
+                  icon: rentOnly ? 'directions_car' : 'explore',
                   tone: 'amber',
-                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Θέση σε δευτερόλεπτα',
+                  title: rentOnly ? 'Οχήματα έτοιμα για δρόμο' : 'Προορισμοί που αξίζουν',
                   body: rentOnly
-                    ? 'Διάλεξε όχημα και ημερομηνίες στο Rent — επιβεβαίωση αμέσως, χωρίς αναμονή στο τηλέφωνο.'
-                    : 'Διάλεξε εκδρομή, κράτα θέση online και πάρε το εισιτήριο στο Wallet πριν καν φύγεις από τον καναπέ.',
+                    ? 'Καθαρά, συντηρημένα αυτοκίνητα από το γραφείο — έτοιμα για παραλαβή όταν τα χρειάζεστε.'
+                    : 'Επιλεγμένες εκδρομές στην Ελλάδα και στο εξωτερικό, με χρόνο να δείτε, να περπατήσετε και να γυρίσετε χορτάτοι.',
                 },
                 {
                   id: 'comfort',
                   step: '02',
-                  icon: rentOnly ? 'directions_car' : 'directions_bus',
+                  icon: rentOnly ? 'garage' : 'directions_bus',
                   tone: 'cyan',
-                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση που φαίνεται στον δρόμο',
+                  title: rentOnly ? 'Στόλος που εμπιστεύεστε' : 'Άνεση στον δρόμο',
                   body: rentOnly
-                    ? 'Οχήματα συντηρημένα, καθαρά και έτοιμα για παραλαβή — με ιστορικό που μπορείς να εμπιστευτείς.'
-                    : 'Σύγχρονα λεωφορεία και αναπαυτικά καθίσματα για ξεκούραστη διαδρομή, όχι απλώς «μεταφορά από Α σε Β».',
+                    ? 'Οχήματα του γραφείου, φροντισμένα και έτοιμα — για διαδρομές στην πόλη και έξω από αυτήν.'
+                    : 'Σύγχρονα λεωφορεία και αναπαυτικά καθίσματα — η διαδρομή είναι μέρος της εκδρομής, όχι απλώς η μετάβαση.',
                 },
                 {
                   id: 'safety',
                   step: '03',
-                  icon: 'verified_user',
+                  icon: rentOnly ? 'handshake' : 'groups',
                   tone: 'mint',
-                  title: rentOnly ? 'Στήριξη σε κάθε χιλιόμετρο' : 'Ασφάλεια χωρίς συμβιβασμούς',
+                  title: rentOnly ? 'Άνθρωποι δίπλα σας' : 'Οδηγοί που σας φροντίζουν',
                   body: rentOnly
-                    ? 'Όροι ενοικίασης ξεκάθαροι και βοήθεια όταν τη χρειάζεσαι — πριν, κατά και μετά την παραλαβή.'
-                    : 'Έμπειροι οδηγοί και σταθερή υποστήριξη από την αναχώρηση μέχρι την άφιξη — σε κάθε στάση της διαδρομής.',
+                    ? 'Το γραφείο είναι δίπλα σας στην παραλαβή, στους όρους και όπου χρειαστείτε βοήθεια στον δρόμο.'
+                    : 'Έμπειροι οδηγοί και το γραφείο δίπλα σας σε κάθε στάση — από το πρωί μέχρι την επιστροφή.',
                 },
               ].map((item) => (
                 <li key={item.id} className={`sf-why-us__stop sf-why-us__stop--${item.tone}`}>
@@ -557,14 +557,14 @@ export default function StorefrontDemoPage() {
             <div className="sf-why-us__hook">
               {rentOnly ? (
                 <Link to="/rent" className="sf-why-us__cta">
-                  Δες οχήματα
+                  Δείτε τα οχήματα
                   <span className="material-symbols-outlined" aria-hidden>
                     arrow_forward
                   </span>
                 </Link>
               ) : (
                 <a href="#search-results" className="sf-why-us__cta">
-                  Δες εκδρομές
+                  Δείτε τις εκδρομές μας
                   <span className="material-symbols-outlined" aria-hidden>
                     arrow_forward
                   </span>
@@ -572,8 +572,8 @@ export default function StorefrontDemoPage() {
               )}
               <p className="sf-why-us__hook-note">
                 {rentOnly
-                  ? 'Κράτηση σε δευτερόλεπτα · επιβεβαίωση στο κινητό.'
-                  : 'Θέση σε δευτερόλεπτα · εισιτήριο στο κινητό.'}
+                  ? 'Καθαρά οχήματα · φροντίδα από το γραφείο.'
+                  : 'Οργανωμένα δρομολόγια · ξεκούραστη διαδρομή.'}
               </p>
             </div>
           </div>
