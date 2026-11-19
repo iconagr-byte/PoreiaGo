@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import CustomerLoginModal from '../auth/CustomerLoginModal.jsx';
 import StorefrontAccountMenu from './StorefrontAccountMenu.jsx';
 import StorefrontBrand from './StorefrontBrand.jsx';
 import {
@@ -82,6 +83,7 @@ export default function StorefrontHeader({
   const isDark = style.variant === 'dark';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const phone = String(siteAppearance?.footer_contact_phone || '').trim();
   const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
@@ -130,6 +132,11 @@ export default function StorefrontHeader({
     .join(' ');
 
   const closeMenu = () => setMenuOpen(false);
+
+  const openLogin = () => {
+    setMenuOpen(false);
+    setLoginOpen(true);
+  };
 
   return (
     <header
@@ -196,11 +203,11 @@ export default function StorefrontHeader({
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
-          <StorefrontAccountMenu isDark={isDark} />
+          <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
         </nav>
 
         <div className="sf-header-actions flex md:hidden items-center">
-          <StorefrontAccountMenu isDark={isDark} compact />
+          <StorefrontAccountMenu isDark={isDark} compact onOpenLogin={openLogin} />
           <button
             type="button"
             className={menuBtn}
@@ -314,11 +321,21 @@ export default function StorefrontHeader({
               </a>
             ) : null}
             <div className="px-1 pt-2 pb-1">
-              <StorefrontAccountMenu isDark={isDark} />
+              <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
             </div>
           </nav>
         </div>
       ) : null}
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => {
+          window.dispatchEvent(new Event('focus'));
+        }}
+        title="Είσοδος στον λογαριασμό"
+        registerFrom="/"
+      />
     </header>
   );
 }
