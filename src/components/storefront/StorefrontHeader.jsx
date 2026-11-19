@@ -203,10 +203,9 @@ export default function StorefrontHeader({
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
-          <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
         </nav>
 
-        <div className="sf-header-actions flex md:hidden items-center">
+        <div className="sf-header-actions flex items-center">
           <StorefrontAccountMenu isDark={isDark} compact onOpenLogin={openLogin} />
           <button
             type="button"
@@ -320,9 +319,6 @@ export default function StorefrontHeader({
                 {phone}
               </a>
             ) : null}
-            <div className="px-1 pt-2 pb-1">
-              <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
-            </div>
           </nav>
         </div>
       ) : null}
