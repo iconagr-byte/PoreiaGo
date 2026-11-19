@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Diagnose Teltonika Codec 8 TCP ingest + Achillio Travel device bindings.
 # Safe to run via Actions from /tmp — pass REPO_ROOT=/opt/poreiago.
-# Bump: 2026-11-19 11:52 EET dump last_hw / last_fix_source / live_map_fix.
+# Bump: 2026-11-19 12:02 EET dump last_hw even if live_map_fix not in container yet.
 set -euo pipefail
 
 ROOT="${REPO_ROOT:-}"
@@ -70,12 +70,23 @@ echo "(Note: docker-exec get_teltonika_status counters are always 0 — fresh pr
 echo "(Tracker pins without driver_id are allowed when IMEI/plate is bound here.)"
 "${COMPOSE[@]}" exec -T api-blue python - <<'PY'
 from travel_platform.telemetry.teltonika import list_devices
-import json
+
+try:
+    from travel_platform.telemetry.teltonika.device_store import live_map_fix
+except ImportError:
+    live_map_fix = None
+
 rows = list_devices()
 print("device_count=", len(rows))
 for r in rows:
-    from travel_platform.telemetry.teltonika.device_store import live_map_fix
-
+    if live_map_fix is not None:
+        map_fix = live_map_fix(r)
+    else:
+        map_fix = (
+            (r.get("last_hw_lat"), r.get("last_hw_lng"))
+            if r.get("last_hw_lat") is not None
+            else (r.get("last_lat"), r.get("last_lng"))
+        )
     print(
         "device",
         "imei=", r.get("imei"),
@@ -88,7 +99,7 @@ for r in rows:
         "hw_lat=", r.get("last_hw_lat"),
         "hw_lng=", r.get("last_hw_lng"),
         "fix_src=", r.get("last_fix_source"),
-        "map_fix=", live_map_fix(r),
+        "map_fix=", map_fix,
         "speed=", r.get("last_speed_kmh"),
         "points=", r.get("points_accepted"),
         "label=", r.get("label"),
