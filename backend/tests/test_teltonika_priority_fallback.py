@@ -48,8 +48,23 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertTrue(is_tracker_binding_alive({"last_seen_at": recent}, max_age_sec=90))
 
     def test_binding_dead_when_last_seen_old(self):
+        # No durable fix → parked window does not apply.
         old = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
         self.assertFalse(is_tracker_binding_alive({"last_seen_at": old}, max_age_sec=90))
+
+    def test_binding_alive_when_parked_fix_within_window(self):
+        """Ignition-off Teltonika often reports every few minutes — keep the pin."""
+        parked = (datetime.now(timezone.utc) - timedelta(seconds=240)).isoformat()
+        self.assertTrue(
+            is_tracker_binding_alive(
+                {
+                    "last_seen_at": parked,
+                    "last_lat": 39.16,
+                    "last_lng": 23.39,
+                },
+                max_age_sec=90,
+            )
+        )
 
     def test_binding_alive_when_tcp_session_open(self):
         """Open Codec TCP counts as online so reconnect paints before first AVL."""

@@ -24,6 +24,11 @@ DEFAULT_TRACKER_ALIVE_SECONDS = 90
 # Was 900s and kept buses looking active ~15 min after GPS power cut.
 # Open Codec TCP still counts as online via is_tracker_binding_alive().
 DEVICE_ONLINE_BADGE_SECONDS = 90
+# Parked / ignition-off Teltonika often closes TCP and only reconnects every
+# few minutes with one AVL burst. Keep the last Codec fix on the map while
+# last_seen is within this window *and* durable lat/lng exist — otherwise
+# ΕΕΧ5670 (and similar) vanish between records even though the unit is up.
+TELTONIKA_PARKED_ALIVE_SECONDS = 600
 
 
 # Greek lookalikes → Latin so App/Teltonika plates collapse to one key.
@@ -164,7 +169,12 @@ def is_tracker_binding_alive(
     max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
     now: datetime | None = None,
 ) -> bool:
-    """True when the IMEI binding is online (fresh last_seen or open Codec TCP)."""
+    """True when the IMEI binding should keep a map pin.
+
+    Live: fresh last_seen (≤ max_age_sec) or open Codec TCP.
+    Parked: recent last_seen (≤ TELTONIKA_PARKED_ALIVE_SECONDS) with durable
+    last_lat/last_lng — intermittent ignition-off records must not blank the map.
+    """
     if not tracker:
         return False
     age = age_seconds(tracker.get("last_seen_at"), now=now)
@@ -180,6 +190,18 @@ def is_tracker_binding_alive(
             return True
     except Exception:
         pass
+    # Parked Codec: has a fix and reported within the parked window.
+    has_fix = tracker.get("last_lat") is not None and tracker.get("last_lng") is not None
+    if not has_fix:
+        has_fix = (
+            tracker.get("last_hw_lat") is not None and tracker.get("last_hw_lng") is not None
+        )
+    if (
+        age is not None
+        and age <= max(int(max_age_sec), int(TELTONIKA_PARKED_ALIVE_SECONDS))
+        and has_fix
+    ):
+        return True
     return False
 
 
