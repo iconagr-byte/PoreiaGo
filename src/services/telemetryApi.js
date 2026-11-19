@@ -25,6 +25,7 @@ export async function postTelemetryUpdate(payload) {
 export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
   const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
     headers: authHeaders,
+    cache: 'no-store',
   });
   if (res.ok) {
     const data = await res.json();

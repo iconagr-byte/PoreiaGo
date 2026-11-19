@@ -96,6 +96,16 @@ class LiveFleetAdminMergeTests(unittest.IsolatedAsyncioTestCase):
         codes = {r.vehicle_code for r in rows}
         self.assertEqual(codes, {"OLD-1", "NEW-1"})
 
+    def test_sync_admin_list_does_not_bleed_demo_into_office(self):
+        """The leftover sync merge used to dump DEMO pins onto every office map."""
+        live = LiveFleetService()
+        _ping(live, tenant_id=DEMO, code="TRIP-1", lat=40.8, lng=22.05)
+
+        with patch.dict(os.environ, {"ALLOW_CROSS_TENANT_FLEET_MERGE": ""}, clear=False):
+            rows = live.list_active_for_admin(UUID(OTHER))
+
+        self.assertEqual(rows, [])
+
     async def test_other_office_never_sees_achillio_or_demo_pin(self):
         """PoreiaGo must not show Achilleas even if legacy merge is enabled."""
         live = LiveFleetService()

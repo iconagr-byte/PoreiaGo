@@ -36,7 +36,14 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
             },
             tenant_id=self.tenant,
         )
-        ds.touch_device("861076085468260", lat=38.25, lng=20.65, speed_kmh=12, points=1)
+        ds.touch_device(
+            "861076085468260",
+            lat=38.25,
+            lng=20.65,
+            speed_kmh=12,
+            points=1,
+            from_hardware=True,
+        )
 
     def tearDown(self):
         self.patcher.stop()
@@ -163,7 +170,14 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
 
     def test_online_tracker_reclaims_app_pin(self):
         """Online IMEI reclaim App pin so dual-live position stays on hardware."""
-        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        ds.touch_device(
+            "861076085468260",
+            lat=40.8,
+            lng=22.05,
+            speed_kmh=0,
+            points=1,
+            from_hardware=True,
+        )
         vid = "veh-app"
         LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
         LiveFleetService._vehicles[vid] = {

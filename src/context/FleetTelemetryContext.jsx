@@ -530,6 +530,15 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             const id = vehicleIdFromRow(msg);
             setVehicles((prev) => {
               const plate = normalizePlateKey(msg);
+              // HTTP poll is the office source of truth. A live WS worker can
+              // inject extra plates (desktop vs laptop looked different).
+              const known =
+                Boolean(prev[id]) ||
+                (plate &&
+                  Object.values(prev).some((row) => normalizePlateKey(row) === plate));
+              if (!known && Object.keys(prev).length > 0) {
+                return prev;
+              }
               // Teltonika owns the plate — fold App GPS into the hardware pin
               // (dual badge) instead of painting a second marker.
               if (plate && isPhoneGpsRow(msg)) {
