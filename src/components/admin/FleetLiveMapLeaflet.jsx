@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -34,6 +34,13 @@ import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
 import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
+import {
+  boundsBoxFromLeaflet,
+  haversineMeters,
+  lngLatInPaddedBounds,
+  pickFollowTarget,
+  shouldPanToFollowTarget,
+} from '../../lib/admin/fleetMapFollow.js';
 
 function escapeAttr(value) {
   return String(value || '')
@@ -169,27 +176,34 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
   ));
 }
 
-/** Fit when the active pin *set* changes (or recenter) — zoom by pin count, never on GPS ticks. */
-function FitBounds({ vehicles, fitNonce = 0 }) {
+/** Fit on pin-set / «Κέντρο στόλου»; keep the tracked pin centered on GPS ticks. */
+function FitBounds({ vehicles, fitNonce = 0, followId = null }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
-  const userMovedRef = useRef(false);
   const programmaticRef = useRef(false);
+  const draggingRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
+  const [recapture, setRecapture] = useState(0);
 
   useEffect(() => {
-    const markMoved = () => {
-      if (programmaticRef.current) {
-        programmaticRef.current = false;
-        return;
-      }
-      userMovedRef.current = true;
+    const onDragStart = () => {
+      if (programmaticRef.current) return;
+      draggingRef.current = true;
     };
-    map.on('dragstart', markMoved);
-    map.on('zoomstart', markMoved);
+    const onDragEnd = () => {
+      draggingRef.current = false;
+      setRecapture((n) => n + 1);
+    };
+    const onMoveEnd = () => {
+      programmaticRef.current = false;
+    };
+    map.on('dragstart', onDragStart);
+    map.on('dragend', onDragEnd);
+    map.on('moveend', onMoveEnd);
     return () => {
-      map.off('dragstart', markMoved);
-      map.off('zoomstart', markMoved);
+      map.off('dragstart', onDragStart);
+      map.off('dragend', onDragEnd);
+      map.off('moveend', onMoveEnd);
     };
   }, [map]);
 
@@ -204,26 +218,64 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       .sort()
       .join('|');
     const force = fitNonce !== lastNonceRef.current;
-    if (force) {
-      userMovedRef.current = false;
+    const pinSetChanged = ids !== fittedIdsRef.current;
+    if (force || pinSetChanged) {
       lastNonceRef.current = fitNonce;
-    } else if (userMovedRef.current) {
-      return;
-    } else if (ids === fittedIdsRef.current) {
+      fittedIdsRef.current = ids;
+      const count = pts.length;
+      const maxZoom = resolveFleetFitMaxZoom(count);
+      const pad = resolveFleetFitPadding(count);
+      programmaticRef.current = true;
+      if (count === 1) {
+        map.setView([pts[0].lat, pts[0].lng], maxZoom, { animate: true });
+        return;
+      }
+      const bounds = L.latLngBounds(pts.map((v) => [v.lat, v.lng]));
+      map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
       return;
     }
-    fittedIdsRef.current = ids;
-    const count = pts.length;
-    const maxZoom = resolveFleetFitMaxZoom(count);
-    const pad = resolveFleetFitPadding(count);
+
+    const follow = pickFollowTarget(
+      pts.filter((v) => !String(v.id || '').startsWith('sos-')),
+      followId,
+    );
+    if (follow) {
+      const center = map.getCenter();
+      const dist = haversineMeters(center.lat, center.lng, follow.lat, follow.lng);
+      const pinInView = lngLatInPaddedBounds(
+        follow.lng,
+        follow.lat,
+        boundsBoxFromLeaflet(map.getBounds()),
+        0.1,
+      );
+      if (
+        !shouldPanToFollowTarget({
+          speedKmh: follow.speed ?? follow.speed_kmh,
+          distanceFromCenterM: dist,
+          pinInView,
+          dragging: draggingRef.current,
+        })
+      ) {
+        return;
+      }
+      programmaticRef.current = true;
+      map.panTo([follow.lat, follow.lng], { animate: true, duration: 0.7, noMoveStart: true });
+      return;
+    }
+
+    if (draggingRef.current) return;
+    const view = map.getBounds().pad(-0.1);
+    const left = pts.some((p) => !view.contains([p.lat, p.lng]));
+    if (!left) return;
+    const pad = resolveFleetFitPadding(pts.length);
     programmaticRef.current = true;
-    if (count === 1) {
-      map.setView([pts[0].lat, pts[0].lng], maxZoom, { animate: true });
-      return;
-    }
     const bounds = L.latLngBounds(pts.map((v) => [v.lat, v.lng]));
-    map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
-  }, [vehicles, map, fitNonce]);
+    map.fitBounds(bounds, {
+      padding: [pad, pad],
+      maxZoom: map.getZoom(),
+      animate: true,
+    });
+  }, [vehicles, map, fitNonce, followId, recapture]);
 
   return null;
 }
@@ -244,6 +296,7 @@ export default function FleetLiveMapLeaflet({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
+  followId = null,
   onVehicleHistory,
   onClearSos = null,
 }) {
@@ -277,7 +330,7 @@ export default function FleetLiveMapLeaflet({
       />
       <ZoomControl position="bottomright" />
       <GreecePlacesLeafletLayer visible={showPlaces} />
-      <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
+      <FitBounds vehicles={fitPoints} fitNonce={fitNonce} followId={followId} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
