@@ -23,7 +23,8 @@ param(
   [string]$Branch = "main",
   [double]$WaitMinutes = 5,
   [switch]$StartEmulator,
-  [string]$Serial = ""
+  [string]$Serial = "",
+  [switch]$UsbOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -192,6 +193,8 @@ if (
     if ($Sdk) { $argList += @("-Sdk", $Sdk) }
     if ($JavaHome) { $argList += @("-JavaHome", $JavaHome) }
     if ($StartEmulator) { $argList += "-StartEmulator" }
+    if ($UsbOnly) { $argList += "-UsbOnly" }
+    if ($Serial) { $argList += @("-Serial", $Serial) }
     & powershell.exe @argList
     exit $LASTEXITCODE
   }
@@ -638,7 +641,11 @@ $online = Get-OnlineAdbDevice
 $hasOffline = Test-AdbHasOffline
 $preferred = Get-PreferredAdbSerial
 $usbReady = $preferred -and ($preferred -notmatch '^emulator-')
-if ($usbReady) {
+if ($UsbOnly -and -not $usbReady) {
+  Write-Host "USB-ONLY: no tablet/phone in state device. Will not install on emulator." -ForegroundColor Red
+  Write-Host "EL: to tablet den fainetai. USB debugging + Allow + File Transfer." -ForegroundColor Yellow
+  & $adb devices | Out-Host
+} elseif ($usbReady) {
   Use-AdbSerial $preferred
   Write-Host "USB tablet/phone is device - skipping emulator." -ForegroundColor Green
   Write-Host "EL: to tablet einai etoimo - den anoigei emulator." -ForegroundColor Green
@@ -705,7 +712,7 @@ while ((Get-Date) -lt $deadline) {
       $adbRestartedOnce = $true
       continue
     }
-    if (-not $emuRelaunchedOnce -and ($StartEmulator -or $stuckOffline) -and -not (Test-AdbHasUsbRow)) {
+    if (-not $emuRelaunchedOnce -and -not $UsbOnly -and ($StartEmulator -or $stuckOffline) -and -not (Test-AdbHasUsbRow)) {
       Stop-EmulatorProcesses
       Restart-AdbServer
       [void](Start-FirstAvd "cold relaunch (was stuck offline)")
@@ -743,6 +750,9 @@ if (-not $online -or $online.Count -eq 0) {
 
 $pin = Get-PreferredAdbSerial
 if (-not $pin) { $pin = Get-AdbSerialFromRow $online[0] }
+if ($UsbOnly -and (-not $pin -or $pin -match '^emulator-')) {
+  throw "USB-ONLY: tablet not in state device. adb devices must show a non-emulator serial. EL: syndese to tablet, pata Allow."
+}
 Use-AdbSerial $pin
 
 [void](Wait-ForBootCompleted 2)
@@ -858,7 +868,12 @@ if (Test-Path -LiteralPath $shaScript) {
 } else {
   Write-Host "Run: keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android"
 }
+$verLine = ""
+try {
+  $verLine = (& $adb shell dumpsys package com.poreiago.wallet 2>$null | Select-String -Pattern "versionName=" | Select-Object -First 1)
+} catch { }
 Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In.") -ForegroundColor Green
+if ($verLine) { Write-Host ("OK: " + $verLine.ToString().Trim() + "  (tablet must show 1.0.31, no Live Tracking map)") -ForegroundColor Green }
 Write-Host "Do NOT press Studio Run (cache fight / Unknown error). For Logcat only:" -ForegroundColor Yellow
 Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1" -ForegroundColor Cyan
 Write-Host "  then File -> Open -> android\  (not repo root)" -ForegroundColor Cyan

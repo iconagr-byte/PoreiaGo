@@ -51,6 +51,8 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
                 webView.getSettings().setDatabaseEnabled(true);
                 webView.getSettings().setLoadWithOverviewMode(true);
                 webView.getSettings().setUseWideViewPort(true);
+                webView.getSettings().setCacheMode(android.webkit.WebSettings.LOAD_NO_CACHE);
+                webView.clearCache(true);
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                     webView.getSettings().setMixedContentMode(
                         android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
