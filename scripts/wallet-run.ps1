@@ -12,6 +12,7 @@
 #   -Branch main          (default; do NOT use old feature branches)
 #   -WaitMinutes 8        (adb "device" wait timeout; default 5 - offline is NOT ready)
 #   -StartEmulator        (auto-start first AVD if empty/offline; relaunches if stuck offline)
+#   -Serial <id>          (force that adb serial; USB tablet/phone is preferred by default)
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
@@ -21,7 +22,8 @@ param(
   # produced stale APKs (v1.0.9) missing recent Wallet UI fixes (tabs / multi-ticket).
   [string]$Branch = "main",
   [double]$WaitMinutes = 5,
-  [switch]$StartEmulator
+  [switch]$StartEmulator,
+  [string]$Serial = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -401,6 +403,55 @@ function Get-AdbDeviceRows {
   )
 }
 
+function Get-AdbSerialFromRow([string]$row) {
+  if ($row -match '^(\S+)\s+device$') { return $Matches[1] }
+  return $null
+}
+
+# USB tablet/phone first; emulator-5554 only if no USB is in state device.
+function Get-PreferredAdbSerial {
+  if ($Serial) { return $Serial }
+  $usb = $null
+  $emuSerial = $null
+  foreach ($r in (Get-OnlineAdbDevice)) {
+    $s = Get-AdbSerialFromRow $r
+    if (-not $s) { continue }
+    if ($s -match '^emulator-') {
+      if (-not $emuSerial) { $emuSerial = $s }
+    } elseif (-not $usb) {
+      $usb = $s
+    }
+  }
+  if ($usb) { return $usb }
+  return $emuSerial
+}
+
+function Use-AdbSerial([string]$target) {
+  if (-not $target) { return }
+  $env:ANDROID_SERIAL = $target
+  $kind = "emulator"
+  if ($target -notmatch '^emulator-') { $kind = "USB tablet/phone" }
+  Write-Host ("==> adb target " + $target + " (" + $kind + ")") -ForegroundColor Green
+}
+
+function Test-AdbHasUnauthorized {
+  $rows = Get-AdbDeviceRows
+  foreach ($r in $rows) {
+    if ($r -match "\tunauthorized$") { return $true }
+  }
+  return $false
+}
+
+function Test-AdbHasUsbRow {
+  $rows = Get-AdbDeviceRows
+  foreach ($r in $rows) {
+    if ($r -match "^\s*$") { continue }
+    $serial = ($r -split "\s+")[0]
+    if ($serial -and $serial -notmatch "^emulator-") { return $true }
+  }
+  return $false
+}
+
 function Test-AdbHasOffline {
   $rows = Get-AdbDeviceRows
   foreach ($r in $rows) {
@@ -585,22 +636,36 @@ function Show-InstallTimeoutHelp([string]$apkPath) {
 
 $online = Get-OnlineAdbDevice
 $hasOffline = Test-AdbHasOffline
-if ((-not $online -or $online.Count -eq 0) -or $hasOffline) {
+$preferred = Get-PreferredAdbSerial
+$usbReady = $preferred -and ($preferred -notmatch '^emulator-')
+if ($usbReady) {
+  Use-AdbSerial $preferred
+  Write-Host "USB tablet/phone is device - skipping emulator." -ForegroundColor Green
+  Write-Host "EL: to tablet einai etoimo - den anoigei emulator." -ForegroundColor Green
+} elseif ((-not $online -or $online.Count -eq 0) -or $hasOffline) {
   Write-Host ""
+  if (Test-AdbHasUnauthorized) {
+    Write-Host "adb shows UNAUTHORIZED. Unlock the tablet and tap Allow USB debugging." -ForegroundColor Yellow
+    Write-Host "EL: sto tablet pata Allow USB debugging (epitrepre ayton ton ypologisti)." -ForegroundColor Yellow
+  }
   if ($hasOffline) {
     Write-Host "adb shows OFFLINE (not ready). Only state 'device' can install." -ForegroundColor Yellow
-    Write-Host "EL: to emulator einai offline - den einai etoimo gia install." -ForegroundColor Yellow
+    Write-Host "EL: to emulator/tablet einai offline - den einai etoimo gia install." -ForegroundColor Yellow
     Restart-AdbServer
   } else {
     Write-Host "NO DEVICE: adb devices empty (or no 'device' row)." -ForegroundColor Yellow
-    Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
-    Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
+    Write-Host "  1) Plug the tablet, USB debugging ON, tap Allow on the tablet" -ForegroundColor Yellow
+    Write-Host "  2) OR Android Studio -> Device Manager -> Play on an AVD" -ForegroundColor Yellow
     Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
   }
   Write-Host ("APK ready at: " + $apk) -ForegroundColor DarkYellow
   Write-Host ""
 
-  if ($StartEmulator -or $hasOffline) {
+  $usbRow = Test-AdbHasUsbRow
+  if ($usbRow) {
+    Write-Host "USB tablet/phone is listed - waiting for Allow / File Transfer (not starting emulator)." -ForegroundColor Yellow
+    Write-Host "EL: sto tablet pata Allow USB debugging. USB mode = File Transfer / MTP." -ForegroundColor Yellow
+  } elseif ($StartEmulator -or $hasOffline) {
     if ($hasOffline) {
       Stop-EmulatorProcesses
       Restart-AdbServer
@@ -640,7 +705,7 @@ while ((Get-Date) -lt $deadline) {
       $adbRestartedOnce = $true
       continue
     }
-    if (-not $emuRelaunchedOnce -and ($StartEmulator -or $stuckOffline)) {
+    if (-not $emuRelaunchedOnce -and ($StartEmulator -or $stuckOffline) -and -not (Test-AdbHasUsbRow)) {
       Stop-EmulatorProcesses
       Restart-AdbServer
       [void](Start-FirstAvd "cold relaunch (was stuck offline)")
@@ -649,7 +714,7 @@ while ((Get-Date) -lt $deadline) {
       continue
     }
   } elseif (-not $emptyHintShown) {
-    Write-Host "Still empty - leave this window open, start the emulator, wait for home screen..." -ForegroundColor DarkYellow
+    Write-Host "Still empty - plug the tablet (USB debugging + Allow) or start an emulator..." -ForegroundColor DarkYellow
     $emptyHintShown = $true
   }
 
@@ -673,8 +738,12 @@ while ((Get-Date) -lt $deadline) {
 }
 if (-not $online -or $online.Count -eq 0) {
   Show-InstallTimeoutHelp $apk
-  throw "No adb device online after build (offline is not ready). Start AVD / USB phone, then install (commands above)."
+  throw "No adb device online after build (offline is not ready). Start AVD / USB tablet, then install (commands above)."
 }
+
+$pin = Get-PreferredAdbSerial
+if (-not $pin) { $pin = Get-AdbSerialFromRow $online[0] }
+Use-AdbSerial $pin
 
 [void](Wait-ForBootCompleted 2)
 [void](Wait-ForPackageService 3)
