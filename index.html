@@ -150,6 +150,8 @@
 
             // Cold-start: role home (or keep an allowed deep link). history.replaceState
             // so Capacitor does not re-fetch a missing file.
+            // Stay on "/" — some tablet WebViews treat replaceState("/login") as a
+            // document load of a missing file and paint a white screen.
             var path0 = location.pathname || '/';
             if (flavor === 'driver') {
               var driverOk =
@@ -158,10 +160,48 @@
               if (!driverOk) {
                 history.replaceState(null, '', '/driver' + (location.search || '') + (location.hash || ''));
               }
-            } else if (!pathAllowed(path0)) {
+            } else if (path0 !== '/' && !pathAllowed(path0)) {
               var home = resolveRoleHome();
               history.replaceState(null, '', home + (location.search || '') + (location.hash || ''));
             }
+            document.addEventListener('DOMContentLoaded', function () {
+              var boot = document.getElementById('pg-native-boot');
+              var root = document.getElementById('root');
+              if (boot) boot.style.display = 'flex';
+              function hideBoot() {
+                if (boot) boot.style.display = 'none';
+              }
+              function hideSplash() {
+                try {
+                  var C = window.Capacitor;
+                  var sp = C && C.Plugins && C.Plugins.SplashScreen;
+                  if (sp && typeof sp.hide === 'function') sp.hide({ fadeOutDuration: 150 });
+                } catch (err) { /* ignore */ }
+              }
+              hideSplash();
+              setTimeout(hideSplash, 400);
+              setTimeout(hideSplash, 1600);
+              if (root) {
+                var obs = new MutationObserver(function () {
+                  if (root.childNodes && root.childNodes.length) {
+                    hideBoot();
+                    hideSplash();
+                    try { obs.disconnect(); } catch (err2) { /* ignore */ }
+                  }
+                });
+                try { obs.observe(root, { childList: true, subtree: true }); } catch (err3) { /* ignore */ }
+              }
+              setTimeout(function () {
+                if (root && root.childNodes && root.childNodes.length) {
+                  hideBoot();
+                  return;
+                }
+                if (boot) {
+                  boot.style.display = 'flex';
+                  boot.textContent = 'PoreiaGo';
+                }
+              }, 8000);
+            });
           }
         } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();
@@ -228,11 +268,12 @@
         }
       })();
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   </head>
   <body class="antialiased font-body-md text-body-md overflow-x-hidden selection:bg-primary-container selection:text-white">
+    <div id="pg-native-boot" style="display:none;position:fixed;inset:0;z-index:2147483000;align-items:center;justify-content:center;background:#ffffff;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.04em;">PoreiaGo</div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -42,7 +42,9 @@ if (typeof document !== 'undefined' && isNativeApp()) {
         );
       }
     } else if (isNativeUnifiedApp() || flavor === NATIVE_APP_WALLET || flavor === NATIVE_APP_UNIFIED) {
-      if (!isUnifiedNativeAppPath(path)) {
+      // Keep document URL at "/" on cold start. Tablet WebViews can white-screen
+      // if replaceState jumps to /login before index.html is the loaded document.
+      if (path !== '/' && !isUnifiedNativeAppPath(path)) {
         const home = resolveNativeRoleHomePath();
         window.history.replaceState(
           null,
