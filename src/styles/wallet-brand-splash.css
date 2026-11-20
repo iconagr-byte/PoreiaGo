@@ -92,6 +92,14 @@
   color: var(--pg-splash-accent);
 }
 
+.pg-wallet-splash-version {
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--pg-splash-mute);
+}
+
 /* Driver account splash may still show office seal + name on a light shell. */
 .pg-wallet-splash--office {
   --pg-splash-ink: #1d1d1f;

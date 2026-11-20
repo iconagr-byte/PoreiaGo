@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import 'leaflet/dist/leaflet.css';
 import { fetchTripTrack } from '../services/passengerTrackApi.js';
 import { useLiveEta } from '../hooks/useLiveEta.js';
@@ -68,6 +69,8 @@ export default function PassengerTrackPage() {
     if (lat != null && lng != null) return [lat, lng];
     return [38.5, 23.5];
   }, [lat, lng]);
+
+  if (isNativeApp()) return <Navigate to="/wallet" replace />;
 
   return (
     <div className="passenger-track-app bg-slate-950 text-white">

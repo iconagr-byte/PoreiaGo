@@ -40,10 +40,10 @@ Rebuild native whenever Wallet UI/nav changes land on `main`. Stale `android/app
 
 ### Preferred path: `wallet-run.ps1` (not Studio Run)
 
-1. **Close** Android Studio (avoids Gradle cache fights).
+1. **Close** Android Studio (avoids Gradle cache fights) unless you are installing onto a USB tablet via Studio Run (see tablet section below).
 2. **Start a device** (or the script waits / fails with a clear message):
-   - Android Studio → **Device Manager** → ▶ on an AVD → wait for **home screen**, **or**
-   - USB phone with **USB debugging** on.
+   - USB **tablet/phone** with **USB debugging** on (preferred — scripts pin `ANDROID_SERIAL` to USB, not the emulator), **or**
+   - Android Studio → **Device Manager** → ▶ on an AVD → wait for **home screen**.
 3. Pull `main` and run:
 
 ```powershell
@@ -143,9 +143,45 @@ cd android && ./gradlew assembleDebug
 
 Expect: `OK: Google Sign-In present in packaged assets` then `DONE`.
 
-## Android Studio — when you need it
+## Tablet via Android Studio (USB)
 
-Use Studio for **debugger / Logcat**. Prefer `wallet-run.ps1` for install.
+The Cloud Agent cannot see your tablet. Do this on the Windows PC (`C:\Users\User\poreiago`). minSdk is 24 — any recent Android tablet works; telephony is not required.
+
+1. Tablet: **Settings → About tablet** → tap **Build number** 7 times.
+2. **Developer options → USB debugging** ON.
+3. USB cable. Notification: USB mode = **File Transfer / MTP** (not Charging only).
+4. Unlock the tablet → tap **Allow USB debugging** → Always allow this computer.
+5. **One line only** in a **normal** PowerShell (not Administrator, not `C:\Windows\system32`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-tablet-studio.ps1
+```
+
+That restarts adb, prints `adb devices`, and opens Studio on `android/` only when the tablet is `device`.
+
+Empty list = Windows does not see the tablet (charge-only cable, Charging-only USB mode, missing Google USB Driver, or Admin PowerShell). Install **Google USB Driver** (SDK Manager → SDK Tools), then Device Manager → Update driver → `%LOCALAPPDATA%\Android\Sdk\extras\google\usb_driver`.
+
+`unauthorized` = tap Allow on the tablet. `offline` = unplug/replug + File Transfer.
+
+6. Prep without the wrapper (optional):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-studio-prep.ps1 -OpenStudio
+```
+
+7. Wait for Gradle sync. Gradle JDK = **jbr-21**, wrapper **8.14.3**.
+8. Toolbar: pick the **tablet** (not the emulator, not «No Devices»).
+9. **Run** ▶ — module `poreiago.app.main`.
+
+If Studio toasts **Error running 'app' / Unknown error**, skip Run and install from PowerShell (USB is preferred over any emulator):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+```
+
+## Android Studio — debugger / Logcat
+
+Use Studio for **debugger / Logcat**. Prefer `wallet-run.ps1` for install unless you are targeting a USB tablet as above.
 
 ### Open the right folder
 
@@ -170,7 +206,7 @@ Studio often shows that toast with **no details**. Usual causes for this project
 
 | Cause | What to do |
 |-------|------------|
-| No device selected | Device Manager → ▶ AVD → wait home screen → pick it in toolbar |
+| No device selected | Pick the USB **tablet** in the toolbar (or Device Manager ▶ AVD → home screen) |
 | Wrong/stale Run module | Run → Edit Configurations… → **app** → Module = `poreiago.app.main` → Apply |
 | Opened repo root | Close → Open folder `android\` only |
 | Gradle JDK 25 / Gradle 9.6 | Wrapper + `jbr-21` (see above) |
