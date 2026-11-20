@@ -151,21 +151,22 @@ The Cloud Agent cannot see your tablet. Do this on the Windows PC (`C:\Users\Use
 2. **Developer options → USB debugging** ON.
 3. USB cable. Notification: USB mode = **File Transfer / MTP** (not Charging only).
 4. Unlock the tablet → tap **Allow USB debugging** → Always allow this computer.
-5. PowerShell check:
+5. **One line only** in a **normal** PowerShell (not Administrator, not `C:\Windows\system32`):
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
-# expect a serial (not emulator-5554) with state: device
-# unauthorized = tap Allow on the tablet
-# offline = unplug/replug, File Transfer, adb kill-server / start-server
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-tablet-studio.ps1
 ```
 
-6. Prep + open the **android** folder (not repo root):
+That restarts adb, prints `adb devices`, and opens Studio on `android/` only when the tablet is `device`.
+
+Empty list = Windows does not see the tablet (charge-only cable, Charging-only USB mode, missing Google USB Driver, or Admin PowerShell). Install **Google USB Driver** (SDK Manager → SDK Tools), then Device Manager → Update driver → `%LOCALAPPDATA%\Android\Sdk\extras\google\usb_driver`.
+
+`unauthorized` = tap Allow on the tablet. `offline` = unplug/replug + File Transfer.
+
+6. Prep without the wrapper (optional):
 
 ```powershell
-cd C:\Users\User\poreiago
-git fetch origin main; git checkout main; git pull origin main
-powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1 -OpenStudio
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-studio-prep.ps1 -OpenStudio
 ```
 
 7. Wait for Gradle sync. Gradle JDK = **jbr-21**, wrapper **8.14.3**.

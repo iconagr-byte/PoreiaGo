@@ -14,7 +14,8 @@
 
 param(
   [switch]$SyncFirst,
-  [switch]$OpenStudio
+  [switch]$OpenStudio,
+  [switch]$ForceStudio
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,8 +89,13 @@ if (Test-Path -LiteralPath $adb) {
     Write-Host "EL: sto tablet pata Allow USB debugging (epitrepre ayton ton ypologisti)." -ForegroundColor Yellow
     Write-Host "    USB mode = File Transfer / MTP (ochi Charging only)." -ForegroundColor Yellow
   } else {
-    Write-Host "No USB tablet in state device yet." -ForegroundColor Yellow
-    Write-Host "EL: syndese to tablet, Developer options -> USB debugging ON, pata Allow." -ForegroundColor Yellow
+    Write-Host "No USB tablet in state device yet. adb devices is empty." -ForegroundColor Yellow
+    Write-Host "EL: to tablet den fainetai. USB debugging ON, File Transfer, DATA cable." -ForegroundColor Yellow
+    Write-Host "    One-liner: powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-tablet-studio.ps1" -ForegroundColor Yellow
+    if ($OpenStudio -and -not $ForceStudio) {
+      $OpenStudio = $false
+      Write-Host "Skip OpenStudio until adb shows the tablet (or pass -ForceStudio)." -ForegroundColor DarkYellow
+    }
   }
 } else {
   Write-Host ("WARN: adb missing: " + $adb) -ForegroundColor Yellow
