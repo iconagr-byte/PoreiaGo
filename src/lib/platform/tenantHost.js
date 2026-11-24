@@ -55,3 +55,31 @@ export function isTenantStorefrontHost(hostname = currentHostname()) {
   // Any other hostname (e.g. www.achilliotravel.com) is a tenant custom domain.
   return true;
 }
+
+/** Single-label office subdomain on the platform base domain, or ''. */
+export function platformOfficeSubdomain(hostname = currentHostname()) {
+  const host = String(hostname || '').toLowerCase().split(':')[0];
+  const base = getPlatformBaseDomain();
+  if (!host || !host.endsWith(`.${base}`)) return '';
+  const sub = host.slice(0, -(base.length + 1));
+  if (!sub || sub.includes('.') || sub === 'www' || sub === 'api' || sub === 'admin') {
+    return '';
+  }
+  return sub;
+}
+
+/**
+ * When Host is slugify(legal_name).poreiago.com but the office lives on
+ * {tenant_slug}.poreiago.com, bounce to the canonical subdomain (keep path/query).
+ * @returns {boolean} true when a redirect was started
+ */
+export function redirectToCanonicalOfficeHost(tenantSlug, hostname = currentHostname()) {
+  const slug = String(tenantSlug || '').trim().toLowerCase();
+  if (!slug || typeof window === 'undefined') return false;
+  const current = platformOfficeSubdomain(hostname);
+  if (!current || current === slug) return false;
+  const base = getPlatformBaseDomain();
+  const next = `https://${slug}.${base}${window.location.pathname || '/'}${window.location.search || ''}${window.location.hash || ''}`;
+  window.location.replace(next);
+  return true;
+}

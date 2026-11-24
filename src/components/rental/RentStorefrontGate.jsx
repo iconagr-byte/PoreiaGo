@@ -5,7 +5,11 @@ import {
   fetchOfficeModules,
   shouldShowRentStorefront,
 } from '../../services/officeModulesApi.js';
-import { isPlatformMarketingHost, isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import {
+  isPlatformMarketingHost,
+  isTenantStorefrontHost,
+  redirectToCanonicalOfficeHost,
+} from '../../lib/platform/tenantHost.js';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 import { isNativeRentDemo } from '../../lib/rental/nativeRentDemo.js';
 
@@ -37,6 +41,7 @@ export default function RentStorefrontGate({ children }) {
     fetchOfficeModules()
       .then((modules) => {
         if (cancelled) return;
+        if (redirectToCanonicalOfficeHost(modules?.tenant_slug)) return;
         setState({
           loading: false,
           allowed: shouldShowRentStorefront(modules),
