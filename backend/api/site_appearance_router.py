@@ -1293,7 +1293,7 @@ async def _resolve_office_seo_for_host(request: Request, host: str | None) -> di
             from app.core.database import AsyncSessionLocal
             from olympus.tenant.domain_resolver import DomainResolver
             from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
-            from app.services.tenant_modules import is_achillio_travel_office
+            from app.services.tenant_modules import is_achillio_travel_office, modules_for_tenant
             from sqlalchemy import select
             from app.models.tenant import Tenant
 
@@ -1316,6 +1316,20 @@ async def _resolve_office_seo_for_host(request: Request, host: str | None) -> di
                     footer_brand = str(appearance.get("footer_brand_name") or "").strip()
                     hero_title = str(appearance.get("hero_title") or "").strip()
                     hero_subtitle = str(appearance.get("hero_subtitle") or "").strip()
+                    # Rent-only: SEO must describe car rental, never bus «εκδρομές».
+                    if tenant and modules_for_tenant(tenant).get("mode") == "rent_only":
+                        rent_title = (
+                            str(appearance.get("rent_guest_hero_title") or "").strip()
+                            or str(appearance.get("rent_hero_title") or "").strip()
+                        )
+                        rent_sub = (
+                            str(appearance.get("rent_guest_hero_copy") or "").strip()
+                            or str(appearance.get("rent_hero_copy") or "").strip()
+                        )
+                        if rent_title:
+                            hero_title = rent_title
+                        if rent_sub:
+                            hero_subtitle = rent_sub
                     if not display_name:
                         display_name = footer_brand
         except Exception:

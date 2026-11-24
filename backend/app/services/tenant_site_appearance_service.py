@@ -130,6 +130,70 @@ def coerce_appearance_for_response(data: dict[str, Any] | None) -> dict[str, Any
             merged[key] = default
     return merged
 
+
+# Bus marketing copy that must never leak onto rent-only offices (SEO, wallet home, admin).
+BUS_DEFAULT_HOME_COPY_KEYS = (
+    "hero_badge",
+    "hero_title",
+    "hero_title_accent",
+    "hero_subtitle",
+    "hero_search_label",
+)
+
+
+def rent_safe_home_copy(appearance: dict[str, Any] | None = None) -> dict[str, str]:
+    """Hero/SEO fallbacks for rent-only offices — prefer rent guest fields when set."""
+    a = appearance if isinstance(appearance, dict) else {}
+    title = str(a.get("rent_guest_hero_title") or "").strip() or "Ενοικίαση αυτοκινήτου"
+    accent = (
+        str(a.get("rent_guest_hero_title_accent") or "").strip()
+        or "— αναζήτησε, σύγκρινε & κλείσε"
+    )
+    subtitle = (
+        str(a.get("rent_guest_hero_copy") or "").strip()
+        or str(a.get("rent_hero_copy") or "").strip()
+        or "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
+    )
+    return {
+        "hero_badge": "Ενοικιάσεις γραφείου",
+        "hero_title": title,
+        "hero_title_accent": accent,
+        "hero_subtitle": subtitle,
+        "hero_search_label": "Αναζήτηση οχημάτων",
+    }
+
+
+def scrub_bus_home_copy_for_rent_only(
+    appearance: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """
+    Replace leftover bus homepage defaults on a rent-only appearance merge.
+
+    Returns (scrubbed_appearance, persist_patch) where persist_patch only
+    contains keys that still matched bus defaults in storage / merge.
+    """
+    out = dict(appearance or {})
+    safe = rent_safe_home_copy(out)
+    persist: dict[str, Any] = {}
+    for key in BUS_DEFAULT_HOME_COPY_KEYS:
+        current = str(out.get(key) or "").strip()
+        bus_default = str(DEFAULT_SITE_APPEARANCE.get(key) or "").strip()
+        # Empty or exact bus default → rent copy. Custom office copy is kept.
+        if not current or current == bus_default:
+            out[key] = safe[key]
+            persist[key] = safe[key]
+    # Rent-only wallets must not advertise upcoming bus excursions.
+    if out.get("wallet_home_show_trips") is not False:
+        trips_title = str(out.get("wallet_home_trips_title") or "").strip()
+        bus_trips = str(DEFAULT_SITE_APPEARANCE.get("wallet_home_trips_title") or "").strip()
+        if not trips_title or trips_title == bus_trips or "εκδρομ" in trips_title.lower():
+            out["wallet_home_trips_title"] = "Οι κρατήσεις σας"
+            persist["wallet_home_trips_title"] = "Οι κρατήσεις σας"
+        out["wallet_home_show_trips"] = False
+        persist["wallet_home_show_trips"] = False
+    return out, persist
+
+
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
     "logo_height_px": 40,
@@ -495,6 +559,7 @@ class TenantSiteAppearanceService:
         from app.services.tenant_modules import (
             is_achillio_travel_office,
             is_poreiago_platform_office,
+            modules_for_tenant,
         )
 
         if is_poreiago_platform_office(tenant):
@@ -505,6 +570,17 @@ class TenantSiteAppearanceService:
             if persist:
                 base = dict(stored) if isinstance(stored, dict) else {}
                 base.update(persist)
+                settings["site_appearance"] = base
+                tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+                await self._session.flush()
+
+        # Rent-only offices: strip leftover bus homepage defaults (SEO / wallet).
+        mods = modules_for_tenant(tenant)
+        if mods.get("mode") == "rent_only":
+            merged, rent_persist = scrub_bus_home_copy_for_rent_only(merged)
+            if rent_persist:
+                base = dict(stored) if isinstance(stored, dict) else {}
+                base.update(rent_persist)
                 settings["site_appearance"] = base
                 tenant.settings_json = json.dumps(settings, ensure_ascii=False)
                 await self._session.flush()
@@ -543,7 +619,10 @@ class TenantSiteAppearanceService:
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
         updated = _sanitize_poreiago_platform_appearance(updated, tenant)
         # Keep an explicit upload — Achillio Travel logos may contain "achillio" in the path.
-        from app.services.tenant_modules import is_achillio_travel_office
+        from app.services.tenant_modules import is_achillio_travel_office, modules_for_tenant
+
+        if modules_for_tenant(tenant).get("mode") == "rent_only":
+            updated, _ = scrub_bus_home_copy_for_rent_only(updated)
 
         if "logo_url" in patch:
             explicit = str(patch.get("logo_url") or "").strip()
