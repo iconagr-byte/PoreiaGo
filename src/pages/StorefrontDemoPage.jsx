@@ -29,7 +29,11 @@ import {
   getHomepageThemeById,
   themeToAppearancePatch,
 } from '../lib/homepage/homepageThemes.js';
-import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
+import {
+  isPlatformMarketingHost,
+  isTenantStorefrontHost,
+  redirectToCanonicalOfficeHost,
+} from '../lib/platform/tenantHost.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
@@ -152,8 +156,12 @@ export default function StorefrontDemoPage() {
 
     const loadCommon = () => {
       fetchOfficeModules()
-        .then(setModules)
-        .finally(() => setModulesReady(true));
+        .then((mods) => {
+          if (redirectToCanonicalOfficeHost(mods?.tenant_slug)) return;
+          setModules(mods);
+          setModulesReady(true);
+        })
+        .catch(() => setModulesReady(true));
       fetchPlatformSettings().then(setPricingSettings);
     };
 
@@ -376,6 +384,21 @@ export default function StorefrontDemoPage() {
   // Rent-only offices land on /rent (sea hero + search + full fleet) — no bus photo gate.
   if (!modulesReady) {
     return <div className="min-h-screen bg-slate-950" aria-busy="true" />;
+  }
+  // Unknown *.poreiago.com label (no tenant) — never show Achillio bus defaults.
+  if (allowStorefront && !modules.tenant_slug) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">PoreiaGo</p>
+          <h1 className="text-2xl font-bold text-slate-900">Το γραφείο δεν βρέθηκε</h1>
+          <p className="text-slate-600 text-sm leading-relaxed">
+            Αυτή η διεύθυνση δεν αντιστοιχεί σε ενεργό γραφείο. Ανοίξτε το subdomain του
+            γραφείου από το admin (π.χ. το σύντομο slug, όχι το πλήρες νομικό όνομα).
+          </p>
+        </div>
+      </div>
+    );
   }
   if (rentOnly) {
     return <Navigate to="/rent" replace />;

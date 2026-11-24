@@ -1,14 +1,22 @@
-import assert from 'node:assert/strict';
-import { isPlatformMarketingHost, isTenantStorefrontHost } from './tenantHost.js';
+/**
+ * @vitest-environment node
+ */
+import { describe, expect, it } from 'vitest';
+import { platformOfficeSubdomain } from './tenantHost.js';
 
-assert.equal(isPlatformMarketingHost('www.poreiago.com'), true);
-assert.equal(isPlatformMarketingHost('poreiago.com'), true);
-assert.equal(isPlatformMarketingHost('localhost'), true);
-assert.equal(isTenantStorefrontHost('www.poreiago.com'), false);
-assert.equal(isTenantStorefrontHost('www.achilliotravel.com'), true);
-assert.equal(isTenantStorefrontHost('achilliotravel.com'), true);
-assert.equal(isTenantStorefrontHost('demo.poreiago.com'), true);
-assert.equal(isTenantStorefrontHost('api.poreiago.com'), false);
-assert.equal(isTenantStorefrontHost('www.demo.poreiago.com'), false);
+describe('platformOfficeSubdomain', () => {
+  it('extracts single-label office subdomains', () => {
+    expect(platformOfficeSubdomain('iconarent.poreiago.com')).toBe('iconarent');
+    expect(
+      platformOfficeSubdomain(
+        'dodopoulos-christos-charalampidis-achilleas-o-e.poreiago.com',
+      ),
+    ).toBe('dodopoulos-christos-charalampidis-achilleas-o-e');
+  });
 
-console.log('tenantHost: OK');
+  it('rejects marketing and multi-label hosts', () => {
+    expect(platformOfficeSubdomain('www.poreiago.com')).toBe('');
+    expect(platformOfficeSubdomain('api.poreiago.com')).toBe('');
+    expect(platformOfficeSubdomain('achilliotravel.com')).toBe('');
+  });
+});

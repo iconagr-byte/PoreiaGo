@@ -94,7 +94,10 @@ class DomainResolver:
 
         stmt = select(Tenant).where(Tenant.is_active.is_(True))
         if subdomain:
-            stmt = stmt.where(Tenant.subdomain == subdomain)
+            # Prefer exact subdomain, then slug (legacy rows where they drifted).
+            stmt = stmt.where(
+                or_(Tenant.subdomain == subdomain, Tenant.slug == subdomain),
+            )
         else:
             apex = normalized.removeprefix("www.")
             stmt = stmt.where(
@@ -110,12 +113,46 @@ class DomainResolver:
         if tenant:
             return _tenant_to_resolved(tenant)
 
+        # Operators sometimes open slugify(legal_name).poreiago.com while the
+        # real subdomain is shorter (e.g. iconarent). Map uniquely when possible.
+        if subdomain:
+            tenant = await self._resolve_via_legal_name_slug(subdomain)
+            if tenant:
+                return _tenant_to_resolved(tenant)
+
         # File branding often has custom_domain before Postgres is updated —
         # map Host → branding slug/subdomain → tenants row, then backfill DB.
         if not subdomain:
             tenant = await self._resolve_via_file_branding(normalized)
             if tenant:
                 return _tenant_to_resolved(tenant)
+        return None
+
+    async def _resolve_via_legal_name_slug(self, subdomain: str) -> Tenant | None:
+        """Match Host label to slugify(legal_name) when subdomain/slug miss."""
+        from olympus.tenant.provisioning import slugify
+
+        want = slugify(subdomain)
+        if not want or want in {"www", "api", "admin", "app"}:
+            return None
+
+        result = await self._session.execute(
+            select(Tenant).where(Tenant.is_active.is_(True))
+        )
+        matches: list[Tenant] = []
+        for row in result.scalars().all():
+            legal = str(getattr(row, "legal_name", None) or "").strip()
+            if not legal:
+                continue
+            if slugify(legal) == want:
+                matches.append(row)
+        if len(matches) == 1:
+            logger.info(
+                "Resolved host subdomain=%s via legal_name → slug=%s",
+                subdomain,
+                matches[0].slug,
+            )
+            return matches[0]
         return None
 
     async def _resolve_via_file_branding(self, normalized_host: str) -> Tenant | None:
