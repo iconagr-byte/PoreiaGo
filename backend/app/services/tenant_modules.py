@@ -69,6 +69,14 @@ def initial_settings_for_plan(
             # Never seed Achillio bus photo on rent-only offices — coastal sea hero.
             "hero_image_url": "/images/rent-hero-coastal-v2.jpg",
             "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+            # Override bus homepage slots so DEFAULT merge / SEO never say «εκδρομές».
+            "hero_badge": "Ενοικιάσεις γραφείου",
+            "hero_title": "Ενοικίαση αυτοκινήτου",
+            "hero_title_accent": "— αναζήτησε, σύγκρινε & κλείσε",
+            "hero_subtitle": (
+                "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
+            ),
+            "hero_search_label": "Αναζήτηση οχημάτων",
             "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
             "rent_hero_copy": (
                 "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -87,6 +95,8 @@ def initial_settings_for_plan(
             "rent_cta_label": "Βρες όχημα",
             "show_fleet_section": False,
             "show_why_us_section": False,
+            "wallet_home_show_trips": False,
+            "wallet_home_trips_title": "Οι κρατήσεις σας",
         }
     else:
         settings["modules"] = {"trips_enabled": True, "rent_enabled": False}

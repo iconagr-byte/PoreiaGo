@@ -42,4 +42,23 @@ describe('resolveWalletHomeFeed', () => {
     expect(feed.showTrips).toBe(false);
     expect(feed.tripsTitle).toBe('Προσεχώς');
   });
+
+  it('prefers rent guest copy for rent-only wallet home', () => {
+    const feed = resolveWalletHomeFeed(
+      {
+        hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
+        hero_subtitle: 'Διάλεξτε από τις προγραμματισμένες εκδρομές μας.',
+        rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+        rent_guest_hero_title_accent: '— στόλος IconaRent',
+        rent_hero_copy: 'Παραλαβή στο γραφείο.',
+        rent_office_name: 'ICONA RENT',
+        wallet_home_show_trips: false,
+      },
+      { rentOnly: true },
+    );
+    expect(feed.headline).toContain('Ενοικίαση αυτοκινήτου');
+    expect(feed.body).toContain('Παραλαβή');
+    expect(feed.showTrips).toBe(false);
+    expect(feed.body.toLowerCase()).not.toContain('εκδρομές');
+  });
 });

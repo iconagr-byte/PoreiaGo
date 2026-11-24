@@ -47,25 +47,45 @@ function normalizeNews(row, index = 0) {
 export function resolveWalletHomeFeed(appearance = {}, opts = {}) {
   const a = appearance && typeof appearance === 'object' ? appearance : {};
   const officeName =
-    cleanText(opts.officeName) || cleanText(a.footer_brand_name) || 'Το γραφείο μας';
+    cleanText(opts.officeName) ||
+    cleanText(a.rent_office_name) ||
+    cleanText(a.footer_brand_name) ||
+    'Το γραφείο μας';
+
+  // Rent-only offices often still carry bus DEFAULT hero_* until healed — prefer rent copy.
+  // Do not treat bus+rent add-on offices as rent-only (they keep trip wallet home).
+  const rentTitle = cleanText(a.rent_guest_hero_title) || cleanText(a.rent_hero_title);
+  const rentBody =
+    cleanText(a.rent_guest_hero_copy) || cleanText(a.rent_hero_copy);
+  const rentOffice = Boolean(opts.rentOnly || a.wallet_home_show_trips === false);
 
   const hook =
     cleanText(a.wallet_home_hook) ||
+    (rentOffice ? 'Ενοικιάσεις γραφείου' : '') ||
     cleanText(a.hero_badge) ||
-    DEFAULT_SITE_APPEARANCE.hero_badge;
+    (rentOffice ? 'Ενοικιάσεις γραφείου' : DEFAULT_SITE_APPEARANCE.hero_badge);
 
   const headline =
     cleanText(a.wallet_home_headline) ||
+    (rentOffice
+      ? [rentTitle, cleanText(a.rent_guest_hero_title_accent)].filter(Boolean).join(' ')
+      : '') ||
     [cleanText(a.hero_title), cleanText(a.hero_title_accent)].filter(Boolean).join(' ') ||
     `Καλώς ήρθατε στο ${officeName}`;
 
   const body =
     cleanText(a.wallet_home_body) ||
+    (rentOffice ? rentBody : '') ||
     cleanText(a.hero_subtitle) ||
-    DEFAULT_SITE_APPEARANCE.hero_subtitle;
+    (rentOffice
+      ? 'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.'
+      : DEFAULT_SITE_APPEARANCE.hero_subtitle);
 
   const imageUrl =
-    cleanText(a.wallet_home_image_url) || cleanText(a.hero_image_url) || '';
+    cleanText(a.wallet_home_image_url) ||
+    cleanText(a.rent_hero_image_url) ||
+    cleanText(a.hero_image_url) ||
+    '';
 
   const services = asList(a.wallet_home_services)
     .map(normalizeService)
@@ -79,11 +99,12 @@ export function resolveWalletHomeFeed(appearance = {}, opts = {}) {
 
   const news = asList(a.wallet_home_news).map(normalizeNews).filter(Boolean);
 
-  const showTrips = a.wallet_home_show_trips !== false;
+  const showTrips = rentOffice ? false : a.wallet_home_show_trips !== false;
   const tripsTitle =
     cleanText(a.wallet_home_trips_title) ||
-    DEFAULT_SITE_APPEARANCE.wallet_home_trips_title ||
-    'Επερχόμενες εκδρομές';
+    (rentOffice
+      ? 'Οι κρατήσεις σας'
+      : DEFAULT_SITE_APPEARANCE.wallet_home_trips_title || 'Επερχόμενες εκδρομές');
 
   return {
     officeName,
