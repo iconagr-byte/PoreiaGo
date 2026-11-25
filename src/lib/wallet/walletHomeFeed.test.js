@@ -2,7 +2,11 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
-import { resolveWalletHomeFeed } from './walletHomeFeed.js';
+import {
+  RENT_WALLET_HOME_SERVICES,
+  resolveWalletHomeFeed,
+} from './walletHomeFeed.js';
+import { DEFAULT_SITE_APPEARANCE } from '../../services/siteAppearanceApi.js';
 
 describe('resolveWalletHomeFeed', () => {
   it('falls back to hero copy when wallet home fields are empty', () => {
@@ -22,6 +26,9 @@ describe('resolveWalletHomeFeed', () => {
     expect(feed.headline).toContain('Η Ελλάδα');
     expect(feed.body).toContain('Εκδρομές');
     expect(feed.services.length).toBeGreaterThan(0);
+    expect(feed.services[0].title).toBe(
+      DEFAULT_SITE_APPEARANCE.wallet_home_services[0].title,
+    );
     expect(feed.showTrips).toBe(true);
   });
 
@@ -43,6 +50,27 @@ describe('resolveWalletHomeFeed', () => {
     expect(feed.tripsTitle).toBe('Προσεχώς');
   });
 
+  it('does not treat hidden trips as rent-only (bus/hybrid can hide excursions)', () => {
+    const feed = resolveWalletHomeFeed({
+      hero_badge: 'Premium',
+      hero_title: 'Η Ελλάδα,',
+      hero_title_accent: 'όπως πρέπει.',
+      hero_subtitle: 'Εκδρομές με το γραφείο μας.',
+      rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+      rent_guest_hero_copy: 'Παραλαβή στο γραφείο.',
+      wallet_home_show_trips: false,
+      wallet_home_services: [],
+    });
+    expect(feed.showTrips).toBe(false);
+    expect(feed.hook).toBe('Premium');
+    expect(feed.headline).toContain('Η Ελλάδα');
+    expect(feed.body).toContain('Εκδρομές');
+    expect(feed.body.toLowerCase()).not.toContain('ενοικίαση');
+    expect(feed.services[0].title).toBe(
+      DEFAULT_SITE_APPEARANCE.wallet_home_services[0].title,
+    );
+  });
+
   it('prefers rent guest copy for rent-only wallet home', () => {
     const feed = resolveWalletHomeFeed(
       {
@@ -60,5 +88,23 @@ describe('resolveWalletHomeFeed', () => {
     expect(feed.body).toContain('Παραλαβή');
     expect(feed.showTrips).toBe(false);
     expect(feed.body.toLowerCase()).not.toContain('εκδρομές');
+  });
+
+  it('uses rent-safe service defaults when rent-only services are empty', () => {
+    const feed = resolveWalletHomeFeed(
+      {
+        wallet_home_services: [],
+        rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+      },
+      { rentOnly: true },
+    );
+    expect(feed.services).toHaveLength(RENT_WALLET_HOME_SERVICES.length);
+    expect(feed.services[0].title).toBe(RENT_WALLET_HOME_SERVICES[0].title);
+    expect(feed.services.map((s) => s.body).join(' ').toLowerCase()).not.toContain(
+      'εισιτήρι',
+    );
+    expect(feed.services.map((s) => s.body).join(' ').toLowerCase()).not.toContain(
+      'θέση',
+    );
   });
 });

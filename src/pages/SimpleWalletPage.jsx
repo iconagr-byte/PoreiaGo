@@ -795,6 +795,7 @@ function WalletAuthenticatedApp() {
       appearance={siteAppearance}
       officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
       tenantId={sealedTenantId}
+      rentOnly={rentOnlyShell}
       onOpenTicket={() => switchTab('pass')}
       onBrowseAllTrips={openOfficeTrips}
     />
