@@ -11,6 +11,7 @@ import PageDesignBuilderPanel, {
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
+import RentServicesMosaicEditor from './fleet/RentServicesMosaicEditor.jsx';
 import RentBrandDesigner from './RentBrandDesigner.jsx';
 import WalletHomeCopyEditor from './WalletHomeCopyEditor.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
@@ -1151,17 +1152,32 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               </PanelCard>
             )}
             {section === 'copy' && (
-              <PanelCard
-                title="Όνομα & κείμενα /rent"
-                description="Εμφανίζονται αμέσως στην εφαρμογή ενοικίασης μετά την αποθήκευση."
-              >
-                <RentAppBrandingEditor
-                  embedded
-                  onSaved={(appearance) => {
-                    if (appearance) setForm((p) => ({ ...p, ...appearance }));
-                  }}
-                />
-              </PanelCard>
+              <>
+                <PanelCard
+                  title="Όνομα & κείμενα /rent"
+                  description="Εμφανίζονται αμέσως στην εφαρμογή ενοικίασης μετά την αποθήκευση."
+                >
+                  <RentAppBrandingEditor
+                    embedded
+                    onSaved={(appearance) => {
+                      if (appearance) setForm((p) => ({ ...p, ...appearance }));
+                    }}
+                  />
+                </PanelCard>
+                <div className="mt-6">
+                  <PanelCard
+                    title="Υπηρεσίες κάτω από τον στόλο"
+                    description="Coastal story panes στο /rent — τίτλοι, κείμενα, links και φωτό από το γραφείο."
+                  >
+                    <RentServicesMosaicEditor
+                      embedded
+                      onSaved={(appearance) => {
+                        if (appearance) setForm((p) => ({ ...p, ...appearance }));
+                      }}
+                    />
+                  </PanelCard>
+                </div>
+              </>
             )}
 
             {section === 'fleet' && (

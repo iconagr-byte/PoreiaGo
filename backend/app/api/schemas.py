@@ -503,6 +503,13 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
     rent_upsell_coverage_id: str = ""
+    rent_services_mosaic_enabled: bool = True
+    rent_services_mosaic_kicker: str = "Γραφείο"
+    rent_services_mosaic_title: str = "Ό,τι χρειάζεστε στο ταξίδι"
+    rent_services_mosaic_lead: str = (
+        "Υπηρεσίες του γραφείου — δίπλα στον στόλο, πριν την κράτηση."
+    )
+    rent_services_mosaic_cards: list[dict] = []
     rent_notify_email_enabled: bool = True
     rent_notify_sms_enabled: bool = True
     rent_notify_email_label: str = ""
@@ -606,6 +613,11 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
     rent_upsell_coverage_id: str | None = None
+    rent_services_mosaic_enabled: bool | None = None
+    rent_services_mosaic_kicker: str | None = None
+    rent_services_mosaic_title: str | None = None
+    rent_services_mosaic_lead: str | None = None
+    rent_services_mosaic_cards: list[dict] | None = None
     rent_notify_email_enabled: bool | None = None
     rent_notify_sms_enabled: bool | None = None
     rent_notify_email_label: str | None = None

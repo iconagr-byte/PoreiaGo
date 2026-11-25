@@ -85,6 +85,13 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_coverage_options: [],
   rent_included_defaults: [],
   rent_upsell_coverage_id: '',
+  /** Story panes under /rent fleet — office-editable mosaic. */
+  rent_services_mosaic_enabled: true,
+  rent_services_mosaic_kicker: 'Γραφείο',
+  rent_services_mosaic_title: 'Ό,τι χρειάζεστε στο ταξίδι',
+  rent_services_mosaic_lead:
+    'Υπηρεσίες του γραφείου — δίπλα στον στόλο, πριν την κράτηση.',
+  rent_services_mosaic_cards: [],
   /** Bus trip extras catalog (after seat selection). */
   trip_extra_options: [],
   rent_notify_email_enabled: true,
@@ -367,6 +374,11 @@ export async function uploadSiteAsset(kind, file) {
     if (!res.ok) await parseError(res);
     const data = await res.json();
     if (data.appearance || data.url) {
+      const svcKind = /^rent_svc_\d+$/i.test(String(kind || ''));
+      if (svcKind) {
+        // Mosaic card photos — return URL only; do not overwrite hero/logo.
+        return data;
+      }
       const key =
         kind === 'logo'
           ? 'logo_url'
