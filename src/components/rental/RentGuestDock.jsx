@@ -1,5 +1,5 @@
 /**
- * Guest /rent bottom dock — book-first home (not a Hertz clone).
+ * Guest /rent bottom dock — phone/tablet only (parent must not mount on desktop).
  * Book · My rentals · Account · Help
  */
 export default function RentGuestDock({

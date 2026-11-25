@@ -3712,9 +3712,13 @@
   }
 }
 
-/* Guest bottom dock */
+/* Guest bottom dock — phone / tablet only (never desktop storefront). */
 .rent-app--guest {
   padding-bottom: calc(4.35rem + env(safe-area-inset-bottom, 0px));
+}
+
+.rent-phone-stage--desktop .rent-app--guest {
+  padding-bottom: 0;
 }
 
 .rent-guest-dock {
@@ -3735,10 +3739,7 @@
 }
 
 .rent-phone-stage--desktop .rent-guest-dock {
-  left: 0;
-  transform: none;
-  width: 100%;
-  max-width: none;
+  display: none;
 }
 
 .rent-guest-dock-item {

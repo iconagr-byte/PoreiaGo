@@ -607,31 +607,34 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           ) : null}
         </main>
 
-        <RentGuestDock
-          active="book"
-          helpHref={
-            String(siteAppearance?.footer_contact_phone || '').trim()
-              ? `tel:${String(siteAppearance.footer_contact_phone).replace(/\s+/g, '')}`
-              : ''
-          }
-          onBook={() => {
-            document
-              .getElementById('rent-guest-search')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }}
-          onRentals={onRequireLogin}
-          onAccount={onRequireLogin}
-          onHelp={() => {
-            const phone = String(siteAppearance?.footer_contact_phone || '').trim();
-            if (phone) {
-              window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
-              return;
+        {/* Phone-only bottom dock — desktop already has header Account / filters. */}
+        {isMobile ? (
+          <RentGuestDock
+            active="book"
+            helpHref={
+              String(siteAppearance?.footer_contact_phone || '').trim()
+                ? `tel:${String(siteAppearance.footer_contact_phone).replace(/\s+/g, '')}`
+                : ''
             }
-            document
-              .getElementById('rent-guest-search')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }}
-        />
+            onBook={() => {
+              document
+                .getElementById('rent-guest-search')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+            onRentals={onRequireLogin}
+            onAccount={onRequireLogin}
+            onHelp={() => {
+              const phone = String(siteAppearance?.footer_contact_phone || '').trim();
+              if (phone) {
+                window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+                return;
+              }
+              document
+                .getElementById('rent-guest-search')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          />
+        ) : null}
       </div>
       <RentVehicleDetailSheet
         vehicle={detailVehicle}
