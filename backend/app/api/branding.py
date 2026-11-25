@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Annotated
 from uuid import UUID
 
@@ -37,14 +38,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/branding", tags=["Tenant Branding"])
 
 _ASSET_KINDS = frozenset({"logo", "hero", "rent_logo"})
+_RENT_SVC_KIND_RE = re.compile(r"^rent_svc_[0-5]$")
 
 
-def _appearance_key_for_kind(kind: str) -> str:
+def _asset_kind_allowed(kind: str) -> bool:
+    k = str(kind or "").strip().lower()
+    return k in _ASSET_KINDS or bool(_RENT_SVC_KIND_RE.match(k))
+
+
+def _appearance_key_for_kind(kind: str) -> str | None:
     if kind == "logo":
         return "logo_url"
     if kind == "rent_logo":
         return "rent_logo_url"
-    return "hero_image_url"
+    if kind == "hero":
+        return "hero_image_url"
+    # rent_svc_* mosaic photos are stored on disk; URL lives in cards JSON.
+    return None
 
 
 def _dev_fallback_enabled() -> bool:
@@ -306,7 +316,7 @@ async def upload_site_appearance_asset(
     from travel_platform.media.image_optimize import looks_like_image, sniff_image_ext
 
     kind_norm = str(kind or "").strip().lower()
-    if kind_norm not in _ASSET_KINDS:
+    if not _asset_kind_allowed(kind_norm):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid asset kind")
     content = await file.read()
     ctype = str(file.content_type or "").strip().lower()
@@ -341,6 +351,22 @@ async def upload_site_appearance_asset(
     persist_warning = None
     appearance: dict = {}
     svc = TenantSiteAppearanceService(db)
+
+    # Mosaic card photos: return URL only — appearance cards JSON is saved by the editor.
+    if key is None:
+        try:
+            appearance = await svc.get_appearance(tenant_id)
+        except Exception:
+            appearance = {}
+        return {
+            "ok": True,
+            "kind": kind_norm,
+            "url": saved["url"],
+            "bytes": saved["bytes"],
+            "content_type": saved["content_type"],
+            "appearance": appearance,
+        }
+
     patch = {key: saved["url"]}
 
     async def _persist_url() -> dict:
@@ -416,7 +442,7 @@ async def clear_site_appearance_asset(
     _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
 ):
     kind_norm = str(kind or "").strip().lower()
-    if kind_norm not in _ASSET_KINDS:
+    if not _asset_kind_allowed(kind_norm):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid asset kind")
     try:
         clear_office_asset(tenant_id, kind_norm)
@@ -424,6 +450,8 @@ async def clear_site_appearance_asset(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     key = _appearance_key_for_kind(kind_norm)
+    if key is None:
+        return {"ok": True, "appearance": {}}
     value = (
         DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
         if kind_norm == "hero"

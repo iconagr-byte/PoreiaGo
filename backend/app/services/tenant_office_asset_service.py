@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from uuid import UUID
 
 from app.core.data_paths import poreiago_data_dir
 from travel_platform.media.image_optimize import optimize_driver_photo
 
-_ALLOWED_KINDS = frozenset({"logo", "hero", "rent_logo"})
+_BASE_KINDS = frozenset({"logo", "hero", "rent_logo"})
 _MAX_BYTES = 4 * 1024 * 1024
+# rent_svc_0 … rent_svc_5 — mosaic card photos under /rent fleet
+_RENT_SVC_KIND_RE = re.compile(r"^rent_svc_[0-5]$")
+
+
+def _kind_allowed(kind: str) -> bool:
+    k = str(kind or "").strip().lower()
+    return k in _BASE_KINDS or bool(_RENT_SVC_KIND_RE.match(k))
 
 
 def office_asset_root() -> Path:
@@ -36,7 +44,7 @@ def save_office_asset(
     filename: str | None = None,
 ) -> dict:
     kind = str(kind or "").strip().lower()
-    if kind not in _ALLOWED_KINDS:
+    if not _kind_allowed(kind):
         raise ValueError("Invalid asset kind")
     if not content:
         raise ValueError("Άδειο αρχείο")
@@ -68,7 +76,7 @@ def save_office_asset(
 
 def clear_office_asset(tenant_id: UUID, kind: str) -> None:
     kind = str(kind or "").strip().lower()
-    if kind not in _ALLOWED_KINDS:
+    if not _kind_allowed(kind):
         raise ValueError("Invalid asset kind")
     folder = tenant_asset_dir(tenant_id)
     for old in folder.glob(f"{kind}.*"):
@@ -77,7 +85,7 @@ def clear_office_asset(tenant_id: UUID, kind: str) -> None:
 
 def resolve_office_asset_path(tenant_id: UUID, kind: str, filename: str) -> Path | None:
     kind = str(kind or "").strip().lower()
-    if kind not in _ALLOWED_KINDS:
+    if not _kind_allowed(kind):
         return None
     name = Path(str(filename or "")).name
     if not name or ".." in name:
