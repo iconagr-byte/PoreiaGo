@@ -88,9 +88,9 @@ export const DEFAULT_SITE_APPEARANCE = {
   /** Story panes under /rent fleet — office-editable mosaic. */
   rent_services_mosaic_enabled: true,
   rent_services_mosaic_kicker: 'Γραφείο',
-  rent_services_mosaic_title: 'Ό,τι χρειάζεστε στο ταξίδι',
+  rent_services_mosaic_title: 'Υπηρεσίες του γραφείου μας',
   rent_services_mosaic_lead:
-    'Υπηρεσίες του γραφείου — δίπλα στον στόλο, πριν την κράτηση.',
+    'Ό,τι προσφέρει το γραφείο δίπλα στον στόλο — πριν την κράτηση.',
   rent_services_mosaic_cards: [],
   /** Bus trip extras catalog (after seat selection). */
   trip_extra_options: [],

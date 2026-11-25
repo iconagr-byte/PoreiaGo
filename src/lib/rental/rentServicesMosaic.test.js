@@ -11,9 +11,13 @@ describe('resolveRentServicesMosaic', () => {
   it('falls back to default story panes when cards are empty', () => {
     const mosaic = resolveRentServicesMosaic({});
     expect(mosaic.enabled).toBe(true);
-    expect(mosaic.title).toContain('ταξίδι');
+    expect(mosaic.title).toContain('γραφείου');
+    expect(mosaic.lead).toContain('γραφείο');
     expect(mosaic.cards).toHaveLength(DEFAULT_RENT_SERVICES_MOSAIC_CARDS.length);
     expect(mosaic.cards[0].title).toBe(DEFAULT_RENT_SERVICES_MOSAIC_CARDS[0].title);
+    expect(mosaic.cards.every((c) => c.image_url.startsWith('/images/rent-svc-'))).toBe(
+      true,
+    );
   });
 
   it('uses office copy and cards when set', () => {

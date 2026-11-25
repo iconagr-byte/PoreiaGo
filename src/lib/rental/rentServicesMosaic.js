@@ -9,33 +9,37 @@ export const DEFAULT_RENT_SERVICES_MOSAIC_CARDS = [
   {
     id: 'svc-cover',
     title: 'Καλύψεις & εξοπλισμός',
-    subtitle: 'Επιπλέον ασφάλεια, παιδικά καθίσματα και αξεσουάρ για το ταξίδι.',
+    subtitle:
+      'Το γραφείο σας προσφέρει επιπλέον ασφάλεια, παιδικά καθίσματα και αξεσουάρ για το ταξίδι.',
     href: '#rent-guest-search',
-    image_url: '',
+    image_url: '/images/rent-svc-cover.jpg',
     icon: 'verified_user',
   },
   {
     id: 'svc-pickup',
     title: 'Παραλαβή όπου σας βολεύει',
-    subtitle: 'Αεροδρόμιο, λιμάνι ή γραφείο — επιλέξτε σημείο στην κράτηση.',
+    subtitle:
+      'Αεροδρόμιο, λιμάνι ή κατάστημα του γραφείου — επιλέξτε σημείο στην κράτηση.',
     href: '#rent-guest-search',
-    image_url: '',
+    image_url: '/images/rent-svc-pickup.jpg',
     icon: 'location_on',
   },
   {
     id: 'svc-support',
     title: 'Υποστήριξη γραφείου',
-    subtitle: 'Είμαστε δίπλα σας πριν και κατά τη διάρκεια της ενοικίασης.',
+    subtitle:
+      'Η ομάδα του γραφείου είναι δίπλα σας πριν και κατά τη διάρκεια της ενοικίασης.',
     href: '#rent-guest-search',
-    image_url: '',
+    image_url: '/images/rent-svc-support.jpg',
     icon: 'support_agent',
   },
   {
     id: 'svc-checkin',
-    title: 'Ψηφιακό check-in',
-    subtitle: 'Έγγραφα και QR στο Wallet — λιγότερη αναμονή στο γκισέ.',
+    title: 'Γρήγορο check-in στο γραφείο',
+    subtitle:
+      'Ολοκληρώστε τα έγγραφα online και παραλάβετε χωρίς αναμονή στο γκισέ.',
     href: '/rent/wallet',
-    image_url: '',
+    image_url: '/images/rent-svc-checkin.jpg',
     icon: 'qr_code_2',
   },
 ];
@@ -61,7 +65,7 @@ export function normalizeRentServicesMosaicCard(row, index = 0) {
   if (!title && !subtitle && !cleanText(row.image_url)) return null;
   return {
     id: cleanText(row.id) || `svc-${index + 1}`,
-    title: title || 'Υπηρεσία',
+    title: title || 'Υπηρεσία γραφείου',
     subtitle,
     href: normalizeHref(row.href || row.url || row.link),
     image_url: cleanText(row.image_url || row.image || row.photo_url),
@@ -84,10 +88,10 @@ export function resolveRentServicesMosaic(appearance = {}) {
   const enabled = a.rent_services_mosaic_enabled !== false;
   const kicker = cleanText(a.rent_services_mosaic_kicker) || 'Γραφείο';
   const title =
-    cleanText(a.rent_services_mosaic_title) || 'Ό,τι χρειάζεστε στο ταξίδι';
+    cleanText(a.rent_services_mosaic_title) || 'Υπηρεσίες του γραφείου μας';
   const lead =
     cleanText(a.rent_services_mosaic_lead) ||
-    'Υπηρεσίες του γραφείου — δίπλα στον στόλο, πριν την κράτηση.';
+    'Ό,τι προσφέρει το γραφείο δίπλα στον στόλο — πριν την κράτηση.';
 
   const raw = Array.isArray(a.rent_services_mosaic_cards)
     ? a.rent_services_mosaic_cards
