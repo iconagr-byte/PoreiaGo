@@ -35,6 +35,8 @@ export default function WalletStartFeed({
   appearance = {},
   officeName = '',
   tenantId = '',
+  /** Contract mode rent_only — never infer from wallet_home_show_trips. */
+  rentOnly = false,
   onOpenTicket,
   onBrowseAllTrips,
 }) {
@@ -42,8 +44,8 @@ export default function WalletStartFeed({
   const nativeWallet = isNativeApp();
   const tripsSectionRef = useRef(null);
   const feed = useMemo(
-    () => resolveWalletHomeFeed(appearance, { officeName }),
-    [appearance, officeName],
+    () => resolveWalletHomeFeed(appearance, { officeName, rentOnly: Boolean(rentOnly) }),
+    [appearance, officeName, rentOnly],
   );
   const [trips, setTrips] = useState([]);
   const [tripsLoading, setTripsLoading] = useState(Boolean(feed.showTrips));
