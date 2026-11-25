@@ -259,9 +259,9 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_upsell_coverage_id": "",
     "rent_services_mosaic_enabled": True,
     "rent_services_mosaic_kicker": "Γραφείο",
-    "rent_services_mosaic_title": "Ό,τι χρειάζεστε στο ταξίδι",
+    "rent_services_mosaic_title": "Υπηρεσίες του γραφείου μας",
     "rent_services_mosaic_lead": (
-        "Υπηρεσίες του γραφείου — δίπλα στον στόλο, πριν την κράτηση."
+        "Ό,τι προσφέρει το γραφείο δίπλα στον στόλο — πριν την κράτηση."
     ),
     "rent_services_mosaic_cards": [],
     "trip_extra_options": [],

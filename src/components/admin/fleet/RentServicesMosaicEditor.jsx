@@ -169,7 +169,7 @@ export default function RentServicesMosaicEditor({ embedded = false, onSaved } =
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
             value={form.rent_services_mosaic_title}
             onChange={(e) => setField('rent_services_mosaic_title', e.target.value)}
-            placeholder="Ό,τι χρειάζεστε στο ταξίδι"
+            placeholder="Υπηρεσίες του γραφείου μας"
           />
         </label>
         <label className="block text-sm sm:col-span-2">
