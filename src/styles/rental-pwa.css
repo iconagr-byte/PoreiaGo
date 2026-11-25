@@ -11577,3 +11577,308 @@ button.rent-offer {
     transition: none !important;
   }
 }
+
+/* ── Rent newsletter strip (under services mosaic) ── */
+.rent-nl {
+  --rent-nl-ink: #0b3d4a;
+  --rent-nl-muted: rgba(11, 61, 74, 0.72);
+  --rent-nl-panel: #dff3ee;
+  --rent-nl-line: rgba(11, 61, 74, 0.22);
+  --rent-nl-field: #ffffff;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 1.25rem 2.75rem;
+  background: transparent;
+  color: var(--rent-nl-ink);
+}
+
+.rent-nl-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+  max-width: 1120px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  background: var(--rent-nl-panel);
+  box-shadow: 0 18px 40px rgba(11, 61, 74, 0.08);
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-nl--in .rent-nl-shell {
+  opacity: 1;
+  transform: none;
+}
+
+.rent-nl-media {
+  position: relative;
+  min-height: 240px;
+  background: #c5ddd7;
+  overflow: hidden;
+}
+
+.rent-nl-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 45%;
+  display: block;
+  transform: scale(1.04);
+  transition: transform 1.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-nl--in .rent-nl-media img {
+  transform: scale(1);
+}
+
+.rent-nl-media-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  background:
+    linear-gradient(145deg, rgba(10, 122, 108, 0.35), transparent 55%),
+    linear-gradient(180deg, #9ec9c0, #dff3ee);
+}
+
+.rent-nl-panel {
+  background: var(--rent-nl-panel);
+  padding: clamp(1.35rem, 3.2vw, 2.35rem) clamp(1.2rem, 3vw, 2.4rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.rent-nl-title {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 1.28;
+  color: var(--rent-nl-ink);
+  max-width: 36rem;
+}
+
+.rent-nl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+}
+
+.rent-nl-interests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.35rem;
+}
+
+.rent-nl-interest {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--rent-nl-ink);
+  cursor: pointer;
+}
+
+.rent-nl-interest input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #0a7a6c;
+  cursor: pointer;
+}
+
+.rent-nl-email-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.rent-nl-email-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.rent-nl-email-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--rent-nl-muted);
+}
+
+.rent-nl-email-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--rent-nl-line);
+  border-radius: 0.55rem;
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--rent-nl-ink);
+  background: var(--rent-nl-field);
+  outline: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.rent-nl-email-field input::placeholder {
+  color: rgba(11, 61, 74, 0.42);
+}
+
+.rent-nl-email-field input:focus {
+  border-color: #0a7a6c;
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.18);
+}
+
+.rent-nl-submit {
+  white-space: nowrap;
+  min-height: 2.85rem;
+  padding: 0.7rem 1.15rem;
+  border-radius: 0.55rem;
+  border: 1.5px solid var(--rent-nl-ink);
+  background: transparent;
+  color: var(--rent-nl-ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition:
+    background 0.22s ease,
+    color 0.22s ease,
+    transform 0.18s ease;
+}
+
+.rent-nl-submit:hover:not(:disabled) {
+  background: var(--rent-nl-ink);
+  color: #f4fffb;
+  transform: translateY(-1px);
+}
+
+.rent-nl-submit:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.rent-nl-consent {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--rent-nl-muted);
+  cursor: pointer;
+}
+
+.rent-nl-consent input {
+  margin-top: 0.12rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  accent-color: #0a7a6c;
+  cursor: pointer;
+}
+
+.rent-nl-consent a {
+  color: var(--rent-nl-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rent-nl-consent a:hover {
+  color: #0a7a6c;
+}
+
+.rent-nl-error {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b42318;
+}
+
+.rent-nl-success {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+  line-height: 1.45;
+  font-weight: 650;
+  color: #0a7a6c;
+  animation: rent-nl-fade 0.4s ease both;
+}
+
+@keyframes rent-nl-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rent-phone-stage--desktop .rent-nl {
+  padding-inline: 1.75rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-nl {
+  padding: 0.15rem 1rem 2.15rem;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-nl-shell {
+  grid-template-columns: 1fr;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-nl-media {
+  min-height: 180px;
+  max-height: 210px;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-nl-email-row {
+  grid-template-columns: 1fr;
+}
+
+.rent-phone-stage:not(.rent-phone-stage--desktop) .rent-nl-submit {
+  width: 100%;
+}
+
+@media (max-width: 860px) {
+  .rent-nl-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .rent-nl-media {
+    min-height: 190px;
+    max-height: 220px;
+  }
+
+  .rent-nl-email-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rent-nl-submit {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rent-nl-shell,
+  .rent-nl-media img,
+  .rent-nl-submit,
+  .rent-nl-success {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .rent-nl-shell {
+    opacity: 1;
+    transform: none;
+  }
+
+  .rent-nl-media img {
+    transform: none;
+  }
+}

@@ -12,6 +12,7 @@ import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
 import RentServicesMosaicEditor from './fleet/RentServicesMosaicEditor.jsx';
+import RentNewsletterStripEditor from './fleet/RentNewsletterStripEditor.jsx';
 import RentBrandDesigner from './RentBrandDesigner.jsx';
 import WalletHomeCopyEditor from './WalletHomeCopyEditor.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
@@ -1170,6 +1171,19 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     description="Coastal story panes στο /rent — τίτλοι, κείμενα, links και φωτό από το γραφείο."
                   >
                     <RentServicesMosaicEditor
+                      embedded
+                      onSaved={(appearance) => {
+                        if (appearance) setForm((p) => ({ ...p, ...appearance }));
+                      }}
+                    />
+                  </PanelCard>
+                </div>
+                <div className="mt-6">
+                  <PanelCard
+                    title="Newsletter κάτω από τις υπηρεσίες"
+                    description="Φωτό + φόρμα εγγραφής στο /rent — κείμενα, χρώμα panel και ενδιαφέροντα από το γραφείο."
+                  >
+                    <RentNewsletterStripEditor
                       embedded
                       onSaved={(appearance) => {
                         if (appearance) setForm((p) => ({ ...p, ...appearance }));
