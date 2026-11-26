@@ -48,7 +48,7 @@ class NewsletterPublicTests(unittest.TestCase):
             "api.newsletter_public_router.email_store.ensure_subscriber",
             new_callable=AsyncMock,
             return_value=fake,
-        ):
+        ) as ensure:
             res = self.client.post(
                 "/api/newsletter/subscribe",
                 json={
@@ -62,6 +62,9 @@ class NewsletterPublicTests(unittest.TestCase):
         body = res.json()
         self.assertTrue(body.get("ok"))
         self.assertEqual(body.get("email"), "guest@example.com")
+        ensure.assert_awaited()
+        kwargs = ensure.await_args.kwargs
+        self.assertTrue(str(kwargs.get("customer_id") or "").startswith("nl-trips"))
 
 
 if __name__ == "__main__":

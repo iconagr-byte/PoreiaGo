@@ -110,7 +110,8 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
         <div>
           <h3 className="text-base font-bold text-slate-900">Newsletter κάτω από τις υπηρεσίες</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Φωτό + φόρμα εγγραφής στο /rent. Δικά σας κείμενα και χρώμα panel — χωρίς επιλογές ενδιαφερόντων.
+            Φωτό + φόρμα εγγραφής στο /rent. Δικά σας κείμενα και χρώμα panel. Οι εγγραφές
+            δένονται στο γραφείο (Host) και εμφανίζονται στους συνδρομητές email.
           </p>
         </div>
       ) : null}

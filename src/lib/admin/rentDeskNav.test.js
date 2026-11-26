@@ -53,4 +53,13 @@ describe('rent desk nav vs bus fleet', () => {
     expect(String(clients.description || '').trim()).toBe('');
     expect(String(clients.description || '')).not.toMatch(/CRM/i);
   });
+
+  it('exposes Αρχική /rent for services mosaic + newsletter editors', () => {
+    const home = RENT_DESK_TABS.find((t) => t.id === 'home_blocks');
+    expect(home).toBeTruthy();
+    expect(home.label).toBe('Αρχική /rent');
+    expect(home.group).toBe('setup');
+    const nav = buildRentDeskNavItems().fleet_rental_home_blocks;
+    expect(nav.fleetRentalTab).toBe('home_blocks');
+  });
 });

@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import ImageDropField from '../ImageDropField.jsx';
 import {
   DEFAULT_RENT_SERVICES_MOSAIC_CARDS,
+  DEFAULT_RENT_SERVICES_MOSAIC_CTA,
+  RENT_SERVICES_MOSAIC_LINK_PRESETS,
   RENT_SERVICES_MOSAIC_MAX,
   normalizeRentServicesMosaicCard,
   resolveRentServicesMosaic,
@@ -21,7 +23,9 @@ function blankCard() {
     id: `svc-${Date.now()}`,
     title: '',
     subtitle: '',
+    body: '',
     href: '#rent-guest-search',
+    cta_label: DEFAULT_RENT_SERVICES_MOSAIC_CTA,
     image_url: '',
     icon: 'spa',
   };
@@ -139,7 +143,8 @@ export default function RentServicesMosaicEditor({ embedded = false, onSaved } =
         <div>
           <h3 className="text-base font-bold text-slate-900">Υπηρεσίες κάτω από τον στόλο</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Εμφανίζονται στο /rent κάτω από τα αυτοκίνητα. Δικό σας coastal layout — όχι clone.
+            Εμφανίζονται στο /rent κάτω από τα αυτοκίνητα. Αλλάξτε τίτλους, κείμενα, φωτό και πού
+            οδηγεί το «Μάθετε περισσότερα» — αποθηκεύστε και φαίνονται αμέσως.
           </p>
         </div>
       ) : null}
@@ -227,7 +232,7 @@ export default function RentServicesMosaicEditor({ embedded = false, onSaved } =
                 />
               </label>
               <label className="block text-sm sm:col-span-2">
-                <span className="font-semibold text-slate-700">Κείμενο</span>
+                <span className="font-semibold text-slate-700">Σύντομο κείμενο (κάρτα)</span>
                 <textarea
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
                   rows={2}
@@ -235,8 +240,49 @@ export default function RentServicesMosaicEditor({ embedded = false, onSaved } =
                   onChange={(e) => updateCard(index, { subtitle: e.target.value })}
                 />
               </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="font-semibold text-slate-700">Λεπτομέρειες (popup)</span>
+                <textarea
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  rows={3}
+                  value={card.body || ''}
+                  onChange={(e) => updateCard(index, { body: e.target.value })}
+                  placeholder="Αν συμπληρωθεί, το «Μάθετε περισσότερα» ανοίγει popup με αυτό το κείμενο."
+                />
+              </label>
               <label className="block text-sm">
-                <span className="font-semibold text-slate-700">Link (URL ή #άγκυρα)</span>
+                <span className="font-semibold text-slate-700">Κείμενο κουμπιού</span>
+                <input
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  value={card.cta_label || DEFAULT_RENT_SERVICES_MOSAIC_CTA}
+                  onChange={(e) => updateCard(index, { cta_label: e.target.value })}
+                  placeholder={DEFAULT_RENT_SERVICES_MOSAIC_CTA}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-semibold text-slate-700">Προεπιλογή link</span>
+                <select
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  value={
+                    RENT_SERVICES_MOSAIC_LINK_PRESETS.some((p) => p.value === card.href)
+                      ? card.href
+                      : '__custom__'
+                  }
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') return;
+                    updateCard(index, { href: e.target.value });
+                  }}
+                >
+                  {RENT_SERVICES_MOSAIC_LINK_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                  <option value="__custom__">Προσαρμοσμένο URL…</option>
+                </select>
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="font-semibold text-slate-700">Link (URL, /διαδρομή ή #άγκυρα)</span>
                 <input
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
                   value={card.href}
@@ -244,7 +290,7 @@ export default function RentServicesMosaicEditor({ embedded = false, onSaved } =
                   placeholder="#rent-guest-search"
                 />
               </label>
-              <label className="block text-sm">
+              <label className="block text-sm sm:col-span-2">
                 <span className="font-semibold text-slate-700">Icon (Material)</span>
                 <input
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
