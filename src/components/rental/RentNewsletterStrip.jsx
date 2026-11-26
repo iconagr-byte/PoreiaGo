@@ -1,6 +1,6 @@
 /**
  * Split photo + seafoam newsletter CTA under /rent services mosaic.
- * Office-configurable copy/colors — own look, not a Hertz yellow clone.
+ * Office-configurable copy/colors — email + consent only (no interest checkboxes).
  */
 import { useEffect, useRef, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
@@ -12,7 +12,6 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
   const rootRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const [email, setEmail] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -41,15 +40,6 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
 
   const imageSrc = cfg.image_url ? resolveSiteAssetUrl(cfg.image_url) : '';
 
-  const toggleInterest = (id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -57,20 +47,16 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
       setError('Χρειάζεται να συμφωνήσεις με την Πολιτική Απορρήτου.');
       return;
     }
-    const picks = cfg.interests
-      .filter((row) => selected.has(row.id))
-      .map((row) => row.label);
     setBusy(true);
     try {
       await subscribeNewsletter({
         email,
-        preferredCity: picks.join(', '),
+        preferredCity: '',
         consent,
         source: 'rent',
       });
       setDone(true);
       setEmail('');
-      setSelected(new Set());
       setConsent(false);
     } catch (err) {
       setError(err?.message || 'Αποτυχία εγγραφής');
@@ -107,22 +93,6 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
             </p>
           ) : (
             <form className="rent-nl-form" onSubmit={onSubmit} noValidate>
-              {cfg.interests.length ? (
-                <div className="rent-nl-interests" role="group" aria-label="Ενδιαφέροντα">
-                  {cfg.interests.map((row) => (
-                    <label key={row.id} className="rent-nl-interest">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={() => toggleInterest(row.id)}
-                        disabled={busy}
-                      />
-                      <span>{row.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-
               <div className="rent-nl-email-row">
                 <label className="rent-nl-email-field">
                   <span className="rent-nl-email-label">Email</span>

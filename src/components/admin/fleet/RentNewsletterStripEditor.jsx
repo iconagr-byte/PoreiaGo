@@ -1,14 +1,12 @@
 /**
  * Office admin — configure the /rent newsletter strip under the services mosaic.
+ * Email + consent CTA only (no interest checkboxes).
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import ImageDropField from '../ImageDropField.jsx';
 import {
   DEFAULT_RENT_NEWSLETTER,
-  DEFAULT_RENT_NEWSLETTER_INTERESTS,
-  RENT_NEWSLETTER_INTERESTS_MAX,
-  normalizeRentNewsletterInterest,
   resolveRentNewsletterStrip,
 } from '../../../lib/rental/rentNewsletterStrip.js';
 import {
@@ -16,13 +14,6 @@ import {
   updateSiteAppearance,
   uploadSiteAsset,
 } from '../../../services/siteAppearanceApi.js';
-
-function blankInterest() {
-  return {
-    id: `interest-${Date.now()}`,
-    label: '',
-  };
-}
 
 function formFromAppearance(data) {
   const strip = resolveRentNewsletterStrip(data || {});
@@ -33,7 +24,6 @@ function formFromAppearance(data) {
     rent_newsletter_panel_color: strip.panel_color,
     rent_newsletter_button_label: strip.button_label,
     rent_newsletter_email_placeholder: strip.email_placeholder,
-    rent_newsletter_interests: strip.interests.map((row) => ({ ...row })),
   };
 }
 
@@ -65,32 +55,6 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
 
   const setField = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
-  const updateInterest = (index, patch) => {
-    setForm((p) => ({
-      ...p,
-      rent_newsletter_interests: p.rent_newsletter_interests.map((row, i) =>
-        i === index ? { ...row, ...patch } : row,
-      ),
-    }));
-  };
-
-  const addInterest = () => {
-    setForm((p) => {
-      if (p.rent_newsletter_interests.length >= RENT_NEWSLETTER_INTERESTS_MAX) return p;
-      return {
-        ...p,
-        rent_newsletter_interests: [...p.rent_newsletter_interests, blankInterest()],
-      };
-    });
-  };
-
-  const removeInterest = (index) => {
-    setForm((p) => ({
-      ...p,
-      rent_newsletter_interests: p.rent_newsletter_interests.filter((_, i) => i !== index),
-    }));
-  };
-
   const resetDefaults = () => {
     setForm((p) => ({
       ...p,
@@ -99,7 +63,6 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
       rent_newsletter_panel_color: DEFAULT_RENT_NEWSLETTER.panel_color,
       rent_newsletter_button_label: DEFAULT_RENT_NEWSLETTER.button_label,
       rent_newsletter_email_placeholder: DEFAULT_RENT_NEWSLETTER.email_placeholder,
-      rent_newsletter_interests: DEFAULT_RENT_NEWSLETTER_INTERESTS.map((row) => ({ ...row })),
     }));
   };
 
@@ -107,9 +70,6 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
     e?.preventDefault?.();
     setSaving(true);
     try {
-      const interests = form.rent_newsletter_interests
-        .map((row, i) => normalizeRentNewsletterInterest(row, i))
-        .filter(Boolean);
       const patch = {
         rent_newsletter_enabled: Boolean(form.rent_newsletter_enabled),
         rent_newsletter_title: String(form.rent_newsletter_title || '').trim(),
@@ -119,7 +79,8 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
         rent_newsletter_email_placeholder: String(
           form.rent_newsletter_email_placeholder || '',
         ).trim(),
-        rent_newsletter_interests: interests,
+        // Clear any previously saved interest checkboxes.
+        rent_newsletter_interests: [],
       };
       const result = await updateSiteAppearance(patch);
       const next = formFromAppearance(result?.data || { ...form, ...patch });
@@ -149,7 +110,7 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
         <div>
           <h3 className="text-base font-bold text-slate-900">Newsletter κάτω από τις υπηρεσίες</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Φωτό + φόρμα εγγραφής στο /rent. Δικά σας κείμενα και χρώμα panel — όχι κίτρινο clone.
+            Φωτό + φόρμα εγγραφής στο /rent. Δικά σας κείμενα και χρώμα panel — χωρίς επιλογές ενδιαφερόντων.
           </p>
         </div>
       ) : null}
@@ -226,45 +187,11 @@ export default function RentNewsletterStripEditor({ embedded = false, onSaved } 
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-900 hover:bg-teal-100 disabled:opacity-50"
-          onClick={addInterest}
-          disabled={form.rent_newsletter_interests.length >= RENT_NEWSLETTER_INTERESTS_MAX}
-        >
-          + Ενδιαφέρον
-        </button>
-        <button
-          type="button"
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           onClick={resetDefaults}
         >
           Επαναφορά προεπιλογών
         </button>
-      </div>
-
-      <div className="space-y-3">
-        {form.rent_newsletter_interests.map((row, index) => (
-          <div
-            key={row.id || index}
-            className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
-          >
-            <label className="min-w-[12rem] flex-1 text-sm">
-              <span className="font-semibold text-slate-700">Επιλογή {index + 1}</span>
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
-                value={row.label}
-                onChange={(e) => updateInterest(index, { label: e.target.value })}
-                placeholder="π.χ. Ενοικίαση αυτοκινήτου"
-              />
-            </label>
-            <button
-              type="button"
-              className="text-sm font-semibold text-rose-600 hover:underline"
-              onClick={() => removeInterest(index)}
-            >
-              Διαγραφή
-            </button>
-          </div>
-        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-1">

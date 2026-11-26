@@ -95,7 +95,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   /** Newsletter CTA under /rent services mosaic. */
   rent_newsletter_enabled: true,
   rent_newsletter_title:
-    'Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; Διάλεξε τι σε ενδιαφέρει:',
+    'Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου;',
   rent_newsletter_image_url: '/images/rent-nl-coast.jpg',
   rent_newsletter_panel_color: '#dff3ee',
   rent_newsletter_button_label: 'Γράφομαι στο newsletter',
