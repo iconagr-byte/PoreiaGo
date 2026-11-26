@@ -569,6 +569,26 @@ export default function PageDesignBuilderPanel({
                     />
                   </label>
                   <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Cookies</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_cookies_label || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_cookies_label: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="pdw-builder__field">
+                    <span className="pdw-builder__field-label">Cookies URL</span>
+                    <input
+                      className="pdw-builder__input"
+                      value={form.footer_cookies_url || ''}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, footer_cookies_url: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="pdw-builder__field">
                     <span className="pdw-builder__field-label">Email</span>
                     <input
                       type="email"
