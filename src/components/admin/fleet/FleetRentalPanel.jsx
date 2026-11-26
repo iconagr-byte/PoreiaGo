@@ -33,6 +33,7 @@ import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
 import RentalDeskBookingWizard from './RentalDeskBookingWizard.jsx';
 import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentServicesMosaicEditor from './RentServicesMosaicEditor.jsx';
+import RentNewsletterStripEditor from './RentNewsletterStripEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
 import RentNotificationsEditor from './RentNotificationsEditor.jsx';
@@ -1509,6 +1510,7 @@ export default function FleetRentalPanel({
           </button>
           <RentAppBrandingEditor />
           <RentServicesMosaicEditor />
+          <RentNewsletterStripEditor />
         </div>
       )}
 

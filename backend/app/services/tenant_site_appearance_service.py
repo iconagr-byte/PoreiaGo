@@ -264,6 +264,16 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
         "Ό,τι προσφέρει το γραφείο δίπλα στον στόλο — πριν την κράτηση."
     ),
     "rent_services_mosaic_cards": [],
+    "rent_newsletter_enabled": True,
+    "rent_newsletter_title": (
+        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; "
+        "Διάλεξε τι σε ενδιαφέρει:"
+    ),
+    "rent_newsletter_image_url": "/images/rent-nl-coast.jpg",
+    "rent_newsletter_panel_color": "#dff3ee",
+    "rent_newsletter_button_label": "Γράφομαι στο newsletter",
+    "rent_newsletter_email_placeholder": "Συμπλήρωσε το email σου",
+    "rent_newsletter_interests": [],
     "trip_extra_options": [],
     "rent_notify_email_enabled": True,
     "rent_notify_sms_enabled": True,

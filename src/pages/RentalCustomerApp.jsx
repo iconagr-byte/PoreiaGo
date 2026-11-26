@@ -60,6 +60,7 @@ import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestDock from '../components/rental/RentGuestDock.jsx';
 import RentServicesMosaic from '../components/rental/RentServicesMosaic.jsx';
+import RentNewsletterStrip from '../components/rental/RentNewsletterStrip.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentOfferCard from '../components/rental/RentOfferCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
@@ -581,6 +582,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 
               {/* Office-configurable story panes — below fleet, coastal (not Hertz). */}
               <RentServicesMosaic appearance={siteAppearance} />
+              {/* Newsletter CTA — photo + seafoam form under mosaic. */}
+              <RentNewsletterStrip appearance={siteAppearance || {}} />
             </div>
           </div>
 

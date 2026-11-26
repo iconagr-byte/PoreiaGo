@@ -510,6 +510,16 @@ class TenantSiteAppearanceResponse(BaseModel):
         "Ό,τι προσφέρει το γραφείο δίπλα στον στόλο — πριν την κράτηση."
     )
     rent_services_mosaic_cards: list[dict] = []
+    rent_newsletter_enabled: bool = True
+    rent_newsletter_title: str = (
+        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; "
+        "Διάλεξε τι σε ενδιαφέρει:"
+    )
+    rent_newsletter_image_url: str = "/images/rent-nl-coast.jpg"
+    rent_newsletter_panel_color: str = "#dff3ee"
+    rent_newsletter_button_label: str = "Γράφομαι στο newsletter"
+    rent_newsletter_email_placeholder: str = "Συμπλήρωσε το email σου"
+    rent_newsletter_interests: list[dict] = []
     rent_notify_email_enabled: bool = True
     rent_notify_sms_enabled: bool = True
     rent_notify_email_label: str = ""
@@ -618,6 +628,13 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_services_mosaic_title: str | None = None
     rent_services_mosaic_lead: str | None = None
     rent_services_mosaic_cards: list[dict] | None = None
+    rent_newsletter_enabled: bool | None = None
+    rent_newsletter_title: str | None = None
+    rent_newsletter_image_url: str | None = None
+    rent_newsletter_panel_color: str | None = None
+    rent_newsletter_button_label: str | None = None
+    rent_newsletter_email_placeholder: str | None = None
+    rent_newsletter_interests: list[dict] | None = None
     rent_notify_email_enabled: bool | None = None
     rent_notify_sms_enabled: bool | None = None
     rent_notify_email_label: str | None = None
