@@ -1,25 +1,21 @@
 /**
  * Rent home newsletter strip — office-configurable CTA under the services mosaic.
  * Split photo + seafoam panel (own look, not a Hertz yellow clone).
+ * Email + consent only — no interest checkboxes.
  */
-
-export const RENT_NEWSLETTER_INTERESTS_MAX = 6;
-
-export const DEFAULT_RENT_NEWSLETTER_INTERESTS = [
-  { id: 'rent-cars', label: 'Ενοικίαση αυτοκινήτου' },
-  { id: 'rent-offers', label: 'Προσφορές γραφείου' },
-];
 
 export const DEFAULT_RENT_NEWSLETTER = {
   enabled: true,
-  title:
-    'Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; Διάλεξε τι σε ενδιαφέρει:',
+  title: 'Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου;',
   image_url: '/images/rent-nl-coast.jpg',
   panel_color: '#dff3ee',
   button_label: 'Γράφομαι στο newsletter',
   email_placeholder: 'Συμπλήρωσε το email σου',
-  interests: DEFAULT_RENT_NEWSLETTER_INTERESTS,
 };
+
+/** @deprecated Old default that asked visitors to pick interests. */
+const LEGACY_RENT_NEWSLETTER_TITLE =
+  'Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; Διάλεξε τι σε ενδιαφέρει:';
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -37,23 +33,17 @@ function normalizeHexColor(value, fallback) {
   return fallback;
 }
 
-export function normalizeRentNewsletterInterest(row, index = 0) {
-  if (!row || typeof row !== 'object') return null;
-  const label = cleanText(row.label || row.title || row.name);
-  if (!label) return null;
-  return {
-    id: cleanText(row.id) || `interest-${index + 1}`,
-    label,
-  };
-}
-
 /**
  * @param {object} appearance
  */
 export function resolveRentNewsletterStrip(appearance = {}) {
   const a = appearance && typeof appearance === 'object' ? appearance : {};
   const enabled = a.rent_newsletter_enabled !== false;
-  const title = cleanText(a.rent_newsletter_title) || DEFAULT_RENT_NEWSLETTER.title;
+  const rawTitle = cleanText(a.rent_newsletter_title);
+  const title =
+    !rawTitle || rawTitle === LEGACY_RENT_NEWSLETTER_TITLE
+      ? DEFAULT_RENT_NEWSLETTER.title
+      : rawTitle;
   const image_url =
     cleanText(a.rent_newsletter_image_url) || DEFAULT_RENT_NEWSLETTER.image_url;
   const panel_color = normalizeHexColor(
@@ -66,20 +56,6 @@ export function resolveRentNewsletterStrip(appearance = {}) {
     cleanText(a.rent_newsletter_email_placeholder) ||
     DEFAULT_RENT_NEWSLETTER.email_placeholder;
 
-  const raw = Array.isArray(a.rent_newsletter_interests)
-    ? a.rent_newsletter_interests
-    : [];
-  let interests = raw
-    .map((row, i) => normalizeRentNewsletterInterest(row, i))
-    .filter(Boolean)
-    .slice(0, RENT_NEWSLETTER_INTERESTS_MAX);
-
-  if (!interests.length) {
-    interests = DEFAULT_RENT_NEWSLETTER_INTERESTS.map((row, i) =>
-      normalizeRentNewsletterInterest(row, i),
-    );
-  }
-
   const privacy_url = cleanText(a.footer_privacy_url) || '#';
   const privacy_label =
     cleanText(a.footer_privacy_label) || 'Πολιτική Απορρήτου';
@@ -91,7 +67,6 @@ export function resolveRentNewsletterStrip(appearance = {}) {
     panel_color,
     button_label,
     email_placeholder,
-    interests,
     privacy_url,
     privacy_label,
   };

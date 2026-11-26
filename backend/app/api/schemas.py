@@ -512,8 +512,7 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_services_mosaic_cards: list[dict] = []
     rent_newsletter_enabled: bool = True
     rent_newsletter_title: str = (
-        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; "
-        "Διάλεξε τι σε ενδιαφέρει:"
+        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου;"
     )
     rent_newsletter_image_url: str = "/images/rent-nl-coast.jpg"
     rent_newsletter_panel_color: str = "#dff3ee"

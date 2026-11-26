@@ -266,8 +266,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_services_mosaic_cards": [],
     "rent_newsletter_enabled": True,
     "rent_newsletter_title": (
-        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου; "
-        "Διάλεξε τι σε ενδιαφέρει:"
+        "Θέλεις τα νέα και τις προσφορές του γραφείου στο email σου;"
     ),
     "rent_newsletter_image_url": "/images/rent-nl-coast.jpg",
     "rent_newsletter_panel_color": "#dff3ee",
