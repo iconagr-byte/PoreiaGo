@@ -53,11 +53,58 @@ _ADMIN_ROLES = frozenset(
 )
 
 
+def roles_safe_for_office(roles: list[str] | None, *, allow_superadmin: bool) -> list[str]:
+    """
+    Keep office-desk roles. Superadmin is platform-only (www.poreiago.com).
+
+    Same email+password may exist on PoreiaGo platform and on IconaRent /
+    Achillio — mirroring must not promote a tenant office to platform operator.
+    """
+    cleaned: list[str] = []
+    for raw in roles or []:
+        role = str(raw or "").strip().lower()
+        if not role:
+            continue
+        if role == UserRole.SUPERADMIN.value and not allow_superadmin:
+            continue
+        if role not in cleaned:
+            cleaned.append(role)
+    if cleaned:
+        return cleaned
+    return [UserRole.TENANT_ADMIN.value]
+
+
 class AuthService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._mfa = MfaService()
         self._settings = get_settings()
+
+    def _tenant_allows_superadmin(self, tenant: Tenant | None) -> bool:
+        if tenant is None:
+            return False
+        try:
+            from app.services.tenant_modules import (
+                is_achillio_travel_office,
+                is_poreiago_platform_office,
+            )
+
+            # Achillio Travel custom domain is never the PoreiaGo platform desk.
+            if is_achillio_travel_office(tenant):
+                return False
+            return bool(is_poreiago_platform_office(tenant))
+        except Exception:
+            return False
+
+    async def _apply_office_safe_roles(self, user: User, tenant: Tenant | None) -> User:
+        """Strip / heal superadmin on non-platform offices (e.g. iconarent)."""
+        allow = self._tenant_allows_superadmin(tenant)
+        before = [str(r).lower() for r in (user.roles or [])]
+        after = roles_safe_for_office(before, allow_superadmin=allow)
+        if before != after:
+            user.roles = after
+            await self._session.flush()
+        return user
 
     async def authenticate(
         self,
@@ -96,6 +143,7 @@ class AuthService:
             raise ValueError("Λάθος email ή κωδικός")
 
         user = await self._ensure_dev_superadmin(user)
+        user = await self._apply_office_safe_roles(user, tenant)
 
         roles = [UserRole(r) for r in (user.roles or []) if r in {e.value for e in UserRole}]
         mfa_verified = True
@@ -238,6 +286,8 @@ class AuthService:
         if google_name and not str(user.full_name or "").strip():
             user.full_name = google_name.strip()
         user = await self._ensure_dev_superadmin(user)
+        user = await self._apply_office_safe_roles(user, tenant)
+        roles = [r for r in (user.roles or []) if r in _ADMIN_ROLES]
 
         role_enums = [UserRole(r) for r in roles if r in {e.value for e in UserRole}]
         token = create_access_token(
@@ -339,6 +389,18 @@ class AuthService:
         except Exception:
             pass
 
+        target = None
+        try:
+            t_result = await self._session.execute(
+                select(Tenant)
+                .options(*_TENANT_NO_HEAVY)
+                .where(Tenant.id == target_tenant_id)
+                .limit(1),
+            )
+            target = t_result.scalar_one_or_none()
+        except Exception:
+            target = None
+
         existing = await self._session.execute(
             select(User).where(
                 User.tenant_id == target_tenant_id,
@@ -352,7 +414,8 @@ class AuthService:
             # Same email already on PoreiaGo with a different password — do not overwrite.
             if not verify_password(password, user.password_hash):
                 return None
-            return user
+            # Heal leftover platform superadmin on office desks (same email).
+            return await self._apply_office_safe_roles(user, target)
 
         roles = list(source.roles or [])
         # Never copy bare customer-only onto platform admin desk.
@@ -364,25 +427,14 @@ class AuthService:
         }
         if not (set(roles) & admin_roles):
             roles = [UserRole.TENANT_ADMIN.value]
-        # Achillio Travel office must not inherit PoreiaGo platform superadmin.
-        try:
-            from app.services.tenant_modules import is_achillio_travel_office
 
-            t_result = await self._session.execute(
-                select(Tenant)
-                .options(*_TENANT_NO_HEAVY)
-                .where(Tenant.id == target_tenant_id)
-                .limit(1),
-            )
-            target = t_result.scalar_one_or_none()
-            if target and is_achillio_travel_office(target):
-                roles = [
-                    r
-                    for r in roles
-                    if str(r).lower() != UserRole.SUPERADMIN.value
-                ] or [UserRole.TENANT_ADMIN.value, UserRole.DISPATCHER.value]
-        except Exception:
-            pass
+        # Superadmin stays only on the PoreiaGo platform office. Tenant hosts
+        # (iconarent / Achillio / any {slug}.poreiago.com) get office admin only —
+        # same email must not open «όλα τα γραφεία» from an office subdomain.
+        roles = roles_safe_for_office(
+            roles,
+            allow_superadmin=self._tenant_allows_superadmin(target),
+        )
 
         user = User(
             tenant_id=target_tenant_id,

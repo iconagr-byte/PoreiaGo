@@ -2,6 +2,7 @@
  * Client-side JWT payload helpers (UI gating only — server enforces RBAC).
  */
 import { getSaasToken } from '../services/saasApi.js';
+import { isTenantStorefrontHost } from './platform/tenantHost.js';
 
 const ROLES_KEY = 'saas_roles';
 
@@ -64,9 +65,18 @@ export function isImpersonating(token = getSaasToken()) {
 /**
  * True platform operator UI (Tenants/MRR, SaaS Infra, Backup).
  * Hidden while impersonating a tenant office so the view matches that office.
+ * Also hidden on tenant storefront hosts (e.g. iconarent.poreiago.com) even if
+ * the same email holds a platform superadmin JWT from a prior www login —
+ * office desks must never show «όλα τα γραφεία».
  */
 export function canAccessPlatformOperatorUi(token = getSaasToken()) {
   if (isImpersonating(token)) return false;
+  // Office subdomain / custom domain (iconarent, Achillio, …) — never platform UI.
+  try {
+    if (isTenantStorefrontHost()) return false;
+  } catch {
+    /* ignore — SSR / unit without window */
+  }
   return hasSaasRole('superadmin');
 }
 
