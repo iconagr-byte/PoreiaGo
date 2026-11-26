@@ -40,8 +40,17 @@ class PlatformLoginMirrorTests(unittest.IsolatedAsyncioTestCase):
             custom_domain="achilliotravel.com",
             legal_name="Achillio Travel",
         )
-        tenant_result = MagicMock()
-        tenant_result.scalar_one_or_none.return_value = achillio_tenant
+        poreiago_tenant = SimpleNamespace(
+            id=poreiago_tid,
+            slug="achillio",
+            subdomain="achillio",
+            custom_domain=None,
+            legal_name="PoreiaGo",
+        )
+        source_tenant_result = MagicMock()
+        source_tenant_result.scalar_one_or_none.return_value = achillio_tenant
+        target_tenant_result = MagicMock()
+        target_tenant_result.scalar_one_or_none.return_value = poreiago_tenant
 
         existing_result = MagicMock()
         existing_result.scalar_one_or_none.return_value = None
@@ -50,17 +59,24 @@ class PlatformLoginMirrorTests(unittest.IsolatedAsyncioTestCase):
             side_effect=[
                 MagicMock(),  # SET LOCAL row_security
                 match_result,
-                tenant_result,
+                source_tenant_result,
                 MagicMock(),  # SET LOCAL again
+                target_tenant_result,
                 existing_result,
             ],
         )
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        with patch(
-            "app.services.tenant_modules.is_achillio_travel_office",
-            return_value=True,
+        with (
+            patch(
+                "app.services.tenant_modules.is_achillio_travel_office",
+                side_effect=lambda t: getattr(t, "slug", "") == "admin-achillio-gr",
+            ),
+            patch(
+                "app.services.tenant_modules.is_poreiago_platform_office",
+                side_effect=lambda t: getattr(t, "slug", "") == "achillio",
+            ),
         ):
             service = AuthService(session)
             user = await service._mirror_user_onto_tenant(
