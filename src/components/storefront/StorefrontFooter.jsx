@@ -114,6 +114,7 @@ function SocialRow({ contact }) {
 }
 
 function ExploreLinks({ tripsEnabled, rentEnabled, showFleet, className = '' }) {
+  const rentOnly = Boolean(rentEnabled && !tripsEnabled);
   return (
     <ul className={`sf-footer__list ${className}`.trim()}>
       {tripsEnabled ? (
@@ -121,19 +122,29 @@ function ExploreLinks({ tripsEnabled, rentEnabled, showFleet, className = '' }) 
           <a href="#search-results">Εκδρομές</a>
         </li>
       ) : null}
-      {rentEnabled ? (
+      {rentEnabled && !rentOnly ? (
         <li>
           <Link to="/rent">Ενοικίαση</Link>
         </li>
       ) : null}
+      {rentOnly ? (
+        <li>
+          <a href="#rent-guest-fleet">Στόλος</a>
+        </li>
+      ) : null}
       {showFleet ? (
         <li>
-          <a href="#our-fleet">Στόλος</a>
+          <a href="#our-fleet">Στόλος λεωφορείων</a>
         </li>
       ) : null}
       {tripsEnabled ? (
         <li>
           <Link to="/my-booking">Η κράτησή μου</Link>
+        </li>
+      ) : null}
+      {rentOnly ? (
+        <li>
+          <a href="#rent-guest-search">Κράτηση</a>
         </li>
       ) : null}
       <li>
@@ -147,18 +158,24 @@ function ExploreLinks({ tripsEnabled, rentEnabled, showFleet, className = '' }) 
 }
 
 function LegalLinks({ siteAppearance, className = '' }) {
+  const a = siteAppearance && typeof siteAppearance === 'object' ? siteAppearance : {};
+  const privacyLabel = String(a.footer_privacy_label || '').trim() || 'Πολιτική Απορρήτου';
+  const privacyUrl = String(a.footer_privacy_url || '').trim() || '#';
+  const termsLabel = String(a.footer_terms_label || '').trim() || 'Όροι Χρήσης';
+  const termsUrl = String(a.footer_terms_url || '').trim() || '#';
+  const cookiesLabel = String(a.footer_cookies_label || '').trim() || 'Πολιτική Cookies';
+  const cookiesUrl = String(a.footer_cookies_url || '').trim() || privacyUrl || '#';
   return (
     <ul className={`sf-footer__list ${className}`.trim()}>
-      {siteAppearance.footer_privacy_label ? (
-        <li>
-          <a href={siteAppearance.footer_privacy_url || '#'}>{siteAppearance.footer_privacy_label}</a>
-        </li>
-      ) : null}
-      {siteAppearance.footer_terms_label ? (
-        <li>
-          <a href={siteAppearance.footer_terms_url || '#'}>{siteAppearance.footer_terms_label}</a>
-        </li>
-      ) : null}
+      <li>
+        <a href={privacyUrl}>{privacyLabel}</a>
+      </li>
+      <li>
+        <a href={termsUrl}>{termsLabel}</a>
+      </li>
+      <li>
+        <a href={cookiesUrl}>{cookiesLabel}</a>
+      </li>
     </ul>
   );
 }
@@ -178,6 +195,7 @@ export default function StorefrontFooter({
 }) {
   const brand = resolveOfficeBrand(siteAppearance);
   const contact = resolveFooterContact(siteAppearance);
+  const rentOnly = Boolean(rentEnabled && !tripsEnabled);
   const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
   const tagline =
     String(siteAppearance.footer_tagline || '').trim() ||
@@ -186,8 +204,8 @@ export default function StorefrontFooter({
         ? `${brand.displayName} — οργανωμένες εκδρομές με λεωφορείο.`
         : 'Οργανωμένες εκδρομές με λεωφορείο — από το γραφείο σας, στον προορισμό.'
       : brand.displayName
-        ? `${brand.displayName} — το γραφείο σας, δίπλα σας σε κάθε διαδρομή.`
-        : 'Το γραφείο σας — δίπλα σας σε κάθε διαδρομή.');
+        ? `${brand.displayName} — καθαρά οχήματα και ξεκάθαροι όροι στην παραλαβή.`
+        : 'Το γραφείο σας — καθαρά οχήματα και ξεκάθαροι όροι στην παραλαβή.');
 
   // Prefer the modern multi-column layout for classic + contact-forward templates.
   if (
@@ -200,16 +218,25 @@ export default function StorefrontFooter({
         <div className="sf-footer__aurora" aria-hidden />
         <div className="sf-footer__inner">
           <div className="sf-footer__hook">
-            <p className="sf-footer__hook-kicker">Έτοιμοι για την επόμενη εκδρομή;</p>
+            <p className="sf-footer__hook-kicker">
+              {rentOnly ? 'Έτοιμοι για την επόμενη διαδρομή;' : 'Έτοιμοι για την επόμενη εκδρομή;'}
+            </p>
             <p className="sf-footer__hook-text">
               {tripsEnabled
                 ? 'Δείτε το πρόγραμμα του γραφείου, διαλέξτε ημερομηνία και ταξιδέψτε μαζί μας.'
-                : 'Μιλήστε μαζί μας για την εκδρομή σας — το γραφείο είναι δίπλα σας σε κάθε χιλιόμετρο.'}
+                : rentOnly
+                  ? 'Δείτε τον στόλο του γραφείου, διαλέξτε ημερομηνίες και κλείστε online.'
+                  : 'Μιλήστε μαζί μας για την εκδρομή σας — το γραφείο είναι δίπλα σας σε κάθε χιλιόμετρο.'}
             </p>
             <div className="sf-footer__hook-actions">
               {tripsEnabled ? (
                 <a href="#search-results" className="sf-footer__hook-cta">
                   Δείτε εκδρομές
+                </a>
+              ) : null}
+              {rentOnly ? (
+                <a href="#rent-guest-fleet" className="sf-footer__hook-cta">
+                  Δείτε οχήματα
                 </a>
               ) : null}
               <Link to="/contact" className="sf-footer__hook-link">

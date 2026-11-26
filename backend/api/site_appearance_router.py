@@ -109,6 +109,8 @@ DEFAULT_SITE_APPEARANCE = {
     "footer_brand_name": "",
     "footer_copyright": "",
     "footer_privacy_label": "Πολιτική Απορρήτου",
+    "footer_cookies_label": "Πολιτική Cookies",
+    "footer_cookies_url": "#",
     "footer_privacy_url": "#",
     "footer_terms_label": "Όροι Χρήσης",
     "footer_terms_url": "#",
@@ -279,6 +281,8 @@ class SiteAppearanceResponse(BaseModel):
     footer_privacy_url: str = "#"
     footer_terms_label: str = "Όροι Χρήσης"
     footer_terms_url: str = "#"
+    footer_cookies_label: str = "Πολιτική Cookies"
+    footer_cookies_url: str = "#"
     footer_contact_email: str = ""
     footer_contact_phone: str = ""
     footer_address: str = ""
@@ -436,6 +440,8 @@ class SiteAppearanceUpdate(BaseModel):
     footer_privacy_url: str | None = None
     footer_terms_label: str | None = None
     footer_terms_url: str | None = None
+    footer_cookies_label: str | None = None
+    footer_cookies_url: str | None = None
     footer_contact_email: str | None = None
     footer_contact_phone: str | None = None
     footer_address: str | None = None

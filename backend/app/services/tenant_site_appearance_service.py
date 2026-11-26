@@ -222,6 +222,8 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_privacy_url": "#",
     "footer_terms_label": "Όροι Χρήσης",
     "footer_terms_url": "#",
+    "footer_cookies_label": "Πολιτική Cookies",
+    "footer_cookies_url": "#",
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",

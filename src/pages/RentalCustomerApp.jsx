@@ -69,9 +69,9 @@ import RentBrandMark from '../components/rental/RentBrandMark.jsx';
 import PlatformRentContractsSession from '../components/marketing/PlatformRentContractsSession.jsx';
 import RentShowcaseHub from '../components/marketing/RentShowcaseHub.jsx';
 import RentCapabilitiesSession from '../components/marketing/RentCapabilitiesSession.jsx';
-import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
-import OfficeLoginLink from '../components/storefront/OfficeLoginLink.jsx';
+import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
@@ -606,12 +606,15 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             </>
           ) : null}
 
-          {/* Discreet staff entry — office subdomain only, never platform marketing. */}
-          {isTenantStorefrontHost() ? (
-            <footer className="rent-office-staff-foot" aria-label="Είσοδος γραφείου">
-              <OfficeLoginLink variant="light" density="footer" />
-            </footer>
-          ) : null}
+          {/* Full office footer — legal, contact, copyright + discreet staff login. */}
+          <StorefrontFooter
+            siteAppearance={siteAppearance || {}}
+            templateId={
+              String(siteAppearance?.footer_template || '').trim() || 'classic_columns'
+            }
+            tripsEnabled={false}
+            rentEnabled
+          />
         </main>
 
         {/* Phone-only bottom dock — desktop already has header Account / filters. */}
