@@ -2,6 +2,9 @@
  * Device detection for Rent customer app.
  * Phone → compact PWA chrome. Tablet/desktop → full-bleed layout.
  * `isRentMobileViewport` still groups phone+tablet for wallet-first product behavior.
+ *
+ * Page-design Split preview passes `?preview=1&vp=desktop|tablet|phone` so a narrow
+ * admin pane still shows the selected device layout (not always mobile).
  */
 import { useEffect, useState } from 'react';
 
@@ -10,8 +13,29 @@ const TOUCH_HANDHELD_MQ = '(hover: none) and (pointer: coarse) and (max-width: 1
 /** Narrow phones only — tablets must not get the phone bezel chrome. */
 const PHONE_MQ = '(max-width: 700px)';
 
+/** Read forced device from design-studio preview URL. Exported for tests. */
+export function readRentPreviewViewport(search = '') {
+  try {
+    const raw =
+      search ||
+      (typeof window !== 'undefined' ? window.location?.search || '' : '');
+    const params = new URLSearchParams(raw);
+    if (params.get('preview') !== '1') return null;
+    const vp = String(params.get('vp') || '')
+      .trim()
+      .toLowerCase();
+    if (vp === 'desktop' || vp === 'tablet' || vp === 'phone') return vp;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function isRentMobileViewport() {
   if (typeof window === 'undefined') return false;
+  const override = readRentPreviewViewport();
+  if (override === 'desktop') return false;
+  if (override === 'phone' || override === 'tablet') return true;
   try {
     if (window.matchMedia(MOBILE_MQ).matches) return true;
     if (window.matchMedia(TOUCH_HANDHELD_MQ).matches) return true;
@@ -24,6 +48,9 @@ export function isRentMobileViewport() {
 /** True only on narrow phone widths (not iPad / tablet). */
 export function isRentPhoneViewport() {
   if (typeof window === 'undefined') return false;
+  const override = readRentPreviewViewport();
+  if (override === 'desktop' || override === 'tablet') return false;
+  if (override === 'phone') return true;
   try {
     return window.matchMedia(PHONE_MQ).matches;
   } catch {

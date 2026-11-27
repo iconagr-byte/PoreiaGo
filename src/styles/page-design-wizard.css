@@ -807,30 +807,44 @@
   pointer-events: none;
 }
 
+/* Scaler wraps the virtual device canvas so Desk can be 1280px inside a narrow pane. */
+.page-design-wizard__preview-scaler {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  align-self: center;
+  transition: width 0.22s ease, height 0.22s ease;
+}
+
+.page-design-wizard__preview-scaler.is-desktop {
+  align-self: stretch;
+  height: 100%;
+}
+
+.page-design-wizard__preview-scaler.is-tablet,
+.page-design-wizard__preview-scaler.is-phone {
+  margin: 8px auto;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
 .page-design-wizard__preview-frame {
   position: relative;
   overflow: hidden;
   background: #fff;
-  transition: width 0.22s ease, height 0.22s ease, border-radius 0.22s ease, box-shadow 0.22s ease;
   height: 100%;
 }
 
 .page-design-wizard__preview-frame.is-tablet,
 .page-design-wizard__preview-frame.is-phone {
   border-radius: 14px;
-  height: calc(100% - 16px);
-  margin: 8px auto;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.08),
-    0 18px 48px rgba(15, 23, 42, 0.18);
 }
 
 .page-design-wizard__preview-frame.is-desktop {
   border-radius: 0;
-  margin: 0;
   box-shadow: none;
-  width: 100% !important;
-  max-width: 100%;
 }
 
 .page-design-wizard__preview-iframe {
