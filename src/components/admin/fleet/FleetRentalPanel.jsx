@@ -1508,7 +1508,30 @@ export default function FleetRentalPanel({
             <span className="material-symbols-outlined text-[18px]">web</span>
             Σχεδιασμός σελίδων → Ενοικιάσεις
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('home_blocks')}
+            className="w-full sm:w-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-950 text-sm font-bold hover:bg-cyan-100"
+          >
+            <span className="material-symbols-outlined text-[18px]">view_quilt</span>
+            Υπηρεσίες & newsletter αρχικής →
+          </button>
           <RentAppBrandingEditor />
+        </div>
+      )}
+
+      {tab === 'home_blocks' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 to-white p-4 sm:p-5">
+            <h2 className="text-lg font-bold text-slate-900">Αρχική /rent — κάτω από τον στόλο</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Εδώ ρυθμίζετε τις κάρτες υπηρεσιών και το newsletter που φαίνονται στο{' '}
+              <a href="/rent" className="font-semibold text-teal-800 underline" target="_blank" rel="noreferrer">
+                /rent
+              </a>
+              . Αποθήκευση → ανανέωση της σελίδας πελάτη.
+            </p>
+          </div>
           <RentServicesMosaicEditor />
           <RentNewsletterStripEditor />
         </div>

@@ -29,7 +29,9 @@ describe('resolveRentServicesMosaic', () => {
         {
           title: 'Chauffeur',
           subtitle: 'Οδηγός με ραντεβού',
+          body: 'Λεπτομέρειες υπηρεσίας.',
           href: '/rent/services',
+          cta_label: 'Κλείσε τώρα',
           icon: 'airline_seat_recline_extra',
         },
       ],
@@ -38,6 +40,8 @@ describe('resolveRentServicesMosaic', () => {
     expect(mosaic.title).toBe('Υπηρεσίες δίπλα σας');
     expect(mosaic.cards).toHaveLength(1);
     expect(mosaic.cards[0].href).toBe('/rent/services');
+    expect(mosaic.cards[0].body).toBe('Λεπτομέρειες υπηρεσίας.');
+    expect(mosaic.cards[0].cta_label).toBe('Κλείσε τώρα');
   });
 
   it('can be disabled from the office', () => {

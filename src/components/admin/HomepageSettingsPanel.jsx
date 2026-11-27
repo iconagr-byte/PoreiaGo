@@ -1181,7 +1181,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 <div className="mt-6">
                   <PanelCard
                     title="Newsletter κάτω από τις υπηρεσίες"
-                    description="Φωτό + φόρμα εγγραφής στο /rent — κείμενα, χρώμα panel και ενδιαφέροντα από το γραφείο."
+                    description="Φωτό + φόρμα εγγραφής στο /rent — κείμενα, χρώμα panel και κουμπί από το γραφείο."
                   >
                     <RentNewsletterStripEditor
                       embedded

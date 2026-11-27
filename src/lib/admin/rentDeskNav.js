@@ -133,6 +133,14 @@ export const RENT_DESK_TABS = [
     group: 'setup',
   },
   {
+    id: 'home_blocks',
+    label: 'Αρχική /rent',
+    icon: 'view_quilt',
+    description: 'Υπηρεσίες κάτω από στόλο & newsletter',
+    accent: 'cyan',
+    group: 'setup',
+  },
+  {
     id: 'plans',
     label: 'Κάρτες τιμών',
     icon: 'sell',

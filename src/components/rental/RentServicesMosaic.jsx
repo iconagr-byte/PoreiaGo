@@ -1,8 +1,14 @@
 /**
  * Coastal story panes under /rent fleet — office-configurable, not a Hertz clone.
+ * Cards open a detail sheet (when body is set) and follow the configured link.
  */
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
-import { resolveRentServicesMosaic } from '../../lib/rental/rentServicesMosaic.js';
+import {
+  followRentServicesMosaicHref,
+  resolveRentServicesMosaic,
+} from '../../lib/rental/rentServicesMosaic.js';
 
 function paneTone(index) {
   const tones = ['lagoon', 'foam', 'ink', 'sand'];
@@ -10,8 +16,23 @@ function paneTone(index) {
 }
 
 export default function RentServicesMosaic({ appearance = {} } = {}) {
+  const navigate = useNavigate();
   const mosaic = resolveRentServicesMosaic(appearance);
+  const [openCard, setOpenCard] = useState(null);
+
   if (!mosaic.enabled || !mosaic.cards.length) return null;
+
+  const goHref = (href) => {
+    followRentServicesMosaicHref(href, { navigate });
+  };
+
+  const onCardActivate = (card) => {
+    if (card.body) {
+      setOpenCard(card);
+      return;
+    }
+    goHref(card.href);
+  };
 
   return (
     <section
@@ -33,13 +54,12 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
             const src = card.image_url ? resolveSiteAssetUrl(card.image_url) : '';
             const tone = paneTone(index);
             const indexLabel = String(index + 1).padStart(2, '0');
-            const isExternal = /^https?:\/\//i.test(card.href);
             return (
               <li key={card.id} className={`rent-svc-pane rent-svc-pane--${tone}`}>
-                <a
+                <button
+                  type="button"
                   className="rent-svc-pane-link"
-                  href={card.href}
-                  {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  onClick={() => onCardActivate(card)}
                 >
                   <div className="rent-svc-pane-media" aria-hidden>
                     {src ? (
@@ -55,18 +75,77 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
                     <h3>{card.title}</h3>
                     {card.subtitle ? <p>{card.subtitle}</p> : null}
                     <span className="rent-svc-pane-cta">
-                      Μάθετε περισσότερα
+                      {card.cta_label}
                       <span className="material-symbols-outlined" aria-hidden>
                         arrow_forward
                       </span>
                     </span>
                   </div>
-                </a>
+                </button>
               </li>
             );
           })}
         </ul>
       </div>
+
+      {openCard ? (
+        <div
+          className="rent-svc-detail"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rent-svc-detail-title"
+          onClick={() => setOpenCard(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setOpenCard(null);
+          }}
+        >
+          <div
+            className="rent-svc-detail-card"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="rent-svc-detail-close"
+              aria-label="Κλείσιμο"
+              onClick={() => setOpenCard(null)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                close
+              </span>
+            </button>
+            {openCard.image_url ? (
+              <div className="rent-svc-detail-media" aria-hidden>
+                <img
+                  src={resolveSiteAssetUrl(openCard.image_url)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            ) : null}
+            <div className="rent-svc-detail-body">
+              <h3 id="rent-svc-detail-title">{openCard.title}</h3>
+              {openCard.subtitle ? <p className="rent-svc-detail-lead">{openCard.subtitle}</p> : null}
+              {openCard.body ? <p className="rent-svc-detail-text">{openCard.body}</p> : null}
+              <button
+                type="button"
+                className="rent-svc-detail-cta"
+                onClick={() => {
+                  const href = openCard.href;
+                  setOpenCard(null);
+                  goHref(href);
+                }}
+              >
+                {openCard.cta_label}
+                <span className="material-symbols-outlined" aria-hidden>
+                  arrow_forward
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
