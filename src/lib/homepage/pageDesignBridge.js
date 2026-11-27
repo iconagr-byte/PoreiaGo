@@ -63,6 +63,11 @@ export const PDW_SECTION_SCROLL_TARGETS = {
     '#pdw-footer',
     'footer',
   ],
+  copy: [
+    '[data-pdw-editable="copy"]',
+    '#rent-services-mosaic',
+    '#rent-newsletter-strip',
+  ],
 };
 
 let channel = null;

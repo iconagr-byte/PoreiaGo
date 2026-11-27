@@ -34,6 +34,7 @@ const SECTION_LABELS = {
   trips: 'Καρτέλες',
   branding: 'Μάρκα',
   footer: 'Footer',
+  copy: 'Υπηρεσίες /rent',
 };
 
 /** Nav sections that should outline the hero block when focused. */

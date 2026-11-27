@@ -1300,10 +1300,17 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           primary UI is Divi-like inline Builder on the storefront module in the preview iframe.
           Fallback below only shows when Split preview is hidden (editor-only / narrow).
         */}
-        {designPage === 'home' && isPageDesignBuilderSection(designPage, section) && (
+        {isPageDesignBuilderSection(designPage, section) && (
           <PanelCard
-            title={`Builder · ${HOME_SECTIONS.find((s) => s.id === section)?.label || section}`}
-            description="Στο Split / Προεπισκόπηση πάτα «Builder» δίπλα στον τίτλο ενότητας (εκδρομές, στόλος, rent — ένα πρότυπο για όλες τις κάρτες). Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
+            title={`Builder · ${
+              (designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS).find((s) => s.id === section)
+                ?.label || section
+            }`}
+            description={
+              designPage === 'rent'
+                ? 'Στο Split / Προεπισκόπηση πάτα «Builder» δίπλα στο «Υπηρεσίες του γραφείου μας» για φωτό και κείμενα. Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση.'
+                : 'Στο Split / Προεπισκόπηση πάτα «Builder» δίπλα στον τίτλο ενότητας (εκδρομές, στόλος, rent — ένα πρότυπο για όλες τις κάρτες). Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση.'
+            }
           >
             <PageDesignBuilderPanel
               section={section}

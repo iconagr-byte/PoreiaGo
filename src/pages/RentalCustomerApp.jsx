@@ -62,6 +62,7 @@ import RentGuestDock from '../components/rental/RentGuestDock.jsx';
 import RentServicesMosaic from '../components/rental/RentServicesMosaic.jsx';
 import RentNewsletterStrip from '../components/rental/RentNewsletterStrip.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
+import { PreviewDesignModeProvider } from '../components/storefront/preview/PreviewDesignMode.jsx';
 import RentOfferCard from '../components/rental/RentOfferCard.jsx';
 import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
@@ -314,6 +315,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   );
 
   return (
+    <PreviewDesignModeProvider appearance={siteAppearance || {}}>
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
       <div
         className="rent-app rent-app--guest"
@@ -652,6 +654,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         onSelect={(v) => goToServicesStep(v)}
       />
     </div>
+    </PreviewDesignModeProvider>
   );
 }
 

@@ -15,6 +15,7 @@ import { getHomepageThemeById } from '../../../lib/homepage/homepageThemes.js';
 import { pageSliderPatch } from '../../../lib/homepage/pageSlider.js';
 import { scrollPreviewToSection } from '../../../lib/homepage/pageDesignBridge.js';
 import { DEFAULT_SITE_APPEARANCE } from '../../../services/siteAppearanceApi.js';
+import RentServicesMosaicFields from '../fleet/RentServicesMosaicFields.jsx';
 
 /** Keep the trips strip in view when picking layout/card from Page Studio. */
 function revealTripsPreview() {
@@ -66,6 +67,11 @@ const SECTION_META = {
     blurb: 'Πρότυπο υποσέλιδου και στοιχεία επικοινωνίας.',
     icon: 'vertical_align_bottom',
   },
+  copy: {
+    title: 'Υπηρεσίες /rent',
+    blurb: 'Φωτογραφίες και κείμενα κάτω από τον στόλο.',
+    icon: 'view_quilt',
+  },
 };
 
 /** Sections that use Builder-on-preview (middle column collapses). */
@@ -78,8 +84,13 @@ export const PAGE_DESIGN_BUILDER_SECTIONS = new Set([
   'footer',
 ]);
 
+/** Rent page sections with inline Builder on the live preview. */
+export const RENT_PAGE_DESIGN_BUILDER_SECTIONS = new Set(['copy']);
+
 export function isPageDesignBuilderSection(designPage, section) {
-  return designPage === 'home' && PAGE_DESIGN_BUILDER_SECTIONS.has(section);
+  if (designPage === 'home') return PAGE_DESIGN_BUILDER_SECTIONS.has(section);
+  if (designPage === 'rent') return RENT_PAGE_DESIGN_BUILDER_SECTIONS.has(section);
+  return false;
 }
 
 function BuilderTabs({ tabs, value, onChange }) {
@@ -659,6 +670,13 @@ export default function PageDesignBuilderPanel({
                 </div>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {section === 'copy' ? (
+          <div className="pdw-builder__stack">
+            <p className="pdw-builder__subhead">Φωτογραφίες & κείμενα καρτών</p>
+            <RentServicesMosaicFields form={form} setForm={setForm} compact />
           </div>
         ) : null}
       </div>
