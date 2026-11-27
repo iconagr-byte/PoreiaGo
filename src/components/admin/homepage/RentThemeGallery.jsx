@@ -59,7 +59,7 @@ function RentThemeLivePreview({
     };
   }, [onClose, onSelectTheme, themes, idx, hasPrev, hasNext]);
 
-  const liveHref = `/rent?preview=1&theme=${encodeURIComponent(theme.id)}`;
+  const liveHref = `/rent?preview=1&vp=${encodeURIComponent(viewport)}&theme=${encodeURIComponent(theme.id)}`;
 
   const ui = (
     <div
@@ -193,9 +193,9 @@ function RentThemeLivePreview({
           }}
         >
           <iframe
-            key={`${theme.id}-${frameKey}`}
+            key={`${theme.id}-${frameKey}-${viewport}`}
             title={`Preview ${theme.nameEl}`}
-            src={`/rent?preview=1&theme=${encodeURIComponent(theme.id)}&t=${frameKey}`}
+            src={`/rent?preview=1&vp=${encodeURIComponent(viewport)}&theme=${encodeURIComponent(theme.id)}&t=${frameKey}`}
             className="h-full w-full border-0 bg-white"
             onLoad={() => setLoading(false)}
           />
