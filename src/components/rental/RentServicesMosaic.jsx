@@ -1,7 +1,7 @@
 /**
  * Coastal story panes under /rent fleet — office-configurable, not a Hertz clone.
  * Cards open a detail sheet (when body is set) and follow the configured link.
- * In ?preview=1, a Builder chip opens Page Studio for photos + copy.
+ * In ?preview=1, an Edit chip opens Page Studio for photos + copy.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -62,7 +62,7 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
             <PreviewBuilderControl
               sectionId="copy"
               label="Υπηρεσίες γραφείου"
-              buttonLabel="Builder"
+              buttonLabel="Edit"
               variant="inline"
               instanceId="rent-services-mosaic"
               className="rent-svc-mosaic-builder"
@@ -72,7 +72,7 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
 
         {!mosaic.enabled && previewMode ? (
           <p className="rent-svc-mosaic-preview-note">
-            Η ενότητα είναι κρυφή στο live /rent — άνοιξε Builder για να την ενεργοποιήσεις.
+            Η ενότητα είναι κρυφή στο live /rent — πάτα Edit για να την ενεργοποιήσεις.
           </p>
         ) : null}
 

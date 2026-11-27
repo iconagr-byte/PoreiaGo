@@ -11331,7 +11331,7 @@ button.rent-offer {
 }
 
 .rent-svc-mosaic-head {
-  max-width: 44rem;
+  max-width: none;
   margin-bottom: 1.5rem;
   animation: rent-svc-rise 520ms ease-out both;
 }
@@ -11350,6 +11350,20 @@ button.rent-offer {
 .rent-svc-mosaic-builder {
   flex-shrink: 0;
   margin-top: 0.15rem;
+}
+
+.rent-svc-mosaic-builder .sf-preview-builder__btn {
+  background: #0a7a6c;
+  border-color: #0a7a6c;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(10, 122, 108, 0.22);
+}
+
+.rent-svc-mosaic-builder .sf-preview-builder__btn:hover,
+.rent-svc-mosaic-builder .sf-preview-builder__btn.is-open {
+  background: #08665b;
+  border-color: #08665b;
+  color: #fff;
 }
 
 .rent-svc-mosaic.is-preview-hidden {
