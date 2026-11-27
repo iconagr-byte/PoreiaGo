@@ -1,12 +1,14 @@
-# Start first available AVD (if needed), then install PoreiaGo Wallet APK.
+# Install PoreiaGo Wallet APK onto a USB tablet/phone, or start an AVD if none.
+# USB serial is preferred when both tablet and emulator are connected.
 # Usage (ONE short line - do not paste multi-line blocks):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
-# Optional: -WaitMinutes 5
+# Optional: -WaitMinutes 5  -Serial <adb-serial>
 # ASCII-only (no BOM) for Windows PowerShell 5.1.
 # Treats adb "offline" as NOT ready; waits for state "device" + boot_completed.
 
 param(
-  [double]$WaitMinutes = 5
+  [double]$WaitMinutes = 5,
+  [string]$Serial = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,7 +21,10 @@ $emu = Join-Path $sdk "emulator\emulator.exe"
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 
 if (-not (Test-Path -LiteralPath $adb)) { throw "adb missing: $adb" }
-if (-not (Test-Path -LiteralPath $emu)) { throw "emulator missing: $emu" }
+if (-not (Test-Path -LiteralPath $emu)) {
+  Write-Host "emulator.exe missing - USB tablet/phone only (no AVD fallback)." -ForegroundColor DarkYellow
+  $emu = $null
+}
 if (-not (Test-Path -LiteralPath $apk)) {
   throw "APK missing. First run: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1"
 }
@@ -29,6 +34,42 @@ function Get-OnlineDevice {
   return @(
     & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
   )
+}
+
+function Get-PreferredSerial {
+  if ($Serial) { return $Serial }
+  $usb = $null
+  $emuSerial = $null
+  foreach ($r in (Get-OnlineDevice)) {
+    $s = ($r -split "\s+")[0]
+    if (-not $s) { continue }
+    if ($s -match "^emulator-") {
+      if (-not $emuSerial) { $emuSerial = $s }
+    } elseif (-not $usb) {
+      $usb = $s
+    }
+  }
+  if ($usb) { return $usb }
+  return $emuSerial
+}
+
+function Use-AdbSerial([string]$target) {
+  if (-not $target) { return }
+  $env:ANDROID_SERIAL = $target
+  $kind = "emulator"
+  if ($target -notmatch "^emulator-") { $kind = "USB tablet/phone" }
+  Write-Host ("==> adb target " + $target + " (" + $kind + ")") -ForegroundColor Green
+}
+
+function Test-AdbHasUsbRow {
+  $rows = @(
+    & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\S" }
+  )
+  foreach ($r in $rows) {
+    $s = ($r -split "\s+")[0]
+    if ($s -and $s -notmatch "^emulator-") { return $true }
+  }
+  return $false
 }
 
 function Test-AdbHasOffline {
@@ -63,9 +104,12 @@ function Stop-EmulatorProcesses {
 }
 
 function Start-FirstAvd([string]$reason) {
+  if (-not $emu) {
+    throw "No USB tablet in state device and emulator.exe missing. Plug tablet, Allow USB debugging, then rerun."
+  }
   $avds = @(& $emu -list-avds 2>$null | Where-Object { $_.Trim() -ne "" })
   if (-not $avds -or $avds.Count -eq 0) {
-    throw "No AVDs found. In Android Studio Device Manager create Medium Phone, wait for home screen, then rerun."
+    throw "No AVDs found. Plug a tablet with USB debugging, or in Device Manager create Medium Phone, wait for home screen, then rerun."
   }
   Write-Host ("==> " + $reason + ": AVD " + $avds[0]) -ForegroundColor Cyan
   Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
@@ -94,23 +138,34 @@ function Show-InstallTimeoutHelp([string]$apkPath) {
 & $adb start-server | Out-Null
 $online = Get-OnlineDevice
 $hasOffline = Test-AdbHasOffline
+$preferred = Get-PreferredSerial
+$usbReady = $preferred -and ($preferred -notmatch "^emulator-")
 
-if ($hasOffline) {
+if ($usbReady) {
+  Use-AdbSerial $preferred
+  Write-Host "USB tablet/phone is device - skipping emulator." -ForegroundColor Green
+  Write-Host "EL: to tablet einai etoimo - den anoigei emulator." -ForegroundColor Green
+} elseif ($hasOffline) {
   Write-Host "adb shows OFFLINE (not ready). Only state 'device' can install." -ForegroundColor Yellow
-  Write-Host "EL: to emulator einai offline - den einai etoimo gia install." -ForegroundColor Yellow
+  Write-Host "EL: to emulator/tablet einai offline - den einai etoimo gia install." -ForegroundColor Yellow
   Restart-AdbServer
   $online = Get-OnlineDevice
   $hasOffline = Test-AdbHasOffline
-  if ($hasOffline -or (-not $online -or $online.Count -eq 0)) {
+  $usbRow = Test-AdbHasUsbRow
+  if ($usbRow) {
+    Write-Host "USB tablet/phone is listed - wait for Allow USB debugging (not starting emulator)." -ForegroundColor Yellow
+    Write-Host "EL: sto tablet pata Allow USB debugging. USB mode = File Transfer / MTP." -ForegroundColor Yellow
+  } elseif ($hasOffline -or (-not $online -or $online.Count -eq 0)) {
     Stop-EmulatorProcesses
     Restart-AdbServer
     [void](Start-FirstAvd "relaunch after offline")
   }
 } elseif (-not $online -or $online.Count -eq 0) {
   Write-Host "NO DEVICE: adb devices is empty." -ForegroundColor Yellow
-  Write-Host "Will try to start the first AVD. Or: Device Manager -> Play, or USB phone + debugging." -ForegroundColor Yellow
+  Write-Host "Plug the tablet (USB debugging + Allow) or Device Manager -> Play." -ForegroundColor Yellow
   [void](Start-FirstAvd "starting")
 } else {
+  Use-AdbSerial $preferred
   Write-Host "==> emulator/device already online (state device)" -ForegroundColor Green
 }
 
@@ -142,7 +197,7 @@ while ((Get-Date) -lt $deadline) {
       $adbRestartedOnce = $true
       continue
     }
-    if (-not $emuRelaunchedOnce) {
+    if (-not $emuRelaunchedOnce -and -not (Test-AdbHasUsbRow)) {
       Stop-EmulatorProcesses
       Restart-AdbServer
       [void](Start-FirstAvd "cold relaunch (was stuck offline)")
@@ -151,7 +206,7 @@ while ((Get-Date) -lt $deadline) {
       continue
     }
   } elseif (-not $emptyHintShown) {
-    Write-Host "Still empty - wait for emulator home screen (or unlock USB phone)..." -ForegroundColor DarkYellow
+    Write-Host "Still empty - wait for tablet Allow / emulator home screen..." -ForegroundColor DarkYellow
     $emptyHintShown = $true
   }
 
@@ -175,8 +230,12 @@ while ((Get-Date) -lt $deadline) {
 
 if (-not $online -or $online.Count -eq 0) {
   Show-InstallTimeoutHelp $apk
-  throw "Emulator never became 'device' (offline is not ready). Cold Boot / Wipe Data, wait for home, rerun."
+  throw "No adb device became 'device' (offline is not ready). Allow USB on the tablet, or Cold Boot the AVD, then rerun."
 }
+
+$pin = Get-PreferredSerial
+if (-not $pin) { $pin = (($online[0] -split "\s+")[0]) }
+Use-AdbSerial $pin
 
 Write-Host "==> waiting for sys.boot_completed=1 ..." -ForegroundColor Cyan
 $bootDeadline = (Get-Date).AddMinutes(2)
@@ -241,4 +300,4 @@ if ($LASTEXITCODE -ne 0) {
 & $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
 if ($LASTEXITCODE -ne 0) { throw "failed to start MainActivity" }
 
-Write-Host "DONE - My Wallet should be open. Do not press Studio Run." -ForegroundColor Green
+Write-Host "DONE - My Wallet should be open on the tablet/emulator." -ForegroundColor Green

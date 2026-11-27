@@ -4,6 +4,7 @@ import {
   WALLET_SPLASH_DURATION_MS,
   markWalletBrandSplashSeen,
 } from '../../lib/wallet/walletBrandSplash.js';
+import { NATIVE_APP_VERSION_NAME } from '../../lib/capacitor/nativeAppVersion.js';
 import '../../styles/wallet-brand-splash.css';
 
 /**
@@ -53,6 +54,7 @@ export default function WalletBrandSplash({ onDone }) {
           {brandMain}
           <span>{brandAccent}</span>
         </h1>
+        <p className="pg-wallet-splash-version">{NATIVE_APP_VERSION_NAME}</p>
       </div>
     </div>
   );

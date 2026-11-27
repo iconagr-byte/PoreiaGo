@@ -3,7 +3,7 @@
   "appName": "PoreiaGo",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "backgroundColor": "#ffffff"
   },
   "server": {
@@ -29,7 +29,8 @@
       "enabled": true
     },
     "SplashScreen": {
-      "launchAutoHide": false,
+      "launchAutoHide": true,
+      "launchShowDuration": 2000,
       "backgroundColor": "#ffffff",
       "showSpinner": false,
       "launchFadeOutDuration": 150

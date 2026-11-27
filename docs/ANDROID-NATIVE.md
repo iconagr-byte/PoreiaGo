@@ -40,7 +40,8 @@ Users who already have Wallet keep one icon. Users who installed Driver should u
 ## Windows rebuild (PowerShell)
 
 **Always build from `main` (or this feature branch while landing).**  
-**Prefer `wallet-run.ps1` over Android Studio Run** (Studio Run fights Gradle caches / can toast `Unknown error`).
+**Prefer `wallet-run.ps1` over Android Studio Run** (Studio Run fights Gradle caches / can toast `Unknown error`).  
+USB tablet/phone is preferred over `emulator-5554` (`ANDROID_SERIAL`). Tablet Studio steps: `docs/ANDROID-WALLET.md` § *Tablet via Android Studio*.
 
 ```powershell
 cd C:\Users\User\poreiago
@@ -69,16 +70,17 @@ If Gradle succeeds but install fails with **No adb device online** and `adb devi
 
 Full steps + exact `adb install` command: `docs/ANDROID-WALLET.md` § *If build OK but install hangs*.
 
-### Android Studio (debug / Logcat only)
+### Android Studio (tablet Run, or debug / Logcat)
 
-1. After a successful `wallet-run.ps1` (app already on the device), optional:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
-   ```
-2. File → Open → `C:\Users\User\poreiago\android` (not repo root)
-3. Gradle: **wrapper 8.14.3** + JDK **jbr-21** (not 25)
-4. Toolbar: select a running emulator/phone
-5. Use **Logcat**; avoid Run unless you need the debugger
+USB tablet: Developer options → USB debugging → Allow → File Transfer, then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1 -OpenStudio
+```
+
+File → Open → `C:\Users\User\poreiago\android` (not repo root). Gradle: **wrapper 8.14.3** + JDK **jbr-21** (not 25). Toolbar: pick the **tablet**, then **Run**.
+
+If Run toasts Unknown error, use `wallet-run.ps1` (USB serial is preferred). For debugger/Logcat after a successful install, attach to the already-running app.
 
 If Studio shows **Error running 'app' / Unknown error**: no device, wrong Run module (`poreiago.app.main`), or opened wrong folder — see `docs/ANDROID-WALLET.md` § Unknown error.
 

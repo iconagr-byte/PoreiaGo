@@ -3,10 +3,13 @@
   Open ONLY android/ in Android Studio. Module = poreiago.app.main
   (see settings.gradle rootProject.name).
 
+  USB tablet: USB debugging ON + Allow + File Transfer, then pick the tablet
+  (not emulator) in the toolbar and Run.
+
   If toast = Error running 'app' / Unknown error:
-    1) Pick a device (not No Devices)
+    1) Pick the tablet (not No Devices / not a leftover emulator)
     2) Run → Edit Configurations… → Module → poreiago.app.main (or :app)
-    3) Or skip Studio Run: scripts/wallet-run.ps1
+    3) Or skip Studio Run: scripts/wallet-run.ps1 (USB serial preferred)
 -->
 <component name="ProjectRunConfigurationManager">
   <configuration default="true" name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">

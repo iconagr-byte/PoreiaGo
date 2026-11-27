@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchCustomerBookingTrackLink } from '../../services/customerBookingsApi.js';
 import LiveEtaCountdown from './LiveEtaCountdown.jsx';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
 /**
  * CTA για ζωντανή παρακολούθηση λεωφορείου — wallet / booking detail.
@@ -37,6 +38,7 @@ export default function PassengerTrackCTA({
     };
   }, [booking?.id, tripId, trackUrl]);
 
+  if (isNativeApp()) return null;
   if (!Number.isFinite(tripId) || tripId <= 0) return null;
 
   const href = trackUrl || `/track/trip/${tripId}`;
