@@ -16,6 +16,7 @@ import { pageSliderPatch } from '../../../lib/homepage/pageSlider.js';
 import { scrollPreviewToSection } from '../../../lib/homepage/pageDesignBridge.js';
 import { DEFAULT_SITE_APPEARANCE } from '../../../services/siteAppearanceApi.js';
 import RentServicesMosaicFields from '../fleet/RentServicesMosaicFields.jsx';
+import RentNewsletterStripFields from '../fleet/RentNewsletterStripFields.jsx';
 
 /** Keep the trips strip in view when picking layout/card from Page Studio. */
 function revealTripsPreview() {
@@ -68,8 +69,8 @@ const SECTION_META = {
     icon: 'vertical_align_bottom',
   },
   copy: {
-    title: 'Υπηρεσίες /rent',
-    blurb: 'Φωτογραφίες και κείμενα κάτω από τον στόλο.',
+    title: 'Κείμενα /rent',
+    blurb: 'Υπηρεσίες και newsletter κάτω από τον στόλο.',
     icon: 'view_quilt',
   },
 };
@@ -267,6 +268,11 @@ export default function PageDesignBuilderPanel({
   );
   const [footerTab, setFooterTab] = useState(
     section === 'footer' && initialTab ? initialTab : 'template',
+  );
+  const [copyTab, setCopyTab] = useState(
+    section === 'copy' && (initialTab === 'newsletter' || initialTab === 'mosaic')
+      ? initialTab
+      : 'mosaic',
   );
   const meta = SECTION_META[section] || SECTION_META.general;
   const theme = getHomepageThemeById(form.homepage_theme_id);
@@ -675,8 +681,25 @@ export default function PageDesignBuilderPanel({
 
         {section === 'copy' ? (
           <div className="pdw-builder__stack">
-            <p className="pdw-builder__subhead">Φωτογραφίες & κείμενα καρτών</p>
-            <RentServicesMosaicFields form={form} setForm={setForm} compact />
+            <BuilderTabs
+              tabs={[
+                { id: 'mosaic', label: 'Υπηρεσίες' },
+                { id: 'newsletter', label: 'Newsletter' },
+              ]}
+              value={copyTab}
+              onChange={setCopyTab}
+            />
+            {copyTab === 'newsletter' ? (
+              <>
+                <p className="pdw-builder__subhead">Φωτό + φόρμα newsletter</p>
+                <RentNewsletterStripFields form={form} setForm={setForm} compact />
+              </>
+            ) : (
+              <>
+                <p className="pdw-builder__subhead">Φωτογραφίες & κείμενα καρτών</p>
+                <RentServicesMosaicFields form={form} setForm={setForm} compact />
+              </>
+            )}
           </div>
         ) : null}
       </div>
