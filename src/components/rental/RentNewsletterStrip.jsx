@@ -1,14 +1,22 @@
 /**
  * Split photo + seafoam newsletter CTA under /rent services mosaic.
  * Office-configurable copy/colors — email + consent only (no interest checkboxes).
+ * In ?preview=1, an Edit chip opens Page Studio for photo + copy.
  */
 import { useEffect, useRef, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { subscribeNewsletter } from '../../services/newsletterApi.js';
 import { resolveRentNewsletterStrip } from '../../lib/rental/rentNewsletterStrip.js';
+import {
+  PreviewBuilderControl,
+  usePreviewDesignMode,
+} from '../storefront/preview/PreviewDesignMode.jsx';
 
 export default function RentNewsletterStrip({ appearance = {} } = {}) {
-  const cfg = resolveRentNewsletterStrip(appearance);
+  const preview = usePreviewDesignMode();
+  const liveAppearance = preview?.form || appearance;
+  const cfg = resolveRentNewsletterStrip(liveAppearance);
+  const previewMode = Boolean(preview?.enabled);
   const rootRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const [email, setEmail] = useState('');
@@ -36,7 +44,7 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
     return () => io.disconnect();
   }, []);
 
-  if (!cfg.enabled) return null;
+  if (!cfg.enabled && !previewMode) return null;
 
   const imageSrc = cfg.image_url ? resolveSiteAssetUrl(cfg.image_url) : '';
 
@@ -69,8 +77,11 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
     <section
       ref={rootRef}
       id="rent-newsletter-strip"
-      className={`rent-nl${visible ? ' rent-nl--in' : ''}`}
+      className={`rent-nl${visible ? ' rent-nl--in' : ''}${
+        cfg.enabled ? '' : ' is-preview-hidden'
+      }`}
       aria-labelledby="rent-nl-title"
+      data-pdw-editable="copy"
       style={{ '--rent-nl-panel': cfg.panel_color }}
     >
       <div className="rent-nl-shell">
@@ -83,9 +94,26 @@ export default function RentNewsletterStrip({ appearance = {} } = {}) {
         </div>
 
         <div className="rent-nl-panel">
-          <h2 id="rent-nl-title" className="rent-nl-title">
-            {cfg.title}
-          </h2>
+          <div className="rent-nl-head-row">
+            <h2 id="rent-nl-title" className="rent-nl-title">
+              {cfg.title}
+            </h2>
+            <PreviewBuilderControl
+              sectionId="copy"
+              label="Newsletter /rent"
+              buttonLabel="Edit"
+              variant="inline"
+              instanceId="rent-newsletter-strip"
+              studioTab="newsletter"
+              className="rent-nl-builder"
+            />
+          </div>
+
+          {!cfg.enabled && previewMode ? (
+            <p className="rent-nl-preview-note">
+              Η ενότητα είναι κρυφή στο live /rent — πάτα Edit για να την ενεργοποιήσεις.
+            </p>
+          ) : null}
 
           {done ? (
             <p className="rent-nl-success" role="status">

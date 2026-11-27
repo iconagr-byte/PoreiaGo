@@ -11807,6 +11807,46 @@ button.rent-offer {
   gap: 1rem;
 }
 
+.rent-nl-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rent-nl-builder {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.rent-nl-builder .sf-preview-builder__btn {
+  background: #0a7a6c;
+  border-color: #0a7a6c;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(10, 122, 108, 0.22);
+}
+
+.rent-nl-builder .sf-preview-builder__btn:hover,
+.rent-nl-builder .sf-preview-builder__btn.is-open {
+  background: #08665b;
+  border-color: #08665b;
+  color: #fff;
+}
+
+.rent-nl.is-preview-hidden {
+  opacity: 0.72;
+}
+
+.rent-nl-preview-note {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  background: rgba(10, 122, 108, 0.08);
+  color: #0b3d4a;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .rent-nl-title {
   margin: 0;
   font-size: clamp(1.15rem, 2.2vw, 1.55rem);
@@ -11815,6 +11855,8 @@ button.rent-offer {
   line-height: 1.28;
   color: var(--rent-nl-ink);
   max-width: 36rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .rent-nl-form {

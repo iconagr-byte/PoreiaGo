@@ -65,6 +65,7 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
               buttonLabel="Edit"
               variant="inline"
               instanceId="rent-services-mosaic"
+              studioTab="mosaic"
               className="rent-svc-mosaic-builder"
             />
           </div>
