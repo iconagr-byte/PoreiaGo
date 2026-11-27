@@ -1,6 +1,7 @@
 /**
  * Coastal story panes under /rent fleet — office-configurable, not a Hertz clone.
  * Cards open a detail sheet (when body is set) and follow the configured link.
+ * In ?preview=1, a Builder chip opens Page Studio for photos + copy.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +10,10 @@ import {
   followRentServicesMosaicHref,
   resolveRentServicesMosaic,
 } from '../../lib/rental/rentServicesMosaic.js';
+import {
+  PreviewBuilderControl,
+  usePreviewDesignMode,
+} from '../storefront/preview/PreviewDesignMode.jsx';
 
 function paneTone(index) {
   const tones = ['lagoon', 'foam', 'ink', 'sand'];
@@ -17,10 +22,13 @@ function paneTone(index) {
 
 export default function RentServicesMosaic({ appearance = {} } = {}) {
   const navigate = useNavigate();
-  const mosaic = resolveRentServicesMosaic(appearance);
+  const preview = usePreviewDesignMode();
+  const liveAppearance = preview?.form || appearance;
+  const mosaic = resolveRentServicesMosaic(liveAppearance);
   const [openCard, setOpenCard] = useState(null);
+  const previewMode = Boolean(preview?.enabled);
 
-  if (!mosaic.enabled || !mosaic.cards.length) return null;
+  if ((!mosaic.enabled || !mosaic.cards.length) && !previewMode) return null;
 
   const goHref = (href) => {
     followRentServicesMosaicHref(href, { navigate });
@@ -37,17 +45,36 @@ export default function RentServicesMosaic({ appearance = {} } = {}) {
   return (
     <section
       id="rent-services-mosaic"
-      className="rent-svc-mosaic"
+      className={`rent-svc-mosaic${mosaic.enabled ? '' : ' is-preview-hidden'}`}
       aria-labelledby="rent-svc-mosaic-title"
+      data-pdw-editable="copy"
     >
       <div className="rent-svc-mosaic-inner">
         <header className="rent-svc-mosaic-head">
-          {mosaic.kicker ? <p className="rent-svc-mosaic-kicker">{mosaic.kicker}</p> : null}
-          <h2 id="rent-svc-mosaic-title" className="rent-svc-mosaic-title">
-            {mosaic.title}
-          </h2>
-          {mosaic.lead ? <p className="rent-svc-mosaic-lead">{mosaic.lead}</p> : null}
+          <div className="rent-svc-mosaic-head-row">
+            <div className="rent-svc-mosaic-head-copy min-w-0 flex-1">
+              {mosaic.kicker ? <p className="rent-svc-mosaic-kicker">{mosaic.kicker}</p> : null}
+              <h2 id="rent-svc-mosaic-title" className="rent-svc-mosaic-title">
+                {mosaic.title}
+              </h2>
+              {mosaic.lead ? <p className="rent-svc-mosaic-lead">{mosaic.lead}</p> : null}
+            </div>
+            <PreviewBuilderControl
+              sectionId="copy"
+              label="Υπηρεσίες γραφείου"
+              buttonLabel="Builder"
+              variant="inline"
+              instanceId="rent-services-mosaic"
+              className="rent-svc-mosaic-builder"
+            />
+          </div>
         </header>
+
+        {!mosaic.enabled && previewMode ? (
+          <p className="rent-svc-mosaic-preview-note">
+            Η ενότητα είναι κρυφή στο live /rent — άνοιξε Builder για να την ενεργοποιήσεις.
+          </p>
+        ) : null}
 
         <ul className="rent-svc-mosaic-grid">
           {mosaic.cards.map((card, index) => {
